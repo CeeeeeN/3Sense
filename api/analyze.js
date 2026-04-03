@@ -21,25 +21,41 @@ export default async function handler(req, res) {
         user_input: text,
     });
 
-    console.log("RAW HUGGING FACE OUTPUT:", JSON.stringify(result.data));
-
-    // Grab the raw output from Python
+    // Grab the raw string from Python
     let aiDataRaw = result.data[0]; 
-    let aiObject = {};
+    console.log("RAW HUGGING FACE OUTPUT:", aiDataRaw);
 
-    // Transform the Python string into a real JavaScript JSON object
+    let finalSentiment = null;
+    let finalConfidence = null;
+
+    // This scans the string and forcibly gets the exact values, regardless of quotes/formatting
     if (typeof aiDataRaw === 'string') {
-      // Replace Python's single quotes with JSON's double quotes
-      const validJsonString = aiDataRaw.replace(/'/g, '"');
-      aiObject = JSON.parse(validJsonString);
-    } else {
-      aiObject = aiDataRaw; 
+      
+      // Look for the word after 'sentiment': 
+      // It matches Positive, Negative, or Neutral
+      const sentimentMatch = aiDataRaw.match(/'sentiment':\s*'([^']+)'/);
+      if (sentimentMatch && sentimentMatch[1]) {
+        finalSentiment = sentimentMatch[1];
+      }
+
+      // Look for the number after 'confidence':
+      const confidenceMatch = aiDataRaw.match(/'confidence':\s*([\d.]+)/);
+      if (confidenceMatch && confidenceMatch[1]) {
+        finalConfidence = parseFloat(confidenceMatch[1]);
+      }
+      
+    } else if (typeof aiDataRaw === 'object') {
+      // Fallback just in case Python never sends real JSON natively
+      finalSentiment = aiDataRaw.sentiment;
+      finalConfidence = aiDataRaw.confidence;
     }
     
-    // Send the properly parsed data back to React
+    console.log("EXTRACTED DATA:", finalSentiment, finalConfidence);
+
+    // Send the data back to the system
     return res.status(200).json({
-      Sentiment: aiObject.sentiment || null,
-      Confidence: aiObject.confidence || null
+      sentiment: finalSentiment,
+      confidence: finalConfidence
     });
 
   } catch (error) {
