@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useRef } from "react";
 import { forgotHouseholdPassword } from "../services/login";
-import { LockIcon, MailIcon, HomeIcon, ArrowIcon } from "../components/icons";
+import { LockIcon, MailIcon, HomeIcon, ArrowIcon } from "./components/Icons";
 
 function MobileHeader({ onBack }) {
   return (
