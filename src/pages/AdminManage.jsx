@@ -40,7 +40,7 @@ export default function AdminServices() {
   });
 
   const handleGenerateQR = (service) => {
-    const residentAppUrl = "https://3s-sense.vercel.app/";
+    const residentAppUrl = "https://3-sense.vercel.app/";
     const validName = service.title || service.Name || service.FacilityName || "Barangay Service";
     const encodedUrl = `${residentAppUrl}?serviceId=${service.id}&serviceName=${encodeURIComponent(validName)}`;
     setSelectedServiceQR({ name: validName, qrValue: `${encodedUrl}` });
