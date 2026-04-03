@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ScholarshipIcon, AcademicIcon, HealthIcon, AssistanceIcon, VerifiedVisitIcon, DocumentIcon, FeedbackIcon, BarangayStatusIcon, TrendUpIcon, ClockIcon, CheckSmallIcon, BoltIcon, GridIcon, BellIcon, ArrowRightIcon, ChevronIcon, XIcon, CalendarIcon, MapPinIcon } from "../components/icons";
+import { ScholarshipIcon, AcademicIcon, HealthIcon, AssistanceIcon, VerifiedVisitIcon, DocumentIcon, FeedbackIcon, BarangayStatusIcon, TrendUpIcon, ClockIcon, CheckSmallIcon, BoltIcon, GridIcon, BellIcon, ArrowRightIcon, ChevronIcon, XIcon, CalendarIcon, MapPinIcon } from "./components/Icons";
 
 // DATA
 

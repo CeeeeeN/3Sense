@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import barangayLogo from "./barangay-logo.jpg";
-import { IconBell, NavIconUser, IconProfile2, IconSettings, IconHelp, IconLogout } from "../components/icons";
+import { IconBell, NavIconUser, IconProfile2, IconSettings, IconHelp, IconLogout } from "./components/Icons";
 
 const NOTIFICATIONS = [
   { id:1, icon:"📢", bg:"rgba(49,125,137,0.1)",  title:"Free Medical Mission",         desc:"Register now for the free medical mission on March 15.", time:"2 hours ago", unread:true },

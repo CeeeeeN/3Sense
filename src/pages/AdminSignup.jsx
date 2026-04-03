@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../AdminStyle.css";
-import { UserIcon, EmailIcon, PhoneIcon, LockIcon, PositionIcon } from "../components/icons";
+import { UserIcon, EmailIcon, PhoneIcon, LockIcon, PositionIcon } from "./components/Icons";
 import InputField from "../components/InputField";
 import { auth, db } from "../firebase/firebase";                          // 🆕 import Firebase
 import { createUserWithEmailAndPassword } from "firebase/auth"; // 🆕 signup function

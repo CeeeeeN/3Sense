@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AdminLayout from "../components/AdminLayout";
 import "../AdminStyle.css";
-import { IconLocation, IconCalendar, IconClock, IconAdd, IconQR, IconDownload, IconConfirmCheck } from "../components/icons";
+import { IconLocation, IconCalendar, IconClock, IconAdd, IconQR, IconDownload, IconConfirmCheck } from "./components/Icons";
 import { db } from "../firebase/firebase"; 
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "firebase/firestore";
 
