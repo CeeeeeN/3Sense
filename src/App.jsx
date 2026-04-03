@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import AdminSignup from "./pages/AdminSignup";
 import ApprovalPending from "./pages/AdminApprovalPending";
-import AdminLogin from "./pages/adminLogin";
+import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminManage from "./pages/AdminManage";
 import AdminRequests from "./pages/AdminRequests";
