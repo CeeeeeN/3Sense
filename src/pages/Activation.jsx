@@ -1,6 +1,6 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState } from "react";
-import {HomeIcon, LockIcon, ArrowIcon, EyeIcon, EyeOffIcon} from "./components/Icons";
+import {HomeIcon, LockIcon, ArrowIcon, EyeIcon, EyeOffIcon} from "../components/Icons";
 import { activateAccount } from "../services/activation";
 
 function MobileHeader({ onBack }) {

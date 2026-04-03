@@ -1,6 +1,6 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useRef } from "react";
-import { IconUser, IconCalendar, IconClock, IconPin, IconHome, IconGlobe, IconPhone, IconMail, IconHeart, IconBriefcase, IconGradCap, IconBook, IconShield, IconInfo, IconReligion, IconPlus, IconArrow, IconCheck, IconX } from "./components/Icons";
+import { IconUser, IconCalendar, IconClock, IconPin, IconHome, IconGlobe, IconPhone, IconMail, IconHeart, IconBriefcase, IconGradCap, IconBook, IconShield, IconInfo, IconReligion, IconPlus, IconArrow, IconCheck, IconX } from "../components/Icons";
 import { addHouseholdMember } from "../services/addMembers";
 
 const AVATAR_COLORS = [

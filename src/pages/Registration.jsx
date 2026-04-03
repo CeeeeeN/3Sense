@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect } from "react";
 import { submitRegistration } from "../services/registration";
-import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap } from "./components/Icons";
+import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap } from "../components/Icons";
 
 const STEPS = [
   { label: "Personal Info" },

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from '../firebase/firebase'; 
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon, MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon } from './components/Icons';
+import { StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon, MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon } from '../components/Icons';
 
 // STAR RATING LABEL
 const STAR_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIcon, ProgramIcon, DocumentIcon, FeedbackIcon, ReservationIcon, StarIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/icons";
+import { ActivityIcon, ProgramIcon, DocumentIcon, FeedbackIcon, ReservationIcon, StarIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 
 // STATUS CONFIG 
 
