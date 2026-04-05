@@ -1,5 +1,33 @@
 import React from 'react';
 
+// Admin Dashboard icons
+export const SmileIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+    <circle cx="9" cy="9" r="1.2" fill="currentColor" />
+    <circle cx="15" cy="9" r="1.2" fill="currentColor" />
+    <path d="M8 14c1.5 2 6.5 2 8 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+export const NeutralIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+    <circle cx="9" cy="9" r="1.2" fill="currentColor" />
+    <circle cx="15" cy="9" r="1.2" fill="currentColor" />
+    <line x1="8" y1="14" x2="16" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+export const FrownIcon = () => (
+  <svg viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+    <circle cx="9" cy="9" r="1.2" fill="currentColor" />
+    <circle cx="15" cy="9" r="1.2" fill="currentColor" />
+    <path d="M8 16c1.5-2 6.5-2 8 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
 // Navbar icons
 export const IconBell = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
 export const NavIconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
