@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { calculateMoodCardData } from '../services/sentimentAggregator';
-import { SmileIcon, NeutralIcon, FrownIcon } from '../components/icons';
+import { SmileIcon, NeutralIcon, FrownIcon } from '../components/Icons';
 
 export default function AdminDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
