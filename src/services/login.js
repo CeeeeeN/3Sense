@@ -28,9 +28,7 @@ export const loginWithHouseholdID = async (householdID, password) => {
     const householdRef = doc(db, "households", householdID.trim());
     const snapshot = await getDoc(householdRef);
 
-    if (!snapshot.exists()) {
-        throw new Error("Invalid Household ID.");
-    }
+    if (!snapshot.exists()) throw new Error("Invalid Household ID.");
 
     const householdData = snapshot.data();
 
@@ -42,20 +40,28 @@ export const loginWithHouseholdID = async (householdID, password) => {
 
     await signInWithEmailAndPassword(auth, householdData.email, password);
 
-    const membersSnap = await getDocs(
-        collection(db, "households", householdID.trim(), "members")
+    // Load all residents from the sub-collection
+    const residentsSnap = await getDocs(
+        collection(db, "households", householdID.trim(), "residents")
     );
 
-    const members = membersSnap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-    }));
+    const residents = residentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     return {
         householdID: householdID.trim(),
-        householdName: householdData.name,
+        householdName: [residents.find(r => r.role === "head")?.firstName,
+        residents.find(r => r.role === "head")?.lastName]
+            .filter(Boolean).join(" ") || householdData.email,
         email: householdData.email,
-        members,
+        address: {
+            houseNumber: householdData.houseNumber || "",
+            street: householdData.street || "",
+            barangay: householdData.barangay || "",
+            city: householdData.city || "",
+            province: householdData.province || "",
+            region: householdData.region || "",
+        },
+        residents,
     };
 };
 
@@ -65,60 +71,52 @@ export const forgotHouseholdPassword = async (householdID) => {
     const householdRef = doc(db, "households", householdID.trim());
     const snapshot = await getDoc(householdRef);
 
-    if (!snapshot.exists()) {
-        throw new Error("Invalid Household ID.");
-    }
+    if (!snapshot.exists()) throw new Error("Invalid Household ID.");
 
     const email = snapshot.data().email;
-
-    // Firebase sends reset link to household head's email
     await sendPasswordResetEmail(auth, email);
 
     const [user, domain] = email.split("@");
-    const masked = user[0] + "***@" + domain;
-    return masked;
+    return user[0] + "***@" + domain;
 };
 
-// Checks if a member already has a PIN set in Firestore
-export const getMemberPin = async (householdID, memberID) => {
-    const memberRef = doc(db, "households", householdID, "members", memberID);
-    const snapshot = await getDoc(memberRef);
-    if (!snapshot.exists()) return null;
-    return snapshot.data().pinHash || null;
+export const getMemberPin = async (householdID, residentID) => {
+    const ref = doc(db, "households", householdID, "residents", residentID);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    // pin is stored as a hash under the field `pinHash`
+    return snap.data().pinHash || null;
 };
 
-export const saveMemberPin = async (householdID, memberID, pin) => {
+export const saveMemberPin = async (householdID, residentID, pin) => {
     const pinHash = await hashPin(pin);
-    const memberRef = doc(db, "households", householdID, "members", memberID);
-    await updateDoc(memberRef, { pinHash });
+    const ref = doc(db, "households", householdID, "residents", residentID);
+    await updateDoc(ref, { pinHash, updatedAt: new Date() });
 };
 
-export const verifyMemberPin = async (householdID, memberID, enteredPin) => {
-    const storedHash = await getMemberPin(householdID, memberID);
+export const verifyMemberPin = async (householdID, residentID, enteredPin) => {
+    const storedHash = await getMemberPin(householdID, residentID);
     if (!storedHash) return false;
     const enteredHash = await hashPin(enteredPin);
     return enteredHash === storedHash;
 };
 
-export const resetMemberPin = async (householdID, memberID) => {
-    const memberRef = doc(db, "households", householdID, "members", memberID);
-    const memberSnap = await getDoc(memberRef);
+export const resetMemberPin = async (householdID, residentID) => {
+    const ref = doc(db, "households", householdID, "residents", residentID);
+    const snap = await getDoc(ref);
 
-    if (!memberSnap.exists()) {
-        throw new Error("Member not found.");
-    }
+    if (!snap.exists()) throw new Error("Resident not found.");
 
-    const memberData = memberSnap.data();
-    const memberEmail = memberData.email;
+    const residentData = snap.data();
+    const residentEmail = residentData.email;
 
-    if (!memberEmail) {
+    if (!residentEmail) {
         throw new Error(
-            "No email found for this member. Please contact the Barangay office to reset your PIN."
+            "No email found for this resident. Please contact the Barangay office to reset your PIN."
         );
     }
 
-    // Clear the PIN 
-    await updateDoc(memberRef, { pinHash: null });
+    await updateDoc(ref, { pinHash: null, updatedAt: new Date() });
 
     const apiKey = import.meta.env.VITE_RESEND_API_KEY;
     if (apiKey) {
@@ -130,17 +128,21 @@ export const resetMemberPin = async (householdID, memberID) => {
             },
             body: JSON.stringify({
                 from: "Barangay 3S+ Malanday <onboarding@resend.dev>",
-                to: [memberEmail],
+                to: [residentEmail],
                 subject: "Your 3S Sense PIN Has Been Reset",
-                html: buildPinResetEmail(memberData.fullName || memberData.firstName || "Member"),
+                html: buildPinResetEmail(
+                    residentData.firstName || residentData.lastName || "Resident"
+                ),
             }),
         });
     }
 
-    // Return masked email for display 
-    const [user, domain] = memberEmail.split("@");
-    const masked = user[0] + "***@" + domain;
-    return masked;
+    const [user, domain] = residentEmail.split("@");
+    return user[0] + "***@" + domain;
+};
+
+export const logout = async () => {
+    await firebaseSignOut(auth);
 };
 
 const buildPinResetEmail = (name) => `
@@ -189,7 +191,3 @@ const buildPinResetEmail = (name) => `
 </body>
 </html>
 `.trim();
-
-export const logout = async () => {
-    await firebaseSignOut(auth);
-};

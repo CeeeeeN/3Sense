@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect } from "react";
 import { submitRegistration } from "../services/registration";
-import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap } from "../components/Icons";
+import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap, IconPin } from "../components/Icons";
 
 const STEPS = [
   { label: "Personal Info" },
@@ -53,7 +53,7 @@ export default function Registration({ onBack }) {
     categories: [],
     pwdStatus: "", disabilityType: "",
     educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
-    householdMembers: "", householdClassification: "",
+    totalMembers: "", householdClassification: "",
   });
 
   const set = (field) => (e) => {
@@ -414,7 +414,7 @@ export default function Registration({ onBack }) {
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
                       <Field label="Number of Household Members" required hint="Include yourself in the count.">
-                        <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.householdMembers} onChange={set("householdMembers")} />
+                        <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.totalMembers} onChange={set("totalMembers")} />
                       </Field>
                       <Field label="Household Classification" required>
                         <SelectField icon={RegisIconHome} value={form.householdClassification} onChange={set("householdClassification")}>
@@ -486,7 +486,7 @@ export default function Registration({ onBack }) {
                   </ReviewSection>
 
                   <ReviewSection icon="🏠" title="Household Details">
-                    <ReviewField label="No. of Members" value={rv(form.householdMembers)} />
+                    <ReviewField label="No. of Members" value={rv(form.totalMembers)} />
                     <ReviewField label="Classification" value={rv(form.householdClassification)} />
                   </ReviewSection>
 

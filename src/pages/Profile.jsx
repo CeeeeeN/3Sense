@@ -20,10 +20,11 @@ const BLANK = {
   birthDate:"", birthPlace:"", sex:"Male", civilStatus:"",
   citizenship:"", religion:"", contactNumber:"", email:"",
   houseNumber:"", street:"", region:"", province:"", city:"", barangay:"",
+  sameAddress: false,
   categories:[],
   pwdStatus:"", disabilityType:"",
   educationAttainment:"", educationStatus:"", occupation:"", employmentStatus:"",
-  householdMembers:"", householdClassification:"",
+  totalMembers:"", householdClassification:"",
 };
 
 const IconQR      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>;
@@ -122,12 +123,23 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
   const openModal  = () => { setDraft({ ...data }); setTab(0); setOpen(true); };
   const closeModal = () => setOpen(false);
 
+  const computeSameAddress = () => {
+    // Keep household link when a non-head member has not changed address.
+    if (data.role !== "head" && data.sameAddress) {
+      const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
+      const isUnchanged = addressFields.every(field => draft[field] === data[field]);
+      return isUnchanged;
+    }
+    return false;
+  };
+
   const save = async () => {
     if (!hhId || !memberId) { alert("Missing household or member info."); return; }
     setSaving(true);
     try {
-      await updateMemberProfile(hhId, memberId, draft);
-      setData({ ...draft });
+      const payload = { ...draft, sameAddress: computeSameAddress() };
+      await updateMemberProfile(hhId, memberId, payload);
+      setData({ ...payload });
       setOpen(false);
     } catch (err) {
       alert("Failed to save: " + err.message);
@@ -144,16 +156,37 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
     link.click();
   };
 
-  const set = f => e => setDraft(d => ({ ...d, [f]: e.target.value }));
-  const toggleCat  = cat => setDraft(d => ({
-    ...d,
-    categories: d.categories.includes(cat)
-      ? d.categories.filter(c => c !== cat)
-      : [...d.categories, cat]
-  }));
+  const normalizeCategories = (cats) => {
+    if (Array.isArray(cats)) return cats;
+    if (typeof cats === "string") return cats.split(",").map(s => s.trim()).filter(Boolean);
+    return [];
+  };
 
-  const isPwd    = data.categories.includes("♿ PWD");
-  const draftPwd = draft.categories.includes("♿ PWD");
+  const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
+
+  const set = f => e => {
+    const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setDraft(d => ({
+      ...d,
+      [f]: value,
+      sameAddress: addressFields.includes(f) ? false : d.sameAddress,
+    }));
+  };
+
+  const toggleCat = cat => setDraft(d => {
+    const current = normalizeCategories(d.categories);
+    return {
+      ...d,
+      categories: current.includes(cat)
+        ? current.filter(c => c !== cat)
+        : [...current, cat],
+    };
+  });
+
+  const normalizedDataCategories = normalizeCategories(data.categories);
+  const normalizedDraftCategories = normalizeCategories(draft.categories);
+  const isPwd = normalizedDataCategories.includes("♿ PWD");
+  const draftPwd = normalizedDraftCategories.includes("♿ PWD");
 
   const STATUS_MAP = {
     clear:     { label: "Clear Case",   cls: "clear",     desc: "This resident has no pending cases or violations on record." },
@@ -285,7 +318,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
         <Card icon={IconHome2} title="Household Information">
           <div className="pf-info-grid c3">
             <InfoItem label="Household ID" value={hhId} />
-            <InfoItem label="Total Members" value={data.householdMembers} />
+            <InfoItem label="Total Members" value={data.totalMembers} />
             <InfoItem label="Classification" value={data.householdClassification} />
           </div>
         </Card>
@@ -435,7 +468,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
                 <div className="fg">
                   <Field label="Region">
                     <div className="pf-sel-wrap">
-                      <select className="pf-sel" value={draft.region} onChange={set("region")}>
+                      <select className="pf-sel" value={draft.region} onChange={set("region")} disabled={draft.sameAddress}>
                         <option value="">Select region</option>
                         <option>NCR – National Capital Region</option>
                         <option>Region I – Ilocos Region</option>
@@ -457,7 +490,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
                       </select>
                     </div>
                   </Field>
-                  <Field label="Province"><input className="pf-inp" placeholder="Metro Manila" value={draft.province} onChange={set("province")} /></Field>
+                  <Field label="Province"><input className="pf-inp" placeholder="Metro Manila" value={draft.province} onChange={set("province")} readOnly={draft.sameAddress} /></Field>
                 </div>
                 <div className="fg">
                   <Field label="City / Municipality" req><input className="pf-inp" placeholder="Valenzuela City" value={draft.city} onChange={set("city")} /></Field>
@@ -467,17 +500,22 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
 
               {/* TAB 2 — Category */}
               {tab === 2 && <>
-                <div className="pf-chk-grid">
-                  {CATS.map(cat => (
-                    <label key={cat} className="pf-chk-opt">
-                      <input type="checkbox" checked={draft.categories.includes(cat)} onChange={() => toggleCat(cat)} />
-                      <span className="pf-chk-lbl">
-                        <span className="pf-chk-box">{draft.categories.includes(cat) && "✓"}</span>
-                        {cat}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                {(() => {
+                  const draftCategories = Array.isArray(draft.categories) ? draft.categories : [];
+                  return (
+                    <div className="pf-chk-grid">
+                      {CATS.map(cat => (
+                        <label key={cat} className="pf-chk-opt">
+                          <input type="checkbox" checked={draftCategories.includes(cat)} onChange={() => toggleCat(cat)} />
+                          <span className="pf-chk-lbl">
+                            <span className="pf-chk-box">{draftCategories.includes(cat) ? "✓" : ""}</span>
+                            {cat}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {draftPwd && (
                   <div className="pf-subfields">
                     <div className="pf-subtitle">♿ PWD Details</div>
@@ -514,7 +552,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
               {/* TAB 4 — Household */}
               {tab === 4 && <>
                 <div className="fg">
-                  <Field label="Total Household Members"><input className="pf-inp" type="number" min="1" placeholder="e.g. 4" value={draft.householdMembers} onChange={set("householdMembers")} /></Field>
+                  <Field label="Total Members"><input className="pf-inp" type="number" min="1" placeholder="e.g. 4" value={draft.totalMembers} onChange={set("totalMembers")} /></Field>
                   <Field label="Household Classification">
                     <div className="pf-sel-wrap"><select className="pf-sel" value={draft.householdClassification} onChange={set("householdClassification")}><option value="">Select</option><option>Class A</option><option>Class B</option><option>Class C</option><option>Class D</option><option>Class E</option></select></div>
                   </Field>

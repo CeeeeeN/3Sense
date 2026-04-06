@@ -3,6 +3,7 @@ import {
     getDoc,
     updateDoc,
     setDoc,
+    deleteField,
     serverTimestamp,
 } from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -10,7 +11,7 @@ import { db, auth } from "../firebase/firebase";
 
 export const activateAccount = async (householdID, password, confirmPassword) => {
     if (password !== confirmPassword) {
-        throw new Error("Passwords do not match");
+        throw new Error("Passwords do not match.");
     }
 
     const householdRef = doc(db, "households", householdID);
@@ -26,60 +27,74 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         throw new Error("This account has already been activated. Please log in instead.");
     }
 
-    const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        data.email,
-        password
-    );
+    let userCredential;
+    try {
+        userCredential = await createUserWithEmailAndPassword(auth, data.email, password);
+    } catch (authError) {
+        if (authError.code === "auth/email-already-in-use") {
+            throw new Error(
+                "This account's email is already registered. If you previously started activation, please log in instead, or contact the Barangay office."
+            );
+        }
+        throw authError;
+    }
+
+    const head = data._pendingHeadData || {};
+    const headRef = doc(db, "households", householdID, "residents", "head");
+
+    await setDoc(headRef, {
+        role: "head",
+        firstName: head.firstName || "",
+        middleName: head.middleName || "",
+        lastName: head.lastName || "",
+        suffix: head.suffix || "",
+
+        birthDate: head.birthDate || "",
+        age: head.age ?? null,
+        birthPlace: head.birthPlace || "",
+        sex: head.sex || "",
+        civilStatus: head.civilStatus || "",
+        religion: head.religion || "",
+        citizenship: head.citizenship || "",
+        contactNumber: head.contactNumber ?? null,
+        email: head.email || "",
+
+        categories: Array.isArray(head.categories)
+            ? head.categories
+            : (head.category ? String(head.category).split(",").map(s => s.trim()).filter(Boolean) : []),
+        pwdStatus: head.pwdStatus || "",
+        disabilityType: head.disabilityType || "",
+
+        educationAttainment: head.educationAttainment || "",
+        educationStatus: head.educationStatus || "",
+        occupation: head.occupation || "",
+        employmentStatus: head.employmentStatus || "",
+
+        pin: null,
+
+        createdAt: serverTimestamp(),
+        addedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    });
 
     await updateDoc(householdRef, {
         activated: true,
-        userUID: userCredential.user.uid,
         activatedAt: serverTimestamp(),
-    });
-
-    // Seed household head with FULL registration data
-    const reg = data.registrationData || {};
-    const headMemberRef = doc(db, "households", householdID, "members", "head");
-    await setDoc(headMemberRef, {
-        id: "head",
-        role: "head",
-        fullName: data.name || "",
-        // personal info
-        firstName: reg.firstName || "",
-        middleName: reg.middleName || "",
-        lastName: reg.lastName || "",
-        suffix: reg.suffix || "",
-        birthDate: reg.birthDate || "",
-        age: reg.age || "",
-        birthPlace: reg.birthPlace || "",
-        sex: reg.sex || "",
-        civilStatus: reg.civilStatus || "",
-        religion: reg.religion || "",
-        citizenship: reg.citizenship || "",
-        contactNumber: reg.contactNumber || "",
-        email: reg.email || "",
-        // address
-        address: data.address || {},
-        // category
-        categories: reg.categories || [],
-        pwdStatus: reg.pwdStatus || "",
-        disabilityType: reg.disabilityType || "",
-        // education & employment
-        educationAttainment: reg.educationAttainment || "",
-        educationStatus: reg.educationStatus || "",
-        occupation: reg.occupation || "",
-        employmentStatus: reg.employmentStatus || "",
-        // household
-        householdMembers: reg.householdMembers || "",
-        householdClassification: reg.householdClassification || "",
-        addedAt: serverTimestamp(),
+        userUID: userCredential.user.uid,
+        _pendingHeadData: deleteField(), // clean up the temp staging field
     });
 
     return {
         householdID,
-        name: data.name || "",
+        name: [head.firstName, head.lastName].filter(Boolean).join(" "),
         email: data.email,
-        address: data.address || {},
+        address: {
+            houseNumber: data.houseNumber || "",
+            street: data.street || "",
+            barangay: data.barangay || "",
+            city: data.city || "",
+            province: data.province || "",
+            region: data.region || "",
+        },
     };
 };

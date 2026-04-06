@@ -98,7 +98,7 @@ export default function AddMembers({ onBack, onDone, hhId, hhAddress }) {
       setForm(f => ({
         ...f,
         sameAddress: true,
-        houseNumber: hhAddress.house || "",
+        houseNumber: hhAddress.houseNumber || "",
         street: hhAddress.street || "",
         region: hhAddress.region || "",
         province: hhAddress.province || "",
@@ -122,39 +122,38 @@ const addMember = async () => {
   try {
     await addHouseholdMember(hhId, {
       // identity
-      fullName,
-      role: form.isHead ? "head" : "member",
+      isHead: form.isHead,
       // personal info
-      firstName: form.firstName || "",
-      middleName: form.middleName || "",
-      lastName: form.lastName || "",
-      suffix: form.suffix || "",
-      birthDate: form.birthDate || "",
-      age: form.age || "",
-      birthPlace: form.birthPlace || "",
-      sex: form.sex || "",
-      civilStatus: form.civilStatus || "",
-      religion: form.religion || "",
+      firstName:    form.firstName    || "",
+      middleName:   form.middleName   || "",
+      lastName:     form.lastName     || "",
+      suffix:       form.suffix       || "",
+      birthDate:    form.birthDate    || "",
+      age:          form.age          || "",
+      birthPlace:   form.birthPlace   || "",
+      sex:          form.sex          || "",
+      civilStatus:  form.civilStatus  || "",
+      religion:     form.religion     || "",
+      citizenship:  form.citizenship  || "",
       contactNumber: form.contactNumber || "",
-      email: form.email || "",
-      // address
-      address: {
-        house: form.houseNumber || "",
-        street: form.street || "",
-        region: form.region || "",
-        province: form.province || "",
-        city: form.city || "",
-        barangay: form.barangay || "",
-      },
-      // category
-      categories: form.categories || [],
-      pwdStatus: form.pwdStatus || "",
+      email:        form.email        || "",
+      // address — service omits these when sameAddress is true
+      sameAddress:  form.sameAddress,
+      houseNumber:  form.houseNumber  || "",
+      street:       form.street       || "",
+      region:       form.region       || "",
+      province:     form.province     || "",
+      city:         form.city         || "",
+      barangay:     form.barangay     || "",
+      // category — service converts array → string
+      categories:   form.categories   || [],
+      pwdStatus:    form.pwdStatus     || "",
       disabilityType: form.disabilityType || "",
       // education & employment
       educationAttainment: form.educationAttainment || "",
-      educationStatus: form.educationStatus || "",
-      occupation: form.occupation || "",
-      employmentStatus: form.employmentStatus || "",
+      educationStatus:     form.educationStatus     || "",
+      occupation:          form.occupation          || "",
+      employmentStatus:    form.employmentStatus    || "",
     });
   } catch (err) {
     alert("Failed to save member: " + err.message);
@@ -171,10 +170,10 @@ const addMember = async () => {
   const removeMember = (i) => setMembers(m => m.filter((_, idx) => idx !== i));
 
   const addrPreview = hhAddress
-    ? [hhAddress.house, hhAddress.street, hhAddress.barangay, hhAddress.city].filter(Boolean).join(", ")
+    ? [hhAddress.houseNumber, hhAddress.street, hhAddress.barangay, hhAddress.city].filter(Boolean).join(", ")
     : "No address found from registration.";
 
-  const isPwd = form.categories.includes("♿ PWD");
+  const isPwd = Array.isArray(form.categories) && form.categories.includes("♿ PWD");
 
   return (
     <div className="am-root">

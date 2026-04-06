@@ -7,7 +7,6 @@ import {
   deleteDoc,
   serverTimestamp,
 } from "firebase/firestore";
-
 import { db } from "../firebase/firebase";
 
 export const generateHouseholdID = async () => {
@@ -22,40 +21,41 @@ export const approveRegistration = async (docID) => {
   const pendingRef = doc(db, "pending_registrations", docID);
   const snapshot = await getDoc(pendingRef);
 
-  if (!snapshot.exists()) {
-    throw new Error("Registration not found");
-  }
+  if (!snapshot.exists()) throw new Error("Registration not found");
 
   const data = snapshot.data();
   const householdID = await generateHouseholdID();
-  const fullName = `${data.firstName} ${data.lastName}`.trim();
+  const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
 
   const householdRef = doc(db, "households", householdID);
   await setDoc(householdRef, {
-    email: data.email,
-    name: fullName,
-    address: {
-      house: data.houseNumber || "",
-      street: data.street || "",
-      region: data.region || "",
-      province: data.province || "",
-      city: data.city || "",
-      barangay: data.barangay || "",
-    },
+    email: data.email || "",
 
-    registrationData: {
+    houseNumber: data.houseNumber || "",
+    street: data.street || "",
+    barangay: data.barangay || "",
+    city: data.city || "",
+    province: data.province || "",
+    region: data.region || "",
+    totalMembers: data.totalMembers ?? null,
+    householdClassification: data.householdClassification || "",
+    createdAt: serverTimestamp(),
+    activated: false,
+    activatedAt: null,
+
+    _pendingHeadData: {
       firstName: data.firstName || "",
       middleName: data.middleName || "",
       lastName: data.lastName || "",
       suffix: data.suffix || "",
       birthDate: data.birthDate || "",
-      age: data.age || "",
+      age: data.age ?? null,
       birthPlace: data.birthPlace || "",
       sex: data.sex || "",
       civilStatus: data.civilStatus || "",
       religion: data.religion || "",
       citizenship: data.citizenship || "",
-      contactNumber: data.contactNumber || "",
+      contactNumber: data.contactNumber ?? null,
       email: data.email || "",
       categories: data.categories || [],
       pwdStatus: data.pwdStatus || "",
@@ -64,30 +64,18 @@ export const approveRegistration = async (docID) => {
       educationStatus: data.educationStatus || "",
       occupation: data.occupation || "",
       employmentStatus: data.employmentStatus || "",
-      householdMembers: data.householdMembers || "",
-      householdClassification: data.householdClassification || "",
     },
-    activated: false,
-    createdAt: serverTimestamp(),
   });
 
   await sendApprovalEmail(householdID, fullName, data.email);
   await deleteDoc(pendingRef);
 
-  return {
-    householdID,
-    email: data.email,
-    name: fullName,
-  };
+  return { householdID, email: data.email, name: fullName };
 };
 
 const sendApprovalEmail = async (householdID, name, toEmail) => {
   const apiKey = import.meta.env.VITE_RESEND_API_KEY;
-
-  if (!apiKey) {
-    console.warn("VITE_RESEND_API_KEY is not set. Skipping email.");
-    return;
-  }
+  if (!apiKey) { console.warn("VITE_RESEND_API_KEY not set. Skipping email."); return; }
 
   const response = await fetch("/resend/emails", {
     method: "POST",
