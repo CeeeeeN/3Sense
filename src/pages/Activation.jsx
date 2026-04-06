@@ -46,26 +46,18 @@ export default function Activation({ onBack, onLoginClick, onSuccess }) {
   const strengthWidths = ["33%", "66%", "100%"];
 
   const handleActivate = async () => {
-
-    if (!hhId.trim())    { alert("Please enter your Household ID."); return; }
-    if (pw1.length < 8)  { alert("Password must be at least 8 characters."); return; }
-    if (pw1 !== pw2)     { alert("Passwords do not match."); return; }
+    if (!hhId.trim())   { alert("Please enter your Household ID."); return; }
+    if (pw1.length < 8) { alert("Password must be at least 8 characters."); return; }
+    if (pw1 !== pw2)    { alert("Passwords do not match."); return; }
 
     try {
-
-    const result = await activateAccount(
-      hhId.trim(),  
-      pw1,          
-      pw2           
-    );
-
-    setConfirmedId(result.householdID);
-    setHouseholdData(result);
-    setScreen("success"); 
-
-  } catch (error) {
-    alert(error.message);
-  }
+      const result = await activateAccount(hhId.trim(), pw1, pw2);
+      setConfirmedId(result.householdID);
+      setHouseholdData(result);
+      setScreen("success");
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   return (

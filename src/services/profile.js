@@ -48,6 +48,25 @@ export const getMemberProfile = async (householdID, residentID) => {
                 .filter(Boolean)
             : [];
 
+    // Normalize status history — each entry is a plain object stored via arrayUnion
+    const rawHistory = Array.isArray(d.statusHistory) ? d.statusHistory : [];
+    const statusHistory = rawHistory
+        .map(entry => ({
+            status: entry.status || "Clear Case",
+            remarks: entry.remarks || "",
+            incident: entry.incident || "",
+            setBy: entry.setBy || "Admin",
+            setByPosition: entry.setByPosition || "",
+            // setAt is stored as ISO string
+            setAt: entry.setAt || null,
+        }))
+        // Sort newest first
+        .sort((a, b) => {
+            if (!a.setAt) return 1;
+            if (!b.setAt) return -1;
+            return new Date(b.setAt) - new Date(a.setAt);
+        });
+
     return {
         role: d.role || "member",
         firstName: d.firstName || "",
@@ -79,10 +98,21 @@ export const getMemberProfile = async (householdID, residentID) => {
         educationStatus: d.educationStatus || "",
         occupation: d.occupation || "",
         employmentStatus: d.employmentStatus || "",
+
+        // Admin-managed record status
+        adminStatus: d.adminStatus || "Clear Case",
+        adminRemarks: d.adminRemarks || "",
+        adminIncident: d.adminIncident || "",
+        adminLastUpdatedBy: d.adminLastUpdatedBy || "",
+        adminLastUpdatedByPosition: d.adminLastUpdatedByPosition || "",
+        // Firestore Timestamp → JS Date for display
+        adminLastUpdatedAt: d.adminLastUpdatedAt ? d.adminLastUpdatedAt.toDate().toLocaleDateString("en-PH", {
+            year: "numeric", month: "short", day: "numeric"
+        }) : null,
+
+        statusHistory,
     };
 };
-
-// Omits address fields entirely when sameAddress is true.
 
 export const updateMemberProfile = async (householdID, residentID, updatedData) => {
     if (!householdID || !residentID) throw new Error("Missing household or resident ID.");
@@ -124,7 +154,6 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         disabilityType: updatedData.disabilityType || "",
 
         totalMembers: updatedData.totalMembers || updatedData.householdMembers || "",
-
         householdClassification: updatedData.householdClassification || "",
 
         educationAttainment: updatedData.educationAttainment || "",

@@ -27,6 +27,12 @@ const BLANK = {
   totalMembers:"", householdClassification:"",
 };
 
+const STATUS_MAP = {
+  "Clear Case":   { label: "Clear Case",   cls: "clear",     color: "#0d7a55", desc: "This resident has no pending cases or violations on record." },
+  "Pending Case": { label: "Pending Case", cls: "pending",   color: "#e8a020", desc: "This resident has a case currently under review." },
+  "Violation":    { label: "Violation",    cls: "violation", color: "#e03e3e", desc: "This resident has a recorded violation." },
+};
+
 const IconQR      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>;
 const ProfileIconUser    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const ProfileIconPin     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>;
@@ -71,6 +77,18 @@ function Field({ label, req, children }) {
       {children}
     </div>
   );
+}
+
+/** Format an ISO date string for display */
+function formatHistoryDate(isoString) {
+  if (!isoString) return "—";
+  try {
+    return new Date(isoString).toLocaleDateString("en-PH", {
+      year: "numeric", month: "short", day: "numeric",
+    });
+  } catch {
+    return isoString;
+  }
 }
 
 export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }) {
@@ -124,7 +142,6 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
   const closeModal = () => setOpen(false);
 
   const computeSameAddress = () => {
-    // Keep household link when a non-head member has not changed address.
     if (data.role !== "head" && data.sameAddress) {
       const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
       const isUnchanged = addressFields.every(field => draft[field] === data[field]);
@@ -188,12 +205,10 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
   const isPwd = normalizedDataCategories.includes("♿ PWD");
   const draftPwd = normalizedDraftCategories.includes("♿ PWD");
 
-  const STATUS_MAP = {
-    clear:     { label: "Clear Case",   cls: "clear",     desc: "This resident has no pending cases or violations on record." },
-    pending:   { label: "Pending Case", cls: "pending",   desc: "This resident has a case currently under review." },
-    violation: { label: "Violation",    cls: "violation", desc: "This resident has a recorded violation." },
-  };
-  const sInfo = STATUS_MAP["clear"];
+  // Live record status from Firestore
+  const currentStatus = data.adminStatus || "Clear Case";
+  const sInfo = STATUS_MAP[currentStatus] || STATUS_MAP["Clear Case"];
+  const statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
 
   return (
     <div className="pf-root">
@@ -235,7 +250,10 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
               <div className="pf-qr-meta">
                 <div><div className="pf-qr-ml">Barangay</div><div className="pf-qr-mv">{data.barangay || "—"}</div></div>
                 <div><div className="pf-qr-ml">City</div><div className="pf-qr-mv">{data.city || "—"}</div></div>
-                <div><div className="pf-qr-ml">Record</div><div className="pf-qr-mv" style={{ color: "#0d7a55" }}>Clear Case</div></div>
+                <div>
+                  <div className="pf-qr-ml">Record</div>
+                  <div className="pf-qr-mv" style={{ color: sInfo.color }}>{sInfo.label}</div>
+                </div>
               </div>
               <button className="pf-btn-dl" onClick={downloadQR} disabled={!qrUrl}><IconDl /> Download QR Code</button>
             </div>
@@ -284,15 +302,15 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
               {data.categories && data.categories.length > 0
                 ? data.categories.map(cat => (
                     <div key={cat} className="pf-chip on">
-                      <span className="cdot" />{cat}
+                      {cat}
                     </div>
                   ))
-                : <div style={{ fontSize: "0.83rem", color: "var(--muted)" }}>No categories selected.</div>
+                : <div className="pf-chip off">No categories assigned</div>
               }
             </div>
             {isPwd && (
-              <div style={{ background: "rgba(26,79,138,0.04)", border: "1px solid rgba(26,79,138,0.12)", borderRadius: "10px", padding: "1rem" }}>
-                <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)", marginBottom: "0.75rem" }}>♿ PWD Details</div>
+              <div className="pf-subfields">
+                <div className="pf-subtitle">♿ PWD Details</div>
                 <div className="pf-info-grid">
                   <InfoItem label="PWD Status" value={data.pwdStatus} />
                   <InfoItem label="Disability Type" value={data.disabilityType} />
@@ -323,7 +341,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
           </div>
         </Card>
 
-        {/* 7. RECORD STATUS */}
+        {/* 7. RECORD STATUS — live from Firestore */}
         <Card icon={ProfileIconShield} title="Barangay Record Status" tag="Circumstances">
           <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
             <div className={`pf-status-badge ${sInfo.cls}`}>
@@ -334,21 +352,75 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
               {sInfo.desc}
             </div>
           </div>
-          <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>Case History</div>
-            {[
-              { date: "Jan 10, 2026", action: "Status verified by Barangay Secretary", by: "Sec. Reyes", type: "clear" },
-              { date: "Nov 05, 2025", action: "Barangay clearance requested and approved", by: "Admin", type: "clear" },
-              { date: "Aug 22, 2025", action: "Resident profile created and verified", by: "Admin", type: "clear" },
-            ].map((item, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.type === "clear" ? "#0d7a55" : item.type === "pending" ? "#e8a020" : "#e03e3e", flexShrink: 0, marginTop: 5 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>{item.action}</div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>{item.date} · by {item.by}</div>
+
+          {/* Remarks & Incident (only when set) */}
+          {(data.adminRemarks || data.adminIncident) && (
+            <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "0.9rem 1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {data.adminRemarks && (
+                <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.55 }}>
+                  <strong style={{ fontFamily: "'Poppins',sans-serif" }}>Remarks: </strong>{data.adminRemarks}
                 </div>
+              )}
+              {data.adminIncident && (
+                <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
+                  <strong style={{ fontFamily: "'Poppins',sans-serif", color: "var(--text)" }}>Incident: </strong>{data.adminIncident}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Last updated attribution */}
+          {data.adminLastUpdatedBy && (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginBottom: "1rem", fontStyle: "italic" }}>
+              Last updated by <strong style={{ fontStyle: "normal" }}>{data.adminLastUpdatedBy}</strong>
+              {data.adminLastUpdatedByPosition ? ` (${data.adminLastUpdatedByPosition})` : ""}
+              {data.adminLastUpdatedAt ? ` · ${data.adminLastUpdatedAt}` : ""}
+            </div>
+          )}
+
+          {/* Status history log */}
+          <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>
+              Case History
+            </div>
+
+            {statusHistory.length > 0 ? (
+              statusHistory.map((entry, i) => {
+                const dotColor = entry.status === "Clear Case"
+                  ? "#0d7a55"
+                  : entry.status === "Pending Case"
+                    ? "#e8a020"
+                    : "#e03e3e";
+                const byLine = [
+                  entry.setBy,
+                  entry.setByPosition ? `(${entry.setByPosition})` : null,
+                ].filter(Boolean).join(" ");
+
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>
+                        Status set to "{entry.status}"
+                        {entry.remarks ? ` — ${entry.remarks}` : ""}
+                      </div>
+                      {entry.incident && (
+                        <div style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: 1 }}>
+                          {entry.incident}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>
+                        {formatHistoryDate(entry.setAt)} · by {byLine}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ fontSize: "0.82rem", color: "var(--muted)", fontStyle: "italic" }}>
+                No status changes recorded yet.
               </div>
-            ))}
+            )}
           </div>
         </Card>
 
@@ -389,7 +461,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
           </div>
         </Card>
 
-        {/* Bottom spacer — prevents content hiding behind fixed mobile nav */}
+        {/* Bottom spacer */}
         <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
 
       </div>}
