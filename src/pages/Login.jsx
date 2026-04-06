@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useCallback } from "react";
 import { loginWithHouseholdID, getMemberPin, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
-import {LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser} from "../components/icons";
+import {LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser} from "../components/Icons";
 function MobileHeader({ onBack }) {
   return (
     <div className="mobile-auth-header" onClick={onBack} style={{ cursor: "pointer" }}>
