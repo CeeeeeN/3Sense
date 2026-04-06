@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useCallback } from "react";
 import { loginWithHouseholdID, getMemberPin, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
-import {LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser} from "../components/Icons";
+import {LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser} from "../components/icons";
 function MobileHeader({ onBack }) {
   return (
     <div className="mobile-auth-header" onClick={onBack} style={{ cursor: "pointer" }}>
@@ -87,12 +87,12 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
         "linear-gradient(135deg,#0d7a55,#13a87a)",
         "linear-gradient(135deg,#e8a020,#f5c04a)",
       ];
-      const mapped = result.members.map((m, i) => {
-        const parts = (m.name || m.fullName || "Member").split(" ");
-        const initials = ((parts[0]?.[0] || "") + (parts[parts.length - 1]?.[0] || "")).toUpperCase();
+      const mapped = result.residents.map((m, i) => {
+        const fullName = [m.firstName, m.lastName].filter(Boolean).join(" ") || `Member ${i + 1}`;
+        const initials = ((m.firstName?.[0] || "") + (m.lastName?.[0] || "M")).toUpperCase();
         return {
           id: m.id,
-          name: m.name || m.fullName || `Member ${i + 1}`,
+          name: fullName,
           initials: initials || "M",
           role: m.role === "head" ? "head" : "member",
           color: COLORS[i % COLORS.length],
@@ -182,7 +182,8 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setTimeout(() => {
       if (onSuccess) onSuccess({
         ...selectedProfile,
-        householdID: hhNumber.trim(), // pass hhNumber so App.jsx can setHhId
+        memberId:    selectedProfile.id,   // explicit alias App.jsx expects
+        householdID: hhNumber.trim(),
       });
     }, 2200);
   }

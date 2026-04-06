@@ -263,7 +263,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
         />
-        <ServicesPage onNavigate={handleNav} hhId={hhId} userName={userName} />
+        <ServicesPage onNavigate={handleNav} hhId={hhId} memberId={memberId} userName={userName} />
       </div>
     );
   }

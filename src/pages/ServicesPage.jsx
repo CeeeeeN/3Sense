@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
+import { getMemberProfile } from "../services/profile";
+import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/icons";
 
 // ── Programs Data ──
 const PROGRAMS = [
@@ -406,7 +407,7 @@ function Step4({ refNum, onReset }) {
 }
 
 // ── Documents Tab ──
-function DocumentsTab() {
+function DocumentsTab({ userData }) {
   const [step, setStep]       = useState(1);
   const [docType, setDocType] = useState(null);
   const [errors, setErrors]   = useState({});
@@ -417,6 +418,26 @@ function DocumentsTab() {
     contact: "", email: "", ctc: "",
     residingSince: "", purpose: "", validId: "", validIdFile: null,
   });
+
+  // Auto-fill form when userData loads
+  useEffect(() => {
+    if (userData) {
+      const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city]
+        .filter(Boolean).join(", ");
+        
+      setForm(f => ({
+        ...f,
+        firstName: userData.firstName || "",
+        middleName: userData.middleName || "",
+        lastName: userData.lastName || "",
+        dob: userData.birthDate || "",
+        civilStatus: userData.civilStatus || "Single",
+        address: fullAddress,
+        contact: userData.contactNumber || "",
+        email: userData.email || "",
+      }));
+    }
+  }, [userData]);
 
   const validateStep1 = () => {
     if (!docType) { setErrors({ docType: "Please select a document type." }); return false; }
@@ -543,17 +564,29 @@ function Calendar({ selectedDate, onSelectDate }) {
 }
 
 // ── Reservation Form ──
-function ReservationForm({ onBack, facility }) {
+function ReservationForm({ onBack, facility, userData }) {
   const facilityName = facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility.title}. Approval is required before confirmation.`
     : "Reserve a facility for your event. Approval is required before confirmation.";
 
-  const [form, setForm] = useState({ fullName: "Juan Dela Cruz", contactNumber: "+63 912 345 6789", purpose: "", date: "", startTime: "", endTime: "", attendees: "", notes: "" });
+  const [form, setForm] = useState({ fullName: "", contactNumber: "", purpose: "", date: "", startTime: "", endTime: "", attendees: "", notes: "" });
   const [dateStatus, setDateStatus] = useState(null);
   const [submitted, setSubmitted]   = useState(false);
   const [errors, setErrors]         = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Auto-fill form when userData loads
+  useEffect(() => {
+    if (userData) {
+      const name = [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ");
+      setForm(f => ({
+        ...f,
+        fullName: name,
+        contactNumber: userData.contactNumber || ""
+      }));
+    }
+  }, [userData]);
 
   const validate = () => {
     const e = {};
@@ -1083,13 +1116,22 @@ function BOSCATab() {
 }
 
 // ── BSWD Tab ──
-function BSWDTab() {
-  const [reportForm, setReportForm]       = useState({ name: "", location: "", description: "", photo: "" });
+function BSWDTab({ userData }) {
+  const [reportForm, setReportForm] = useState({ name: "", location: "", description: "", photo: "" });
   const [reportErrors, setReportErrors]   = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [tipForm, setTipForm]             = useState({ about: "", tip: "", contact: "" });
   const [tipSubmitted, setTipSubmitted]   = useState(false);
   const [tipErrors, setTipErrors]         = useState({});
+
+  useEffect(() => {
+    if (userData) {
+      setReportForm(f => ({
+        ...f,
+        name: [userData.firstName, userData.lastName].filter(Boolean).join(" ")
+      }));
+    }
+  }, [userData]);
 
   const setR = (k, v) => setReportForm(f => ({ ...f, [k]: v }));
   const setT = (k, v) => setTipForm(f => ({ ...f, [k]: v }));
@@ -1254,7 +1296,7 @@ const STATUS_CONFIG = {
   resolved:  { label: "Resolved",  color: "#2DB17B", bg: "rgba(45,177,123,0.1)",   icon: "✅" },
 };
 
-function PeaceOrderTab() {
+function PeaceOrderTab({ userData }) {
   const [view, setView]             = useState("home");
   const [refNum, setRefNum]         = useState("");
   const [trackInput, setTrackInput] = useState("");
@@ -1265,6 +1307,21 @@ function PeaceOrderTab() {
     reporterName: "", isAnonymous: false, contact: "", reporterAddress: "",
     incidentType: "", location: "", date: "", time: "", description: "", urgency: "", photo: "",
   });
+
+  useEffect(() => {
+    if (userData && !form.isAnonymous) {
+      const name = [userData.firstName, userData.lastName].filter(Boolean).join(" ");
+      const fullAddress = [userData.houseNumber, userData.street, userData.barangay].filter(Boolean).join(", ");
+      
+      setForm(f => ({
+        ...f,
+        reporterName: name,
+        contact: userData.contactNumber || "",
+        reporterAddress: fullAddress
+      }));
+    }
+  }, [userData, form.isAnonymous]);
+
   const [errors, setErrors] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -1571,12 +1628,28 @@ const REG_STATUS = {
   completed: { label: "Completed", color: "#5e7a99", bg: "rgba(94,122,153,0.1)" },
 };
 
-function LivelihoodTab() {
+function LivelihoodTab({ userData }) {
   const [view, setView]     = useState("main");
   const [step, setStep]     = useState(1);
   const [regNum, setRegNum] = useState("");
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState({ firstName: "", middleName: "", lastName: "", address: "", contact: "", email: "", idFile: "", programId: "" });
+  
+  useEffect(() => {
+    if (userData) {
+      const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city].filter(Boolean).join(", ");
+      setForm(f => ({
+        ...f,
+        firstName: userData.firstName || "",
+        middleName: userData.middleName || "",
+        lastName: userData.lastName || "",
+        address: fullAddress,
+        contact: userData.contactNumber || "",
+        email: userData.email || ""
+      }));
+    }
+  }, [userData]);
+  
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const selectedProgram = LIVELIHOOD_PROGRAMS.find(p => p.id === parseInt(form.programId));
 
@@ -1958,7 +2031,7 @@ const FILTERS = [
   { key: "community", label: "Community" },
 ];
 
-function ServicesTab() {
+function ServicesTab({ userData }) {
   const [sub, setSub]       = useState(null);
   const [filter, setFilter] = useState("all");
 
@@ -1969,11 +2042,12 @@ function ServicesTab() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           Back to Services
         </button>
+        {/* Pass userData to the tabs that need it */}
         {sub === "vawc"       && <VAWCTab />}
         {sub === "bosca"      && <BOSCATab />}
-        {sub === "bswd"       && <BSWDTab />}
-        {sub === "peace"      && <PeaceOrderTab />}
-        {sub === "livelihood" && <LivelihoodTab />}
+        {sub === "bswd"       && <BSWDTab userData={userData} />}
+        {sub === "peace"      && <PeaceOrderTab userData={userData} />}
+        {sub === "livelihood" && <LivelihoodTab userData={userData} />}
         {sub === "badac"      && <BADACTab />}
       </div>
     );
@@ -2037,9 +2111,21 @@ const TABS = [
 ];
 
 // ── Main Services Page ──
-export default function ServicesPage({ onNavigate }) {
+export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
   const [activeTab, setActiveTab] = useState("services");
   const [reservationFacility, setReservationFacility] = useState(null);
+
+  // hold the user's profile data
+  const [userData, setUserData] = useState(null);
+
+  // Fetch profile data on mount
+  useEffect(() => {
+    if (hhId && memberId) {
+      getMemberProfile(hhId, memberId)
+        .then(data => setUserData(data))
+        .catch(console.error);
+    }
+  }, [hhId, memberId]);
 
   return (
     <main className="db-page sv-page">
@@ -2098,11 +2184,10 @@ export default function ServicesPage({ onNavigate }) {
                   <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online</div></div>
                 </div>
               </div>
-              <DocumentsTab />
-            </>
+              <DocumentsTab userData={userData} />            </>
           )}
 
-          {activeTab === "services" && <ServicesTab />}
+          {activeTab === "services" && <ServicesTab userData={userData} />}
         </div>
       </div>
 
@@ -2112,7 +2197,7 @@ export default function ServicesPage({ onNavigate }) {
             <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-            <ReservationForm facility={reservationFacility} onBack={() => setReservationFacility(null)} />
+            <ReservationForm facility={reservationFacility} onBack={() => setReservationFacility(null)} userData={userData} />
           </div>
         </div>
       )}

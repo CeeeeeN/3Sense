@@ -1,23 +1,23 @@
 import { useState, useEffect } from "react";
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
+import { db } from "../firebase/firebase";
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  deleteDoc, 
+  updateDoc, 
+  collectionGroup 
+} from "firebase/firestore";
+import { approveRegistration } from "../services/admin"; // Adjust path if necessary
 
 export default function HouseholdManagement() {
 
-  // ================= MOCK DATA =================
-  const [residents, setResidents] = useState([
-    { id: 1, fullName: "Juan Dela Cruz", householdId: "HH-001", category: ["Student"], address: "Blk 1 Lot 2 Malanday", birthDate: "Jan 1, 2000", sex: "Male", civilStatus: "Single", education: "College", employment: "Unemployed", members: 4, status: "Clear Case", remarks: "", incident: ""},
-    { id: 2, fullName: "Maria Santos", householdId: "HH-002", category: ["PWD"], address: "Blk 3 Lot 5 Malanday", birthDate: "Feb 2, 1995", sex: "Female", civilStatus: "Married", education: "High School", employment: "Employed", members: 5, status: "Pending Case", remarks: "Under review", incident: "Noise complaint"}
-  ]);
-
-  const [hhRequests, setHhRequests] = useState([
-    { id: 1, fullName: "Pedro Reyes", householdId: "HH-003", address: "Blk 2 Lot 3 Malanday", category: ["Student"], members: 3, dateSubmitted: "March 28, 2026", status: "pending", birthDate: "Mar 10, 1998", sex: "Male", civilStatus: "Single", education: "College", employment: "Unemployed" },
-    { id: 2, fullName: "Ana Rivera", householdId: "HH-004", address: "Blk 5 Lot 1 Malanday", category: ["Senior Citizen"], members: 2, dateSubmitted: "March 27, 2026", status: "pending", birthDate: "Jun 5, 1950", sex: "Female", civilStatus: "Widowed", education: "High School", employment: "Retired" },
-    { id: 3, fullName: "Carlo Bautista", householdId: "HH-005", address: "Blk 7 Lot 9 Malanday", category: ["Solo Parent"], members: 4, dateSubmitted: "March 25, 2026", status: "pending", birthDate: "Aug 22, 1990", sex: "Male", civilStatus: "Separated", education: "Vocational", employment: "Employed" },
-    { id: 4, fullName: "Liza Gomez", householdId: "HH-006", address: "Blk 4 Lot 2 Malanday", category: ["PWD"], members: 5, dateSubmitted: "March 20, 2026", status: "pending", birthDate: "Dec 1, 1985", sex: "Female", civilStatus: "Married", education: "College", employment: "Unemployed" },
-  ]);
-
   // ================= STATE =================
+  const [residents, setResidents] = useState([]);
+  const [hhRequests, setHhRequests] = useState([]);
+
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -28,7 +28,6 @@ export default function HouseholdManagement() {
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
   const defaultRows = 3;
-
 
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusData, setStatusData] = useState(null);
@@ -45,6 +44,78 @@ export default function HouseholdManagement() {
   const [showHhViewModal, setShowHhViewModal] = useState(false);
   const [showHhApproveModal, setShowHhApproveModal] = useState(false);
   const [showHhRejectModal, setShowHhRejectModal] = useState(false);
+
+
+  // Fetch Pending Registrations
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "pending_registrations"), (snapshot) => {
+      const requests = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          householdId: "Pending", // No ID assigned until approved
+          fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+          category: data.categories || (data.category ? [data.category] : []),
+          address: `${data.houseNumber || ""} ${data.street || ""}, ${data.barangay || ""}`.trim(),
+          dateSubmitted: data.createdAt ? data.createdAt.toDate().toLocaleDateString() : "N/A",
+          status: data.status || "pending",
+          ...data
+        };
+      });
+      setHhRequests(requests);
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch Active Residents & Pending Activations
+  useEffect(() => {
+    // Fetch all confirmed residents across all households
+    const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (resSnapshot) => {
+      const activeResidents = resSnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        const householdId = docSnap.ref.parent.parent.id; // Extract HH-ID from path
+        return {
+          id: docSnap.id,
+          householdId,
+          fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+          category: data.categories || [],
+          address: data.houseNumber ? `${data.houseNumber} ${data.street}, ${data.barangay}` : 'Shared Household Address',
+          status: data.adminStatus || "Clear Case",
+          remarks: data.adminRemarks || "",
+          incident: data.adminIncident || "",
+          ...data
+        };
+      });
+
+      // Fetch households to get unactivated heads (approved but haven't logged in yet)
+      const unsubHouseholds = onSnapshot(collection(db, "households"), (hhSnapshot) => {
+        const pendingHeads = [];
+        hhSnapshot.docs.forEach(hhDoc => {
+          const hhData = hhDoc.data();
+          if (hhData.activated === false && hhData._pendingHeadData) {
+            const head = hhData._pendingHeadData;
+            pendingHeads.push({
+              id: `unactivated-${hhDoc.id}`,
+              householdId: hhDoc.id,
+              fullName: `${head.firstName || ""} ${head.lastName || ""}`.trim(),
+              category: head.categories || [],
+              address: hhData.houseNumber ? `${hhData.houseNumber} ${hhData.street}, ${hhData.barangay}` : '',
+              status: "Pending Activation", // Custom status for approved but inactive accounts
+              isPendingActivation: true,
+              ...head
+            });
+          }
+        });
+
+        // Combine both into one list
+        setResidents([...activeResidents, ...pendingHeads]);
+      });
+
+      return () => unsubHouseholds();
+    });
+
+    return () => unsubResidents();
+  }, []);
 
 
   // ================= HH REQUEST FILTERS =================
@@ -82,49 +153,33 @@ export default function HouseholdManagement() {
   }, [searchHhRequest, filterHhStatus]);
 
   // ================= HH REQUEST ACTIONS =================
-  const handleHhApprove = () => {
+  const handleHhApprove = async () => {
     if (!selectedHhRequest) return;
-
-    const newResident = {
-      id: Date.now(),
-      fullName: selectedHhRequest.fullName,
-      householdId: selectedHhRequest.householdId,
-      category: selectedHhRequest.category,
-      address: selectedHhRequest.address,
-      birthDate: selectedHhRequest.birthDate,
-      sex: selectedHhRequest.sex,
-      civilStatus: selectedHhRequest.civilStatus,
-      education: selectedHhRequest.education,
-      employment: selectedHhRequest.employment,
-      members: selectedHhRequest.members,
-      status: "Clear Case",
-      remarks: "",
-      incident: "",
-    };
-
-    setResidents(prev => [...prev, newResident]);
-
-    setHhRequests(prev =>
-      prev.map(r =>
-        r.id === selectedHhRequest.id ? { ...r, status: "approved" } : r
-      )
-    );
-
-    setSelectedHhRequest(null);
-    setShowHhApproveModal(false);
+    try {
+      // Calls your existing backend admin function to create household & send email
+      await approveRegistration(selectedHhRequest.id);
+      
+      setSelectedHhRequest(null);
+      setShowHhApproveModal(false);
+      alert("Registration approved successfully. An email has been sent to the head.");
+    } catch (error) {
+      console.error("Error approving registration:", error);
+      alert("Error approving registration: " + error.message);
+    }
   };
 
-  const handleHhReject = () => {
+  const handleHhReject = async () => {
     if (!selectedHhRequest) return;
-
-    setHhRequests(prev =>
-      prev.map(r =>
-        r.id === selectedHhRequest.id ? { ...r, status: "rejected" } : r
-      )
-    );
-
-    setSelectedHhRequest(null);
-    setShowHhRejectModal(false);
+    try {
+      // Delete the pending document from Firestore
+      await deleteDoc(doc(db, "pending_registrations", selectedHhRequest.id));
+      
+      setSelectedHhRequest(null);
+      setShowHhRejectModal(false);
+    } catch (error) {
+      console.error("Error rejecting registration:", error);
+      alert("Error rejecting registration: " + error.message);
+    }
   };
 
   // ================= RESIDENT FILTERS =================
@@ -136,7 +191,10 @@ export default function HouseholdManagement() {
       r.householdId.toLowerCase().includes(searchText);
 
     const matchesCategory =
-      filterCategory === "All" || r.category.includes(filterCategory);
+      filterCategory === "All" || 
+      (r.category && r.category.some(cat => 
+        cat.toLowerCase().includes(filterCategory.toLowerCase())
+      ));
 
     const matchesStatus =
       filterStatus === "All" || r.status === filterStatus;
@@ -159,15 +217,29 @@ export default function HouseholdManagement() {
     setPage(1);
   }, [search, filterCategory, filterStatus]);
 
-  // ================= SAVE STATUS =================
-  const handleSaveStatus = () => {
-    setResidents(prev =>
-      prev.map(r =>
-        r.id === selectedResident.id ? selectedResident : r
-      )
-    );
-    setShowResidentModal(false);
-    setSelectedResident(null);
+  // SAVE RESIDENT STATUS 
+  const handleSaveStatus = async () => {
+    if (!statusData) return;
+
+    if (statusData.isPendingActivation) {
+      alert("Cannot update status of accounts that are pending activation. Wait for the user to activate their profile.");
+      return;
+    }
+
+    try {
+      const residentRef = doc(db, "households", statusData.householdId, "residents", statusData.id);
+      await updateDoc(residentRef, {
+        adminStatus: statusData.status,
+        adminRemarks: statusData.remarks || "",
+        adminIncident: statusData.incident || ""
+      });
+
+      setShowStatusModal(false);
+      setStatusData(null);
+    } catch (error) {
+      console.error("Error updating resident status:", error);
+      alert("Failed to update status.");
+    }
   };
 
   return (
@@ -204,23 +276,14 @@ export default function HouseholdManagement() {
 
             <div className="card">
 
-              {/* CONTROLS — always visible */}
+              {/* CONTROLS */}
               <div className="table-controls">
                 <input
                   type="text"
-                  placeholder="Search name or household ID..."
+                  placeholder="Search name..."
                   value={searchHhRequest}
                   onChange={(e) => setSearchHhRequest(e.target.value)}
                 />
-                <select
-                  value={filterHhStatus}
-                  onChange={(e) => setFilterHhStatus(e.target.value)}
-                >
-                  <option value="All">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
               </div>
 
               {/* TABLE */}
@@ -231,7 +294,6 @@ export default function HouseholdManagement() {
                     <th>Household ID</th>
                     <th>Category</th>
                     <th>Date Submitted</th>
-                    <th>Status</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -242,13 +304,8 @@ export default function HouseholdManagement() {
                       <tr key={req.id}>
                         <td>{req.fullName}</td>
                         <td>{req.householdId}</td>
-                        <td>{req.category.join(", ")}</td>
+                        <td>{req.category && req.category.join(", ")}</td>
                         <td>{req.dateSubmitted}</td>
-                        <td>
-                          <span className={`status-badge status-${req.status}`}>
-                            {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                          </span>
-                        </td>
                         <td>
                           <div className="resident-btns">
                             <button
@@ -288,8 +345,8 @@ export default function HouseholdManagement() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: "center", padding: "16px" }}>
-                        No results found.
+                      <td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
+                        No pending requests found.
                       </td>
                     </tr>
                   )}
@@ -347,7 +404,7 @@ export default function HouseholdManagement() {
             </div>
             <div className="card">
 
-              {/* CONTROLS — always visible */}
+              {/* CONTROLS */}
               <div className="table-controls">
                 <input
                   type="text"
@@ -363,8 +420,11 @@ export default function HouseholdManagement() {
                   <option value="All">All Categories</option>
                   <option value="Student">Student</option>
                   <option value="Senior Citizen">Senior Citizen</option>
-                  <option value="PWD">PWD</option>
                   <option value="Solo Parent">Solo Parent</option>
+                  <option value="OFW">OFW</option>
+                  <option value="LGBT">LGBT</option>
+                  <option value="Indigenous">Indigenous</option>
+                  <option value="PWD">PWD</option>
                 </select>
 
                 <select
@@ -375,6 +435,7 @@ export default function HouseholdManagement() {
                   <option value="Clear Case">Clear Case</option>
                   <option value="Pending Case">Pending Case</option>
                   <option value="Violation">Violation</option>
+                  <option value="Pending Activation">Pending Activation</option>
                 </select>
               </div>
 
@@ -396,9 +457,9 @@ export default function HouseholdManagement() {
                       <tr key={res.id}>
                         <td>{res.fullName}</td>
                         <td>{res.householdId}</td>
-                        <td>{res.category.join(", ")}</td>
+                        <td>{res.category && res.category.join(", ")}</td>
                         <td>
-                          <span className={`status-badge status-${res.status.toLowerCase().replace(" ", "")}`}>
+                          <span className={`status-badge status-${res.status.toLowerCase().replace(/\s+/g, "")}`}>
                             {res.status}
                           </span>
                         </td>
@@ -413,15 +474,17 @@ export default function HouseholdManagement() {
                             >
                               View Profile
                             </button>
-                            <button
-                              className="update-btn"
-                              onClick={() => {
-                                setStatusData({ ...res });
-                                setShowStatusModal(true);
-                              }}
-                            >
-                              Update Status
-                            </button>
+                            {!res.isPendingActivation && (
+                                <button
+                                  className="update-btn"
+                                  onClick={() => {
+                                    setStatusData({ ...res });
+                                    setShowStatusModal(true);
+                                  }}
+                                >
+                                  Update Status
+                                </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -477,34 +540,32 @@ export default function HouseholdManagement() {
                 </button>
               </div>
 
-              <div
-                className="as-modal-body"
-                style={{ alignItems: "stretch", textAlign: "left" }}
-              >
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <div className="admin-details">
                   <p><strong>Full Name:</strong> {selectedResident.fullName}</p>
                   <p><strong>Birth Date:</strong> {selectedResident.birthDate}</p>
                   <p><strong>Sex:</strong> {selectedResident.sex}</p>
                   <p><strong>Civil Status:</strong> {selectedResident.civilStatus}</p>
                   <p><strong>Address:</strong> {selectedResident.address}</p>
-                  <p><strong>Category:</strong> {selectedResident.category.join(", ")}</p>
-                  <p><strong>Education:</strong> {selectedResident.education}</p>
-                  <p><strong>Employment:</strong> {selectedResident.employment}</p>
+                  <p><strong>Category:</strong> {selectedResident.category && selectedResident.category.join(", ")}</p>
+                  <p><strong>Education:</strong> {selectedResident.educationAttainment || selectedResident.education}</p>
+                  <p><strong>Employment:</strong> {selectedResident.employmentStatus || selectedResident.employment}</p>
                   <p><strong>Household ID:</strong> {selectedResident.householdId}</p>
-                  <p><strong>Members:</strong> {selectedResident.members}</p>
+                  <p><strong>Total Members:</strong> {selectedResident.totalMembers || selectedResident.members}</p>
                   <p>
                     <strong>Status:</strong><br />
-                    <span
-                      className={`status-badge status-${selectedResident.status
-                        .toLowerCase()
-                        .replace(" ", "")}`}
-                    >
+                    <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>
                       {selectedResident.status}
                     </span>
                   </p>
+                  {selectedResident.remarks && (
+                    <p><strong>Remarks:</strong> {selectedResident.remarks}</p>
+                  )}
+                  {selectedResident.incident && (
+                    <p><strong>Incident Details:</strong> {selectedResident.incident}</p>
+                  )}
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -527,10 +588,7 @@ export default function HouseholdManagement() {
                 </button>
               </div>
 
-              <div
-                className="as-modal-body"
-                style={{ alignItems: "stretch", textAlign: "left" }}
-              >
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
 
                 <div className="admin-details">
                   <p><strong>Full Name:</strong> {statusData.fullName}</p>
@@ -575,37 +633,17 @@ export default function HouseholdManagement() {
                       e.target.style.height = e.target.scrollHeight + "px";
                     }}
                   />
-
                 </div>
               </div>
 
               <div className="modal-actions hm-status-actions">
-                <button
-                  className="approve-btn"
-                  onClick={() => {
-                    setResidents(prev =>
-                      prev.map(r =>
-                        r.id === statusData.id ? statusData : r
-                      )
-                    );
-                    setShowStatusModal(false);
-                    setStatusData(null);
-                  }}
-                >
+                <button className="approve-btn" onClick={handleSaveStatus}>
                   Save Changes
                 </button>
-
-                <button
-                  className="reject-btn"
-                  onClick={() => {
-                    setShowStatusModal(false);
-                    setStatusData(null);
-                  }}
-                >
+                <button className="reject-btn" onClick={() => { setShowStatusModal(false); setStatusData(null); }}>
                   Cancel
                 </button>
               </div>
-
             </div>
           </div>
         )}
@@ -628,21 +666,19 @@ export default function HouseholdManagement() {
                 </button>
               </div>
 
-              <div
-                className="as-modal-body"
-                style={{ alignItems: "stretch", textAlign: "left" }}
-              >
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <div className="admin-details">
                   <p><strong>Full Name:</strong> {selectedHhRequest.fullName}</p>
                   <p><strong>Birth Date:</strong> {selectedHhRequest.birthDate}</p>
                   <p><strong>Sex:</strong> {selectedHhRequest.sex}</p>
                   <p><strong>Civil Status:</strong> {selectedHhRequest.civilStatus}</p>
                   <p><strong>Address:</strong> {selectedHhRequest.address}</p>
-                  <p><strong>Category:</strong> {selectedHhRequest.category.join(", ")}</p>
-                  <p><strong>Education:</strong> {selectedHhRequest.education}</p>
-                  <p><strong>Employment:</strong> {selectedHhRequest.employment}</p>
-                  <p><strong>Household ID:</strong> {selectedHhRequest.householdId}</p>
-                  <p><strong>Members:</strong> {selectedHhRequest.members}</p>
+                  <p><strong>Contact Number:</strong> {selectedHhRequest.contactNumber}</p>
+                  <p><strong>Email:</strong> {selectedHhRequest.email}</p>
+                  <p><strong>Category:</strong> {selectedHhRequest.category && selectedHhRequest.category.join(", ")}</p>
+                  <p><strong>Education:</strong> {selectedHhRequest.educationAttainment}</p>
+                  <p><strong>Employment:</strong> {selectedHhRequest.employmentStatus}</p>
+                  <p><strong>Total Members:</strong> {selectedHhRequest.totalMembers}</p>
                   <p><strong>Date Submitted:</strong> {selectedHhRequest.dateSubmitted}</p>
                   <p>
                     <strong>Status:</strong><br />
@@ -664,7 +700,7 @@ export default function HouseholdManagement() {
               <h3 className="modal-title">Approve Resident Registration</h3>
 
               <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
-                Approving will add this resident to the Resident Account Management list.
+                Approving will create a Household ID and email the resident. They will appear in the Account Management tab.
               </p>
 
               <div className="modal-actions">
@@ -692,7 +728,7 @@ export default function HouseholdManagement() {
               <h3 className="modal-title">Confirm Rejection</h3>
 
               <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
-                Are you sure you want to reject this resident registration?
+                Are you sure you want to reject this resident registration? This will delete the request permanently.
               </p>
 
               <div className="modal-actions">
