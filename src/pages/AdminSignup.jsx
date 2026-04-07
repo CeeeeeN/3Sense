@@ -236,7 +236,7 @@ const AdminSignup = () => {
           </form>
 
           <div className="auth-bottom">
-            Already approved? <Link to="/">Login here</Link>
+            Already approved? <Link to="/admin/login">Login here</Link>
           </div>
         </div>
       </section>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
-import { calculateMoodCardData } from '../utils/sentimentAggregator';
+import { calculateMoodCardData } from '../services/sentimentAggregator';
 
 // --- FIREBASE IMPORTS ---
 import { db } from '../firebase/firebase'; 
