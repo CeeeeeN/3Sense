@@ -12,8 +12,8 @@ export function calculateMoodCardData(feedbacks) {
   // 2. Loop through all feedbacks and count them
   feedbacks.forEach((fb) => {
     // Note: Make sure your Firestore document saves a "category" field!
-    const cat = fb.category; 
-    const sentiment = fb.sentiment; // "Positive", "Neutral", or "Negative"
+    const cat = fb.Category; 
+    const sentiment = fb.Sentiment; // "Positive", "Neutral", or "Negative"
     
     // Only count it if it matches one of our 4 main categories and has been analyzed
     if (categoryStats[cat] && sentiment) {
