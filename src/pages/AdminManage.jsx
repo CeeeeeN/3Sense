@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AdminLayout from "../components/AdminLayout";
 import "../AdminStyle.css";
-import { IconLocation, IconCalendar, IconClock, IconAdd, IconQR, IconDownload, IconConfirmCheck } from "../components/Icons";
+import { Manage_IconLocation, Manage_IconCalendar, Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck } from "../components/Icons";
 import { db } from "../firebase/firebase"; 
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "firebase/firestore";
 
@@ -121,13 +121,13 @@ export default function AdminServices() {
               </div>
               <p className="as-card-desc">{service.Description}</p>
               <ul className="as-card-details">
-                <li><IconLocation /> {service.Location}</li>
-                <li><IconLocation /> {service.Category || "General"}</li>
-                <li><IconCalendar /> {service.Date}</li>
-                <li><IconClock /> {service.Time}</li>
+                <li><Manage_IconLocation /> {service.Location}</li>
+                <li><Manage_IconLocation /> {service.Category || "General"}</li>
+                <li><Manage_IconCalendar /> {service.Date}</li>
+                <li><Manage_IconClock /> {service.Time}</li>
               </ul>
               <div className="as-card-footer">
-                <button className="as-qr-btn" onClick={() => handleGenerateQR(service)}><IconQR /> Generate QR Code</button>
+                <button className="as-qr-btn" onClick={() => handleGenerateQR(service)}><Manage_IconQR /> Generate QR Code</button>
               </div>
             </div>
           ))}
