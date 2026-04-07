@@ -92,21 +92,25 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
 
   const [serviceId, setServiceId] = useState("general");
   const [serviceName, setServiceName] = useState("General Barangay Service");
+  const [category, setCategory] = useState("General"); // NEW: Category State
 
   useEffect(() => {
     // Check if the app successfully passed the service as a prop (e.g. from QR scan or navigation)
     if (service && service.name) {
       setServiceId(service.id);
       setServiceName(service.name || service.fullName || "General Barangay Service");
+      setCategory(service.category || "General"); // NEW: Capture from props
     } else {
-      // Fallback: Grab BOTH the ID and Name from the QR Code URL
+      // Fallback: Grab ID, Name, AND Category from the QR Code URL
       const urlParams = new URLSearchParams(window.location.search);
       const scannedId = urlParams.get('serviceId');
       const scannedName = urlParams.get('serviceName');
+      const scannedCategory = urlParams.get('category'); // NEW: Capture from URL
 
       if (scannedId) {
         setServiceId(scannedId);
         setServiceName(scannedName || "General Barangay Service");
+        setCategory(scannedCategory || "General"); // NEW: Set state
       }
     }
   }, [service]);
@@ -152,7 +156,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       let finalConfidence = null;
       let finalStatus = 'pending'; // Default if AI fails
       
-      // Try to send feedback to AI analysis API, but don't block submission if it fails (e.g. 405 or network error)
+      // Try to send feedback to AI analysis API
       try {
         const aiResponse = await fetch('/api/analyze', {
           method: 'POST',
@@ -160,7 +164,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           body: JSON.stringify({ text: comment })
         });
 
-        // Only parse JSON if the API actually succeeded (Not a 405!)
+        // Only parse JSON if the API actually succeeded
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
           finalSentiment = aiData.sentiment || null;
@@ -183,12 +187,13 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       // Save dynamic QR Code data to Firestore
       await addDoc(collection(db, "Feedback"), {
         ReferenceID: ref,
-        FacilityID: serviceId,        // Uses dynamic QR ID
-        FacilityName: serviceName,    // Uses dynamic UI Name
+        FacilityID: serviceId,        
+        FacilityName: serviceName,    
+        Category: category,           
+        Sentiment: finalSentiment,
         Rating: rating,
         Comment: comment,
-        Status: finalStatus,              // Save the final status after AI attempt
-        Sentiment: finalSentiment,
+        Status: finalStatus,              
         Confidence: finalConfidence,
         CreatedAt: serverTimestamp(),
         UserName: userName,
@@ -250,8 +255,8 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
             <MapPinIcon />
           </div>
           <div>
-            <div className="fb-service-info__label">Service / Event</div>
-            {/* UPDATED: Displays dynamic name */}
+            {/* UPDATED: Displays the locked category to the user */}
+            <div className="fb-service-info__label">Service / Event • {category}</div>
             <div className="fb-service-info__name">{serviceName}</div>
             <div className="fb-service-info__desc">{currentService.description}</div>
           </div>

@@ -36,13 +36,13 @@ export default function AdminServices() {
   
   // Form State
   const [newService, setNewService] = useState({
-    name: "", location: "", date: "", time: "", description: ""
+    name: "", category: "", location: "", date: "", time: "", description: ""
   });
 
   const handleGenerateQR = (service) => {
     const residentAppUrl = "https://3-sense.vercel.app/";
     const validName = service.title || service.Name || service.FacilityName || "Barangay Service";
-    const encodedUrl = `${residentAppUrl}?serviceId=${service.id}&serviceName=${encodeURIComponent(validName)}`;
+    const encodedUrl = `${residentAppUrl}?serviceId=${service.id}&serviceName=${encodeURIComponent(validName)}&category=${encodeURIComponent(service.Category || "General")}`;
     setSelectedServiceQR({ name: validName, qrValue: `${encodedUrl}` });
   };
 
@@ -73,12 +73,13 @@ export default function AdminServices() {
         Date: newService.date,
         Time: newService.time,
         Description: newService.description,
+        Category: newService.category || "General",
         Status: "Upcoming",
         CreatedAt: serverTimestamp()
       });
 
       // Reset the form and close the modal on success
-      setNewService({ name: "", location: "", date: "", time: "", description: "" });
+      setNewService({ name: "", category: "", location: "", date: "", time: "", description: "" });
       setShowAddModal(false);
 
     } catch (error) {
@@ -112,7 +113,6 @@ export default function AdminServices() {
         </div>
 
         <div className="as-card-grid">
-          {/* We now map over the 'services' state instead of mockServices */}
           {services.map((service) => (
             <div className="as-card" key={service.id}>
               <div className="as-card-header">
@@ -122,6 +122,7 @@ export default function AdminServices() {
               <p className="as-card-desc">{service.Description}</p>
               <ul className="as-card-details">
                 <li><IconLocation /> {service.Location}</li>
+                <li><IconLocation /> {service.Category || "General"}</li>
                 <li><IconCalendar /> {service.Date}</li>
                 <li><IconClock /> {service.Time}</li>
               </ul>
@@ -161,6 +162,20 @@ export default function AdminServices() {
                     <option value="Barangay Hall Ground">Barangay Hall Ground</option>
                     <option value="Malanday Health Center">Malanday Health Center</option>
                     <option value="Covered Court">Covered Court</option>
+                  </select>
+                </div>
+
+                <div className="as-form-group">
+                  <label className="as-form-label">Category</label>
+                  <select className="as-form-select" required
+                    value={newService.category} onChange={(e) => setNewService({...newService, category: e.target.value})}
+                  >
+                    <option value="" disabled>Select a Category...</option>
+                    <option value="General">General</option>
+                    <option value="Programs">Programs</option>
+                    <option value="Services">Services</option>
+                    <option value="Facilities">Facilities</option>
+                    <option value="Documents">Documents</option>
                   </select>
                 </div>
 

@@ -182,7 +182,7 @@ const LoginPage = () => {
           </form>
 
           <div className="bottom-link">
-            Need access? <Link to="/signup">Request Admin Approval</Link>
+            Need access? <Link to="/admin/signup">Request Admin Approval</Link>
           </div>
         </div>
       </div>
