@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getMemberProfile } from "../services/profile";
+import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport } from "../services/services";
 import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
 
 // ── Programs Data ──
@@ -407,11 +408,11 @@ function Step4({ refNum, onReset }) {
 }
 
 // ── Documents Tab ──
-function DocumentsTab({ userData }) {
+function DocumentsTab({ userData, hhId, userName }) {
   const [step, setStep]       = useState(1);
   const [docType, setDocType] = useState(null);
   const [errors, setErrors]   = useState({});
-  const [refNum]              = useState(() => `BM-2026-${Math.floor(10000 + Math.random() * 90000)}`);
+  const [refNum, setRefNum]   = useState(() => `BM-2026-${Math.floor(10000 + Math.random() * 90000)}`);
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
@@ -433,7 +434,7 @@ function DocumentsTab({ userData }) {
         dob: userData.birthDate || "",
         civilStatus: userData.civilStatus || "Single",
         address: fullAddress,
-        contact: userData.contactNumber || "",
+        contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
         email: userData.email || "",
       }));
     }
@@ -446,15 +447,15 @@ function DocumentsTab({ userData }) {
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.firstName.trim())   e.firstName    = "Required.";
-    if (!form.lastName.trim())    e.lastName     = "Required.";
-    if (!form.dob)                e.dob          = "Required.";
-    if (!form.address.trim())     e.address      = "Required.";
-    if (!form.contact.trim())     e.contact      = "Required.";
-    if (!form.ctc.trim())         e.ctc          = "Required.";
-    if (!form.residingSince)      e.residingSince = "Required.";
-    if (!form.purpose.trim())     e.purpose      = "Required.";
-    if (!form.validId)            e.validId      = "Please upload a valid ID.";
+    if (!form.firstName.trim())              e.firstName    = "Required.";
+    if (!form.lastName.trim())               e.lastName     = "Required.";
+    if (!form.dob)                           e.dob          = "Required.";
+    if (!form.address.trim())                e.address      = "Required.";
+    if (!String(form.contact || "").trim())  e.contact      = "Required.";
+    if (!form.ctc.trim())                    e.ctc          = "Required.";
+    if (!form.residingSince)                 e.residingSince = "Required.";
+    if (!form.purpose.trim())               e.purpose      = "Required.";
+    if (!form.validId)                       e.validId      = "Please upload a valid ID.";
     const extra = EXTRA_FIELDS[docType?.id] || [];
     extra.forEach(f => {
       if (!f.required) return;
@@ -465,10 +466,21 @@ function DocumentsTab({ userData }) {
     return Object.keys(e).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     setErrors({});
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    if (step === 3) {
+      try {
+        const refNumber = `BM-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+        await submitDocumentRequest(hhId, userName || "Unknown", docType, form);
+        setRefNum(refNumber);
+      } catch (error) {
+        console.error("Failed to submit document request:", error);
+        setErrors({ submit: "Failed to submit. Please try again." });
+        return;
+      }
+    }
     setStep(s => s + 1);
   };
 
@@ -564,7 +576,7 @@ function Calendar({ selectedDate, onSelectDate }) {
 }
 
 // ── Reservation Form ──
-function ReservationForm({ onBack, facility, userData }) {
+function ReservationForm({ onBack, facility, userData, hhId, userName }) {
   const facilityName = facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility.title}. Approval is required before confirmation.`
@@ -583,7 +595,7 @@ function ReservationForm({ onBack, facility, userData }) {
       setForm(f => ({
         ...f,
         fullName: name,
-        contactNumber: userData.contactNumber || ""
+        contactNumber: userData.contactNumber != null ? String(userData.contactNumber) : ""
       }));
     }
   }, [userData]);
@@ -598,11 +610,17 @@ function ReservationForm({ onBack, facility, userData }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     if (dateStatus === "reserved") { setErrors({ date: "Selected date is not available." }); return; }
-    setSubmitted(true);
+    try {
+      await submitFacilityReservation(hhId, userName || "User", facility, form);
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Failed to submit reservation:", error);
+      setErrors({ submit: "Failed to submit. Please try again." });
+    }
   };
 
   if (submitted) return (
@@ -1296,7 +1314,7 @@ const STATUS_CONFIG = {
   resolved:  { label: "Resolved",  color: "#2DB17B", bg: "rgba(45,177,123,0.1)",   icon: "✅" },
 };
 
-function PeaceOrderTab({ userData }) {
+function PeaceOrderTab({ userData, hhId }) {
   const [view, setView]             = useState("home");
   const [refNum, setRefNum]         = useState("");
   const [trackInput, setTrackInput] = useState("");
@@ -1336,11 +1354,17 @@ function PeaceOrderTab({ userData }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    setRefNum(`PO-2026-${Math.floor(10000 + Math.random() * 90000)}`);
-    setView("submitted");
+    try {
+      await submitIncidentReport(hhId, form);
+      setRefNum(`PO-2026-${Math.floor(10000 + Math.random() * 90000)}`);
+      setView("submitted");
+    } catch (error) {
+      console.error("Failed to submit incident report:", error);
+      setErrors({ submit: "Failed to submit. Please try again." });
+    }
   };
 
   const handleTrack = () => {
@@ -1628,7 +1652,7 @@ const REG_STATUS = {
   completed: { label: "Completed", color: "#5e7a99", bg: "rgba(94,122,153,0.1)" },
 };
 
-function LivelihoodTab({ userData }) {
+function LivelihoodTab({ userData, hhId, userName }) {
   const [view, setView]     = useState("main");
   const [step, setStep]     = useState(1);
   const [regNum, setRegNum] = useState("");
@@ -1644,7 +1668,7 @@ function LivelihoodTab({ userData }) {
         middleName: userData.middleName || "",
         lastName: userData.lastName || "",
         address: fullAddress,
-        contact: userData.contactNumber || "",
+        contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
         email: userData.email || ""
       }));
     }
@@ -1655,11 +1679,11 @@ function LivelihoodTab({ userData }) {
 
   const validateStep1 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = "Required.";
-    if (!form.lastName.trim())  e.lastName  = "Required.";
-    if (!form.address.trim())   e.address   = "Required.";
-    if (!form.contact.trim())   e.contact   = "Required.";
-    if (!form.idFile)           e.idFile    = "Please upload a valid ID or Barangay Clearance.";
+    if (!form.firstName.trim())             e.firstName = "Required.";
+    if (!form.lastName.trim())              e.lastName  = "Required.";
+    if (!form.address.trim())               e.address   = "Required.";
+    if (!String(form.contact || "").trim()) e.contact   = "Required.";
+    if (!form.idFile)                       e.idFile    = "Please upload a valid ID or Barangay Clearance.";
     setErrors(e); return Object.keys(e).length === 0;
   };
 
@@ -1669,10 +1693,20 @@ function LivelihoodTab({ userData }) {
     setErrors(e); return Object.keys(e).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
-    if (step === 3) { setRegNum(`LH-2026-${Math.floor(10000 + Math.random() * 90000)}`); setStep(4); return; }
+    if (step === 3) {
+      try {
+        await submitLivelihoodRegistration(hhId, form, selectedProgram);
+        setRegNum(`LH-2026-${Math.floor(10000 + Math.random() * 90000)}`);
+        setStep(4);
+      } catch (error) {
+        console.error("Failed to submit livelihood registration:", error);
+        setErrors({ submit: "Failed to submit. Please try again." });
+      }
+      return;
+    }
     setStep(s => s + 1);
   };
 
@@ -2031,7 +2065,7 @@ const FILTERS = [
   { key: "community", label: "Community" },
 ];
 
-function ServicesTab({ userData }) {
+function ServicesTab({ userData, hhId, userName }) {
   const [sub, setSub]       = useState(null);
   const [filter, setFilter] = useState("all");
 
@@ -2046,8 +2080,8 @@ function ServicesTab({ userData }) {
         {sub === "vawc"       && <VAWCTab />}
         {sub === "bosca"      && <BOSCATab />}
         {sub === "bswd"       && <BSWDTab userData={userData} />}
-        {sub === "peace"      && <PeaceOrderTab userData={userData} />}
-        {sub === "livelihood" && <LivelihoodTab userData={userData} />}
+        {sub === "peace"      && <PeaceOrderTab userData={userData} hhId={hhId} />}
+        {sub === "livelihood" && <LivelihoodTab userData={userData} hhId={hhId} userName={userName} />}
         {sub === "badac"      && <BADACTab />}
       </div>
     );
@@ -2184,10 +2218,10 @@ export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
                   <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online</div></div>
                 </div>
               </div>
-              <DocumentsTab userData={userData} />            </>
+              <DocumentsTab userData={userData} hhId={hhId} userName={userName} />            </>
           )}
 
-          {activeTab === "services" && <ServicesTab userData={userData} />}
+          {activeTab === "services" && <ServicesTab userData={userData} hhId={hhId} userName={userName} />}
         </div>
       </div>
 
@@ -2197,7 +2231,7 @@ export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
             <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-            <ReservationForm facility={reservationFacility} onBack={() => setReservationFacility(null)} userData={userData} />
+            <ReservationForm facility={reservationFacility} onBack={() => setReservationFacility(null)} userData={userData} hhId={hhId} userName={userName} />
           </div>
         </div>
       )}
