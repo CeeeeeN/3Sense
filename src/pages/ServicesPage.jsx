@@ -516,8 +516,8 @@ function Calendar({ selectedDate, onSelectDate }) {
 
   const getStatus = (d) => {
     const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    if (RESERVED_DATES.includes(str)) return "reserved";
-    if (PENDING_DATES.includes(str))  return "pending";
+    if (RESERVED_DATES.includes(str)) return "Reserved";
+    if (PENDING_DATES.includes(str))  return "Pending";
     const date = new Date(viewYear, viewMonth, d);
     if (date < new Date(today.getFullYear(), today.getMonth(), today.getDate())) return "past";
     return "available";
