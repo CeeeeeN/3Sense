@@ -12,7 +12,7 @@ body,
 :root {
   --primary: #1a4f8a;
   --primary-light: #2563b0;
-  --teal: #317D89;
+  --teal: #317d89;
   --accent: #e8a020;
   --accent-light: #f5c04a;
   --success: #0d7a55;
@@ -21,7 +21,7 @@ body,
   --muted: #5e7a99;
   --border: #d8e4f0;
   --input-bg: #f8fafd;
-  --hover-bg: #0E7385;
+  --hover-bg: #0e7385;
 }
 
 *,
@@ -2324,6 +2324,221 @@ nav {
     grid-column: span 1;
   }
 }
+
+
+/* ===================================================== */
+/* REPORTS PAGE */
+/* ===================================================== */
+.reports-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 1.5rem auto 0;
+}
+
+.reports-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 1.2rem;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.report-card {
+  background: white;
+  border-radius: 14px;
+  padding: 1.2rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  transition: 0.2s;
+}
+
+.report-card:hover {
+  transform: translateY(-3px);
+}
+
+.report-card h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: var(--muted);
+}
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.report-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.report-controls .filter-group {
+  font-size: 0.7rem;
+}
+
+.report-controls .clear-btn,
+.report-controls .export-btn {
+  height: 38px;
+  display: flex;
+  align-items: center;
+}
+
+.report-card ul {
+  list-style: none;
+  padding: 0;
+}
+
+.report-card li {
+  font-size: 0.9rem;
+  padding: 0.4rem 0;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--border);
+}
+
+.report-card li:last-child {
+  border-bottom: none;
+}
+
+.category-sentiment {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.category-sentiment:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+.sentiment-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.sentiment-pill {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  width: 25%;
+  gap: 4px;
+}
+
+.sentiment-label {
+  font-weight: 600;
+}
+
+.stat-block:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.split-card {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  text-align: center;
+  gap: 2rem;
+}
+
+.stat-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-block:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.highlight-positive {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #16a34a;
+  margin-top: 0.5rem;
+}
+
+.highlight-negative {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #ff383c;
+  margin-top: 0.5rem;
+}
+
+.stat-sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.export-btn {
+  background: var(--teal);
+  color: white;
+  border: none;
+  padding: 0.7rem 1.3rem;
+  border-radius: 10px;
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.export-btn:hover {
+  background: var(--hover-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 25px rgba(49, 125, 137, 0.3);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.filter-group input {
+  margin-top: 0.3rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+  font-family: "Inter", sans-serif;
+}
+
+.clear-btn {
+  background: #ff383c;
+  color: white;
+  border: none;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.clear-btn:hover {
+  background: #df3838;
+}
+
 
 
                                             /* ===================================================== */
