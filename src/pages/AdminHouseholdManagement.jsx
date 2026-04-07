@@ -1,16 +1,21 @@
 import { useState, useEffect } from "react";
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
-import { db } from "../firebase/firebase";
+import { db, auth } from "../firebase/firebase";
 import { 
   collection, 
   onSnapshot, 
   doc, 
   deleteDoc, 
   updateDoc, 
-  collectionGroup 
+  collectionGroup,
+  arrayUnion,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
-import { approveRegistration } from "../services/admin"; // Adjust path if necessary
+import { approveRegistration } from "../services/admin";
 
 export default function HouseholdManagement() {
 
@@ -45,6 +50,27 @@ export default function HouseholdManagement() {
   const [showHhApproveModal, setShowHhApproveModal] = useState(false);
   const [showHhRejectModal, setShowHhRejectModal] = useState(false);
 
+  // Current admin profile
+  const [adminProfile, setAdminProfile] = useState({ fullName: "Admin", position: "" });
+
+  // Fetch current admin's display name from Firestore
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const fetchAdmin = async () => {
+      const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const d = snap.docs[0].data();
+        setAdminProfile({
+          fullName: d.fullName || d.username || user.email,
+          position: d.position || "Admin",
+        });
+      }
+    };
+    fetchAdmin();
+  }, []);
 
   // Fetch Pending Registrations
   useEffect(() => {
@@ -53,7 +79,7 @@ export default function HouseholdManagement() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          householdId: "Pending", // No ID assigned until approved
+          householdId: "Pending",
           fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
           category: data.categories || (data.category ? [data.category] : []),
           address: `${data.houseNumber || ""} ${data.street || ""}, ${data.barangay || ""}`.trim(),
@@ -69,11 +95,10 @@ export default function HouseholdManagement() {
 
   // Fetch Active Residents & Pending Activations
   useEffect(() => {
-    // Fetch all confirmed residents across all households
     const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (resSnapshot) => {
       const activeResidents = resSnapshot.docs.map(docSnap => {
         const data = docSnap.data();
-        const householdId = docSnap.ref.parent.parent.id; // Extract HH-ID from path
+        const householdId = docSnap.ref.parent.parent.id;
         return {
           id: docSnap.id,
           householdId,
@@ -83,11 +108,11 @@ export default function HouseholdManagement() {
           status: data.adminStatus || "Clear Case",
           remarks: data.adminRemarks || "",
           incident: data.adminIncident || "",
+          statusHistory: data.statusHistory || [],
           ...data
         };
       });
 
-      // Fetch households to get unactivated heads (approved but haven't logged in yet)
       const unsubHouseholds = onSnapshot(collection(db, "households"), (hhSnapshot) => {
         const pendingHeads = [];
         hhSnapshot.docs.forEach(hhDoc => {
@@ -100,14 +125,14 @@ export default function HouseholdManagement() {
               fullName: `${head.firstName || ""} ${head.lastName || ""}`.trim(),
               category: head.categories || [],
               address: hhData.houseNumber ? `${hhData.houseNumber} ${hhData.street}, ${hhData.barangay}` : '',
-              status: "Pending Activation", // Custom status for approved but inactive accounts
+              status: "Pending Activation",
               isPendingActivation: true,
+              statusHistory: [],
               ...head
             });
           }
         });
 
-        // Combine both into one list
         setResidents([...activeResidents, ...pendingHeads]);
       });
 
@@ -156,9 +181,7 @@ export default function HouseholdManagement() {
   const handleHhApprove = async () => {
     if (!selectedHhRequest) return;
     try {
-      // Calls your existing backend admin function to create household & send email
       await approveRegistration(selectedHhRequest.id);
-      
       setSelectedHhRequest(null);
       setShowHhApproveModal(false);
       alert("Registration approved successfully. An email has been sent to the head.");
@@ -171,9 +194,7 @@ export default function HouseholdManagement() {
   const handleHhReject = async () => {
     if (!selectedHhRequest) return;
     try {
-      // Delete the pending document from Firestore
       await deleteDoc(doc(db, "pending_registrations", selectedHhRequest.id));
-      
       setSelectedHhRequest(null);
       setShowHhRejectModal(false);
     } catch (error) {
@@ -217,7 +238,7 @@ export default function HouseholdManagement() {
     setPage(1);
   }, [search, filterCategory, filterStatus]);
 
-  // SAVE RESIDENT STATUS 
+  // ================= SAVE RESIDENT STATUS =================
   const handleSaveStatus = async () => {
     if (!statusData) return;
 
@@ -228,10 +249,26 @@ export default function HouseholdManagement() {
 
     try {
       const residentRef = doc(db, "households", statusData.householdId, "residents", statusData.id);
+
+      // Build the history log entry
+      const historyEntry = {
+        status: statusData.status,
+        remarks: statusData.remarks || "",
+        incident: statusData.incident || "",
+        setBy: adminProfile.fullName,
+        setByPosition: adminProfile.position,
+        setAt: new Date().toISOString(), // ISO string so it's readable client-side without Firestore conversion
+      };
+
       await updateDoc(residentRef, {
         adminStatus: statusData.status,
         adminRemarks: statusData.remarks || "",
-        adminIncident: statusData.incident || ""
+        adminIncident: statusData.incident || "",
+        adminLastUpdatedBy: adminProfile.fullName,
+        adminLastUpdatedByPosition: adminProfile.position,
+        adminLastUpdatedAt: serverTimestamp(),
+        // Append to history array (Firestore arrayUnion won't deduplicate objects, use array append instead)
+        statusHistory: arrayUnion(historyEntry),
       });
 
       setShowStatusModal(false);
@@ -275,8 +312,6 @@ export default function HouseholdManagement() {
             </div>
 
             <div className="card">
-
-              {/* CONTROLS */}
               <div className="table-controls">
                 <input
                   type="text"
@@ -286,7 +321,6 @@ export default function HouseholdManagement() {
                 />
               </div>
 
-              {/* TABLE */}
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -353,7 +387,6 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-              {/* PAGINATION */}
               {hhViewMode === "requests" && totalHhRequestPages > 1 && (
                 <div className="pagination">
                   <button
@@ -371,7 +404,6 @@ export default function HouseholdManagement() {
                   </button>
                 </div>
               )}
-
             </div>
           </div>
         )}
@@ -404,7 +436,6 @@ export default function HouseholdManagement() {
             </div>
             <div className="card">
 
-              {/* CONTROLS */}
               <div className="table-controls">
                 <input
                   type="text"
@@ -439,7 +470,6 @@ export default function HouseholdManagement() {
                 </select>
               </div>
 
-              {/* TABLE */}
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -475,15 +505,15 @@ export default function HouseholdManagement() {
                               View Profile
                             </button>
                             {!res.isPendingActivation && (
-                                <button
-                                  className="update-btn"
-                                  onClick={() => {
-                                    setStatusData({ ...res });
-                                    setShowStatusModal(true);
-                                  }}
-                                >
-                                  Update Status
-                                </button>
+                              <button
+                                className="update-btn"
+                                onClick={() => {
+                                  setStatusData({ ...res });
+                                  setShowStatusModal(true);
+                                }}
+                              >
+                                Update Status
+                              </button>
                             )}
                           </div>
                         </td>
@@ -499,7 +529,6 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-              {/* PAGINATION */}
               {residentViewMode === "residents" && totalPages > 1 && (
                 <div className="pagination">
                   <button
@@ -517,7 +546,6 @@ export default function HouseholdManagement() {
                   </button>
                 </div>
               )}
-
             </div>
           </div>
         )}
@@ -564,6 +592,12 @@ export default function HouseholdManagement() {
                   {selectedResident.incident && (
                     <p><strong>Incident Details:</strong> {selectedResident.incident}</p>
                   )}
+                  {selectedResident.adminLastUpdatedBy && (
+                    <p style={{ fontSize: "0.8rem", color: "#888", marginTop: "8px" }}>
+                      Last updated by <strong>{selectedResident.adminLastUpdatedBy}</strong>
+                      {selectedResident.adminLastUpdatedByPosition ? ` (${selectedResident.adminLastUpdatedByPosition})` : ""}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -593,6 +627,10 @@ export default function HouseholdManagement() {
                 <div className="admin-details">
                   <p><strong>Full Name:</strong> {statusData.fullName}</p>
                   <p><strong>Household ID:</strong> {statusData.householdId}</p>
+                  <p style={{ fontSize: "0.8rem", color: "#888" }}>
+                    Setting as: <strong>{adminProfile.fullName}</strong>
+                    {adminProfile.position ? ` · ${adminProfile.position}` : ""}
+                  </p>
                 </div>
 
                 <div style={{ marginTop: "15px" }}>
