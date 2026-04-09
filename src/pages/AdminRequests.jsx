@@ -324,7 +324,7 @@ export default function AdminRequests() {
               <div className="modal-footer">
                 <button className="btn-cancel" onClick={closeModal}>Close</button>
                 
-                {selectedRequest.status == 'Pending' && (
+                {selectedRequest.status.toLowerCase() == 'pending' && (
                   <>
                     <button className="btn-reject" onClick={handleReject}>
                       <XCircle size={16} /> {showRejectReason ? 'Confirm' : 'Reject'}
