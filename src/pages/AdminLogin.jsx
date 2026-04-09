@@ -1,21 +1,45 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import '../AdminStyle.css';
-import { auth } from "../firebase/firebase";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"; // 🆕 added sendPasswordResetEmail
+import { auth, db } from "../firebase/firebase";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 const LoginPage = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState(""); // email or username
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);       // 🆕 tracks if reset email was sent
-  const [resetLoading, setResetLoading] = useState(false); // 🆕 loading state for reset
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const navigate = useNavigate();
 
-  const togglePassword = () => {
-    setPasswordVisible(!passwordVisible);
+  const togglePassword = () => setPasswordVisible(!passwordVisible);
+
+  // Helper: look up email by username from both collections
+  const getEmailFromUsername = async (username) => {
+    // Check approvedAdmins
+    const approvedQ = query(
+      collection(db, "approvedAdmins"),
+      where("username", "==", username)
+    );
+    const approvedSnap = await getDocs(approvedQ);
+    if (!approvedSnap.empty) {
+      return approvedSnap.docs[0].data().email;
+    }
+
+    // Check pendingAdmins
+    const pendingQ = query(
+      collection(db, "pendingAdmins"),
+      where("username", "==", username)
+    );
+    const pendingSnap = await getDocs(pendingQ);
+    if (!pendingSnap.empty) {
+      return pendingSnap.docs[0].data().email;
+    }
+
+    return null;
   };
 
   const handleSubmit = async (e) => {
@@ -24,20 +48,72 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/admin/dashboard");
+      // Determine if input is email or username
+      const isEmail = identifier.includes("@");
+      let emailToUse = identifier;
+
+      if (!isEmail) {
+        // Look up email from username
+        const foundEmail = await getEmailFromUsername(identifier);
+        if (!foundEmail) {
+          setError("No account found with that username.");
+          setLoading(false);
+          return;
+        }
+        emailToUse = foundEmail;
+      }
+
+      // Sign in with Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
+      const user = userCredential.user;
+
+      // Check if user exists in approvedAdmins
+      const approvedQ = query(
+        collection(db, "approvedAdmins"),
+        where("uid", "==", user.uid)
+      );
+      const approvedSnapshot = await getDocs(approvedQ);
+
+      if (!approvedSnapshot.empty) {
+        navigate("/dashboard");
+        return;
+      }
+
+      // Check if still pending
+      const pendingQ = query(
+        collection(db, "pendingAdmins"),
+        where("uid", "==", user.uid)
+      );
+      const pendingSnapshot = await getDocs(pendingQ);
+
+      if (!pendingSnapshot.empty) {
+        const data = pendingSnapshot.docs[0].data();
+        if (data.status === "pending") {
+          setError("Your account is still pending approval. Please wait.");
+        } else if (data.status === "rejected") {
+          setError("Your account was rejected. Contact the Barangay.");
+        } else {
+          setError("Your account status is unknown. Contact the Barangay.");
+        }
+      } else {
+        setError("You are not authorized to access the admin panel.");
+      }
+
+      await auth.signOut();
+
     } catch (err) {
-      setError("Invalid email or password. Please try again.");
+      setError("Invalid credentials. Please try again.");
     }
 
     setLoading(false);
   };
 
-  // 🆕 Forgot Password Handler
   const handleForgotPassword = async () => {
-    // Check if email is filled in first
-    if (!email) {
-      setError("Please enter your email address first, then click Forgot Password.");
+    const isEmail = identifier.includes("@");
+    let emailToReset = identifier;
+
+    if (!identifier) {
+      setError("Please enter your email or username first, then click Forgot Password.");
       return;
     }
 
@@ -46,10 +122,20 @@ const LoginPage = () => {
     setResetSent(false);
 
     try {
-      await sendPasswordResetEmail(auth, email);
-      setResetSent(true); // ✅ show success message
+      if (!isEmail) {
+        const foundEmail = await getEmailFromUsername(identifier);
+        if (!foundEmail) {
+          setError("No account found with that username.");
+          setResetLoading(false);
+          return;
+        }
+        emailToReset = foundEmail;
+      }
+
+      await sendPasswordResetEmail(auth, emailToReset);
+      setResetSent(true);
     } catch (err) {
-      setError("Could not send reset email. Make sure the email is correct.");
+      setError("Could not send reset email. Make sure the email or username is correct.");
     }
 
     setResetLoading(false);
@@ -94,17 +180,15 @@ const LoginPage = () => {
           <h2>Welcome, Admin</h2>
           <p>Log in using your approved administrator credentials.</p>
 
-          {/* Error message */}
           {error && (
             <p style={{ color: "#d9534f", fontSize: "14px", marginBottom: "10px" }}>
               {error}
             </p>
           )}
 
-          {/* 🆕 Success message when reset email is sent */}
           {resetSent && (
             <p style={{ color: "#28a745", fontSize: "14px", marginBottom: "10px", background: "#f0fff4", padding: "10px", borderRadius: "8px" }}>
-              ✅ Password reset email sent! Check your inbox at <strong>{email}</strong>
+              ✅ Password reset email sent! Check your inbox.
             </p>
           )}
 
@@ -117,9 +201,10 @@ const LoginPage = () => {
                   <path d="M5.5 21a6.5 6.5 0 0 1 13 0"/>
                 </svg>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Enter email or username"
                   required
                 />
               </div>
@@ -136,6 +221,7 @@ const LoginPage = () => {
                   type={passwordVisible ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
                   required
                 />
                 <button className="toggle-pw" onClick={togglePassword} type="button">
@@ -156,7 +242,6 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {/* 🆕 Forgot Password link */}
             <div style={{ textAlign: "right", marginBottom: "12px" }}>
               <button
                 type="button"
