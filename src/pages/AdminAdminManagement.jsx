@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import '../AdminStyle.css';
+import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -12,11 +12,10 @@ import {
   updateDoc,
   query,
   where,
-  onSnapshot
+  onSnapshot,
 } from "firebase/firestore";
 
 export default function AdminManagement() {
-
   // ================= STATE =================
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -39,6 +38,8 @@ export default function AdminManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
 
+  const [editedRole, setEditedRole] = useState("Standard Admin");
+
   const [requestPage, setRequestPage] = useState(1);
   const [adminPage, setAdminPage] = useState(1);
 
@@ -52,23 +53,37 @@ export default function AdminManagement() {
         setCurrentUser(user);
 
         // Check pendingAdmins first
-        const pendingQ = query(collection(db, "pendingAdmins"), where("uid", "==", user.uid));
+        const pendingQ = query(
+          collection(db, "pendingAdmins"),
+          where("uid", "==", user.uid),
+        );
         const pendingSnapshot = await getDocs(pendingQ);
 
         if (!pendingSnapshot.empty) {
           const userData = pendingSnapshot.docs[0].data();
-          if (userData.position === "Service Head" || userData.position === "Super admin" || userData.position === "Super Admin") {
+          if (
+            userData.position === "Service Head" ||
+            userData.position === "Super admin" ||
+            userData.position === "Super Admin"
+          ) {
             setIsSuperAdmin(true);
           }
         }
 
         // Also check approvedAdmins
-        const approvedQ = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+        const approvedQ = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid),
+        );
         const approvedSnapshot = await getDocs(approvedQ);
 
         if (!approvedSnapshot.empty) {
           const userData = approvedSnapshot.docs[0].data();
-          if (userData.position === "Service Head" || userData.position === "Super admin" || userData.position === "Super Admin") {
+          if (
+            userData.position === "Service Head" ||
+            userData.position === "Super admin" ||
+            userData.position === "Super Admin"
+          ) {
             setIsSuperAdmin(true);
           }
         }
@@ -83,24 +98,33 @@ export default function AdminManagement() {
   useEffect(() => {
     if (!isSuperAdmin) return;
 
-    const unsubRequests = onSnapshot(collection(db, "pendingAdmins"), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        docId: doc.id,
-        ...doc.data(),
-        dateSubmitted: doc.data().createdAt?.toDate().toLocaleDateString("en-US", {
-          year: "numeric", month: "long", day: "numeric"
-        }) || "N/A"
-      }));
-      setRequests(data);
-    });
+    const unsubRequests = onSnapshot(
+      collection(db, "pendingAdmins"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          docId: doc.id,
+          ...doc.data(),
+          dateSubmitted:
+            doc.data().createdAt?.toDate().toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) || "N/A",
+        }));
+        setRequests(data);
+      },
+    );
 
-    const unsubAdmins = onSnapshot(collection(db, "approvedAdmins"), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        docId: doc.id,
-        ...doc.data()
-      }));
-      setAdmins(data);
-    });
+    const unsubAdmins = onSnapshot(
+      collection(db, "approvedAdmins"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          docId: doc.id,
+          ...doc.data(),
+        }));
+        setAdmins(data);
+      },
+    );
 
     return () => {
       unsubRequests();
@@ -119,17 +143,17 @@ export default function AdminManagement() {
         email: selectedRequest.email,
         contact: selectedRequest.contact,
         position: selectedRequest.position,
+        role: "Standard Admin",
         username: selectedRequest.username,
-        approvedAt: new Date()
+        approvedAt: new Date(),
       });
 
       await updateDoc(doc(db, "pendingAdmins", selectedRequest.docId), {
-        status: "approved"
+        status: "approved",
       });
 
       setSelectedRequest(null);
       setShowApproveModal(false);
-
     } catch (error) {
       console.error("Error approving admin:", error);
       alert("Failed to approve admin. Please try again.");
@@ -142,12 +166,11 @@ export default function AdminManagement() {
 
     try {
       await updateDoc(doc(db, "pendingAdmins", selectedRequest.docId), {
-        status: "rejected"
+        status: "rejected",
       });
 
       setSelectedRequest(null);
       setShowRejectModal(false);
-
     } catch (error) {
       console.error("Error rejecting admin:", error);
       alert("Failed to reject admin. Please try again.");
@@ -163,10 +186,27 @@ export default function AdminManagement() {
 
       setSelectedAdmin(null);
       setShowDeleteModal(false);
-
     } catch (error) {
       console.error("Error deleting admin:", error);
       alert("Failed to delete admin. Please try again.");
+    }
+  };
+
+  // ================= STEP 6: UPDATE ROLE =================
+  const handleSaveRole = async () => {
+    if (!selectedAdmin) return;
+
+    try {
+      await updateDoc(doc(db, "approvedAdmins", selectedAdmin.docId), {
+        role: editedRole,
+      });
+
+      setSelectedAdmin(null);
+      setShowViewModal(false);
+      alert("Admin system role updated successfully!");
+    } catch (error) {
+      console.error("Error updating role:", error);
+      alert("Failed to update role. Please try again.");
     }
   };
 
@@ -185,7 +225,8 @@ export default function AdminManagement() {
         req.fullName?.toLowerCase().includes(searchText) ||
         req.email?.toLowerCase().includes(searchText) ||
         req.username?.toLowerCase().includes(searchText);
-      const matchesStatus = filterStatus === "All" || req.status === filterStatus;
+      const matchesStatus =
+        filterStatus === "All" || req.status === filterStatus;
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
@@ -197,27 +238,41 @@ export default function AdminManagement() {
   const paginatedRequests =
     viewMode === "default"
       ? filteredRequests.slice(0, defaultRows)
-      : filteredRequests.slice((requestPage - 1) * rowsPerPage, requestPage * rowsPerPage);
+      : filteredRequests.slice(
+          (requestPage - 1) * rowsPerPage,
+          requestPage * rowsPerPage,
+        );
 
   const totalRequestPages =
-    viewMode === "default" ? 1 : Math.ceil(filteredRequests.length / rowsPerPage);
+    viewMode === "default"
+      ? 1
+      : Math.ceil(filteredRequests.length / rowsPerPage);
 
   const paginatedAdmins =
     viewMode === "default"
       ? filteredAdmins.slice(0, defaultRows)
-      : filteredAdmins.slice((adminPage - 1) * rowsPerPage, adminPage * rowsPerPage);
+      : filteredAdmins.slice(
+          (adminPage - 1) * rowsPerPage,
+          adminPage * rowsPerPage,
+        );
 
   const totalAdminPages =
     viewMode === "default" ? 1 : Math.ceil(filteredAdmins.length / rowsPerPage);
 
-  useEffect(() => { setRequestPage(1); }, [searchRequest, filterStatus]);
-  useEffect(() => { setAdminPage(1); }, [searchAdmin]);
+  useEffect(() => {
+    setRequestPage(1);
+  }, [searchRequest, filterStatus]);
+  useEffect(() => {
+    setAdminPage(1);
+  }, [searchAdmin]);
 
   // ================= LOADING =================
   if (authLoading) {
     return (
       <AdminLayout>
-        <div style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem" }}>
+        <div
+          style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem" }}
+        >
           Loading...
         </div>
       </AdminLayout>
@@ -242,16 +297,28 @@ export default function AdminManagement() {
   return (
     <AdminLayout>
       <div className="main-content">
-
         {/* ================= REGISTRATION REQUESTS ================= */}
         {(viewMode === "default" || viewMode === "requests") && (
           <div className="section">
             <div className="section-header">
-              <h2>Admin Registration Requests ({filteredRequests.filter(r => r.status === "pending").length})</h2>
+              <h2>
+                Admin Registration Requests (
+                {filteredRequests.filter((r) => r.status === "pending").length})
+              </h2>
               {viewMode === "default" ? (
-                <button className="view-btn" onClick={() => setViewMode("requests")}>See All</button>
+                <button
+                  className="view-btn"
+                  onClick={() => setViewMode("requests")}
+                >
+                  See All
+                </button>
               ) : (
-                <button className="view-btn" onClick={() => setViewMode("default")}>Return</button>
+                <button
+                  className="view-btn"
+                  onClick={() => setViewMode("default")}
+                >
+                  Return
+                </button>
               )}
             </div>
             <div className="card">
@@ -262,10 +329,14 @@ export default function AdminManagement() {
                   value={searchRequest}
                   onChange={(e) => setSearchRequest(e.target.value)}
                 />
-                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
                   <option value="All">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="rejected">Rejected</option>
+                  <option value="approved">Approved</option>
                 </select>
               </div>
               <table className="admin-table">
@@ -292,17 +363,32 @@ export default function AdminManagement() {
                         <td>{req.username}</td>
                         <td>{req.dateSubmitted}</td>
                         <td>
-                          <span className={`status-badge status-${req.status?.toLowerCase()}`}>
-                            {req.status?.charAt(0).toUpperCase() + req.status?.slice(1)}
+                          <span
+                            className={`status-badge status-${req.status?.toLowerCase()}`}
+                          >
+                            {req.status?.charAt(0).toUpperCase() +
+                              req.status?.slice(1)}
                           </span>
                         </td>
                         <td>
                           {req.status === "pending" ? (
                             <div className="btn-group">
-                              <button className="approve-btn" onClick={() => { setSelectedRequest(req); setShowApproveModal(true); }}>
+                              <button
+                                className="approve-btn"
+                                onClick={() => {
+                                  setSelectedRequest(req);
+                                  setShowApproveModal(true);
+                                }}
+                              >
                                 Approve
                               </button>
-                              <button className="reject-btn" onClick={() => { setSelectedRequest(req); setShowRejectModal(true); }}>
+                              <button
+                                className="reject-btn"
+                                onClick={() => {
+                                  setSelectedRequest(req);
+                                  setShowRejectModal(true);
+                                }}
+                              >
                                 Reject
                               </button>
                             </div>
@@ -313,15 +399,34 @@ export default function AdminManagement() {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={8} style={{ textAlign: "center", padding: "16px" }}>No results found.</td></tr>
+                    <tr>
+                      <td
+                        colSpan={8}
+                        style={{ textAlign: "center", padding: "16px" }}
+                      >
+                        No results found.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
               {viewMode === "requests" && totalRequestPages > 1 && (
                 <div className="pagination">
-                  <button disabled={requestPage === 1} onClick={() => setRequestPage(prev => prev - 1)}>Prev</button>
-                  <span>Page {requestPage} of {totalRequestPages}</span>
-                  <button disabled={requestPage === totalRequestPages} onClick={() => setRequestPage(prev => prev + 1)}>Next</button>
+                  <button
+                    disabled={requestPage === 1}
+                    onClick={() => setRequestPage((prev) => prev - 1)}
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    Page {requestPage} of {totalRequestPages}
+                  </span>
+                  <button
+                    disabled={requestPage === totalRequestPages}
+                    onClick={() => setRequestPage((prev) => prev + 1)}
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>
@@ -334,9 +439,19 @@ export default function AdminManagement() {
             <div className="section-header">
               <h2>Admin Account Management</h2>
               {viewMode === "default" ? (
-                <button className="view-btn" onClick={() => setViewMode("admins")}>See All</button>
+                <button
+                  className="view-btn"
+                  onClick={() => setViewMode("admins")}
+                >
+                  See All
+                </button>
               ) : (
-                <button className="view-btn" onClick={() => setViewMode("default")}>Return</button>
+                <button
+                  className="view-btn"
+                  onClick={() => setViewMode("default")}
+                >
+                  Return
+                </button>
               )}
             </div>
             <div className="card">
@@ -366,23 +481,60 @@ export default function AdminManagement() {
                         <td>{admin.username}</td>
                         <td>{admin.position}</td>
                         <td>
-                          <button className="view-btn" onClick={() => { setSelectedAdmin(admin); setShowViewModal(true); }}>View</button>
+                          <button
+                            className="view-btn"
+                            onClick={() => {
+                              setSelectedAdmin(admin);
+                              // Load current role, default to Standard if none exists yet
+                              setEditedRole(admin.role || "Standard Admin");
+                              setShowViewModal(true);
+                            }}
+                          >
+                            View
+                          </button>
                         </td>
                         <td>
-                          <button className="reject-btn" onClick={() => { setSelectedAdmin(admin); setShowDeleteModal(true); }}>Delete</button>
+                          <button
+                            className="reject-btn"
+                            onClick={() => {
+                              setSelectedAdmin(admin);
+                              setShowDeleteModal(true);
+                            }}
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>No results found.</td></tr>
+                    <tr>
+                      <td
+                        colSpan={5}
+                        style={{ textAlign: "center", padding: "16px" }}
+                      >
+                        No results found.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
               {viewMode === "admins" && totalAdminPages > 1 && (
                 <div className="pagination">
-                  <button disabled={adminPage === 1} onClick={() => setAdminPage(prev => prev - 1)}>Prev</button>
-                  <span>Page {adminPage} of {totalAdminPages}</span>
-                  <button disabled={adminPage === totalAdminPages} onClick={() => setAdminPage(prev => prev + 1)}>Next</button>
+                  <button
+                    disabled={adminPage === 1}
+                    onClick={() => setAdminPage((prev) => prev - 1)}
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    Page {adminPage} of {totalAdminPages}
+                  </span>
+                  <button
+                    disabled={adminPage === totalAdminPages}
+                    onClick={() => setAdminPage((prev) => prev + 1)}
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>
@@ -398,11 +550,22 @@ export default function AdminManagement() {
           <div className="modal">
             <h3 className="modal-title">Approve Admin Account</h3>
             <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
-              Are you sure you want to approve <strong>{selectedRequest?.fullName}</strong>?
+              Are you sure you want to approve{" "}
+              <strong>{selectedRequest?.fullName}</strong>?
             </p>
             <div className="modal-actions">
-              <button className="approve-btn" onClick={handleApprove}>Confirm Approval</button>
-              <button className="reject-btn" onClick={() => { setShowApproveModal(false); setSelectedRequest(null); }}>Cancel</button>
+              <button className="approve-btn" onClick={handleApprove}>
+                Confirm Approval
+              </button>
+              <button
+                className="reject-btn"
+                onClick={() => {
+                  setShowApproveModal(false);
+                  setSelectedRequest(null);
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -413,10 +576,22 @@ export default function AdminManagement() {
         <div className="modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Confirm Rejection</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>Are you sure you want to reject this request?</p>
+            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+              Are you sure you want to reject this request?
+            </p>
             <div className="modal-actions">
-              <button className="reject-btn" onClick={confirmReject}>Reject</button>
-              <button className="approve-btn" onClick={() => { setShowRejectModal(false); setSelectedRequest(null); }}>Cancel</button>
+              <button className="reject-btn" onClick={confirmReject}>
+                Reject
+              </button>
+              <button
+                className="approve-btn"
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setSelectedRequest(null);
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -427,23 +602,38 @@ export default function AdminManagement() {
         <div className="modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Delete Admin</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>This action cannot be undone. <br /> Delete this admin?</p>
+            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+              This action cannot be undone. <br /> Delete this admin?
+            </p>
             <div className="modal-actions">
-              <button className="reject-btn" onClick={confirmDeleteAdmin}>Delete</button>
-              <button className="approve-btn" onClick={() => { setShowDeleteModal(false); setSelectedAdmin(null); }}>Cancel</button>
+              <button className="reject-btn" onClick={confirmDeleteAdmin}>
+                Delete
+              </button>
+              <button
+                className="approve-btn"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedAdmin(null);
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* View Admin Details Modal */}
+      {/* View Admin Details Modal */}
       {showViewModal && selectedAdmin && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "420px" }}>
+            
             <div className="as-modal-header">
               <h2>Admin Details</h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
             </div>
+            
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
               <div className="admin-details">
                 <p><strong>Full Name:</strong> {selectedAdmin.fullName}</p>
@@ -451,12 +641,53 @@ export default function AdminManagement() {
                 <p><strong>Contact:</strong> {selectedAdmin.contact}</p>
                 <p><strong>Position:</strong> {selectedAdmin.position}</p>
                 <p><strong>Username:</strong> {selectedAdmin.username}</p>
+
+                {/* --- NEW: SYSTEM ROLE SECTION --- */}
+                <div style={{ marginTop: "16px", borderTop: "1px dashed #ccc", paddingTop: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <strong>System Role:</strong>
+                    
+                    {/* Logic: Only Super Admin can edit, and cannot edit themselves */}
+                    {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid ? (
+                      <select 
+                        value={editedRole} 
+                        onChange={(e) => setEditedRole(e.target.value)}
+                        style={{ padding: "6px 10px", borderRadius: "4px", border: "1px solid #ccc", outline: "none", cursor: "pointer" }}
+                      >
+                        <option value="Super Admin">Super Admin</option>
+                        <option value="Document Admin">Document Admin</option>
+                        <option value="Facility Admin">Facility Admin</option>
+                        <option value="Standard Admin">Standard Admin</option>
+                        <option value="Secretary">Secretary</option>
+                      </select>
+                    ) : (
+                      <span style={{ 
+                        background: selectedAdmin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6', 
+                        color: selectedAdmin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
+                        padding: "4px 12px", 
+                        borderRadius: "20px", 
+                        fontSize: "0.85rem",
+                        fontWeight: "600"
+                      }}>
+                        {selectedAdmin.role || "Standard Admin"}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
+              
+              {/* --- NEW: SAVE CHANGES BUTTON --- */}
+              {/* Only shows if user is Super Admin, is not editing themselves, and actually changed the dropdown */}
+              {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && editedRole !== (selectedAdmin.role || "Standard Admin") && (
+                <div className="modal-actions" style={{ marginTop: "20px", justifyContent: "flex-end", borderTop: "1px solid #eee", paddingTop: "16px" }}>
+                  <button className="approve-btn" onClick={handleSaveRole}>Save Role Changes</button>
+                </div>
+              )}
+
             </div>
           </div>
         </div>
       )}
-
     </AdminLayout>
   );
 }
