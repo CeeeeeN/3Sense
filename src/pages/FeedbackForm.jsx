@@ -16,7 +16,6 @@ const generateRefId = () => {
 function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
   return (
     <div className="fb-confirm-wrap">
-      {/* Success Icon */}
       <div className="fb-confirm-icon">
         <CheckCircleIcon />
       </div>
@@ -26,13 +25,11 @@ function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
         Thank you for submitting your feedback regarding the {serviceName}. Your submission has been received and recorded.
       </p>
 
-      {/* Reference ID */}
       <div className="fb-confirm-ref">
         <span className="fb-confirm-ref__label">Reference ID</span>
         <span className="fb-confirm-ref__id">{refId}</span>
       </div>
 
-      {/* Submission Status */}
       <div className="fb-confirm-status-wrap">
         <div className="fb-confirm-status-title">Submission Status</div>
         <div className="fb-confirm-timeline">
@@ -57,13 +54,11 @@ function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
           </div>
         </div>
 
-        {/* AI Notice */}
         <div className="fb-confirm-ai-note">
           Automated analysis has been completed. Your feedback is currently under review.
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="fb-confirm-actions">
         <button className="fb-confirm-btn-primary" onClick={onGoActivity}>
           <ActivityIcon /> View Progress in Activity
@@ -92,30 +87,27 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
 
   const [serviceId, setServiceId] = useState("general");
   const [serviceName, setServiceName] = useState("General Barangay Service");
-  const [category, setCategory] = useState("General"); // NEW: Category State
+  const [category, setCategory] = useState("General"); 
 
   useEffect(() => {
-    // Check if the app successfully passed the service as a prop (e.g. from QR scan or navigation)
     if (service && service.name) {
       setServiceId(service.id);
       setServiceName(service.name || service.fullName || "General Barangay Service");
-      setCategory(service.category || "General"); // NEW: Capture from props
+      setCategory(service.category || "General"); 
     } else {
-      // Fallback: Grab ID, Name, AND Category from the QR Code URL
       const urlParams = new URLSearchParams(window.location.search);
       const scannedId = urlParams.get('serviceId');
       const scannedName = urlParams.get('serviceName');
-      const scannedCategory = urlParams.get('category'); // NEW: Capture from URL
+      const scannedCategory = urlParams.get('category'); 
 
       if (scannedId) {
         setServiceId(scannedId);
         setServiceName(scannedName || "General Barangay Service");
-        setCategory(scannedCategory || "General"); // NEW: Set state
+        setCategory(scannedCategory || "General"); 
       }
     }
   }, [service]);
 
-  // Fallback styling if no service prop is passed
   const currentService = service || {
     description: "Your feedback helps us improve public services.",
     color: "#317D89",
@@ -151,24 +143,33 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     try {
       const ref = generateRefId();
 
-      // default AI fallback values
+      // Default variables including the new Hybrid metrics
       let finalSentiment = null;
       let finalConfidence = null;
-      let finalStatus = 'pending'; // Default if AI fails
+      let finalHybridScore = null;
+      let finalTextScore = null;
+      let finalStatus = 'pending'; 
       
-      // Try to send feedback to AI analysis API
       try {
+        // --- UPDATED API CALL: Now sending BOTH text and rating ---
         const aiResponse = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: comment })
+          body: JSON.stringify({ 
+            text: comment,
+            rating: rating 
+          })
         });
 
-        // Only parse JSON if the API actually succeeded
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
           finalSentiment = aiData.sentiment || null;
           finalConfidence = aiData.confidence || null;
+          
+          // Capture the new metrics returned from Vercel
+          finalHybridScore = aiData.hybridScore || null;
+          finalTextScore = aiData.textScore || null;
+
           if (finalSentiment) {
             finalStatus = 'analyzed';
           } else {
@@ -184,7 +185,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         finalStatus = 'analysis_failed';
       }
 
-      // Save dynamic QR Code data to Firestore
+      // --- UPDATED FIRESTORE SAVE: Saving the hybrid formula results ---
       await addDoc(collection(db, "Feedback"), {
         ReferenceID: ref,
         FacilityID: serviceId,        
@@ -195,6 +196,8 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         Comment: comment,
         Status: finalStatus,              
         Confidence: finalConfidence,
+        HybridScore: finalHybridScore, // Added to database!
+        TextScore: finalTextScore,     // Added to database!
         CreatedAt: serverTimestamp(),
         UserName: userName,
         HasPhoto: !!photo,
@@ -230,10 +233,9 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     );
   }
 
-  // FEEDBACK FORM
+  // FEEDBACK FORM UI
   return (
     <main className="fb-page">
-      {/* ── Top Bar ── */}
       <div className="fb-topbar">
         <button className="fb-topbar__back" onClick={() => onNavigate && onNavigate("scan")}>
           <ArrowLeftIcon />
@@ -242,27 +244,22 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       </div>
 
       <div className="fb-card">
-
-        {/* ── Attendance Verified Banner ── */}
         <div className="fb-verified-banner">
           <CheckCircleIcon style={{ width: 16, height: 16 }} />
           <span>Attendance Verified!</span>
         </div>
 
-        {/* ── Service Info ── */}
         <div className="fb-service-info" style={{ background: currentService.bg, borderColor: currentService.border }}>
           <div className="fb-service-info__icon" style={{ color: currentService.color }}>
             <MapPinIcon />
           </div>
           <div>
-            {/* UPDATED: Displays the locked category to the user */}
             <div className="fb-service-info__label">Service / Event • {category}</div>
             <div className="fb-service-info__name">{serviceName}</div>
             <div className="fb-service-info__desc">{currentService.description}</div>
           </div>
         </div>
 
-        {/* ── Star Rating ── */}
         <div className="fb-field">
           <label className="fb-label">
             Rate your experience <span className="fb-required">*</span>
@@ -296,7 +293,6 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           {errors.rating && <span className="fb-error-msg">{errors.rating}</span>}
         </div>
 
-        {/* ── Comments ── */}
         <div className="fb-field">
           <label className="fb-label">
             Comments or Suggestions <span className="fb-required">*</span>
@@ -313,7 +309,6 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           {errors.comment && <span className="fb-error-msg">{errors.comment}</span>}
         </div>
 
-        {/* ── Photo Upload ── */}
         <div className="fb-field">
           <label className="fb-label">Image (Optional)</label>
           <p className="fb-hint">Attach photo documentation if applicable</p>
@@ -341,7 +336,6 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           </label>
         </div>
 
-        {/* ── AI Notice ── */}
         <div className="fb-ai-notice">
           <div className="fb-ai-notice__icon">
             <BoltIcon />
@@ -354,7 +348,6 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           </div>
         </div>
 
-        {/* ── Privacy Notice ── */}
         <div className="fb-privacy-notice">
           <ShieldIcon />
           <span>
@@ -362,7 +355,6 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           </span>
         </div>
 
-        {/* ── Submit ── */}
         <button
           className="fb-submit-btn"
           onClick={handleSubmit}
