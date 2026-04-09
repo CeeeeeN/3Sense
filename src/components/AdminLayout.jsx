@@ -96,7 +96,7 @@ export default function AdminLayout({ children }) {
   const handleLogout = async () => {
     try {
       await auth.signOut();
-      window.location.href = "/login";
+      window.location.href = "/admin/login";
     } catch (error) {
       console.error("Logout error:", error);
     }
