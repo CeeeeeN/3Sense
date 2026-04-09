@@ -1,0 +1,307 @@
+import React, { useState } from "react";
+import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
+import { QRCodeSVG } from "qrcode.react";
+import FormBuilder from "../../components/FormBuilder";
+
+const INITIAL_FACILITIES = [
+  { id: "f1", name: "Barangay Multi-Purpose Hall", description: "Spacious hall suitable for events, meetings, seminars.", hours: "8:00 AM - 9:00 PM", available: true, customFields: [] },
+  { id: "f2", name: "Basketball Court", description: "Open-air basketball court available for recreational use.", hours: "6:00 AM - 10:00 PM", available: true, customFields: [] },
+  { id: "f3", name: "Health Center", description: "Barangay health center for consultations.", hours: "8:00 AM - 5:00 PM", available: false, customFields: [] },
+];
+
+export default function ManageFacilities() {
+  const [facilities, setFacilities] = useState(INITIAL_FACILITIES);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showGlobalQRModal, setShowGlobalQRModal] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState(null);
+  const [selectedQR, setSelectedQR] = useState(null);
+  const [editingFacilityId, setEditingFacilityId] = useState(null);
+
+  // Mock calendar state
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [blockedDates, setBlockedDates] = useState(["2026-04-15", "2026-04-20"]);
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const toggleDate = (dateStr) => {
+    if (blockedDates.includes(dateStr)) setBlockedDates(blockedDates.filter(d => d !== dateStr));
+    else setBlockedDates([...blockedDates, dateStr]);
+  };
+
+  const [newFacility, setNewFacility] = useState({
+    name: "", description: "", openTime: "08:00", closeTime: "17:00", available: true, customFields: []
+  });
+
+  const handleEdit = (fac) => {
+    setNewFacility({ 
+      name: fac.name, 
+      description: fac.description || "", 
+      openTime: fac.openTime || "08:00",
+      closeTime: fac.closeTime || "17:00",
+      available: fac.available !== false,
+      customFields: fac.customFields || []
+    });
+    setEditingFacilityId(fac.id);
+    setShowAddModal(true);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this facility?")) {
+      setFacilities(facilities.filter(f => f.id !== id));
+    }
+  };
+
+  const handleAddFacility = (e) => {
+    e.preventDefault();
+    if (editingFacilityId) {
+      setFacilities(facilities.map(f => f.id === editingFacilityId ? { ...f, ...newFacility, hours: `${newFacility.openTime} - ${newFacility.closeTime}` } : f));
+    } else {
+      setFacilities([...facilities, { id: `f${Date.now()}`, ...newFacility, hours: `${newFacility.openTime} - ${newFacility.closeTime}` }]);
+    }
+    setNewFacility({ name: "", description: "", openTime: "8:00 AM", closeTime: "5:00 PM", available: true, customFields: [] });
+    setEditingFacilityId(null);
+    setShowAddModal(false);
+  };
+
+  const openAddModal = () => {
+    setEditingFacilityId(null);
+    setNewFacility({ name: "", description: "", openTime: "08:00", closeTime: "17:00", available: true, customFields: [] });
+    setShowAddModal(true);
+  };
+
+  const openCalendar = (fac) => {
+    setSelectedFacility(fac);
+    setShowCalendarModal(true);
+  };
+
+  const handleGenerateGlobalQR = () => {
+    const residentAppUrl = "https://3-sense.vercel.app/";
+    const encodedUrl = `${residentAppUrl}?serviceId=facilities_global&serviceName=${encodeURIComponent("All Facilities")}&category=Facilities`;
+    setSelectedQR({ name: "Facility Reservation Portal", qrValue: encodedUrl });
+  };
+
+  const handleDownloadQR = () => {
+    const svgElement = document.getElementById("as-qr-svg");
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = canvas.toDataURL("image/png");
+      downloadLink.download = `3Sense-QR-Facilities.png`;
+      downloadLink.click();
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+  };
+
+  const filteredFacs = facilities.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  return (
+    <div className="as-container" style={{ padding: 0 }}>
+      <div className="as-header-section">
+        <div className="as-title-wrap">
+          <h1>Facilities</h1>
+          <p className="as-subtitle">Manage reservable barangay facilities and availability calendar</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="as-qr-btn" onClick={handleGenerateGlobalQR}>
+            <Manage_IconQR /> Generate Global QR
+          </button>
+          <button className="as-btn-aqua" onClick={openAddModal}>
+            <IconAdd /> Add Facility
+          </button>
+        </div>
+      </div>
+
+      <div className="as-controls">
+        <div className="as-search-box">
+          <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input type="text" placeholder="Search facilities..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="as-card-grid">
+        {filteredFacs.map((fac) => (
+          <div className="as-card" key={fac.id}>
+            <div className="as-card-header">
+              <h2 className="as-card-title">{fac.name}</h2>
+              <span className={`as-badge ${fac.available ? "open" : "ongoing"}`}>
+                {fac.available ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            <p className="as-card-desc">{fac.description}</p>
+            <ul className="as-card-details">
+              <li><Manage_IconClock /> {fac.hours}</li>
+            </ul>
+            <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', width: '100%' }} onClick={() => openCalendar(fac)}>View Calendar</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>Edit</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id)}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showAddModal && (
+        <div className="as-modal-overlay">
+          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }}>
+            <div className="as-modal-header">
+              <h2>{editingFacilityId ? "Edit Facility" : "Add Facility"}</h2>
+              <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
+            </div>
+            
+            <div className="as-modal-body" style={{ alignItems: 'stretch' }}>
+              <form className="as-form" onSubmit={handleAddFacility}>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div className="as-form-group">
+                    <label className="as-form-label">Facility Name</label>
+                    <input type="text" className="as-form-input" required placeholder="e.g. Barangay Hall"
+                      value={newFacility.name} onChange={(e) => setNewFacility({...newFacility, name: e.target.value})} 
+                    />
+                  </div>
+
+                  <div className="as-form-group">
+                    <label className="as-form-label">Opening Time</label>
+                    <input type="time" className="as-form-input" required
+                      value={newFacility.openTime} onChange={(e) => setNewFacility({...newFacility, openTime: e.target.value})} 
+                    />
+                  </div>
+
+                  <div className="as-form-group">
+                    <label className="as-form-label">Closing Time</label>
+                    <input type="time" className="as-form-input" required
+                      value={newFacility.closeTime} onChange={(e) => setNewFacility({...newFacility, closeTime: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                <div className="as-form-group">
+                  <label className="as-form-label">Description / Guidelines</label>
+                  <textarea className="as-form-textarea" required rows="2" placeholder="Facility rules, capacity, etc."
+                    value={newFacility.description} onChange={(e) => setNewFacility({...newFacility, description: e.target.value})} 
+                  />
+                </div>
+
+                <div className="as-form-section">
+                  <h3 className="as-form-section-title">Availability Setting</h3>
+                  <label className="as-checkbox-label">
+                    <input type="checkbox" className="as-checkbox" checked={newFacility.available} onChange={(e) => setNewFacility({...newFacility, available: e.target.checked})} />
+                    Available for Reservation
+                  </label>
+                </div>
+
+                <div className="as-form-section" style={{ marginTop: '20px' }}>
+                  <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    Default Collected Fields
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '12px', marginTop: '-10px' }}>The following information is automatically collected. Do not recreate them in the form builder.</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {["Full Name", "Contact Number", "Purpose", "Reservation Date", "Start Time", "End Time", "Estimated Number of Pax", "Additional Notes"].map(f => (
+                      <span key={f} style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <FormBuilder 
+                  fields={newFacility.customFields} 
+                  onChange={(fields) => setNewFacility({ ...newFacility, customFields: fields })} 
+                />
+
+                <div className="as-modal-actions">
+                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>
+                  <button type="submit" className="as-btn-aqua" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Save Facility</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCalendarModal && selectedFacility && (
+        <div className="as-modal-overlay">
+          <div className="as-modal-content" style={{ maxWidth: '600px' }}>
+            <div className="as-modal-header">
+              <h2>Availability Calendar - {selectedFacility.name}</h2>
+              <button className="as-modal-close" onClick={() => setShowCalendarModal(false)}>&times;</button>
+            </div>
+            <div className="as-modal-body" style={{ padding: '20px' }}>
+              <p className="as-modal-desc" style={{ marginBottom: '20px', textAlign: 'center' }}>
+                Click a date to toggle its availability. Red dates are blocked and cannot be reserved by users.
+              </p>
+              
+              <div className="sv-calendar" style={{ margin: '0 auto', maxWidth: '400px' }}>
+                <div className="sv-cal-nav">
+                  <button className="sv-cal-arrow" onClick={prevMonth}><ChevronLeftIcon /></button>
+                  <span className="sv-cal-title">{MONTHS[viewMonth]} {viewYear}</span>
+                  <button className="sv-cal-arrow" onClick={nextMonth}><ChevronRightIcon /></button>
+                </div>
+                <div className="sv-cal-grid">
+                  {DAYS.map(d => <div key={d} className="sv-cal-day-label">{d}</div>)}
+                  {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const d = i + 1;
+                    const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                    const isBlocked = blockedDates.includes(dateStr);
+                    return (
+                      <button key={d} 
+                        className={`sv-cal-cell sv-cal-cell--${isBlocked ? "reserved" : "available"}`}
+                        onClick={() => toggleDate(dateStr)}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="sv-cal-legend" style={{ justifyContent: 'center' }}>
+                  <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
+                  <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Blocked</span>
+                </div>
+              </div>
+              
+              <div className="as-modal-actions" style={{ justifyContent: 'flex-end', marginTop: '30px' }}>
+                <button className="as-btn-aqua" onClick={() => setShowCalendarModal(false)}>Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedQR && (
+        <div className="as-modal-overlay">
+          <div className="as-modal-content" style={{ maxWidth: '450px' }}>
+            <div className="as-modal-header">
+              <h2>QR Code Generated</h2>
+              <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>
+            </div>
+            <div className="as-modal-body" style={{ textAlign: 'center' }}>
+              <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
+              <h3>{selectedQR.name}</h3>
+              <p className="as-modal-desc">Residents can scan this shared code to access all Facility reservations.</p>
+              <div className="as-qr-holder" style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
+                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true}/>
+              </div>
+              <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: '100%' }}><IconDownload /> Download QR Code (PNG)</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
