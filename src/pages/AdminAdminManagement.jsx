@@ -63,8 +63,8 @@ export default function AdminManagement() {
           const userData = pendingSnapshot.docs[0].data();
           if (
             userData.position === "Service Head" ||
-            userData.position === "Super admin" ||
-            userData.position === "Super Admin"
+            userData.role === "Super admin" ||
+            userData.role === "Super Admin"
           ) {
             setIsSuperAdmin(true);
           }
@@ -81,8 +81,8 @@ export default function AdminManagement() {
           const userData = approvedSnapshot.docs[0].data();
           if (
             userData.position === "Service Head" ||
-            userData.position === "Super admin" ||
-            userData.position === "Super Admin"
+            userData.role === "Super admin" ||
+            userData.role === "Super Admin"
           ) {
             setIsSuperAdmin(true);
           }
