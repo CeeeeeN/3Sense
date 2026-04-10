@@ -10,6 +10,10 @@ export default function ServiceLivelihood({ onBack }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProgram, setNewProgram] = useState({ name: "", description: "", date: "", time: "", customFields: [] });
 
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectId, setRejectId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+
   const handleAddProgram = (e) => {
     e.preventDefault();
     setLivelihoodPrograms([...livelihoodPrograms, { ...newProgram, id: Date.now().toString() }]);
@@ -27,12 +31,21 @@ export default function ServiceLivelihood({ onBack }) {
 
   const updateStatus = (id, newStatus) => {
     if (newStatus === 'Rejected') {
-      const reason = window.prompt("Please state the reason for rejecting this applicant:");
-      if (reason === null) return;
-      setParticipants(participants.map(p => p.id === id ? { ...p, status: newStatus, reason } : p));
+      setRejectId(id);
+      setRejectReason("");
+      setShowRejectModal(true);
     } else {
       setParticipants(participants.map(p => p.id === id ? { ...p, status: newStatus } : p));
     }
+  };
+
+  const handleConfirmReject = (e) => {
+    e.preventDefault();
+    if (!rejectId || !rejectReason.trim()) return;
+    setParticipants(participants.map(p => p.id === rejectId ? { ...p, status: 'Rejected', reason: rejectReason } : p));
+    setShowRejectModal(false);
+    setRejectId(null);
+    setRejectReason("");
   };
 
   return (

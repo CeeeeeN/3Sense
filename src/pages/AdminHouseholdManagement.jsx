@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { db, auth } from "../firebase/firebase";
-import { 
-  collection, 
-  onSnapshot, 
-  doc, 
-  deleteDoc, 
-  updateDoc, 
+import {
+  collection,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  updateDoc,
   collectionGroup,
   arrayUnion,
   serverTimestamp,
@@ -32,7 +32,7 @@ export default function HouseholdManagement() {
 
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
-  const defaultRows = 3;
+  const defaultRows = 10;
 
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusData, setStatusData] = useState(null);
@@ -93,53 +93,82 @@ export default function HouseholdManagement() {
     return () => unsub();
   }, []);
 
-  // Fetch Active Residents & Pending Activations
   useEffect(() => {
-    const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (resSnapshot) => {
-      const activeResidents = resSnapshot.docs.map(docSnap => {
+    let latestActive = [];
+    let latestPending = [];
+
+    const merge = () => {
+
+      const seen = new Set();
+      const deduped = latestActive.filter(r => {
+        const key = `${r.householdId}__${r.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      // pendingHeads only exist when activated===false, so they
+      // cannot overlap with any active resident doc. Just append.
+      setResidents([...deduped, ...latestPending]);
+    };
+
+    // Listener 1: all activated residents (households/{id}/residents/*)
+    const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (snap) => {
+      latestActive = snap.docs.map(docSnap => {
         const data = docSnap.data();
-        const householdId = docSnap.ref.parent.parent.id;
+        const householdId = docSnap.ref.parent.parent?.id || "Unknown";
         return {
+          ...data,
           id: docSnap.id,
           householdId,
           fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
-          category: data.categories || [],
-          address: data.houseNumber ? `${data.houseNumber} ${data.street}, ${data.barangay}` : 'Shared Household Address',
+          category: Array.isArray(data.categories) ? data.categories
+            : Array.isArray(data.category) ? data.category
+              : typeof data.category === "string" && data.category ? [data.category]
+                : [],
+          address: data.houseNumber
+            ? `${data.houseNumber} ${data.street || ""}, ${data.barangay || ""}`
+            : "Shared Household Address",
           status: data.adminStatus || "Clear Case",
           remarks: data.adminRemarks || "",
           incident: data.adminIncident || "",
           statusHistory: data.statusHistory || [],
-          ...data
         };
       });
-
-      const unsubHouseholds = onSnapshot(collection(db, "households"), (hhSnapshot) => {
-        const pendingHeads = [];
-        hhSnapshot.docs.forEach(hhDoc => {
-          const hhData = hhDoc.data();
-          if (hhData.activated === false && hhData._pendingHeadData) {
-            const head = hhData._pendingHeadData;
-            pendingHeads.push({
-              id: `unactivated-${hhDoc.id}`,
-              householdId: hhDoc.id,
-              fullName: `${head.firstName || ""} ${head.lastName || ""}`.trim(),
-              category: head.categories || [],
-              address: hhData.houseNumber ? `${hhData.houseNumber} ${hhData.street}, ${hhData.barangay}` : '',
-              status: "Pending Activation",
-              isPendingActivation: true,
-              statusHistory: [],
-              ...head
-            });
-          }
-        });
-
-        setResidents([...activeResidents, ...pendingHeads]);
-      });
-
-      return () => unsubHouseholds();
+      merge();
     });
 
-    return () => unsubResidents();
+    // Listener 2: households not yet activated (pending heads)
+    const unsubHouseholds = onSnapshot(collection(db, "households"), (snap) => {
+      latestPending = [];
+      snap.docs.forEach(hhDoc => {
+        const hhData = hhDoc.data();
+        if (hhData.activated === false && hhData._pendingHeadData) {
+          const head = hhData._pendingHeadData;
+          latestPending.push({
+            ...head,
+            id: `unactivated-${hhDoc.id}`,
+            householdId: hhDoc.id,
+            fullName: `${head.firstName || ""} ${head.lastName || ""}`.trim(),
+            category: Array.isArray(head.categories) ? head.categories
+              : Array.isArray(head.category) ? head.category
+                : typeof head.category === "string" && head.category ? [head.category]
+                  : [],
+            address: hhData.houseNumber
+              ? `${hhData.houseNumber} ${hhData.street || ""}, ${hhData.barangay || ""}`
+              : "",
+            status: "Pending Activation",
+            isPendingActivation: true,
+            statusHistory: [],
+          });
+        }
+      });
+      merge();
+    });
+
+    return () => {
+      unsubResidents();
+      unsubHouseholds();
+    };
   }, []);
 
 
@@ -204,24 +233,37 @@ export default function HouseholdManagement() {
   };
 
   // ================= RESIDENT FILTERS =================
-  const filteredResidents = residents.filter(r => {
-    const searchText = search.toLowerCase();
+  const filteredResidents = useMemo(() => {
+    const seenKeys = new Set();
+    const unique = residents.filter(r => {
+      const key = `${r.householdId}__${r.id}`;
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
 
-    const matchesSearch =
-      r.fullName.toLowerCase().includes(searchText) ||
-      r.householdId.toLowerCase().includes(searchText);
+    return unique.filter(r => {
+      const searchText = search.toLowerCase();
 
-    const matchesCategory =
-      filterCategory === "All" || 
-      (r.category && r.category.some(cat => 
-        cat.toLowerCase().includes(filterCategory.toLowerCase())
-      ));
+      const matchesSearch =
+        r.fullName.toLowerCase().includes(searchText) ||
+        (r.householdId || "").toLowerCase().includes(searchText);
 
-    const matchesStatus =
-      filterStatus === "All" || r.status === filterStatus;
+      const matchesCategory =
+        filterCategory === "All" ||
+        (Array.isArray(r.category) && r.category.some(cat => {
+          // strip emoji / non-word chars and compare
+          const cleaned = cat.replace(/[^\w\s]/g, "").trim();
+          return cleaned.toLowerCase().includes(filterCategory.toLowerCase());
+        }));
 
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+      const matchesStatus =
+        filterStatus === "All" ||
+        (r.status || "").toLowerCase() === filterStatus.toLowerCase();
+
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [residents, search, filterCategory, filterStatus]);
 
   const paginatedResidents = residentViewMode === "default"
     ? filteredResidents.slice(0, defaultRows)
@@ -285,92 +327,60 @@ export default function HouseholdManagement() {
 
         {/* ================= HOUSEHOLD REGISTRATION REQUESTS ================= */}
         {(hhViewMode === "default" || hhViewMode === "requests") && residentViewMode === "default" && (
-          <div className="section">
-            <div className="section-header">
-              <h2>
-                Resident Registration Requests ({filteredHhRequests.filter(r => r.status === "pending").length})
-              </h2>
+          <div style={{ marginBottom: "40px" }}>
+            <div className="af-header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 className="af-title" style={{ fontSize: '24px' }}>
+                  Registration Requests
+                </h2>
+                <p className="af-subtitle">Pending approval ({filteredHhRequests.filter(r => r.status === "pending").length})</p>
+              </div>
               {hhViewMode === "default" ? (
-                <button
-                  className="view-btn"
-                  onClick={() => setHhViewMode("requests")}
-                >
-                  See All
-                </button>
+                <button className="af-view-btn" onClick={() => setHhViewMode("requests")}>See All Requests</button>
               ) : (
-                <button
-                  className="view-btn"
-                  onClick={() => {
-                    setHhViewMode("default");
-                    setSearchHhRequest("");
-                    setFilterHhStatus("All");
-                  }}
-                >
-                  Return
-                </button>
+                <button className="af-view-btn" style={{ background: '#6b7280' }} onClick={() => { setHhViewMode("default"); setSearchHhRequest(""); setFilterHhStatus("All"); }}>Return</button>
               )}
             </div>
 
-            <div className="card">
-              <div className="table-controls">
-                <input
-                  type="text"
-                  placeholder="Search name..."
-                  value={searchHhRequest}
-                  onChange={(e) => setSearchHhRequest(e.target.value)}
-                />
+            <div className="af-controls">
+              <div className="af-search-box">
+                <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" placeholder="Search by name..." value={searchHhRequest} onChange={(e) => setSearchHhRequest(e.target.value)} />
               </div>
+            </div>
 
-              <table className="admin-table">
-                <thead>
+            <div className="af-table-wrapper">
+              <table className="af-table">
+                <thead style={{ background: '#f9fafb' }}>
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
                     <th>Category</th>
                     <th>Date Submitted</th>
-                    <th>Action</th>
+                    <th style={{ textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {paginatedHhRequests.length > 0 ? (
                     paginatedHhRequests.map((req) => (
                       <tr key={req.id}>
-                        <td>{req.fullName}</td>
-                        <td>{req.householdId}</td>
-                        <td>{req.category && req.category.join(", ")}</td>
-                        <td>{req.dateSubmitted}</td>
+                        <td style={{ fontWeight: 500 }}>{req.fullName}</td>
+                        <td style={{ color: '#4b5563' }}>{req.householdId}</td>
+                        <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {req.category && req.category.map((c, i) => (
+                              <span key={i} style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={{ color: '#6b7280' }}>{req.dateSubmitted}</td>
                         <td>
-                          <div className="resident-btns">
-                            <button
-                              className="view-btn"
-                              onClick={() => {
-                                setSelectedHhRequest(req);
-                                setShowHhViewModal(true);
-                              }}
-                            >
-                              View
-                            </button>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedHhRequest(req); setShowHhViewModal(true); }}>View</button>
                             {req.status === "pending" && (
                               <>
-                                <button
-                                  className="approve-btn"
-                                  onClick={() => {
-                                    setSelectedHhRequest(req);
-                                    setShowHhApproveModal(true);
-                                  }}
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  className="reject-btn"
-                                  onClick={() => {
-                                    setSelectedHhRequest(req);
-                                    setShowHhRejectModal(true);
-                                  }}
-                                >
-                                  Reject
-                                </button>
+                                <button className="as-btn-aqua" style={{ background: '#0d7a55', padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedHhRequest(req); setShowHhApproveModal(true); }}>Approve</button>
+                                <button className="as-btn-aqua" style={{ background: '#ef4444', padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedHhRequest(req); setShowHhRejectModal(true); }}>Reject</button>
                               </>
                             )}
                           </div>
@@ -378,30 +388,16 @@ export default function HouseholdManagement() {
                       </tr>
                     ))
                   ) : (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
-                        No pending requests found.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
                   )}
                 </tbody>
               </table>
 
               {hhViewMode === "requests" && totalHhRequestPages > 1 && (
-                <div className="pagination">
-                  <button
-                    disabled={hhRequestPage === 1}
-                    onClick={() => setHhRequestPage(prev => prev - 1)}
-                  >
-                    Prev
-                  </button>
-                  <span>Page {hhRequestPage} of {totalHhRequestPages}</span>
-                  <button
-                    disabled={hhRequestPage === totalHhRequestPages}
-                    onClick={() => setHhRequestPage(prev => prev + 1)}
-                  >
-                    Next
-                  </button>
+                <div className="af-pagination">
+                  <button className="af-page-btn" disabled={hhRequestPage === 1} onClick={() => setHhRequestPage(prev => prev - 1)}>Prev</button>
+                  <span style={{ margin: '0 8px', alignSelf: 'center', fontSize: '0.9rem', color: '#4b5563' }}>Page {hhRequestPage} of {totalHhRequestPages}</span>
+                  <button className="af-page-btn" disabled={hhRequestPage === totalHhRequestPages} onClick={() => setHhRequestPage(prev => prev + 1)}>Next</button>
                 </div>
               )}
             </div>
@@ -410,44 +406,26 @@ export default function HouseholdManagement() {
 
         {/* ================= REGISTERED RESIDENTS ================= */}
         {(residentViewMode === "default" || residentViewMode === "residents") && hhViewMode === "default" && (
-          <div className="section">
-            <div className="section-header">
-              <h2>Resident Account Management</h2>
+          <div style={{ marginBottom: "40px" }}>
+            <div className="af-header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 className="af-title" style={{ fontSize: '24px' }}>Resident Account Management</h2>
+                <p className="af-subtitle">Manage approved residents and update their status</p>
+              </div>
               {residentViewMode === "default" ? (
-                <button
-                  className="view-btn"
-                  onClick={() => setResidentViewMode("residents")}
-                >
-                  See All
-                </button>
+                <button className="af-view-btn" onClick={() => setResidentViewMode("residents")}>See All Residents</button>
               ) : (
-                <button
-                  className="view-btn"
-                  onClick={() => {
-                    setResidentViewMode("default");
-                    setSearch("");
-                    setFilterCategory("All");
-                    setFilterStatus("All");
-                  }}
-                >
-                  Return
-                </button>
+                <button className="af-view-btn" style={{ background: '#6b7280' }} onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); }}>Return</button>
               )}
             </div>
-            <div className="card">
 
-              <div className="table-controls">
-                <input
-                  type="text"
-                  placeholder="Search name or household ID..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                >
+            <div className="af-controls">
+              <div className="af-filters" style={{ flexGrow: 1, gap: '16px' }}>
+                <div className="af-search-box" style={{ maxWidth: '350px' }}>
+                  <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                  <input type="text" placeholder="Search name or household ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <select className="af-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
                   <option value="All">All Categories</option>
                   <option value="Student">Student</option>
                   <option value="Senior Citizen">Senior Citizen</option>
@@ -457,11 +435,7 @@ export default function HouseholdManagement() {
                   <option value="Indigenous">Indigenous</option>
                   <option value="PWD">PWD</option>
                 </select>
-
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                >
+                <select className="af-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                   <option value="All">All Status</option>
                   <option value="Clear Case">Clear Case</option>
                   <option value="Pending Case">Pending Case</option>
@@ -469,81 +443,62 @@ export default function HouseholdManagement() {
                   <option value="Pending Activation">Pending Activation</option>
                 </select>
               </div>
+            </div>
 
-              <table className="admin-table">
-                <thead>
+            <div className="af-table-wrapper">
+              <table className="af-table">
+                <thead style={{ background: '#f9fafb' }}>
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
                     <th>Category</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    <th style={{ textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
-                      <tr key={res.id}>
-                        <td>{res.fullName}</td>
-                        <td>{res.householdId}</td>
-                        <td>{res.category && res.category.join(", ")}</td>
+                      <tr key={`${res.householdId}__${res.id}`}>
+                        <td style={{ fontWeight: 500 }}>{res.fullName}</td>
+                        <td style={{ color: '#4b5563' }}>{res.householdId}</td>
+                        <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {res.category && res.category.map((c, i) => (
+                              <span key={i} style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
+                            ))}
+                          </div>
+                        </td>
                         <td>
-                          <span className={`status-badge status-${res.status.toLowerCase().replace(/\s+/g, "")}`}>
+                          <span className={`status-badge status-${res.status.toLowerCase().replace(/\s+/g, "")}`} style={{
+                            padding: '4px 10px', fontSize: '0.8rem', borderRadius: '12px', fontWeight: 600, display: 'inline-block',
+                            background: res.status === 'Clear Case' ? '#dcfce7' : res.status === 'Pending Case' ? '#fef3c7' : res.status === 'Violation' ? '#fee2e2' : '#e5e7eb',
+                            color: res.status === 'Clear Case' ? '#166534' : res.status === 'Pending Case' ? '#92400e' : res.status === 'Violation' ? '#991b1b' : '#374151'
+                          }}>
                             {res.status}
                           </span>
                         </td>
                         <td>
-                          <div className="resident-btns">
-                            <button
-                              className="view-btn"
-                              onClick={() => {
-                                setSelectedResident(res);
-                                setShowResidentModal(true);
-                              }}
-                            >
-                              View Profile
-                            </button>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View Profile</button>
                             {!res.isPendingActivation && (
-                              <button
-                                className="update-btn"
-                                onClick={() => {
-                                  setStatusData({ ...res });
-                                  setShowStatusModal(true);
-                                }}
-                              >
-                                Update Status
-                              </button>
+                              <button className="as-btn-aqua" style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
                             )}
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: "center", padding: "16px" }}>
-                        No results found.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No results found.</td></tr>
                   )}
                 </tbody>
               </table>
 
               {residentViewMode === "residents" && totalPages > 1 && (
-                <div className="pagination">
-                  <button
-                    disabled={page === 1}
-                    onClick={() => setPage(prev => prev - 1)}
-                  >
-                    Prev
-                  </button>
-                  <span>Page {page} of {totalPages}</span>
-                  <button
-                    disabled={page === totalPages}
-                    onClick={() => setPage(prev => prev + 1)}
-                  >
-                    Next
-                  </button>
+                <div className="af-pagination">
+                  <button className="af-page-btn" disabled={page === 1} onClick={() => setPage(prev => prev - 1)}>Prev</button>
+                  <span style={{ margin: '0 8px', alignSelf: 'center', fontSize: '0.9rem', color: '#4b5563' }}>Page {page} of {totalPages}</span>
+                  <button className="af-page-btn" disabled={page === totalPages} onClick={() => setPage(prev => prev + 1)}>Next</button>
                 </div>
               )}
             </div>
@@ -553,7 +508,7 @@ export default function HouseholdManagement() {
         {/* ================= RESIDENT DETAILS MODAL ================= */}
         {showResidentModal && selectedResident && (
           <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "420px" }}>
+            <div className="as-modal-content" style={{ maxWidth: "600px" }}>
 
               <div className="as-modal-header">
                 <h2>Resident Details</h2>
@@ -568,35 +523,46 @@ export default function HouseholdManagement() {
                 </button>
               </div>
 
-              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
-                <div className="admin-details">
-                  <p><strong>Full Name:</strong> {selectedResident.fullName}</p>
-                  <p><strong>Birth Date:</strong> {selectedResident.birthDate}</p>
-                  <p><strong>Sex:</strong> {selectedResident.sex}</p>
-                  <p><strong>Civil Status:</strong> {selectedResident.civilStatus}</p>
-                  <p><strong>Address:</strong> {selectedResident.address}</p>
-                  <p><strong>Category:</strong> {selectedResident.category && selectedResident.category.join(", ")}</p>
-                  <p><strong>Education:</strong> {selectedResident.educationAttainment || selectedResident.education}</p>
-                  <p><strong>Employment:</strong> {selectedResident.employmentStatus || selectedResident.employment}</p>
-                  <p><strong>Household ID:</strong> {selectedResident.householdId}</p>
-                  <p><strong>Total Members:</strong> {selectedResident.totalMembers || selectedResident.members}</p>
-                  <p>
-                    <strong>Status:</strong><br />
-                    <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>
-                      {selectedResident.status}
-                    </span>
-                  </p>
-                  {selectedResident.remarks && (
-                    <p><strong>Remarks:</strong> {selectedResident.remarks}</p>
-                  )}
-                  {selectedResident.incident && (
-                    <p><strong>Incident Details:</strong> {selectedResident.incident}</p>
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
+                  <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
+                    <strong>Household ID:</strong> {selectedResident.householdId}<br />
+                    <div style={{ marginTop: '8px' }}>
+                      <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
+                    </div>
+                  </div>
+                  <div><strong>Full Name:</strong><br />{selectedResident.fullName}</div>
+                  <div><strong>Contact No:</strong><br />{selectedResident.contactNumber || "N/A"}</div>
+                  <div><strong>Email:</strong><br />{selectedResident.email || "N/A"}</div>
+                  <div><strong>Birth Date:</strong><br />{selectedResident.birthDate} {selectedResident.age ? `(${selectedResident.age} yrs)` : ""}</div>
+                  <div><strong>Birth Place:</strong><br />{selectedResident.birthPlace || "N/A"}</div>
+                  <div><strong>Sex:</strong><br />{selectedResident.sex}</div>
+                  <div><strong>Civil Status:</strong><br />{selectedResident.civilStatus}</div>
+                  <div><strong>Religion:</strong><br />{selectedResident.religion || "N/A"}</div>
+                  <div><strong>Citizenship:</strong><br />{selectedResident.citizenship || "N/A"}</div>
+                  <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>Address:</strong><br />{selectedResident.address}</div>
+                  <div style={{ gridColumn: '1 / -1' }}><strong>Category:</strong><br />{selectedResident.category && selectedResident.category.length > 0 ? selectedResident.category.join(", ") : "None"}</div>
+                  {selectedResident.pwdStatus && <div><strong>PWD Status:</strong><br />{selectedResident.pwdStatus}</div>}
+                  {selectedResident.disabilityType && <div><strong>Disability Type:</strong><br />{selectedResident.disabilityType}</div>}
+                  <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', marginTop: '-4px' }}></div>
+                  <div><strong>Education:</strong><br />{selectedResident.educationAttainment || selectedResident.education || "N/A"}</div>
+                  <div><strong>Ed. Status:</strong><br />{selectedResident.educationStatus || "N/A"}</div>
+                  <div><strong>Employment:</strong><br />{selectedResident.employmentStatus || selectedResident.employment || "N/A"}</div>
+                  <div><strong>Occupation:</strong><br />{selectedResident.occupation || "N/A"}</div>
+                  <div><strong>Total Members:</strong><br />{selectedResident.totalMembers || selectedResident.members || "N/A"}</div>
+                  <div><strong>Household Class.:</strong><br />{selectedResident.householdClassification || "N/A"}</div>
+
+                  {(selectedResident.remarks || selectedResident.incident) && (
+                    <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', color: '#b91c1c' }}>
+                      {selectedResident.remarks && <div style={{ marginBottom: '8px' }}><strong>Remarks:</strong><br />{selectedResident.remarks}</div>}
+                      {selectedResident.incident && <div><strong>Incident Details:</strong><br />{selectedResident.incident}</div>}
+                    </div>
                   )}
                   {selectedResident.adminLastUpdatedBy && (
-                    <p style={{ fontSize: "0.8rem", color: "#888", marginTop: "8px" }}>
+                    <div style={{ gridColumn: '1 / -1', fontSize: "0.8rem", color: "#888", marginTop: "8px" }}>
                       Last updated by <strong>{selectedResident.adminLastUpdatedBy}</strong>
                       {selectedResident.adminLastUpdatedByPosition ? ` (${selectedResident.adminLastUpdatedByPosition})` : ""}
-                    </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -689,7 +655,7 @@ export default function HouseholdManagement() {
         {/* ================= HH REQUEST VIEW MODAL ================= */}
         {showHhViewModal && selectedHhRequest && (
           <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "420px" }}>
+            <div className="as-modal-content" style={{ maxWidth: "600px" }}>
 
               <div className="as-modal-header">
                 <h2>Household Request Details</h2>
@@ -704,26 +670,36 @@ export default function HouseholdManagement() {
                 </button>
               </div>
 
-              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
-                <div className="admin-details">
-                  <p><strong>Full Name:</strong> {selectedHhRequest.fullName}</p>
-                  <p><strong>Birth Date:</strong> {selectedHhRequest.birthDate}</p>
-                  <p><strong>Sex:</strong> {selectedHhRequest.sex}</p>
-                  <p><strong>Civil Status:</strong> {selectedHhRequest.civilStatus}</p>
-                  <p><strong>Address:</strong> {selectedHhRequest.address}</p>
-                  <p><strong>Contact Number:</strong> {selectedHhRequest.contactNumber}</p>
-                  <p><strong>Email:</strong> {selectedHhRequest.email}</p>
-                  <p><strong>Category:</strong> {selectedHhRequest.category && selectedHhRequest.category.join(", ")}</p>
-                  <p><strong>Education:</strong> {selectedHhRequest.educationAttainment}</p>
-                  <p><strong>Employment:</strong> {selectedHhRequest.employmentStatus}</p>
-                  <p><strong>Total Members:</strong> {selectedHhRequest.totalMembers}</p>
-                  <p><strong>Date Submitted:</strong> {selectedHhRequest.dateSubmitted}</p>
-                  <p>
-                    <strong>Status:</strong><br />
-                    <span className={`status-badge status-${selectedHhRequest.status}`}>
-                      {selectedHhRequest.status.charAt(0).toUpperCase() + selectedHhRequest.status.slice(1)}
-                    </span>
-                  </p>
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
+                  <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
+                    <strong>Date Submitted:</strong> {selectedHhRequest.dateSubmitted}<br />
+                    <div style={{ marginTop: '8px' }}>
+                      <strong>Status:</strong> <span className={`status-badge status-${selectedHhRequest.status}`}>
+                        {selectedHhRequest.status.charAt(0).toUpperCase() + selectedHhRequest.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                  <div><strong>Full Name:</strong><br />{selectedHhRequest.fullName}</div>
+                  <div><strong>Contact No:</strong><br />{selectedHhRequest.contactNumber || "N/A"}</div>
+                  <div><strong>Email:</strong><br />{selectedHhRequest.email || "N/A"}</div>
+                  <div><strong>Birth Date:</strong><br />{selectedHhRequest.birthDate} {selectedHhRequest.age ? `(${selectedHhRequest.age} yrs)` : ""}</div>
+                  <div><strong>Birth Place:</strong><br />{selectedHhRequest.birthPlace || "N/A"}</div>
+                  <div><strong>Sex:</strong><br />{selectedHhRequest.sex}</div>
+                  <div><strong>Civil Status:</strong><br />{selectedHhRequest.civilStatus}</div>
+                  <div><strong>Religion:</strong><br />{selectedHhRequest.religion || "N/A"}</div>
+                  <div><strong>Citizenship:</strong><br />{selectedHhRequest.citizenship || "N/A"}</div>
+                  <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>Address:</strong><br />{selectedHhRequest.address}</div>
+                  <div style={{ gridColumn: '1 / -1' }}><strong>Category:</strong><br />{selectedHhRequest.category && selectedHhRequest.category.length > 0 ? selectedHhRequest.category.join(", ") : "None"}</div>
+                  {selectedHhRequest.pwdStatus && <div><strong>PWD Status:</strong><br />{selectedHhRequest.pwdStatus}</div>}
+                  {selectedHhRequest.disabilityType && <div><strong>Disability Type:</strong><br />{selectedHhRequest.disabilityType}</div>}
+                  <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', marginTop: '-4px' }}></div>
+                  <div><strong>Education:</strong><br />{selectedHhRequest.educationAttainment || "N/A"}</div>
+                  <div><strong>Ed. Status:</strong><br />{selectedHhRequest.educationStatus || "N/A"}</div>
+                  <div><strong>Employment:</strong><br />{selectedHhRequest.employmentStatus || "N/A"}</div>
+                  <div><strong>Occupation:</strong><br />{selectedHhRequest.occupation || "N/A"}</div>
+                  <div><strong>Total Members:</strong><br />{selectedHhRequest.totalMembers || "N/A"}</div>
+                  <div><strong>Household Class.:</strong><br />{selectedHhRequest.householdClassification || "N/A"}</div>
                 </div>
               </div>
 
