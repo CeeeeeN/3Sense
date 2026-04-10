@@ -1376,17 +1376,19 @@ nav {
 
 /* Buttons */
 .as-btn-aqua {
-  background-color: #128FA6; /* Figma main button color */
+  background-color: #128FA6;
   color: white;
-  padding: 10px 20px;
+  padding: 8px 16px;
   border-radius: 6px;
   border: none;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
   transition: background-color 0.2s;
+  white-space: nowrap;
 }
 .as-btn-aqua:hover { background-color: var(--hover-bg); }
 
@@ -1397,10 +1399,12 @@ nav {
   border-radius: 6px;
   border: 1px solid #d1d5db;
   font-weight: 500;
+  font-size: 0.9rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 .as-btn-ghost:hover { background-color: #f9fafb; }
 
@@ -1488,19 +1492,20 @@ nav {
 /* Card Footer */
 .as-card-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid #e5e7eb; }
 .as-qr-btn {
-  width: 100%;
   background-color: white;
-  color: #128FA6; /* Main aqua color */
+  color: #128FA6;
   border: 1px solid #128FA6;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 .as-qr-btn:hover { background-color: #128FA6; color: white; }
 
