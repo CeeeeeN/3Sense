@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect } from "react";
 import { submitRegistration } from "../services/registration";
-import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap, IconPin } from "../components/Icons";
+import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap } from "../components/Icons";
 
 const STEPS = [
   { label: "Personal Info" },
@@ -53,7 +53,7 @@ export default function Registration({ onBack }) {
     categories: [],
     pwdStatus: "", disabilityType: "",
     educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
-    totalMembers: "", householdClassification: "",
+    householdMembers: "", householdClassification: "",
   });
 
   const set = (field) => (e) => {
@@ -304,16 +304,17 @@ export default function Registration({ onBack }) {
                           <option>BARMM</option>
                         </SelectField>
                       </Field>
+                      {/* ── STEP 2: Address ── */}
                       <Field label="Province" required>
-                        <InputField icon={IconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} />
+                        <InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} />
                       </Field>
-                    </div>
-                    <div className="reg-form-grid cols-2">
+
                       <Field label="City / Municipality" required>
-                        <InputField icon={IconPin} type="text" placeholder="Valenzuela City" value={form.city} onChange={set("city")} />
+                        <InputField icon={RegisIconPin} type="text" placeholder="Valenzuela City" value={form.city} onChange={set("city")} />
                       </Field>
+
                       <Field label="Barangay" required>
-                        <InputField icon={IconPin} type="text" placeholder="Malanday" value={form.barangay} onChange={set("barangay")} />
+                        <InputField icon={RegisIconPin} type="text" placeholder="Malanday" value={form.barangay} onChange={set("barangay")} />
                       </Field>
                     </div>
                   </div>
@@ -414,7 +415,7 @@ export default function Registration({ onBack }) {
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
                       <Field label="Number of Household Members" required hint="Include yourself in the count.">
-                        <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.totalMembers} onChange={set("totalMembers")} />
+                        <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.householdMembers} onChange={set("householdMembers")} />
                       </Field>
                       <Field label="Household Classification" required>
                         <SelectField icon={RegisIconHome} value={form.householdClassification} onChange={set("householdClassification")}>
@@ -461,6 +462,7 @@ export default function Registration({ onBack }) {
                     <ReviewField label="Region" value={rv(form.region)} full />
                   </ReviewSection>
 
+
                   <ReviewSection icon="🏷️" title="Category">
                     {form.categories.length === 0 ? (
                       <ReviewField label="Classifications" value={null} full />
@@ -486,7 +488,7 @@ export default function Registration({ onBack }) {
                   </ReviewSection>
 
                   <ReviewSection icon="🏠" title="Household Details">
-                    <ReviewField label="No. of Members" value={rv(form.totalMembers)} />
+                    <ReviewField label="No. of Members" value={rv(form.householdMembers)} />
                     <ReviewField label="Classification" value={rv(form.householdClassification)} />
                   </ReviewSection>
 
