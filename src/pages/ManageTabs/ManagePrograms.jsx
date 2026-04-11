@@ -1,65 +1,65 @@
-import React, { useState } from "react";
-import { Manage_IconLocation, Manage_IconCalendar, Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck } from "../../components/Icons";
+import React, { useState, useEffect } from "react";
+import {
+  Manage_IconLocation, Manage_IconCalendar, Manage_IconClock,
+  IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck
+} from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import FormBuilder from "../../components/FormBuilder";
-
-const INITIAL_PROGRAMS = [
-  {
-    id: "p1",
-    title: "Local Scholarship Grant 2026",
-    description: "Financial assistance for qualified students enrolled in college or vocational courses.",
-    date: "2026-04-15", startTime: "08:00", endTime: "17:00",
-    location: "Barangay 3S+ Hall",
-    demographic: "Students (College / Vocational)",
-    slots: 50,
-    requirements: ["Valid barangay ID", "School enrollment form", "1x1 ID photo"],
-    status: "Open",
-    customFields: []
-  },
-  {
-    id: "p2",
-    title: "Livelihood Training",
-    description: "Free skills training on food processing and basic entrepreneurship.",
-    date: "2026-04-07", startTime: "09:00", endTime: "16:00",
-    location: "Barangay Multi-Purpose Hall",
-    demographic: "All Residents (18 and above)",
-    slots: 40,
-    requirements: ["Barangay ID", "Registration form"],
-    status: "Upcoming",
-    customFields: []
-  }
-];
+import { db } from "../../firebase/firebase"; // 🆕
+import {
+  collection, addDoc, updateDoc, deleteDoc,
+  doc, onSnapshot, serverTimestamp
+} from "firebase/firestore"; // 🆕
 
 export default function ManagePrograms() {
-  const [programs, setPrograms] = useState(INITIAL_PROGRAMS);
-  const [searchTerm, setSearchTerm] = useState("");
-  
-  const [selectedQR, setSelectedQR] = useState(null);
+  // 🆕 Programs now come from Firestore
+  const [programs, setPrograms]         = useState([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+
+  const [searchTerm, setSearchTerm]     = useState("");
+  const [selectedQR, setSelectedQR]     = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProgramId, setEditingProgramId] = useState(null);
+  const [saving, setSaving]             = useState(false);
 
   const [newProgram, setNewProgram] = useState({
-    title: "", description: "", date: "", startTime: "", endTime: "", location: "", demographic: "", slots: "", requirements: [""], customFields: []
+    title: "", description: "", date: "", startTime: "", endTime: "",
+    location: "", demographic: "", slots: "", requirements: [""], customFields: []
   });
+
+  // 🆕 Real-time listener to Firestore Programs collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "Programs"), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPrograms(data);
+      setLoadingPrograms(false);
+    }, (error) => {
+      console.error("Error fetching programs:", error);
+      setLoadingPrograms(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleGenerateQR = (prog) => {
     const residentAppUrl = "https://3-sense.vercel.app/";
     const encodedUrl = `${residentAppUrl}?serviceId=${prog.id}&serviceName=${encodeURIComponent(prog.title)}&category=Programs`;
-    setSelectedQR({ name: prog.title, qrValue: `${encodedUrl}` });
+    setSelectedQR({ name: prog.title, qrValue: encodedUrl });
   };
 
   const handleDownloadQR = () => {
     const svgElement = document.getElementById("as-qr-svg");
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
+    const svgData    = new XMLSerializer().serializeToString(svgElement);
+    const canvas     = document.createElement("canvas");
+    const ctx        = canvas.getContext("2d");
+    const img        = new Image();
     img.onload = () => {
-      canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0);
-      const downloadLink = document.createElement("a");
-      downloadLink.href = canvas.toDataURL("image/png");
-      downloadLink.download = `3Sense-QR-${selectedQR.name}.png`;
-      downloadLink.click();
+      canvas.width = img.width; canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      const link = document.createElement("a");
+      link.href     = canvas.toDataURL("image/png");
+      link.download = `3Sense-QR-${selectedQR.name}.png`;
+      link.click();
     };
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
@@ -70,60 +70,100 @@ export default function ManagePrograms() {
     setNewProgram({ ...newProgram, requirements: updated });
   };
 
-  const addReqField = () => {
-    setNewProgram({ ...newProgram, requirements: [...newProgram.requirements, ""] });
-  };
-
-  const removeReqField = (index) => {
-    const updated = newProgram.requirements.filter((_, i) => i !== index);
-    setNewProgram({ ...newProgram, requirements: updated });
-  };
+  const addReqField    = () => setNewProgram({ ...newProgram, requirements: [...newProgram.requirements, ""] });
+  const removeReqField = (index) => setNewProgram({ ...newProgram, requirements: newProgram.requirements.filter((_, i) => i !== index) });
 
   const handleEdit = (prog) => {
-    setNewProgram({ ...prog });
+    setNewProgram({
+      title: prog.title || "",
+      description: prog.description || "",
+      date: prog.date || "",
+      startTime: prog.startTime || "",
+      endTime: prog.endTime || "",
+      location: prog.location || "",
+      demographic: prog.demographic || "",
+      slots: prog.slots || "",
+      requirements: prog.requirements?.length > 0 ? prog.requirements : [""],
+      customFields: prog.customFields || []
+    });
     setEditingProgramId(prog.id);
     setShowAddModal(true);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this program?")) {
-      setPrograms(programs.filter(p => p.id !== id));
+  // 🆕 Delete from Firestore
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this program?")) return;
+    try {
+      await deleteDoc(doc(db, "Programs", id));
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      alert("Failed to delete program. Please try again.");
     }
   };
 
-  const handleAddProgram = (e) => {
-    e.preventDefault(); 
-    if (editingProgramId) {
-      const updatedProg = {
-        ...newProgram,
-        id: editingProgramId,
-        requirements: newProgram.requirements.filter(r => r.trim() !== ""),
-        time: newProgram.startTime && newProgram.endTime ? `${newProgram.startTime} - ${newProgram.endTime}` : ""
-      };
-      setPrograms(programs.map(p => p.id === editingProgramId ? updatedProg : p));
-    } else {
-      const prog = {
-        ...newProgram,
-        id: `p${Date.now()}`,
-        status: "Upcoming",
-        requirements: newProgram.requirements.filter(r => r.trim() !== ""),
-        time: newProgram.startTime && newProgram.endTime ? `${newProgram.startTime} - ${newProgram.endTime}` : ""
-      };
-      setPrograms([prog, ...programs]);
+  // 🆕 Save to Firestore (add or update)
+  const handleAddProgram = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    const programData = {
+      title: newProgram.title,
+      description: newProgram.description,
+      date: newProgram.date,
+      startTime: newProgram.startTime,
+      endTime: newProgram.endTime,
+      time: newProgram.startTime && newProgram.endTime
+        ? `${newProgram.startTime} - ${newProgram.endTime}` : "",
+      location: newProgram.location,
+      demographic: newProgram.demographic,
+      slots: newProgram.slots,
+      requirements: newProgram.requirements.filter(r => r.trim() !== ""),
+      customFields: newProgram.customFields || [],
+    };
+
+    try {
+      if (editingProgramId) {
+        // ✅ Update existing
+        await updateDoc(doc(db, "Programs", editingProgramId), {
+          ...programData,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // ✅ Add new
+        await addDoc(collection(db, "Programs"), {
+          ...programData,
+          status: "Upcoming",
+          createdAt: serverTimestamp()
+        });
+      }
+
+      setNewProgram({
+        title: "", description: "", date: "", startTime: "", endTime: "",
+        location: "", demographic: "", slots: "", requirements: [""], customFields: []
+      });
+      setEditingProgramId(null);
+      setShowAddModal(false);
+
+    } catch (error) {
+      console.error("Error saving program:", error);
+      alert("Failed to save program. Please try again.");
+    } finally {
+      setSaving(false);
     }
-    
-    setNewProgram({ title: "", description: "", date: "", time: "", location: "", demographic: "", slots: "", requirements: [""], customFields: [] });
-    setEditingProgramId(null);
-    setShowAddModal(false);
   };
 
   const openAddModal = () => {
     setEditingProgramId(null);
-    setNewProgram({ title: "", description: "", date: "", time: "", location: "", demographic: "", slots: "", requirements: [""], customFields: [] });
+    setNewProgram({
+      title: "", description: "", date: "", startTime: "", endTime: "",
+      location: "", demographic: "", slots: "", requirements: [""], customFields: []
+    });
     setShowAddModal(true);
   };
 
-  const filteredPrograms = programs.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPrograms = programs.filter(p =>
+    p.title?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="as-container" style={{ padding: 0 }}>
@@ -132,150 +172,175 @@ export default function ManagePrograms() {
           <h1>Programs</h1>
           <p className="as-subtitle">Manage barangay programs, slots, and requirements</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="as-btn-aqua" onClick={openAddModal}>
-            <IconAdd /> Add New Program
-          </button>
-        </div>
+        <button className="as-btn-aqua" onClick={openAddModal}>
+          <IconAdd /> Add New Program
+        </button>
       </div>
 
       <div className="as-controls">
         <div className="as-search-box">
-          <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          <input type="text" placeholder="Search programs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input
+            type="text" placeholder="Search programs..."
+            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 
-      <div className="as-card-grid">
-        {filteredPrograms.map((prog) => (
-          <div className="as-card" key={prog.id}>
-            <div className="as-card-header">
-              <h2 className="as-card-title">{prog.title}</h2>
-              <span className={`as-badge ${prog.status.toLowerCase().replace(" ", "-")}`}>{prog.status}</span>
+      {/* 🆕 Loading state */}
+      {loadingPrograms ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>
+          Loading programs...
+        </div>
+      ) : filteredPrograms.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>
+          {searchTerm ? "No programs match your search." : "No programs yet. Click 'Add New Program' to create one."}
+        </div>
+      ) : (
+        <div className="as-card-grid">
+          {filteredPrograms.map((prog) => (
+            <div className="as-card" key={prog.id}>
+              <div className="as-card-header">
+                <h2 className="as-card-title">{prog.title}</h2>
+                <span className={`as-badge ${prog.status?.toLowerCase().replace(" ", "-")}`}>
+                  {prog.status}
+                </span>
+              </div>
+              <p className="as-card-desc">{prog.description}</p>
+              <ul className="as-card-details">
+                <li><Manage_IconLocation /> {prog.location}</li>
+                <li><Manage_IconCalendar /> {prog.date} • {prog.time}</li>
+                <li><strong>Target:</strong> {prog.demographic}</li>
+                <li><strong>Slots:</strong> {prog.slots || "Unlimited"}</li>
+              </ul>
+              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: "#6B7280" }}>
+                <strong>Requirements:</strong>{" "}
+                {prog.requirements?.length > 0 ? prog.requirements.join(", ") : "None"}
+              </div>
+              <div className="as-card-footer" style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}>
+                <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1 }} onClick={() => handleEdit(prog)}>Edit</button>
+                <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1, color: "red", borderColor: "#fca5a5" }} onClick={() => handleDelete(prog.id)}>Delete</button>
+                <button className="as-qr-btn" style={{ width: "100%", marginTop: "5px" }} onClick={() => handleGenerateQR(prog)}>
+                  <Manage_IconQR /> Generate QR Code
+                </button>
+              </div>
             </div>
-            <p className="as-card-desc">{prog.description}</p>
-            <ul className="as-card-details">
-              <li><Manage_IconLocation /> {prog.location}</li>
-              <li><Manage_IconCalendar /> {prog.date} • {prog.time}</li>
-              <li><strong>Target:</strong> {prog.demographic}</li>
-              <li><strong>Slots:</strong> {prog.slots || "Unlimited"}</li>
-            </ul>
-            <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#6B7280' }}>
-              <strong>Requirements:</strong> {prog.requirements.length > 0 ? prog.requirements.join(", ") : "None"}
-            </div>
-            <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(prog)}>Edit</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(prog.id)}>Delete</button>
-              <button className="as-qr-btn" style={{ width: '100%', marginTop: '5px' }} onClick={() => handleGenerateQR(prog)}><Manage_IconQR /> Generate QR Code</button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
+      {/* ── Add / Edit Modal ── */}
       {showAddModal && (
         <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '700px', width: '100%' }}>
+          <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
             <div className="as-modal-header">
               <h2>{editingProgramId ? "Edit Program" : "Add Program"}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
             </div>
-            
-            <div className="as-modal-body" style={{ alignItems: 'stretch' }}>
+            <div className="as-modal-body" style={{ alignItems: "stretch" }}>
               <form className="as-form" onSubmit={handleAddProgram}>
                 <div className="as-form-group">
                   <label className="as-form-label">Program Title</label>
                   <input type="text" className="as-form-input" required
-                    value={newProgram.title} onChange={(e) => setNewProgram({...newProgram, title: e.target.value})} 
+                    value={newProgram.title} onChange={(e) => setNewProgram({ ...newProgram, title: e.target.value })}
                   />
                 </div>
                 <div className="as-form-group">
                   <label className="as-form-label">Description</label>
                   <textarea className="as-form-textarea" required
-                    value={newProgram.description} onChange={(e) => setNewProgram({...newProgram, description: e.target.value})} 
+                    value={newProgram.description} onChange={(e) => setNewProgram({ ...newProgram, description: e.target.value })}
                   />
                 </div>
-                
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Location</label>
                     <input type="text" className="as-form-input" required
-                      value={newProgram.location} onChange={(e) => setNewProgram({...newProgram, location: e.target.value})} 
+                      value={newProgram.location} onChange={(e) => setNewProgram({ ...newProgram, location: e.target.value })}
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Target Demographic</label>
                     <input type="text" className="as-form-input" required placeholder="e.g. Students, Seniors"
-                      value={newProgram.demographic} onChange={(e) => setNewProgram({...newProgram, demographic: e.target.value})} 
+                      value={newProgram.demographic} onChange={(e) => setNewProgram({ ...newProgram, demographic: e.target.value })}
                     />
                   </div>
                 </div>
-
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Date</label>
                     <input type="date" className="as-form-input" required
-                      value={newProgram.date} onChange={(e) => setNewProgram({...newProgram, date: e.target.value})} 
+                      value={newProgram.date} onChange={(e) => setNewProgram({ ...newProgram, date: e.target.value })}
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Start Time</label>
                     <input type="time" className="as-form-input" required
-                      value={newProgram.startTime} onChange={(e) => setNewProgram({...newProgram, startTime: e.target.value})} 
+                      value={newProgram.startTime} onChange={(e) => setNewProgram({ ...newProgram, startTime: e.target.value })}
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">End Time</label>
                     <input type="time" className="as-form-input" required
-                      value={newProgram.endTime} onChange={(e) => setNewProgram({...newProgram, endTime: e.target.value})} 
+                      value={newProgram.endTime} onChange={(e) => setNewProgram({ ...newProgram, endTime: e.target.value })}
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Available Slots</label>
                     <input type="number" className="as-form-input" placeholder="Leave blank if unlimited"
-                      value={newProgram.slots} onChange={(e) => setNewProgram({...newProgram, slots: e.target.value})} 
+                      value={newProgram.slots} onChange={(e) => setNewProgram({ ...newProgram, slots: e.target.value })}
                     />
                   </div>
                 </div>
-
                 <div className="as-form-group">
                   <label className="as-form-label">Requirements (List)</label>
                   {newProgram.requirements.map((req, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+                    <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
                       <input type="text" className="as-form-input" placeholder="e.g. Valid ID"
                         value={req} onChange={(e) => handleReqChange(i, e.target.value)}
                       />
                       {newProgram.requirements.length > 1 && (
-                        <button type="button" className="as-btn-ghost" onClick={() => removeReqField(i)} style={{ padding: '0 10px', color: 'red' }}>&times;</button>
+                        <button type="button" className="as-btn-ghost" onClick={() => removeReqField(i)}
+                          style={{ padding: "0 10px", color: "red" }}>&times;</button>
                       )}
                     </div>
                   ))}
-                  <button type="button" className="as-btn-ghost" onClick={addReqField} style={{ width: 'fit-content', padding: '5px 10px', fontSize: '0.9rem' }}>+ Add Requirement</button>
+                  <button type="button" className="as-btn-ghost" onClick={addReqField}
+                    style={{ width: "fit-content", padding: "5px 10px", fontSize: "0.9rem" }}>
+                    + Add Requirement
+                  </button>
                 </div>
-
-                <div className="as-form-section" style={{ marginTop: '20px' }}>
-                  <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <div className="as-form-section" style={{ marginTop: "20px" }}>
+                  <h3 className="as-form-section-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
                     Default Collected Fields
                   </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '12px', marginTop: '-10px' }}>The following information is automatically collected. Do not recreate them in the form builder.</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <p style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: "12px", marginTop: "-10px" }}>
+                    The following information is automatically collected. Do not recreate them in the form builder.
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     {["Full Name", "Complete Address", "Contact Number", "Email (Optional)", "Upload Valid ID / Clearance"].map(f => (
-                      <span key={f} style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                      <span key={f} style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 500, display: "flex", alignItems: "center", gap: "4px" }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
                         {f}
                       </span>
                     ))}
                   </div>
                 </div>
-
-                <FormBuilder 
-                  fields={newProgram.customFields} 
-                  onChange={(fields) => setNewProgram({ ...newProgram, customFields: fields })} 
+                <FormBuilder
+                  fields={newProgram.customFields}
+                  onChange={(fields) => setNewProgram({ ...newProgram, customFields: fields })}
                 />
-
                 <div className="as-modal-actions">
                   <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>
-                  <button type="submit" className="as-btn-aqua" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Save Program</button>
+                  <button type="submit" className="as-btn-aqua" style={{ padding: "8px 16px", fontSize: "0.9rem" }} disabled={saving}>
+                    {saving ? "Saving..." : "Save Program"}
+                  </button>
                 </div>
               </form>
             </div>
@@ -283,21 +348,24 @@ export default function ManagePrograms() {
         </div>
       )}
 
+      {/* ── QR Modal ── */}
       {selectedQR && (
         <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '450px' }}>
+          <div className="as-modal-content" style={{ maxWidth: "450px" }}>
             <div className="as-modal-header">
               <h2>QR Code Generated</h2>
               <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>
             </div>
-            <div className="as-modal-body" style={{ textAlign: 'center' }}>
+            <div className="as-modal-body" style={{ textAlign: "center" }}>
               <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
               <h3>{selectedQR.name}</h3>
               <p className="as-modal-desc">Residents can scan this code to access {selectedQR.name}.</p>
-              <div className="as-qr-holder" style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
-                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true}/>
+              <div className="as-qr-holder" style={{ margin: "20px auto", display: "flex", justifyContent: "center" }}>
+                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true} />
               </div>
-              <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: '100%' }}><IconDownload /> Download QR Code (PNG)</button>
+              <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: "100%" }}>
+                <IconDownload /> Download QR Code (PNG)
+              </button>
             </div>
           </div>
         </div>
