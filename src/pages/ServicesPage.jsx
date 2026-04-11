@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { getMemberProfile } from "../services/profile";
 import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport } from "../services/services";
 import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
+import { db } from "../firebase/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 
 // ── Programs Data ──
 const PROGRAMS = [
@@ -776,23 +778,60 @@ function ProgramModal({ program, onClose }) {
 // ── Programs Tab ──
 function ProgramsTab() {
   const [activeProgram, setActiveProgram] = useState(null);
+  const [programs, setPrograms] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "Programs"), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPrograms(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) return (
+    <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>
+      Loading programs...
+    </div>
+  );
+
+  if (programs.length === 0) return (
+    <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>
+      No programs available at the moment.
+    </div>
+  );
+
   return (
     <>
       <div className="sv-programs-grid">
-        {PROGRAMS.map(p => (
-          <div key={p.id} className={`sv-program-card sv-program-card--${p.color}`}>
+        {programs.map(p => (
+          <div key={p.id} className={`sv-program-card sv-program-card--teal`}>
             <div className="sv-program-card__bar" />
             <div className="sv-program-card__head">
-              <span className="sv-program-card__tag">{p.tag}</span>
-              <span className={`sv-program-card__status sv-program-card__status--${p.status === "Open" ? "open" : "ongoing"}`}>{p.status}</span>
+              <span className="sv-program-card__tag">{p.demographic || "General"}</span>
+              <span className={`sv-program-card__status sv-program-card__status--${p.status === "Open" ? "open" : "ongoing"}`}>
+                {p.status || "Upcoming"}
+              </span>
             </div>
             <div className="sv-program-card__title">{p.title}</div>
-            <div className="sv-program-card__desc">{p.desc}</div>
-            <button className="sv-program-card__cta" onClick={() => setActiveProgram(p)}>Learn More <ChevronRightIcon /></button>
+            <div className="sv-program-card__desc">{p.description}</div>
+            <button className="sv-program-card__cta" onClick={() => setActiveProgram(p)}>
+              Learn More <ChevronRightIcon />
+            </button>
           </div>
         ))}
       </div>
-      {activeProgram && <ProgramModal program={activeProgram} onClose={() => setActiveProgram(null)} />}
+      {activeProgram && (
+        <ProgramModal program={{
+          ...activeProgram,
+          color: "teal",
+          tag: activeProgram.demographic || "General",
+          fullDesc: activeProgram.description,
+          time: activeProgram.time || `${activeProgram.startTime} - ${activeProgram.endTime}`,
+          requirements: activeProgram.requirements || [],
+        }} onClose={() => setActiveProgram(null)} />
+      )}
     </>
   );
 }
