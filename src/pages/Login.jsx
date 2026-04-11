@@ -19,6 +19,7 @@ function MobileHeader({ onBack }) {
 function ScreenTag({ step, icon }) {
   return (
     <div className="screen-tag">
+
       {icon}
       {step}
     </div>
@@ -182,7 +183,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setTimeout(() => {
       if (onSuccess) onSuccess({
         ...selectedProfile,
-        memberId:    selectedProfile.id,   // explicit alias App.jsx expects
+        memberId:    selectedProfile.id,
         householdID: hhNumber.trim(),
       });
     }, 2200);
@@ -222,9 +223,15 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           </div>
         </div>
         <div className="left-content">
-          <h2>Your barangay,<br /><span>at your fingertips.</span></h2>
+          {/* FIX 1: "at your fingertips." text color changed to #D9E232 */}
+          <h2>Your barangay,<br /><span style={{ color: "#D9E232" }}>at your fingertips.</span></h2>
           <p>Sign in to manage your household, request documents, and access all barangay services — securely and conveniently.</p>
-          <div className="feature-pills">
+
+          {/* FIX 2: Pills layout fixed with inline styles */}
+          <div
+            className="feature-pills"
+            style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "1.5rem" }}
+          >
             {[
               [
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
@@ -243,8 +250,28 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 "Quick access to emergency services"
               ],
             ].map(([icon, text]) => (
-              <div className="pill" key={text}>
-                <div className="pill-icon">{icon}</div>
+              <div
+                className="pill"
+                key={text}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  borderRadius: "999px",
+                  padding: "0.45rem 0.85rem",
+                  fontSize: "0.78rem",
+                  color: "rgba(255,255,255,0.85)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <div
+                  className="pill-icon"
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                >
+                  {icon}
+                </div>
                 {text}
               </div>
             ))}
@@ -261,7 +288,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {screen === "credentials" && (
             <div key={screenKey} className="screen-enter">
               <MobileHeader onBack={onBack} />
-              <ScreenTag step="Step 1 of 3" icon={<LoginLockIcon />} />
+              <div className="act-screen-tag"> <LoginLockIcon /> Step 1 of 3 </div>
               <h2 className="screen-title">Welcome back!</h2>
               <p className="screen-sub">Enter your Household Number and password to continue.</p>
 
@@ -292,16 +319,16 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <button className="btn-ghost-sm" onClick={onForgotPassword}>Forgot password?</button>
               </div>
 
-              <button className="btn-main" onClick={handleLogin} disabled={!hhNumber.trim() || !password || loginLoading}>
+              <button className="act-btn-main" onClick={handleLogin} disabled={!hhNumber.trim() || !password || loginLoading}>
                 {loginLoading ? "Signing in..." : <> Login <LoginArrowIcon /> </>}
               </button>
 
               <div className="divider">or</div>
 
-              <div className="bottom-link">
+              <div className="act-bottom-link">
                 Don't have an account? <a onClick={onRegister}>Register Household</a>
               </div>
-              <div className="bottom-link" style={{ marginTop: "0.5rem" }}>
+              <div className="act-bottom-link" style={{ marginTop: "0.5rem" }}>
                 Have an approval email? <a onClick={onActivate}>Activate Account</a>
               </div>
             </div>
@@ -311,7 +338,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {screen === "profiles" && (
             <div key={screenKey} className="screen-enter">
               <MobileHeader onBack={onBack} />
-              <ScreenTag step="Step 2 of 3" icon={<IconUser />} />
+              <div className="act-screen-tag"> <LoginLockIcon /> Step 2 of 3 </div>
               <h2 className="screen-title">Select Your Profile</h2>
               <p className="screen-sub">Choose which household member you are to continue.</p>
 
@@ -323,7 +350,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 ))}
               </div>
 
-              <button className="btn-main" onClick={handleContinueToPin} disabled={!selectedProfile}>
+              <button className="act-btn-main" onClick={handleContinueToPin} disabled={!selectedProfile}>
                 Continue <LoginArrowIcon />
               </button>
 
@@ -337,7 +364,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {screen === "pin" && (
             <div key={screenKey} className="screen-enter">
               <MobileHeader onBack={onBack} />
-              <ScreenTag step="Step 3 of 3" icon={<LoginLockIcon />} />
+              <div className="act-screen-tag"> <LoginLockIcon /> Step 3 of 3 </div>
               <h2 className="screen-title">
                 {hasExistingPin
                   ? "Enter Your PIN"

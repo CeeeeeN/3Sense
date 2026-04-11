@@ -70,7 +70,6 @@ function PrimaryHotline({ hotline }) {
         <div className="em-hotline-primary__number">{hotline.number}</div>
         <div className="em-hotline-primary__name">{hotline.name}</div>
       </div>
-      <div className="em-hotline-primary__chevron"><PhoneIcon size={18} /></div>
     </a>
   );
 }
@@ -84,7 +83,6 @@ function SecondaryHotline({ hotline }) {
         <div className="em-hotline-card__number">{hotline.number}</div>
         <div className="em-hotline-card__sub">{hotline.sub}</div>
       </div>
-      <div className="em-hotline-card__arrow"><PhoneIcon size={14} /></div>
     </a>
   );
 }

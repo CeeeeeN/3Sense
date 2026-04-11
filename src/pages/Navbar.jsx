@@ -118,8 +118,6 @@ export default function Navbar({ activePage = "home", onNavigate, hhId = "", use
                   </div>
                 </div>
                 <button className="nb-dd-item" onClick={() => { nav("profile"); setUserOpen(false); }}><IconProfile2 /> My Profile</button>
-                <button className="nb-dd-item" onClick={() => { nav("settings"); setUserOpen(false); }}><IconSettings /> Settings</button>
-                <button className="nb-dd-item" onClick={() => { nav("help"); setUserOpen(false); }}><IconHelp /> Help & Support</button>
                 <div className="nb-dd-divider" />
                 <button className="nb-dd-item danger" onClick={() => nav("logout")}><IconLogout /> Logout</button>
               </div>
