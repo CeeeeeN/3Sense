@@ -69,82 +69,6 @@ const PROGRAMS = [
   },
 ];
 
-// ── Facilities Data ──
-const FACILITIES = [
-  { id: 1, title: "Barangay Multi-Purpose Hall", capacity: "Up to 200 persons", hours: "8:00 AM – 9:00 PM", desc: "Spacious hall suitable for events, meetings, seminars, and community gatherings. Equipped with tables, chairs, and a stage.", available: true  },
-  { id: 2, title: "Basketball Court",            capacity: "Up to 50 persons",  hours: "6:00 AM – 10:00 PM", desc: "Open-air basketball court available for recreational use, tournaments, and community sports events.",                    available: true  },
-  { id: 3, title: "Health Center",               capacity: "Up to 30 persons",  hours: "8:00 AM – 5:00 PM",  desc: "Barangay health center for consultations, immunizations, and prenatal check-ups. Walk-in and appointment basis.",      available: false },
-];
-
-// ── Document Icons ──
-const DocIconClearance    = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>;
-const DocIconEmployment   = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>;
-const DocIconLegal        = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><path d="M8 14l2.5-2.5M12 8v2M9.5 11.5l5-5"/></svg>;
-const DocIconIndigency    = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-const DocIconGoodMoral    = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>;
-const DocIconFirstJob     = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>;
-const DocIconMarriage     = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
-const DocIconPedicab      = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>;
-const DocIconDeath        = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>;
-const DocIconBuilding     = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M9 22V12h6v10"/><path d="M2 7h20"/><path d="M2 12h20"/></svg>;
-const DocIconBailBond     = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>;
-
-const DOC_TYPES = [
-  { id: "clearance",            icon: <DocIconClearance />,  name: "Barangay Clearance",          desc: "General barangay clearance",       fee: "₱50",    days: "Same day",  note: "Valid only when filed and approved by the Office of the Punong Barangay." },
-  { id: "clearance_employment", icon: <DocIconEmployment />, name: "Clearance for Employment",    desc: "For job application use",          fee: "₱70",    days: "Same day",  note: "Specify employer name in the Purpose field." },
-  { id: "clearance_legal",      icon: <DocIconLegal />,      name: "Certificate – Legal Purpose", desc: "For court and legal use",          fee: "₱50",    days: "Same day",  note: "Include details of legal matter in the Purpose field." },
-  { id: "indigency",            icon: <DocIconIndigency />,  name: "Certificate of Indigency",    desc: "For financial assistance",         fee: "Free",   days: "Same day",  note: "THIS CERTIFICATION IS FREE OF CHARGE." },
-  { id: "goodmoral",            icon: <DocIconGoodMoral />,  name: "Certificate of Good Moral",   desc: "Character certificate",            fee: "₱50",    days: "Same day",  note: "THIS CERTIFICATION IS FREE OF CHARGE." },
-  { id: "firstjob",             icon: <DocIconFirstJob />,   name: "First Time Job Seeker",       desc: "For employment assistance",        fee: "Free",   days: "Same day",  note: "Can only be availed ONCE. Requires signing of Oath of Undertaking in the presence of the Barangay Council." },
-  { id: "marriage",             icon: <DocIconMarriage />,   name: "Marriage Certification",      desc: "For marriage application",         fee: "₱50",    days: "Same day",  note: "THIS CERTIFICATION IS FREE OF CHARGE." },
-  { id: "pedicab",              icon: <DocIconPedicab />,    name: "Pedicab Permit",              desc: "Pedicab driver clearance",         fee: "₱60",    days: "1–2 days", note: "Bring your Community Tax Certificate and pedicab registration documents." },
-  { id: "death",                icon: <DocIconDeath />,      name: "Death Assistance Certificate",desc: "For deceased resident",            fee: "Free",   days: "Same day",  note: "THIS CERTIFICATION IS FREE OF CHARGE." },
-  { id: "building",             icon: <DocIconBuilding />,   name: "Building Permit Endorsement", desc: "Construction clearance",          fee: "₱1,000", days: "2–3 days", note: "Excavation and Restoration fees apply. Bring complete project plans." },
-  { id: "bailbond",             icon: <DocIconBailBond />,   name: "Bail Bond Certificate",       desc: "For bail bond purposes",           fee: "₱50",    days: "Same day",  note: "THIS CERTIFICATION IS FREE OF CHARGE." },
-];
-
-const EXTRA_FIELDS = {
-  clearance: [],
-  clearance_employment: [
-    { key: "employer_name", label: "Employer / Company Name", required: true, placeholder: "e.g. ABC Corporation" },
-  ],
-  clearance_legal: [
-    { key: "legal_details", label: "Details of Legal Matter", required: true, placeholder: "e.g. For filing of civil case, court proceedings..." },
-  ],
-  indigency: [
-    { key: "assistance_type", label: "Type of Assistance Needed (DSWD Requirement)", required: true, placeholder: "e.g. Medical assistance, burial assistance, scholarship..." },
-    { key: "recipient_name",  label: "Recipient of Assistance", required: true, placeholder: "Full name of person receiving the assistance" },
-  ],
-  goodmoral: [],
-  firstjob: [
-    { key: "age",          label: "Age",                         required: true,  placeholder: "e.g. 20", type: "number" },
-    { key: "oath_confirm", label: "I confirm that this is my FIRST TIME availing of RA 11261 and I have not previously availed of this benefit.", required: true, type: "checkbox" },
-  ],
-  marriage: [
-    { key: "fiance_name",    label: "Name of Fiancé / Fiancée",    required: true, placeholder: "Full name" },
-    { key: "fiance_address", label: "Address of Fiancé / Fiancée", required: true, placeholder: "Complete address" },
-  ],
-  pedicab: [
-    { key: "owner_name", label: "Owner's Full Name", required: true, placeholder: "Name of pedicab owner" },
-    { key: "pru_number", label: "P.R.U. Number",     required: true, placeholder: "e.g. PRU-0001" },
-  ],
-  death: [
-    { key: "deceased_name",   label: "Deceased Person's Full Name", required: true,  placeholder: "Full name of the deceased" },
-    { key: "date_of_death",   label: "Date of Death",               required: true,  type: "date" },
-    { key: "requestor_name",  label: "Requestor's Full Name",       required: true,  placeholder: "Full name of person requesting" },
-    { key: "request_purpose", label: "Purpose of Request",          required: true,  placeholder: "e.g. For burial assistance, legal purposes..." },
-  ],
-  building: [
-    { key: "project_desc",    label: "Project Description",            required: true,  placeholder: "e.g. Construction of residential house" },
-    { key: "project_address", label: "Project / Construction Address", required: true,  placeholder: "Exact address of the project" },
-    { key: "rep_name",        label: "Representative Name",            required: false, placeholder: "If represented by another person (optional)" },
-  ],
-  bailbond: [
-    { key: "bail_for",     label: "Bail Bond For (Full Name of Person)", required: true, placeholder: "Full name of the person being bailed" },
-    { key: "bail_purpose", label: "Court / Case Details",               required: true, placeholder: "e.g. RTC Branch 172, Criminal Case No. XXXX" },
-  ],
-};
-
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
 
@@ -173,25 +97,25 @@ function StepIndicator({ step }) {
 }
 
 // ── Step 1: Select Document ──
-function Step1({ selected, onSelect }) {
+function Step1({ docTypes, selected, onSelect }) {
   return (
     <div className="dr-step1">
       <p className="dr-step-hint">Select the document you need. You must choose one to proceed.</p>
       <div className="dr-doc-list">
-        {DOC_TYPES.map(d => (
+        {docTypes.map(d => (
           <button
             key={d.id}
             className={`dr-doc-row${selected?.id === d.id ? " dr-doc-row--selected" : ""}`}
             onClick={() => onSelect(d)}
           >
-            <div className="dr-doc-row__icon">{d.icon}</div>
+            <div className="dr-doc-row__icon">{d.icon || <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>}</div>
             <div className="dr-doc-row__body">
-              <div className="dr-doc-row__name">{d.name}</div>
-              <div className="dr-doc-row__desc">{d.desc}</div>
+              <div className="dr-doc-row__name">{d.title || d.name}</div>
+              <div className="dr-doc-row__desc">{d.description || d.desc}</div>
             </div>
             <div className="dr-doc-row__meta">
               <span className="dr-doc-row__fee">{d.fee}</span>
-              <span className="dr-doc-row__days">{d.days}</span>
+              <span className="dr-doc-row__days">{d.processingTime || d.days}</span>
             </div>
             <div className="dr-doc-row__check">
               {selected?.id === d.id
@@ -209,7 +133,7 @@ function Step1({ selected, onSelect }) {
 // ── Step 2: Personal Details ──
 function Step2({ docType, form, setForm, errors }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const extraFields = EXTRA_FIELDS[docType?.id] || [];
+  const extraFields = docType?.customFields || [];
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -225,8 +149,8 @@ function Step2({ docType, form, setForm, errors }) {
         <div className="dr-doc-selected-banner">
           <span className="dr-doc-selected-icon">{docType.icon}</span>
           <div>
-            <div className="dr-doc-selected-name">{docType.name}</div>
-            {docType.note && <div className="dr-doc-selected-note">{docType.note}</div>}
+            <div className="dr-doc-selected-name">{docType.title || docType.name}</div>
+            {(docType.reminder || docType.note) && <div className="dr-doc-selected-note">{docType.reminder || docType.note}</div>}
           </div>
         </div>
       )}
@@ -281,11 +205,7 @@ function Step2({ docType, form, setForm, errors }) {
           <label className="sv-label">Email Address</label>
           <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
         </div>
-        <div className="dr-field">
-          <label className="sv-label">CTC Number <span className="sv-required">*</span></label>
-          <input className={`sv-input${errors.ctc ? " sv-input--error" : ""}`} value={form.ctc} onChange={e => set("ctc", e.target.value)} placeholder="e.g. 01234567-2026" />
-          {errors.ctc && <span className="sv-error-msg">{errors.ctc}</span>}
-        </div>
+
       </div>
       <div className="dr-field">
         <label className="sv-label">Purpose <span className="sv-required">*</span></label>
@@ -321,20 +241,20 @@ function Step2({ docType, form, setForm, errors }) {
             {extraFields.map(f => {
               if (f.type === "checkbox") {
                 return (
-                  <div className="dr-field dr-field--full" key={f.key}>
-                    <label className={`dr-checkbox-label${errors[f.key] ? " dr-checkbox-label--error" : ""}`}>
-                      <input type="checkbox" checked={!!form[f.key]} onChange={e => set(f.key, e.target.checked)} className="dr-checkbox" />
+                  <div className="dr-field dr-field--full" key={f.id}>
+                    <label className={`dr-checkbox-label${errors[f.id] ? " dr-checkbox-label--error" : ""}`}>
+                      <input type="checkbox" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} className="dr-checkbox" />
                       <span>{f.label} {f.required && <span className="sv-required">*</span>}</span>
                     </label>
-                    {errors[f.key] && <span className="sv-error-msg">{errors[f.key]}</span>}
+                    {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
                   </div>
                 );
               }
               return (
-                <div className="dr-field" key={f.key}>
+                <div className="dr-field" key={f.id}>
                   <label className="sv-label">{f.label} {f.required && <span className="sv-required">*</span>}</label>
-                  <input className={`sv-input${errors[f.key] ? " sv-input--error" : ""}`} type={f.type || "text"} value={form[f.key] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.key, e.target.value)} />
-                  {errors[f.key] && <span className="sv-error-msg">{errors[f.key]}</span>}
+                  <input className={`sv-input${errors[f.id] ? " sv-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
+                  {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
                 </div>
               );
             })}
@@ -347,9 +267,9 @@ function Step2({ docType, form, setForm, errors }) {
 
 // ── Step 3: Review ──
 function Step3({ docType, form }) {
-  const extraFields = EXTRA_FIELDS[docType?.id] || [];
+  const extraFields = docType?.customFields || [];
   const rows = [
-    { label: "Document Type",    value: docType?.name, full: true },
+    { label: "Document Type",    value: docType?.title || docType?.name, full: true },
     { label: "Full Name",        value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
     { label: "Date of Birth",    value: form.dob },
     { label: "Civil Status",     value: form.civilStatus },
@@ -357,11 +277,10 @@ function Step3({ docType, form }) {
     { label: "Address",          value: form.address, full: true },
     { label: "Contact Number",   value: form.contact },
     { label: "Email",            value: form.email || "—" },
-    { label: "CTC Number",       value: form.ctc },
     { label: "Purpose",          value: form.purpose, full: true },
     { label: "Valid ID Uploaded",value: form.validId || "—" },
-    ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.key] || "—" })),
-    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.key] ? "✓ Confirmed" : "Not confirmed" })),
+    ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
+    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
   ];
 
   return (
@@ -411,6 +330,7 @@ function Step4({ refNum, onReset }) {
 
 // ── Documents Tab ──
 function DocumentsTab({ userData, hhId, userName }) {
+  const [docTypes, setDocTypes] = useState([]);
   const [step, setStep]       = useState(1);
   const [docType, setDocType] = useState(null);
   const [errors, setErrors]   = useState({});
@@ -418,9 +338,16 @@ function DocumentsTab({ userData, hhId, userName }) {
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
-    contact: "", email: "", ctc: "",
+    contact: "", email: "",
     residingSince: "", purpose: "", validId: "", validIdFile: null,
   });
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "document_types"), (snapshot) => {
+      setDocTypes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Auto-fill form when userData loads
   useEffect(() => {
@@ -454,15 +381,14 @@ function DocumentsTab({ userData, hhId, userName }) {
     if (!form.dob)                           e.dob          = "Required.";
     if (!form.address.trim())                e.address      = "Required.";
     if (!String(form.contact || "").trim())  e.contact      = "Required.";
-    if (!form.ctc.trim())                    e.ctc          = "Required.";
-    if (!form.residingSince)                 e.residingSince = "Required.";
+        if (!form.residingSince)                 e.residingSince = "Required.";
     if (!form.purpose.trim())               e.purpose      = "Required.";
     if (!form.validId)                       e.validId      = "Please upload a valid ID.";
-    const extra = EXTRA_FIELDS[docType?.id] || [];
+    const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.key]) e[f.key] = "You must confirm this to proceed."; }
-      else { if (!form[f.key]?.toString().trim()) e[f.key] = "Required."; }
+      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
+      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -474,9 +400,12 @@ function DocumentsTab({ userData, hhId, userName }) {
     if (step === 2 && !validateStep2()) return;
     if (step === 3) {
       try {
-        const refNumber = `BM-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-        await submitDocumentRequest(hhId, userName || "Unknown", docType, form);
-        setRefNum(refNumber);
+        const customData = {};
+        (docType.customFields || []).forEach(f => {
+          if (form[f.id] !== undefined) customData[f.label] = form[f.id];
+        });
+        const generatedRef = await submitDocumentRequest(hhId, userName || "Unknown", docType, form, customData);
+        setRefNum(generatedRef);
       } catch (error) {
         console.error("Failed to submit document request:", error);
         setErrors({ submit: "Failed to submit. Please try again." });
@@ -495,7 +424,7 @@ function DocumentsTab({ userData, hhId, userName }) {
     <div className="dr-wizard">
       <div className="dr-wizard-header"><StepIndicator step={step} /></div>
       <div className="dr-wizard-body">
-        {step === 1 && <Step1 selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} />}
+        {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} />}
         {errors.docType && <p className="sv-error-msg" style={{ padding: "0 1.5rem" }}>{errors.docType}</p>}
         {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
         {step === 3 && <Step3 docType={docType} form={form} />}
@@ -514,10 +443,8 @@ function DocumentsTab({ userData, hhId, userName }) {
 // ── Calendar ──
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const RESERVED_DATES = ["2026-03-14","2026-03-15","2026-03-20"];
-const PENDING_DATES  = ["2026-03-18","2026-03-22","2026-03-27"];
 
-function Calendar({ selectedDate, onSelectDate }) {
+function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates = [], blockedDates = [] }) {
   const today = new Date();
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -530,10 +457,11 @@ function Calendar({ selectedDate, onSelectDate }) {
 
   const getStatus = (d) => {
     const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    if (RESERVED_DATES.includes(str)) return "Reserved";
-    if (PENDING_DATES.includes(str))  return "Pending";
+    if (reservedDates.includes(str)) return "Reserved";
+    if (pendingDates.includes(str))  return "Pending";
     const date = new Date(viewYear, viewMonth, d);
     if (date < new Date(today.getFullYear(), today.getMonth(), today.getDate())) return "past";
+    if (blockedDates.includes(str)) return "past";
     return "available";
   };
 
@@ -579,15 +507,50 @@ function Calendar({ selectedDate, onSelectDate }) {
 
 // ── Reservation Form ──
 function ReservationForm({ onBack, facility, userData, hhId, userName }) {
-  const facilityName = facility?.title || "Barangay Multi-Purpose Hall";
+  const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
-    ? `Reserve a time slot for ${facility.title}. Approval is required before confirmation.`
+    ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
     : "Reserve a facility for your event. Approval is required before confirmation.";
+  
+  const [reservations, setReservations] = useState([]);
+  const [pendingDates, setPendingDates] = useState([]);
 
-  const [form, setForm] = useState({ fullName: "", contactNumber: "", purpose: "", date: "", startTime: "", endTime: "", attendees: "", notes: "" });
-  const [dateStatus, setDateStatus] = useState(null);
-  const [submitted, setSubmitted]   = useState(false);
-  const [errors, setErrors]         = useState({});
+  useEffect(() => {
+    if (!facility) return;
+    const unsub = onSnapshot(collection(db, "facilityReservations"), (snapshot) => {
+      const allRes = [];
+      const datesWithRes = new Set();
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (String(data.facilityId) === String(facility.id) && data.date) {
+            const stat = (data.status || "").toLowerCase();
+            if (stat !== "rejected") {
+                allRes.push({
+                   id: doc.id,
+                   date: data.date,
+                   startTime: data.startTime,
+                   endTime: data.endTime,
+                   status: stat
+                });
+                datesWithRes.add(data.date);
+            }
+        }
+      });
+      setReservations(allRes);
+      setPendingDates(Array.from(datesWithRes));
+    });
+    return () => unsub();
+  }, [facility]);
+
+  const [form, setForm] = useState({
+    fullName: "", email: "", contactNumber: "",
+    purpose: "", date: "", startTime: "", endTime: "",
+    attendees: "", notes: ""
+  });
+  const [refNum, setRefNum]             = useState("");
+  const [dateStatus, setDateStatus]     = useState(null);
+  const [submitted, setSubmitted]       = useState(false);
+  const [errors, setErrors]             = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   // Auto-fill form when userData loads
@@ -597,6 +560,7 @@ function ReservationForm({ onBack, facility, userData, hhId, userName }) {
       setForm(f => ({
         ...f,
         fullName: name,
+        email: userData.email || "",
         contactNumber: userData.contactNumber != null ? String(userData.contactNumber) : ""
       }));
     }
@@ -604,20 +568,44 @@ function ReservationForm({ onBack, facility, userData, hhId, userName }) {
 
   const validate = () => {
     const e = {};
+    if (!form.email?.trim())   e.email     = "Email is required.";
     if (!form.purpose.trim())  e.purpose   = "Purpose of use is required.";
     if (!form.date)            e.date      = "Please select a date.";
     if (!form.startTime)       e.startTime = "Start time is required.";
     if (!form.endTime)         e.endTime   = "End time is required.";
     if (form.startTime && form.endTime && form.startTime >= form.endTime) e.endTime = "End time must be after start time.";
+    
+    const extra = facility?.customFields || [];
+    extra.forEach(f => {
+      if (!f.required) return;
+      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
+      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
+    });
     return e;
   };
 
   const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    if (dateStatus === "reserved") { setErrors({ date: "Selected date is not available." }); return; }
+    
+    // Check for overlap
+    const hasOverlap = reservations.some(r => {
+      if (r.date !== form.date) return false;
+      return form.startTime < r.endTime && r.startTime < form.endTime;
+    });
+
+    if (hasOverlap) {
+      setErrors({ timeOverlap: "The selected time slot conflicts with an existing reservation. Please select a different time." });
+      return;
+    }
+
     try {
-      await submitFacilityReservation(hhId, userName || "User", facility, form);
+      const customData = {};
+      (facility?.customFields || []).forEach(f => {
+        if (form[f.id] !== undefined) customData[f.label] = form[f.id];
+      });
+      const generatedRef = await submitFacilityReservation(hhId, userName || "User", facility, form, customData);
+      setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit reservation:", error);
@@ -630,8 +618,14 @@ function ReservationForm({ onBack, facility, userData, hhId, userName }) {
       <div className="sv-success-icon"><ServiceCheckCircleIcon /></div>
       <h3 className="sv-success-title">Reservation Submitted</h3>
       <p className="sv-success-sub">Your reservation request has been submitted and is awaiting barangay approval.</p>
+      
+      <div className="dr-ref-box" style={{ margin: '1.5rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+        <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
+        <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
+      </div>
+
       <div className="sv-status-badge"><ServiceClockIcon /> Pending Approval</div>
-      <button className="sv-btn-outline" onClick={onBack}>Close</button>
+      <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>Close</button>
     </div>
   );
 
@@ -656,6 +650,17 @@ function ReservationForm({ onBack, facility, userData, hhId, userName }) {
               <label className="sv-label">Contact Number</label>
               <input className="sv-input sv-input--readonly" value={form.contactNumber} readOnly />
             </div>
+          </div>
+          <div className="sv-field">
+            <label className="sv-label">Email Address <span className="sv-required">*</span></label>
+            <input
+              className={`sv-input${errors.email ? " sv-input--error" : ""}`}
+              type="email"
+              placeholder="your@email.com"
+              value={form.email}
+              onChange={e => { set("email", e.target.value); setErrors(p => ({...p, email: ""})); }}
+            />
+            {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
           <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Reservation Details</div>
           <div className="sv-field">
@@ -684,13 +689,39 @@ function ReservationForm({ onBack, facility, userData, hhId, userName }) {
             <textarea className="sv-textarea" placeholder="Any special setup requirements, equipment needed, etc." rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
           </div>
         </div>
+        {facility?.customFields?.length > 0 && (
+          <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
+            <div className="sv-field-section-label">Additional Information</div>
+            <div className="dr-field-row dr-field-row--wrap">
+              {facility.customFields.map(f => {
+                if (f.type === "checkbox") {
+                  return (
+                    <div className="dr-field dr-field--full" key={f.id}>
+                      <label className={`dr-checkbox-label${errors[f.id] ? " dr-checkbox-label--error" : ""}`}>
+                        <input type="checkbox" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} className="dr-checkbox" />
+                        <span>{f.label} {f.required && <span className="sv-required">*</span>}</span>
+                      </label>
+                      {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
+                    </div>
+                  );
+                }
+                return (
+                  <div className="dr-field" key={f.id}>
+                    <label className="sv-label">{f.label} {f.required && <span className="sv-required">*</span>}</label>
+                    <input className={`sv-input${errors[f.id] ? " sv-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
+                    {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="sv-calendar-col">
           <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
-          <Calendar selectedDate={form.date} onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({...p, date: ""})); }} />
+          <Calendar selectedDate={form.date} reservedDates={[]} pendingDates={pendingDates} blockedDates={facility?.blockedDates || []} onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({...p, date: ""})); }} />
           {errors.date && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{errors.date}</span>}
-          {dateStatus === "reserved" && form.date && <div className="sv-cal-warning"><ServiceInfoIcon /> Selected time slot is not available.</div>}
-          {dateStatus === "pending"  && form.date && <div className="sv-cal-warning sv-cal-warning--pending"><ServiceInfoIcon /> This date has a pending reservation.</div>}
-          {dateStatus === "available" && form.date && <div className="sv-cal-info"><ServiceCheckCircleIcon /> Date is available.</div>}
+          {errors.timeOverlap && <div className="sv-error-msg" style={{marginTop:"0.5rem", padding:"0.75rem", background:"#fef2f2", border:"1px solid #fecaca", borderRadius:"0.375rem", color:"#b91c1c"}}>{errors.timeOverlap}</div>}
+          {pendingDates.includes(form.date) && !errors.timeOverlap && <div className="sv-cal-warning sv-cal-warning--pending"><ServiceInfoIcon /> This date has existing reservations. Make sure your time slot doesn't overlap.</div>}
         </div>
       </div>
       <div className="sv-form-actions">
@@ -838,20 +869,32 @@ function ProgramsTab() {
 
 // ── Facilities Tab ──
 function FacilitiesTab({ onReserve }) {
+  const [facilities, setFacilities] = useState([]);
+  
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "facilities"), snapshot => {
+      setFacilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, []);
+
   return (
     <div className="sv-facilities-list">
-      {FACILITIES.map(f => (
+      {facilities.map(f => (
         <div key={f.id} className="sv-facility-card">
           <div className="sv-facility-card__left">
             <div className="sv-facility-card__icon-wrap"><BuildingIcon /></div>
             <div>
-              <div className="sv-facility-card__title">{f.title}</div>
+              <div className="sv-facility-card__title">{f.name || f.title}</div>
               <div className="sv-facility-card__meta">
                 <span>{f.capacity}</span>
                 <span className="sv-facility-card__dot" />
-                <span>{f.hours}</span>
+                <span>{f.openTime && f.closeTime ? (() => {
+                  const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h,10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
+                  return fmt(f.openTime) + ' - ' + fmt(f.closeTime);
+                })() : f.hours}</span>
               </div>
-              <div className="sv-facility-card__desc">{f.desc}</div>
+              <div className="sv-facility-card__desc">{f.fullDescription || f.desc}</div>
             </div>
           </div>
           <div className="sv-facility-card__right">
@@ -1398,7 +1441,7 @@ function PeaceOrderTab({ userData, hhId }) {
     if (Object.keys(e).length) { setErrors(e); return; }
     try {
       await submitIncidentReport(hhId, form);
-      setRefNum(`PO-2026-${Math.floor(10000 + Math.random() * 90000)}`);
+      setRefNum(Array.from({length:8}, ()=>"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join(""));
       setView("submitted");
     } catch (error) {
       console.error("Failed to submit incident report:", error);
@@ -2141,7 +2184,7 @@ function ServicesTab({ userData, hhId, userName }) {
       </div>
       <div className="svc-filter-tabbar">
         {FILTERS.map(f => (
-          <button key={f.key} className={`svc-filter-tab${filter === f.key ? " svc-filter-tab--active" : ""}`} onClick={() => setFilter(f.key)}>
+          <button key={f.id} className={`svc-filter-tab${filter === f.key ? " svc-filter-tab--active" : ""}`} onClick={() => setFilter(f.key)}>
             {f.label}
             {f.key !== "all" && (
               <span className="svc-filter-tab__count">{SERVICES_SUBTABS.filter(s => s.category === f.key).length}</span>

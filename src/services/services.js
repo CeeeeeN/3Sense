@@ -4,18 +4,27 @@ import {
   query, where, orderBy, serverTimestamp,
 } from "firebase/firestore";
 
+const generateRef = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
 // ══════════════════════════════
-export async function submitDocumentRequest(hhId, userName, docType, form) {
-  const refNum = `BM-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+export async function submitDocumentRequest(hhId, userName, docType, form, customData = {}) {
+  const refNum = generateRef();
   await addDoc(collection(db, "documentRequests"), {
     refNum, hhId,
     requesterName: userName,
-    documentType: docType.name,
+    documentType: docType.name || docType.title,
     documentId: docType.id,
-    fee: docType.fee,
-    processingDays: docType.days,
+    fee: docType.fee || "Free",
+    processingDays: docType.days || docType.processingTime || "",
     firstName: form.firstName,
     middleName: form.middleName || "",
     lastName: form.lastName,
@@ -25,11 +34,11 @@ export async function submitDocumentRequest(hhId, userName, docType, form) {
     address: form.address,
     contact: form.contact,
     email: form.email || "",
-    ctcNumber: form.ctc,
     residingSince: form.residingSince,
     purpose: form.purpose,
     validIdFileName: form.validId || "",
     status: "Pending",
+    ...customData,
     submittedAt: serverTimestamp(),
   });
   return refNum;
@@ -48,12 +57,15 @@ export async function getDocumentRequests(hhId) {
 // ══════════════════════════════
 // 🏢 FACILITY RESERVATIONS
 // ══════════════════════════════
-export async function submitFacilityReservation(hhId, userName, facility, form) {
-  const refNum = `FR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+export async function submitFacilityReservation(hhId, userName, facility, form, customData = {}) {
+  const refNum = generateRef();
   await addDoc(collection(db, "facilityReservations"), {
     refNum, hhId,
-    requesterName: userName,
-    facilityName: facility?.title || "Barangay Multi-Purpose Hall",
+    requesterName: form.fullName || userName,
+    fullName: form.fullName || userName,
+    email: form.email || "",
+    contactNumber: form.contactNumber || "",
+    facilityName: facility?.name || facility?.title || "Barangay Multi-Purpose Hall",
     facilityId: facility?.id || 1,
     purpose: form.purpose,
     date: form.date,
@@ -62,6 +74,7 @@ export async function submitFacilityReservation(hhId, userName, facility, form) 
     attendees: form.attendees || "",
     notes: form.notes || "",
     status: "Pending",
+    ...customData,
     submittedAt: serverTimestamp(),
   });
   return refNum;
@@ -85,7 +98,7 @@ export async function submitIncidentReport(hhId, form) {
     description: form.description,
     urgency: form.urgency,
     photoFileName: form.photo || "",
-    status: "Received",
+    status: "received",
     updates: [`${form.date} – Report received`],
     submittedAt: serverTimestamp(),
   });
@@ -113,7 +126,7 @@ export async function submitBSWDReport(hhId, form) {
     location: form.location,
     description: form.description,
     photoFileName: form.photo || "",
-    status: "Received",
+    status: "received",
     submittedAt: serverTimestamp(),
   });
 }
@@ -125,7 +138,7 @@ export async function submitBSWDTip(hhId, form) {
     about: form.about,
     tip: form.tip,
     contact: form.contact || "",
-    status: "Received",
+    status: "received",
     submittedAt: serverTimestamp(),
   });
 }
@@ -150,7 +163,7 @@ export async function submitLivelihoodRegistration(hhId, form, program) {
     programDate: program.date,
     programTime: program.time,
     programLocation: program.location,
-    status: "Pending",
+    status: "pending",
     submittedAt: serverTimestamp(),
   });
   return regNum;
