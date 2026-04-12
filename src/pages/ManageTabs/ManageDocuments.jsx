@@ -1,61 +1,70 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import FormBuilder from "../../components/FormBuilder";
+import { db } from "../../firebase/firebase";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 
 export default function ManageDocuments() {
-  const [documents, setDocuments] = useState([
-    { id: "d1", title: "Barangay Clearance", processingTime: "1-2 Working Days", fee: "₱50.00", requirements: ["Valid ID", "Cedula"], customFields: [] },
-    { id: "d2", title: "Certificate of Indigency", processingTime: "1 Working Day", fee: "Free", requirements: ["Valid ID", "Voter's Certification"], customFields: [] },
-    { id: "d3", title: "Business Permit Clearance", processingTime: "3-5 Working Days", fee: "₱500.00", requirements: ["DTI Registration", "Contract of Lease", "Sketch of Business Location"], customFields: [] },
-  ]);
+  const [documents, setDocuments] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null);
   const [editingDocId, setEditingDocId] = useState(null);
 
-  const [newDocument, setNewDocument] = useState({ title: "", processingTime: "", fee: "", requirements: [""], customFields: [] });
+  const [newDocument, setNewDocument] = useState({ title: "", processingTime: "", fee: "", description: "", reminder: "", customFields: [] });
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "document_types"), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setDocuments(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleEdit = (docType) => {
     setNewDocument({
       title: docType.title || "",
       processingTime: docType.processingTime || "",
       fee: docType.fee || "",
-      requirements: docType.requirements && docType.requirements.length > 0 ? docType.requirements : [""],
+      description: docType.description || "",
+      reminder: docType.reminder || "",
       customFields: docType.customFields || []
     });
     setEditingDocId(docType.id);
     setShowAddModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this document type?")) {
-      setDocuments(documents.filter(d => d.id !== id));
+      try {
+        await deleteDoc(doc(db, "document_types", id));
+      } catch(error) {
+        console.error("Error deleting document type: ", error);
+      }
     }
   };
 
-  const handleAddDocument = (e) => {
+  const handleAddDocument = async (e) => {
     e.preventDefault();
-    const reqArray = newDocument.requirements.filter(r => r.trim() !== "");
-    
-    if (editingDocId) {
-      setDocuments(documents.map(d => d.id === editingDocId ? { ...d, ...newDocument, requirements: reqArray } : d));
-    } else {
-      setDocuments([...documents, { ...newDocument, id: `d${Date.now()}`, requirements: reqArray }]);
+    try {
+      if (editingDocId) {
+        await updateDoc(doc(db, "document_types", editingDocId), { ...newDocument });
+      } else {
+        await addDoc(collection(db, "document_types"), { ...newDocument, createdAt: serverTimestamp() });
+      }
+      setNewDocument({ title: "", processingTime: "", fee: "", description: "", reminder: "", customFields: [] });
+      setEditingDocId(null);
+      setShowAddModal(false);
+    } catch(error) {
+      console.error("Error saving document type: ", error);
     }
-    setNewDocument({ title: "", processingTime: "", fee: "", requirements: [""], customFields: [] });
-    setEditingDocId(null);
-    setShowAddModal(false);
   };
 
   const openAddModal = () => {
     setEditingDocId(null);
-    setNewDocument({ title: "", processingTime: "", fee: "", requirements: [""], customFields: [] });
+    setNewDocument({ title: "", processingTime: "", fee: "", description: "", reminder: "", customFields: [] });
     setShowAddModal(true);
-  };
-
-  const addReqField = () => {
-    setNewDocument({ ...newDocument, requirements: [...newDocument.requirements, ""] });
   };
 
   const handleGenerateGlobalQR = () => {
@@ -112,6 +121,7 @@ export default function ManageDocuments() {
             <div className="as-card-header">
               <h2 className="as-card-title">{doc.title}</h2>
             </div>
+            {doc.description && <p className="as-card-desc" style={{ marginBottom: '10px' }}>{doc.description}</p>}
             <ul className="as-card-details">
               <li><Manage_IconClock /> <strong>Processing:</strong> {doc.processingTime}</li>
               <li><strong>Fee:</strong> {doc.fee}</li>
@@ -157,17 +167,17 @@ export default function ManageDocuments() {
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Requirements</label>
-                  {newDocument.requirements.map((req, idx) => (
-                    <input key={idx} type="text" className="as-form-input" style={{ marginBottom: '5px' }} placeholder="Requirement name"
-                      value={req} onChange={(e) => {
-                        const newReqs = [...newDocument.requirements];
-                        newReqs[idx] = e.target.value;
-                        setNewDocument({...newDocument, requirements: newReqs});
-                      }}
-                    />
-                  ))}
-                  <button type="button" className="as-btn-ghost" onClick={addReqField} style={{ width: 'fit-content', padding: '5px 10px', fontSize: '0.9rem' }}>+ Add Requirement</button>
+                  <label className="as-form-label">Description (Preview)</label>
+                  <input type="text" className="as-form-input" placeholder="e.g. General barangay clearance"
+                    value={newDocument.description} onChange={(e) => setNewDocument({...newDocument, description: e.target.value})} 
+                  />
+                </div>
+
+                <div className="as-form-group">
+                  <label className="as-form-label">Reminder (Detailed Info)</label>
+                  <textarea className="as-form-textarea" rows="2" placeholder="e.g. Valid only when filed and approved by the Office of the Punong Barangay"
+                    value={newDocument.reminder} onChange={(e) => setNewDocument({...newDocument, reminder: e.target.value})} 
+                  />
                 </div>
 
                 <div className="as-form-section" style={{ marginTop: '20px' }}>

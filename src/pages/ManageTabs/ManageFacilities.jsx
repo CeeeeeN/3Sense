@@ -1,53 +1,69 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
-import FormBuilder from "../../components/FormBuilder";
-
-const INITIAL_FACILITIES = [
-  { id: "f1", name: "Barangay Multi-Purpose Hall", description: "Spacious hall suitable for events, meetings, seminars.", hours: "8:00 AM - 9:00 PM", available: true, customFields: [] },
-  { id: "f2", name: "Basketball Court", description: "Open-air basketball court available for recreational use.", hours: "6:00 AM - 10:00 PM", available: true, customFields: [] },
-  { id: "f3", name: "Health Center", description: "Barangay health center for consultations.", hours: "8:00 AM - 5:00 PM", available: false, customFields: [] },
-];
+import { db } from "../../firebase/firebase";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 
 export default function ManageFacilities() {
-  const [facilities, setFacilities] = useState(INITIAL_FACILITIES);
+  const [facilities, setFacilities] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showGlobalQRModal, setShowGlobalQRModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState(null);
-  const [selectedQR, setSelectedQR] = useState(null);
+    const [selectedQR, setSelectedQR] = useState(null);
   const [editingFacilityId, setEditingFacilityId] = useState(null);
 
   // Mock calendar state
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [blockedDates, setBlockedDates] = useState(["2026-04-15", "2026-04-20"]);
-
+  
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "facilities"), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFacilities(data);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
 
-  const toggleDate = (dateStr) => {
-    if (blockedDates.includes(dateStr)) setBlockedDates(blockedDates.filter(d => d !== dateStr));
-    else setBlockedDates([...blockedDates, dateStr]);
+  const toggleDate = async (dateStr) => {
+    if (!selectedFacility) return;
+    const current = selectedFacility.blockedDates || [];
+    let newBlocked;
+    if (current.includes(dateStr)) newBlocked = current.filter(d => d !== dateStr);
+    else newBlocked = [...current, dateStr];
+    
+    // Update local state for immediate feedback
+    setSelectedFacility(prev => ({...prev, blockedDates: newBlocked}));
+    
+    // Update firestore asynchronously
+    try {
+      await updateDoc(doc(db, "facilities", selectedFacility.id), { blockedDates: newBlocked });
+    } catch(err) {
+      console.error(err);
+    }
   };
 
   const [newFacility, setNewFacility] = useState({
-    name: "", description: "", openTime: "08:00", closeTime: "17:00", available: true, customFields: []
+    name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: []
   });
 
   const handleEdit = (fac) => {
     setNewFacility({ 
       name: fac.name, 
-      description: fac.description || "", 
+      capacity: fac.capacity || "", 
       openTime: fac.openTime || "08:00",
       closeTime: fac.closeTime || "17:00",
+      fullDescription: fac.fullDescription || "",
       available: fac.available !== false,
       customFields: fac.customFields || []
     });
@@ -55,29 +71,39 @@ export default function ManageFacilities() {
     setShowAddModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this facility?")) {
-      setFacilities(facilities.filter(f => f.id !== id));
+      try {
+        await deleteDoc(doc(db, "facilities", id));
+      } catch(error) {
+        console.error("Error deleting facility: ", error);
+      }
     }
   };
 
-  const handleAddFacility = (e) => {
+  const handleAddFacility = async (e) => {
     e.preventDefault();
-    if (editingFacilityId) {
-      setFacilities(facilities.map(f => f.id === editingFacilityId ? { ...f, ...newFacility, hours: `${newFacility.openTime} - ${newFacility.closeTime}` } : f));
-    } else {
-      setFacilities([...facilities, { id: `f${Date.now()}`, ...newFacility, hours: `${newFacility.openTime} - ${newFacility.closeTime}` }]);
+    try {
+      if (editingFacilityId) {
+        await updateDoc(doc(db, "facilities", editingFacilityId), { ...newFacility });
+      } else {
+        await addDoc(collection(db, "facilities"), { ...newFacility, createdAt: serverTimestamp() });
+      }
+      setNewFacility({ name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: [] });
+      setEditingFacilityId(null);
+      setShowAddModal(false);
+    } catch(error) {
+      console.error("Error saving facility: ", error);
     }
-    setNewFacility({ name: "", description: "", openTime: "8:00 AM", closeTime: "5:00 PM", available: true, customFields: [] });
-    setEditingFacilityId(null);
-    setShowAddModal(false);
   };
 
   const openAddModal = () => {
     setEditingFacilityId(null);
-    setNewFacility({ name: "", description: "", openTime: "08:00", closeTime: "17:00", available: true, customFields: [] });
+    setNewFacility({ name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: [] });
     setShowAddModal(true);
   };
+
+
 
   const openCalendar = (fac) => {
     setSelectedFacility(fac);
@@ -141,18 +167,21 @@ export default function ManageFacilities() {
                 {fac.available ? "Enabled" : "Disabled"}
               </span>
             </div>
-            <p className="as-card-desc">{fac.description}</p>
+            <p className="as-card-desc" style={{ marginBottom: '12px' }}>{fac.fullDescription}</p>
             <ul className="as-card-details">
-              <li><Manage_IconClock /> {fac.hours}</li>
+              <li><strong>Capacity:</strong> {fac.capacity}</li>
+              <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>
             </ul>
             <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', width: '100%' }} onClick={() => openCalendar(fac)}>View Calendar</button>
+                            <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>Calendar</button>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>Edit</button>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id)}>Delete</button>
             </div>
           </div>
         ))}
       </div>
+
+
 
       {showAddModal && (
         <div className="as-modal-overlay">
@@ -174,6 +203,15 @@ export default function ManageFacilities() {
                   </div>
 
                   <div className="as-form-group">
+                    <label className="as-form-label">Capacity</label>
+                    <input type="text" className="as-form-input" required placeholder="e.g. Up to 200 persons"
+                      value={newFacility.capacity} onChange={(e) => setNewFacility({...newFacility, capacity: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div className="as-form-group">
                     <label className="as-form-label">Opening Time</label>
                     <input type="time" className="as-form-input" required
                       value={newFacility.openTime} onChange={(e) => setNewFacility({...newFacility, openTime: e.target.value})} 
@@ -189,9 +227,9 @@ export default function ManageFacilities() {
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Description / Guidelines</label>
-                  <textarea className="as-form-textarea" required rows="2" placeholder="Facility rules, capacity, etc."
-                    value={newFacility.description} onChange={(e) => setNewFacility({...newFacility, description: e.target.value})} 
+                  <label className="as-form-label">Full Description</label>
+                  <textarea className="as-form-textarea" required rows="3" placeholder="Hall details, inclusions like tables, chairs, stage, etc."
+                    value={newFacility.fullDescription} onChange={(e) => setNewFacility({...newFacility, fullDescription: e.target.value})} 
                   />
                 </div>
 
@@ -219,10 +257,7 @@ export default function ManageFacilities() {
                   </div>
                 </div>
 
-                <FormBuilder 
-                  fields={newFacility.customFields} 
-                  onChange={(fields) => setNewFacility({ ...newFacility, customFields: fields })} 
-                />
+
 
                 <div className="as-modal-actions">
                   <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>
@@ -258,7 +293,7 @@ export default function ManageFacilities() {
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const d = i + 1;
                     const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-                    const isBlocked = blockedDates.includes(dateStr);
+                    const isBlocked = (selectedFacility?.blockedDates || []).includes(dateStr);
                     return (
                       <button key={d} 
                         className={`sv-cal-cell sv-cal-cell--${isBlocked ? "reserved" : "available"}`}
