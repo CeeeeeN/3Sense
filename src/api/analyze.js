@@ -6,7 +6,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Only POST requests allowed' });
   }
 
-  // Extract text and rating from the frontend request
   const { text, rating } = req.body;
 
   if (!text) {
@@ -14,24 +13,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Connect to Hugging Face Space
     const client = await Client.connect("3Sense/3Sense");
     
-    // Send BOTH inputs to the AI model
-    const result = await client.predict("/analyze_barangay_feedback", {
-        user_input: text,
-        star_rating: rating ? parseInt(rating) : 3, 
-    });
+    const result = await client.predict("/analyze_barangay_feedback", [
+        text,
+        rating ? parseInt(rating) : 3
+    ]);
 
-    // Extract the JSON dictionary returned by HuggingFace App
     const aiData = result.data[0]; 
     
-    // Send all the metrics back to React
     return res.status(200).json({
       sentiment: aiData.sentiment,
       hybridScore: aiData.hybrid_score,
       textScore: aiData.text_contribution_score,
-      confidence: aiData.ai_confidence,
+      confidence: aiData.ai_confidence, 
       detectedIssue: aiData.detected_issue,
       issueConfidence: aiData.issue_confidence
     });
