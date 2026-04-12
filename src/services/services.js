@@ -29,7 +29,7 @@ export async function submitDocumentRequest(hhId, userName, docType, form) {
     residingSince: form.residingSince,
     purpose: form.purpose,
     validIdFileName: form.validId || "",
-    status: "pending",
+    status: "Pending",
     submittedAt: serverTimestamp(),
   });
   return refNum;
@@ -61,7 +61,7 @@ export async function submitFacilityReservation(hhId, userName, facility, form) 
     endTime: form.endTime,
     attendees: form.attendees || "",
     notes: form.notes || "",
-    status: "pending",
+    status: "Pending",
     submittedAt: serverTimestamp(),
   });
   return refNum;
@@ -85,7 +85,7 @@ export async function submitIncidentReport(hhId, form) {
     description: form.description,
     urgency: form.urgency,
     photoFileName: form.photo || "",
-    status: "received",
+    status: "Received",
     updates: [`${form.date} – Report received`],
     submittedAt: serverTimestamp(),
   });
@@ -113,7 +113,7 @@ export async function submitBSWDReport(hhId, form) {
     location: form.location,
     description: form.description,
     photoFileName: form.photo || "",
-    status: "received",
+    status: "Received",
     submittedAt: serverTimestamp(),
   });
 }
@@ -125,7 +125,7 @@ export async function submitBSWDTip(hhId, form) {
     about: form.about,
     tip: form.tip,
     contact: form.contact || "",
-    status: "received",
+    status: "Received",
     submittedAt: serverTimestamp(),
   });
 }
@@ -150,7 +150,7 @@ export async function submitLivelihoodRegistration(hhId, form, program) {
     programDate: program.date,
     programTime: program.time,
     programLocation: program.location,
-    status: "pending",
+    status: "Pending",
     submittedAt: serverTimestamp(),
   });
   return regNum;
