@@ -6,8 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Only POST requests allowed' });
   }
 
-  // Extract text and rating from the frontend request
-  const { text, rating } = req.body;
+  const { text } = req.body;
 
   if (!text) {
     return res.status(400).json({ message: 'Feedback text is required' });
@@ -16,23 +15,47 @@ export default async function handler(req, res) {
   try {
     // Connect to Hugging Face Space
     const client = await Client.connect("3Sense/3Sense");
-    // Send BOTH inputs to the AI model
-    const result = await client.predict("/analyze_barangay_feedback", [
-        text,
-        rating ? parseInt(rating) : 3
-    ]);
-
-    // Extract the JSON dictionary returned
-    const aiData = result.data[0]; 
     
-    // Send all the metrics back to React
+    // Send the feedback text to the AI model
+    const result = await client.predict("/analyze_barangay_feedback", {
+        user_input: text,
+    });
+
+    // Grab the raw string from Python
+    let aiDataRaw = result.data[0]; 
+    console.log("RAW HUGGING FACE OUTPUT:", aiDataRaw);
+
+    let finalSentiment = null;
+    let finalConfidence = null;
+
+    // This scans the string and forcibly gets the exact values, regardless of quotes/formatting
+    if (typeof aiDataRaw === 'string') {
+      
+      // Look for the word after 'sentiment': 
+      // It matches Positive, Negative, or Neutral
+      const sentimentMatch = aiDataRaw.match(/'sentiment':\s*'([^']+)'/);
+      if (sentimentMatch && sentimentMatch[1]) {
+        finalSentiment = sentimentMatch[1];
+      }
+
+      // Look for the number after 'confidence':
+      const confidenceMatch = aiDataRaw.match(/'confidence':\s*([\d.]+)/);
+      if (confidenceMatch && confidenceMatch[1]) {
+        finalConfidence = parseFloat(confidenceMatch[1]);
+      }
+      
+    } else if (typeof aiDataRaw === 'object') {
+      // Fallback just in case Python never sends real JSON natively
+      finalSentiment = aiDataRaw.sentiment;
+      finalConfidence = aiDataRaw.confidence;
+    }
+    
+    console.log("EXTRACTED DATA:", finalSentiment, finalConfidence);
+
+    // Send the data back to the system
     return res.status(200).json({
-      sentiment: aiData.sentiment,
-      hybridScore: aiData.hybrid_score,
-      textScore: aiData.text_contribution_score,
-      confidence: aiData.ai_confidence,
-      detectedIssue: aiData.detected_issue,
-      issueConfidence: aiData.issue_confidence
+      sentiment: finalSentiment,
+      confidence: finalConfidence
     });
 
   } catch (error) {
