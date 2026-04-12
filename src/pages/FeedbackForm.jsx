@@ -143,15 +143,18 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     try {
       const ref = generateRefId();
 
-      // Default variables including the new Hybrid metrics
+      // Default variables for AI Metrics
       let finalSentiment = null;
       let finalConfidence = null;
       let finalHybridScore = null;
       let finalTextScore = null;
       let finalStatus = 'pending'; 
       
+      // --- NEW: Variables for Pattern Recognition ---
+      let finalDetectedIssue = "None"; 
+      let finalIssueConfidence = null;
+
       try {
-        // --- UPDATED API CALL: Now sending BOTH text and rating ---
         const aiResponse = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -165,10 +168,12 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           const aiData = await aiResponse.json();
           finalSentiment = aiData.sentiment || null;
           finalConfidence = aiData.confidence || null;
-          
-          // Capture the new metrics returned from Vercel
           finalHybridScore = aiData.hybridScore || null;
           finalTextScore = aiData.textScore || null;
+          
+          // --- NEW: Catching the Zero-Shot outputs from Vercel ---
+          finalDetectedIssue = aiData.detectedIssue || "None";
+          finalIssueConfidence = aiData.issueConfidence || null;
 
           if (finalSentiment) {
             finalStatus = 'analyzed';
@@ -185,7 +190,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         finalStatus = 'analysis_failed';
       }
 
-      // --- UPDATED FIRESTORE SAVE: Saving the hybrid formula results ---
+      // --- FIRESTORE SAVE: Now includes Issue Detection data ---
       await addDoc(collection(db, "Feedback"), {
         ReferenceID: ref,
         FacilityID: serviceId,        
@@ -196,8 +201,10 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         Comment: comment,
         Status: finalStatus,              
         Confidence: finalConfidence,
-        HybridScore: finalHybridScore, // Added to database!
-        TextScore: finalTextScore,     // Added to database!
+        HybridScore: finalHybridScore, 
+        TextScore: finalTextScore,     
+        DetectedIssue: finalDetectedIssue,     // <--- ADDED TO DATABASE
+        IssueConfidence: finalIssueConfidence, // <--- ADDED TO DATABASE
         CreatedAt: serverTimestamp(),
         UserName: userName,
         HasPhoto: !!photo,
