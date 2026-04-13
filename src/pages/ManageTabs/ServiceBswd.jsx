@@ -1,27 +1,82 @@
-import React, { useState } from "react";
-import { HeartIcon, SendIcon, IconUser } from "../../components/Icons";
+import React, { useState, useEffect } from "react";
+import { db } from "../../firebase/firebase";
+import {
+  collection, onSnapshot, doc, updateDoc,
+  serverTimestamp, query, orderBy,
+} from "firebase/firestore";
 
-const MOCK_REPORTS = [
-  { id: "R-001", name: "Anonymous", location: "Under the footbridge near highway", concern: "Elderly man sleeping without cover, seems sick.", photo: "No photo attached", status: "Pending", date: "2026-03-15" },
-  { id: "R-002", name: "Maria Santos", location: "Basketball Court Area", concern: "Displaced family from recent fire needs food assistance.", photo: "fire_victims.jpg", status: "Responded", date: "2026-03-14" },
-];
+const formatTs = (ts) => {
+  if (!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+};
 
-const MOCK_TIPS = [
-  { id: "T-001", about: "Kuya Pedro (street vendor)", tip: "His cart was destroyed by a passing truck last night. Needs livelihood support.", contact: "09123456789", status: "Pending", date: "2026-03-15" },
-  { id: "T-002", about: "Unknown child near 7/11", tip: "Child has been begging for two days. Seems lost.", contact: "Anonymous", status: "Resolved (Turned over to DSWD)", date: "2026-03-13" },
-];
+const StatusBadge = ({ status }) => {
+  const s = (status || "").toLowerCase();
+  const isResolved  = s.includes("resolved") || s === "resolved (handled)" || s === "resolved";
+  const isResponded = s === "responded";
+  const style = {
+    padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 600,
+    background: isResolved ? "#dcfce7" : isResponded ? "#e0e7ff" : "#fef3c7",
+    color:      isResolved ? "#166534" : isResponded ? "#3730a3" : "#92400e",
+  };
+  return <span style={style}>{status || "pending"}</span>;
+};
 
 export default function ServiceBswd({ onBack }) {
   const [activeTab, setActiveTab] = useState("reports");
-  const [reports, setReports] = useState(MOCK_REPORTS);
-  const [tips, setTips] = useState(MOCK_TIPS);
 
-  const updateStatus = (id, newStatus, isTip = false) => {
-    if (isTip) {
-      setTips(tips.map(t => t.id === id ? { ...t, status: newStatus } : t));
-    } else {
-      setReports(reports.map(r => r.id === id ? { ...r, status: newStatus } : r));
+  // ── bswdReports ──────────────────────────────────────────────────
+  const [reports, setReports]         = useState([]);
+  const [loadingReports, setLoadingReports] = useState(true);
+
+  // We treat "homeless_report" type as Displacement Reports and
+  // "community_tip" / all others without a specific type as Community Tips.
+  const displacementReports = reports.filter(r => (r.type || "") === "homeless_report");
+  const communityTips       = reports.filter(r => (r.type || "") !== "homeless_report");
+
+  // ── Saving state ─────────────────────────────────────────────────
+  const [saving, setSaving] = useState(false);
+
+  // ── Real-time listener ───────────────────────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setReports(data);
+      setLoadingReports(false);
+    }, (err) => {
+      console.error("bswdReports listener error:", err);
+      setLoadingReports(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // ── Update status ────────────────────────────────────────────────
+  const updateStatus = async (id, newStatus) => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "bswdReports", id), {
+        status:    newStatus,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Error updating status:", err);
     }
+    setSaving(false);
+  };
+
+  // ── Stats ─────────────────────────────────────────────────────────
+  const reportsStats = {
+    total:    displacementReports.length,
+    pending:  displacementReports.filter(r => (r.status || "").toLowerCase() === "pending").length,
+    responded:displacementReports.filter(r => (r.status || "").toLowerCase() === "responded").length,
+    resolved: displacementReports.filter(r => (r.status || "").toLowerCase().includes("resolved")).length,
+  };
+  const tipsStats = {
+    total:   communityTips.length,
+    pending: communityTips.filter(t => !(t.status || "").toLowerCase().includes("resolved") && (t.status || "").toLowerCase() !== "responded").length,
+    handled: communityTips.filter(t => (t.status || "").toLowerCase().includes("resolved") || (t.status || "").toLowerCase().includes("handled")).length,
   };
 
   return (
@@ -32,69 +87,104 @@ export default function ServiceBswd({ onBack }) {
 
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Social Welfare & Development</h1>
+          <h1>Social Welfare &amp; Development</h1>
           <p className="as-subtitle">Manage displaced person reports and community welfare tips</p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>
-        <button 
-          style={{ padding: '8px 16px', background: activeTab === 'reports' ? '#111827' : 'transparent', color: activeTab === 'reports' ? '#fff' : '#6b7280', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-          onClick={() => setActiveTab('reports')}
-        >
-          Displacement Reports ({reports.length})
-        </button>
-        <button 
-          style={{ padding: '8px 16px', background: activeTab === 'tips' ? '#111827' : 'transparent', color: activeTab === 'tips' ? '#fff' : '#6b7280', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-          onClick={() => setActiveTab('tips')}
-        >
-          Community Tips ({tips.length})
-        </button>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid #e5e7eb", paddingBottom: "10px" }}>
+        {[
+          { key: "reports", label: `Displacement Reports (${displacementReports.length})` },
+          { key: "tips",    label: `Community Tips (${communityTips.length})` },
+        ].map(tab => (
+          <button key={tab.key}
+            style={{ padding: "8px 16px", background: activeTab === tab.key ? "#111827" : "transparent", color: activeTab === tab.key ? "#fff" : "#6b7280", borderRadius: "6px", border: "none", fontWeight: 600, cursor: "pointer" }}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {activeTab === "reports" ? (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+      {/* Stat row */}
+      {activeTab === "reports" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
+          {[
+            { label: "Total",     value: reportsStats.total,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+            { label: "Pending",   value: reportsStats.pending,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: "Responded", value: reportsStats.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+            { label: "Resolved",  value: reportsStats.resolved,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+          ].map(s => (
+            <div key={s.label} style={{ background: s.bg, padding: "14px 18px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
+              <div style={{ color: "#6b7280", fontSize: "0.82rem", marginBottom: "4px" }}>{s.label}</div>
+              <div style={{ fontSize: "1.6rem", fontWeight: 700, color: s.color }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {activeTab === "tips" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "20px" }}>
+          {[
+            { label: "Total Tips", value: tipsStats.total,   bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+            { label: "Pending",    value: tipsStats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: "Handled",    value: tipsStats.handled, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+          ].map(s => (
+            <div key={s.label} style={{ background: s.bg, padding: "14px 18px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
+              <div style={{ color: "#6b7280", fontSize: "0.82rem", marginBottom: "4px" }}>{s.label}</div>
+              <div style={{ fontSize: "1.6rem", fontWeight: 700, color: s.color }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loadingReports ? (
+        <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>Loading…</div>
+      ) : activeTab === "reports" ? (
+
+        /* ── Displacement Reports Table ── */
+        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               <tr>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Date</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Reporter Name</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Location</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Concern / Description</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Status</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                {["Date", "HH ID", "Reporter Name", "Location", "Description", "Status", "Actions"].map(h => (
+                  <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {reports.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '16px', color: '#6b7280', fontSize: '0.9rem' }}>{r.date}</td>
-                  <td style={{ padding: '16px', fontWeight: 500 }}>{r.name}</td>
-                  <td style={{ padding: '16px', color: '#111827' }}>{r.location}</td>
-                  <td style={{ padding: '16px', color: '#4b5563', maxWidth: '300px' }}>
-                    <div style={{ marginBottom: '8px' }}>{r.concern}</div>
-                    <span style={{ fontSize: '0.75rem', color: '#317D89', background: '#e0f2fe', padding: '2px 8px', borderRadius: '12px' }}>
-                      📸 {r.photo}
-                    </span>
+              {displacementReports.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No displacement reports yet.</td></tr>
+              )}
+              {displacementReports.map(r => (
+                <tr key={r.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(r.submittedAt)}</td>
+                  <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.82rem" }}>{r.hhid || "—"}</td>
+                  <td style={{ padding: "14px 16px", fontWeight: 500 }}>{r.reporterName || "Anonymous"}</td>
+                  <td style={{ padding: "14px 16px", color: "#111827" }}>{r.location || "—"}</td>
+                  <td style={{ padding: "14px 16px", color: "#4b5563", maxWidth: "260px" }}>
+                    <div style={{ marginBottom: r.photoFileName ? "6px" : 0 }}>{r.description || "—"}</div>
+                    {r.photoFileName && (
+                      <span style={{ fontSize: "0.75rem", color: "#317D89", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px" }}>
+                        📸 {r.photoFileName}
+                      </span>
+                    )}
                   </td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{ 
-                      padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600,
-                      background: r.status === 'Resolved' ? '#dcfce7' : r.status === 'Pending' ? '#fef3c7' : '#e0e7ff',
-                      color: r.status === 'Resolved' ? '#166534' : r.status === 'Pending' ? '#92400e' : '#3730a3'
-                    }}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
-                    {r.status !== 'Resolved' ? (
-                      <select onChange={(e) => updateStatus(r.id, e.target.value)} defaultValue={r.status} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.8rem' }}>
-                        <option value="Pending">Pending</option>
-                        <option value="Responded">Responded</option>
-                        <option value="Resolved">Resolved</option>
+                  <td style={{ padding: "14px 16px" }}><StatusBadge status={r.status} /></td>
+                  <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                    {!(r.status || "").toLowerCase().includes("resolved") ? (
+                      <select
+                        defaultValue={r.status || "pending"}
+                        onChange={(e) => updateStatus(r.id, e.target.value)}
+                        disabled={saving}
+                        style={{ padding: "5px 10px", borderRadius: "6px", border: "1px solid #e5e7eb", fontSize: "0.8rem", cursor: "pointer" }}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="responded">Responded</option>
+                        <option value="resolved">Resolved</option>
                       </select>
                     ) : (
-                      <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Closed</span>
+                      <span style={{ color: "#9ca3af", fontSize: "0.85rem" }}>Closed</span>
                     )}
                   </td>
                 </tr>
@@ -102,40 +192,49 @@ export default function ServiceBswd({ onBack }) {
             </tbody>
           </table>
         </div>
+
       ) : (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+
+        /* ── Community Tips Table ── */
+        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               <tr>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Date</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>About Who?</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>What is known (Tip)</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Contact Info</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem' }}>Status</th>
-                <th style={{ padding: '16px', fontWeight: 600, color: '#4b5563', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                {["Date", "HH ID", "Reporter Name", "Location", "Description", "Status", "Actions"].map(h => (
+                  <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {tips.map(t => (
-                <tr key={t.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '16px', color: '#6b7280', fontSize: '0.9rem' }}>{t.date}</td>
-                  <td style={{ padding: '16px', fontWeight: 500, color: '#111827' }}>{t.about}</td>
-                  <td style={{ padding: '16px', color: '#4b5563', maxWidth: '300px' }}>{t.tip}</td>
-                  <td style={{ padding: '16px', color: '#6b7280' }}>{t.contact}</td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{ 
-                      padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600,
-                      background: t.status.includes('Resolved') ? '#dcfce7' : '#fef3c7',
-                      color: t.status.includes('Resolved') ? '#166534' : '#92400e'
-                    }}>
-                      {t.status}
-                    </span>
+              {communityTips.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No community tips yet.</td></tr>
+              )}
+              {communityTips.map(t => (
+                <tr key={t.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(t.submittedAt)}</td>
+                  <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.82rem" }}>{t.hhid || "—"}</td>
+                  <td style={{ padding: "14px 16px", fontWeight: 500 }}>{t.reporterName || "Anonymous"}</td>
+                  <td style={{ padding: "14px 16px", color: "#111827" }}>{t.location || "—"}</td>
+                  <td style={{ padding: "14px 16px", color: "#4b5563", maxWidth: "280px" }}>
+                    <div>{t.description || "—"}</div>
+                    {t.photoFileName && (
+                      <span style={{ fontSize: "0.75rem", color: "#317D89", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px", marginTop: "4px", display: "inline-block" }}>
+                        📸 {t.photoFileName}
+                      </span>
+                    )}
                   </td>
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
-                    {!t.status.includes('Resolved') ? (
-                      <button style={{ padding: '6px 12px', background: '#fff', border: '1px solid #2DB17B', color: '#2DB17B', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }} onClick={() => updateStatus(t.id, 'Resolved (Handled)', true)}>Mark Handled</button>
+                  <td style={{ padding: "14px 16px" }}><StatusBadge status={t.status} /></td>
+                  <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                    {!(t.status || "").toLowerCase().includes("resolved") && !(t.status || "").toLowerCase().includes("handled") ? (
+                      <button
+                        style={{ padding: "5px 12px", background: "#fff", border: "1px solid #2DB17B", color: "#2DB17B", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
+                        onClick={() => updateStatus(t.id, "resolved")}
+                        disabled={saving}
+                      >
+                        Mark Handled
+                      </button>
                     ) : (
-                      <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Done</span>
+                      <span style={{ color: "#9ca3af", fontSize: "0.85rem" }}>Done</span>
                     )}
                   </td>
                 </tr>
