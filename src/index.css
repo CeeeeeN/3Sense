@@ -13193,15 +13193,15 @@ h1,h2,h3,h4,.poppins {
 .act2-stars {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
 }
 
 .act2-stars__label {
   font-family: 'Poppins', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.75rem;   /* was 0.72rem */
   font-weight: 700;
   color: #f59e0b;
-  margin-left: 0.35rem;
+  margin-left: 5px;
 }
 
 /* Feedback comment */
