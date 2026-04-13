@@ -1,14 +1,19 @@
-import { doc, setDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 export const addHouseholdMember = async (householdID, memberData) => {
     if (!householdID) throw new Error("Household ID is required.");
+
+    const hhRef = doc(db, "households", householdID);
+    const hhSnap = await getDoc(hhRef);
+    const hhUserID = hhSnap.data()?.userID || "";
 
     const residentsRef = collection(db, "households", householdID, "residents");
     const newMemberRef = doc(residentsRef);
 
     const resident = {
         role: memberData.isHead ? "head" : "member",
+        userID: hhUserID,
         firstName: memberData.firstName || "",
         middleName: memberData.middleName || "",
         lastName: memberData.lastName || "",

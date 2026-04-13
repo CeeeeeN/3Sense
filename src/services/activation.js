@@ -72,6 +72,7 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
 
         pin: null,
 
+        userID: userCredential.user.uid,
         createdAt: serverTimestamp(),
         addedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -80,7 +81,7 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
     await updateDoc(householdRef, {
         activated: true,
         activatedAt: serverTimestamp(),
-        userUID: userCredential.user.uid,
+        userID: userCredential.user.uid,
         _pendingHeadData: deleteField(), // clean up the temp staging field
     });
 

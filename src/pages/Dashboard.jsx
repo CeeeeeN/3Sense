@@ -172,7 +172,7 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) { setDataLoading(false); return; }
       try {
-        const hhQ = query(collection(db, "households"), where("userUID", "==", user.uid));
+        const hhQ = query(collection(db, "households"), where("userID", "==", user.uid));
         const hhSnap = await getDocs(hhQ);
         if (hhSnap.empty) { setDataLoading(false); return; }
 
