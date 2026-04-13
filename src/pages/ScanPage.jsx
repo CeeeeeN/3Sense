@@ -244,11 +244,9 @@ export default function ScanPage({
       }
     } catch (e) {
       console.error("QR Validation failed:", e);
-      // Optional: you could show a quick toast error here
-      // For now we just resume scanning to allow another try naturally
-      scanning.current = true;
-      setCamState("active"); 
-      tick();
+      setCamError(e.message || "QR Validation failed.");
+      setCamState("error");
+      // Don't auto-resume if there is a severe auth/backend error, let user see it
     }
   };
 

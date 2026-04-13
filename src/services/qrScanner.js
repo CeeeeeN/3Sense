@@ -53,7 +53,7 @@ export async function processQRScan({ qrUrl, userID, householdID }) {
         validationName = docSnap.data().title || validationName;
       }
     } else if (category === "Facilities") {
-      if (serviceId === "facility-global") {
+      if (serviceId === "facilities_global") {
         isValid = true;
       } else {
         const docRef = doc(db, "facilities", serviceId);
@@ -64,11 +64,15 @@ export async function processQRScan({ qrUrl, userID, householdID }) {
         }
       }
     } else if (category === "Documents") {
-      const docRef = doc(db, "document_types", serviceId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
+      if (serviceId === "documents_global") {
         isValid = true;
-        validationName = docSnap.data().title || validationName;
+      } else {
+        const docRef = doc(db, "document_types", serviceId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          isValid = true;
+          validationName = docSnap.data().title || validationName;
+        }
       }
     }
 
