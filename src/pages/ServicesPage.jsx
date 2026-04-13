@@ -3,71 +3,8 @@ import { getMemberProfile } from "../services/profile";
 import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport, submitBSWDReport, submitBSWDTip } from "../services/services";
 import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
 import { db } from "../firebase/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, runTransaction } from "firebase/firestore";
 
-// ── Programs Data ──
-const PROGRAMS = [
-  {
-    id: 1, color: "teal", tag: "Student", status: "Open",
-    title: "Local Scholarship Grant 2026",
-    desc: "Financial assistance for qualified students enrolled in college or vocational courses. Deadline: April 15, 2026.",
-    fullDesc: "The Barangay 3S+ Malanday Local Scholarship Grant provides financial assistance to qualified residents enrolled in college or TESDA-accredited vocational programs. Grantees receive a one-time stipend to help cover tuition and school supply costs for the current academic year.",
-    date: "April 15, 2026", time: "8:00 AM – 5:00 PM",
-    location: "Barangay 3S+ Hall, Malanday, Valenzuela City",
-    demographic: "Students (College / Vocational)", slots: 50,
-    requirements: ["Valid barangay ID", "School enrollment form", "1×1 ID photo", "Grade / transcript of records"],
-  },
-  {
-    id: 2, color: "amber", tag: "Student", status: "Open",
-    title: "Free Tutorial & Career Orientation",
-    desc: "Free tutorial sessions and career orientation seminar for high school and college students. March 18–22.",
-    fullDesc: "A week-long learning event offering free academic tutorial sessions in Math, Science, and English, followed by a career orientation seminar featuring guest speakers from various industries. Open to all high school and college students residing in Barangay Malanday.",
-    date: "March 18–22, 2026", time: "1:00 PM – 5:00 PM",
-    location: "Barangay Multi-Purpose Hall",
-    demographic: "High School & College Students", slots: 80,
-    requirements: ["Barangay residency", "Registration form (on-site)"],
-  },
-  {
-    id: 3, color: "green", tag: "Senior / PWD", status: "Ongoing",
-    title: "Senior Citizen Health Assistance",
-    desc: "Monthly health monitoring and medicine subsidy for senior citizens aged 60 and above. Bring your senior ID.",
-    fullDesc: "A monthly barangay health program offering free blood pressure monitoring, blood sugar testing, and medicine subsidies for senior citizens. A dedicated health team visits every second Saturday to provide consultations and dispense maintenance medicines.",
-    date: "Every 2nd Saturday", time: "8:00 AM – 12:00 PM",
-    location: "Barangay Health Center",
-    demographic: "Senior Citizens (60 and above)", slots: null,
-    requirements: ["Senior Citizen ID", "Health booklet (if available)"],
-  },
-  {
-    id: 4, color: "purple", tag: "Senior / PWD", status: "Open",
-    title: "PWD Social Welfare Assistance",
-    desc: "Financial and social assistance for persons with disabilities. Submit PWD ID and medical certificate at the hall.",
-    fullDesc: "This program provides financial and social welfare assistance to persons with disabilities (PWD) residing in Barangay Malanday. Qualified beneficiaries may receive cash assistance, assistive device referrals, and access to DSWD-linked programs.",
-    date: "April 1–30, 2026", time: "8:00 AM – 5:00 PM (Weekdays)",
-    location: "Barangay 3S+ Hall – Social Welfare Desk",
-    demographic: "Persons with Disabilities (PWD)", slots: 30,
-    requirements: ["PWD ID", "Medical certificate", "1×1 ID photo", "Barangay clearance"],
-  },
-  {
-    id: 5, color: "teal", tag: "General", status: "Open",
-    title: "Livelihood Training – April Batch",
-    desc: "Free skills training on food processing and basic entrepreneurship for all residents. Registration until March 31.",
-    fullDesc: "A free three-day livelihood training covering food processing techniques (longganisa, bottled goods) and basic entrepreneurship. Participants receive a training certificate and starter kit upon completion. Part of the DOLE-partnered barangay livelihood initiative.",
-    date: "April 7–9, 2026", time: "9:00 AM – 4:00 PM",
-    location: "Barangay Multi-Purpose Hall",
-    demographic: "All Residents (18 and above)", slots: 40,
-    requirements: ["Barangay ID", "Registration form (deadline: March 31)"],
-  },
-  {
-    id: 6, color: "green", tag: "General", status: "Ongoing",
-    title: "Community Health & Wellness Program",
-    desc: "Weekly health and wellness activities including Zumba, free BP monitoring, and health lectures every Saturday.",
-    fullDesc: "A weekly wellness program open to all barangay residents featuring Zumba fitness sessions, free blood pressure monitoring, health awareness lectures, and mental wellness tips. No registration required — just show up every Saturday morning at the barangay hall grounds.",
-    date: "Every Saturday", time: "6:00 AM – 9:00 AM",
-    location: "Barangay Hall Grounds",
-    demographic: "All Residents", slots: null,
-    requirements: ["No registration required", "Bring water and comfortable clothes"],
-  },
-];
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
@@ -740,8 +677,12 @@ const COLOR_MAP = {
   purple: { bar: "#703381", badge: "rgba(112,51,129,0.10)",  text: "#703381" },
 };
 
-function ProgramModal({ program, onClose }) {
+function ProgramModal({ program, onClose, onRegister, isRegistering }) {
   const c = COLOR_MAP[program.color] || COLOR_MAP.teal;
+  
+  // Calculate if the program is fully booked
+  const slotsLeft = parseInt(program.slots || "0", 10);
+  const isFull = slotsLeft <= 0;
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -749,20 +690,20 @@ function ProgramModal({ program, onClose }) {
   }, []);
 
   return (
-    <div className="pm-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pm-modal" role="dialog" aria-modal="true">
+    <div className="pm-overlay" onClick={e => { if (e.target === e.currentTarget && !isRegistering) onClose(); }}>
+      <div className="pm-modal" role="dialog" aria-modal="true" style={{ display: "flex", flexDirection: "column" }}>
         <div className="pm-modal__bar" style={{ background: c.bar }} />
-        <button className="pm-close" onClick={onClose} aria-label="Close">
+        <button className="pm-close" onClick={onClose} disabled={isRegistering} aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
-        <div className="pm-scroll">
+        <div className="pm-scroll" style={{ flex: 1 }}>
           <div className="pm-header">
             <div className="pm-header__tags">
               <span className="pm-badge" style={{ background: c.badge, color: c.text }}>{program.tag}</span>
               <span className={`sv-program-card__status sv-program-card__status--${program.status === "Open" ? "open" : "ongoing"}`}>{program.status}</span>
             </div>
-            <h2 className="pm-title">{program.title}</h2>
-            <p className="pm-fulldesc">{program.fullDesc}</p>
+            <h2 className="pm-title">{program.title || program.description}</h2>
+            <p className="pm-fulldesc">{program.fullDesc || program.description}</p>
           </div>
 
           <div className="pm-details-grid">
@@ -771,7 +712,7 @@ function ProgramModal({ program, onClose }) {
               { icon: "clock",    label: "Time",             value: program.time },
               { icon: "pin",      label: "Location",         value: program.location },
               { icon: "users",    label: "For",              value: program.demographic },
-              ...(program.slots ? [{ icon: "slots", label: "Available Slots", value: `${program.slots} slots` }] : []),
+              ...(program.slots !== undefined ? [{ icon: "slots", label: "Available Slots", value: `${program.slots} slots` }] : []),
             ].map(item => (
               <div className="pm-detail-item" key={item.label}>
                 <span className="pm-detail-icon">
@@ -789,28 +730,45 @@ function ProgramModal({ program, onClose }) {
             ))}
           </div>
 
-          <div className="pm-section pm-section--last">
-            <div className="pm-section-title">Requirements</div>
-            <ul className="pm-req-list">
-              {program.requirements.map((r, i) => (
-                <li key={i} className="pm-req-item">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={c.text} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  {r}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {program.requirements && program.requirements.length > 0 && (
+            <div className="pm-section pm-section--last">
+              <div className="pm-section-title">Requirements</div>
+              <ul className="pm-req-list">
+                {program.requirements.map((r, i) => (
+                  <li key={i} className="pm-req-item">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={c.text} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
+        
+        {/* --- ADDED: Action Bar for Registration --- */}
+        <div style={{ padding: "20px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "12px", borderBottomLeftRadius: "12px", borderBottomRightRadius: "12px" }}>
+          <button className="sv-btn-ghost" onClick={onClose} disabled={isRegistering}>Cancel</button>
+          <button 
+            className="sv-btn-primary" 
+            style={{ background: isFull ? "#9ca3af" : c.text, opacity: isFull ? 0.7 : 1 }} 
+            disabled={isFull || isRegistering}
+            onClick={onRegister}
+          >
+            {isRegistering ? "Registering..." : isFull ? "Program Full" : "Register Now"}
+          </button>
+        </div>
+        
       </div>
     </div>
   );
 }
 
 // ── Programs Tab ──
-function ProgramsTab() {
+function ProgramsTab({ userData }) {
   const [activeProgram, setActiveProgram] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "Programs"), (snapshot) => {
@@ -820,6 +778,60 @@ function ProgramsTab() {
     });
     return () => unsubscribe();
   }, []);
+
+  // --- ADDED: The Transaction Logic ---
+  const handleRegister = async (programId) => {
+    if (!userData || !userData.userID) {
+      return alert("Please ensure you are logged in and have selected a profile.");
+    }
+    
+    setIsRegistering(true);
+    
+    try {
+      const programRef = doc(db, "Programs", programId);
+      const attendeeRef = doc(db, "Programs", programId, "attendees", userData.userID);
+
+      await runTransaction(db, async (transaction) => {
+        const progDoc = await transaction.get(programRef);
+        if (!progDoc.exists()) throw new Error("Program does not exist!");
+
+        const data = progDoc.data();
+        const currentSlotsStr = data.slots;
+        if (!currentSlotsStr) throw new Error("This program does not have a slot limit configured.");
+        
+        const currentSlots = parseInt(currentSlotsStr, 10);
+        if (currentSlots <= 0) throw new Error("Sorry, this program is fully booked!");
+
+        // Check if already registered
+        const checkAttendee = await transaction.get(attendeeRef);
+        if (checkAttendee.exists()) throw new Error("You are already registered for this program!");
+
+        // Add to subcollection
+        transaction.set(attendeeRef, {
+          userID: userData.userID,
+          userName: [userData.firstName, userData.lastName].filter(Boolean).join(" "),
+          programId: programId,
+          programName: data.description || data.title || "Program",
+          programDate: data.date,
+          status: "Registered",
+          createdAt: new Date()
+        });
+
+        // Decrement slot
+        transaction.update(programRef, {
+          slots: (currentSlots - 1).toString()
+        });
+      });
+
+      alert("Successfully registered for the program!");
+      setActiveProgram(null); // Close the modal upon success
+    } catch (error) {
+      console.error("Registration failed:", error);
+      alert(error.message);
+    } finally {
+      setIsRegistering(false);
+    }
+  };
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>
@@ -845,8 +857,8 @@ function ProgramsTab() {
                 {p.status || "Upcoming"}
               </span>
             </div>
-            <div className="sv-program-card__title">{p.title}</div>
-            <div className="sv-program-card__desc">{p.description}</div>
+            <div className="sv-program-card__title">{p.description || p.title}</div>
+            <div className="sv-program-card__desc">{p.fullDescription || p.description}</div>
             <button className="sv-program-card__cta" onClick={() => setActiveProgram(p)}>
               Learn More <ChevronRightIcon />
             </button>
@@ -854,14 +866,20 @@ function ProgramsTab() {
         ))}
       </div>
       {activeProgram && (
-        <ProgramModal program={{
-          ...activeProgram,
-          color: "teal",
-          tag: activeProgram.demographic || "General",
-          fullDesc: activeProgram.description,
-          time: activeProgram.time || `${activeProgram.startTime} - ${activeProgram.endTime}`,
-          requirements: activeProgram.requirements || [],
-        }} onClose={() => setActiveProgram(null)} />
+        <ProgramModal 
+          program={{
+            ...activeProgram,
+            color: "teal",
+            tag: activeProgram.demographic || "General",
+            title: activeProgram.description || activeProgram.title,
+            fullDesc: activeProgram.fullDescription || activeProgram.description,
+            time: activeProgram.time || `${activeProgram.startTime} - ${activeProgram.endTime}`,
+            requirements: activeProgram.requirements || [],
+          }} 
+          onClose={() => setActiveProgram(null)} 
+          onRegister={() => handleRegister(activeProgram.id)}
+          isRegistering={isRegistering}
+        />
       )}
     </>
   );
