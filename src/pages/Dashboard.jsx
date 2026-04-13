@@ -216,6 +216,11 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
         const drSnap = await getDocs(query(collection(db, "documentRequests"),     where("hhId", "==", hhId)));
         const fbSnap = await getDocs(query(collection(db, "Feedback"),             where("hhId", "==", hhId)));
 
+        setWidgets([
+          { icon: <VerifiedVisitIcon />, color: "teal",   value: frSnap.size.toString(), label: "Verified Visits",   sub: "via QR scans",     badge: "Active",                                       badgeIcon: <TrendUpIcon /> },
+          { icon: <DocumentIcon />,      color: "amber",  value: drSnap.size.toString(), label: "Document Requests", sub: "currently active", badge: "Updated",                                      badgeIcon: <ClockIcon /> },
+          { icon: <FeedbackIcon />,      color: "green",  value: fbSnap.size.toString(), label: "Feedback",          sub: "submitted",        badge: "Done",                                         badgeIcon: <CheckSmallIcon /> },
+          { icon: <BarangayStatusIcon />,color: "purple", value: adminStatus,            label: "Barangay Status",   sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
 export default function Dashboard({ userName = "Mark", onNavigate }) {
   const [selectedAlert, setSelectedAlert]   = useState(null);
   const [selectedAnn, setSelectedAnn]       = useState(null);
