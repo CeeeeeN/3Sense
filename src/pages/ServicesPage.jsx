@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getMemberProfile } from "../services/profile";
-import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport } from "../services/services";
+import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport, submitBSWDReport, submitBSWDTip } from "../services/services";
 import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
 import { db } from "../firebase/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -1216,7 +1216,7 @@ function BOSCATab() {
 }
 
 // ── BSWD Tab ──
-function BSWDTab({ userData }) {
+function BSWDTab({ userData, householdID }) {
   const [reportForm, setReportForm] = useState({ name: "", location: "", description: "", photo: "" });
   const [reportErrors, setReportErrors]   = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);
@@ -1236,20 +1236,36 @@ function BSWDTab({ userData }) {
   const setR = (k, v) => setReportForm(f => ({ ...f, [k]: v }));
   const setT = (k, v) => setTipForm(f => ({ ...f, [k]: v }));
 
-  const submitReport = () => {
+  const submitReport = async () => {
     const e = {};
     if (!reportForm.location.trim())    e.location    = "Location is required.";
     if (!reportForm.description.trim()) e.description = "Please describe what you observed.";
     if (Object.keys(e).length) { setReportErrors(e); return; }
-    setReportErrors({}); setReportSubmitted(true);
+    
+    try {
+      await submitBSWDReport(householdID || "Public", userData?.userID || "", reportForm);
+      setReportErrors({}); 
+      setReportSubmitted(true);
+    } catch (err) {
+      console.error("BSWD Report failed:", err);
+      setReportErrors({ submit: "Failed to submit report. Please try again." });
+    }
   };
 
-  const submitTip = () => {
+  const submitTip = async () => {
     const e = {};
     if (!tipForm.about.trim()) e.about = "Please describe who this is about.";
     if (!tipForm.tip.trim())   e.tip   = "Please share what you know.";
     if (Object.keys(e).length) { setTipErrors(e); return; }
-    setTipErrors({}); setTipSubmitted(true);
+
+    try {
+      await submitBSWDTip(householdID || "Public", userData?.userID || "", tipForm);
+      setTipErrors({}); 
+      setTipSubmitted(true);
+    } catch (err) {
+      console.error("BSWD Tip failed:", err);
+      setTipErrors({ submit: "Failed to send tip. Please try again." });
+    }
   };
 
   return (
@@ -1440,7 +1456,7 @@ function PeaceOrderTab({ userData, householdID }) {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     try {
-      await submitIncidentReport(householdID, form);
+      await submitIncidentReport(householdID, userData?.userID || "", form);
       setRefNum(Array.from({length:8}, ()=>"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join(""));
       setView("submitted");
     } catch (error) {
@@ -1780,8 +1796,8 @@ function LivelihoodTab({ userData, householdID, userName }) {
     if (step === 2 && !validateStep2()) return;
     if (step === 3) {
       try {
-        await submitLivelihoodRegistration(householdID, form, selectedProgram);
-        setRegNum(`LH-2026-${Math.floor(10000 + Math.random() * 90000)}`);
+        const generatedRegNum = await submitLivelihoodRegistration(householdID, userData?.userID || "", form, selectedProgram);
+        setRegNum(generatedRegNum);
         setStep(4);
       } catch (error) {
         console.error("Failed to submit livelihood registration:", error);
@@ -2161,7 +2177,7 @@ function ServicesTab({ userData, householdID, userName }) {
         {/* Pass userData to the tabs that need it */}
         {sub === "vawc"       && <VAWCTab />}
         {sub === "bosca"      && <BOSCATab />}
-        {sub === "bswd"       && <BSWDTab userData={userData} />}
+        {sub === "bswd"       && <BSWDTab userData={userData} householdID={householdID} />}
         {sub === "peace"      && <PeaceOrderTab userData={userData} householdID={householdID} />}
         {sub === "livelihood" && <LivelihoodTab userData={userData} householdID={householdID} userName={userName} />}
         {sub === "badac"      && <BADACTab />}
