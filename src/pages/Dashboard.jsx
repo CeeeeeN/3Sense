@@ -359,7 +359,6 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
               </div>
             ))}
         </SectionCard>
-      </div>
 
       {/* ── Footer ── */}
       <footer className="db-footer" style={{ marginTop: 'auto' }}>
