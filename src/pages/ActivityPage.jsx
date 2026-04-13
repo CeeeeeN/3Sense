@@ -1,118 +1,40 @@
-import { useState } from "react";
-import { ActivityIcon, ProgramIcon, DocumentIcon, ReservationIcon, StarIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
+import { useState, useEffect } from "react";
+import { db } from "../firebase/firebase";
+import { collection, collectionGroup, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { ActivityIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 
-// STATUS CONFIG 
+// ── SESSION HELPER ──
+const getSaved = (key, fallback) => {
+  try {
+    return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback;
+  } catch {
+    return fallback;
+  }
+};
 
+// ── STATUS CONFIG ──
 const STATUS = {
   open:         { label: "Open",             color: "#317D89", bg: "rgba(49,125,137,0.1)"  },
-  ongoing:      { label: "Ongoing",           color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
-  completed:    { label: "Completed",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
-  pending:      { label: "Pending",           color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  approved:     { label: "Approved",          color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
-  rejected:     { label: "Rejected",          color: "#e03e3e", bg: "rgba(224,62,62,0.1)"   },
-  received:     { label: "Received",          color: "#317D89", bg: "rgba(49,125,137,0.1)"  },
-  under_review: { label: "Under Review",      color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  resolved:     { label: "Resolved",          color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
-  processing:   { label: "Processing",        color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  ready:        { label: "Ready for Pickup",  color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  ongoing:      { label: "Ongoing",          color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
+  completed:    { label: "Completed",        color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  pending:      { label: "Pending",          color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
+  approved:     { label: "Approved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  rejected:     { label: "Rejected",         color: "#e03e3e", bg: "rgba(224,62,62,0.1)"   },
+  received:     { label: "Received",         color: "#317D89", bg: "rgba(49,125,137,0.1)"  },
+  under_review: { label: "Under Review",     color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
+  resolved:     { label: "Resolved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  processing:   { label: "Processing",       color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
+  ready:        { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
 };
-
-// Feedback keyed by item id so each tab can look up its own feedback
-const FEEDBACK_MAP = {
-  // Programs & Facilities
-  "pf-001": {
-    rating: 5,
-    status: "resolved",
-    comment: "Very helpful program, makakapagcheckout na ko sa shopee",
-    adminResponse: "Thank you for your kind feedback! We are glad the scholarship helped you. We will continue to improve our programs for residents like you.",
-  },
-  "pf-002": {
-    rating: 4,
-    status: "under_review",
-    comment: "The staff were very accommodating and professional.",
-    adminResponse: null,
-  },
-  "pf-004": {
-    rating: 3,
-    status: "received",
-    comment: "ambagal i-process pero mabait ung staff",
-    adminResponse: null,
-  },
-  // Documents
-  "doc-001": {
-    rating: 4,
-    status: "under_review",
-    comment: "Mabilis na ma-process, salamat!",
-    adminResponse: null,
-  },
-  "doc-002": {
-    rating: 5,
-    status: "resolved",
-    comment: "Very smooth transaction, highly satisfied.",
-    adminResponse: "Thank you for your kind feedback! We are glad to have served you efficiently.",
-  },
-  // Reservations
-  "rsv-002": {
-    rating: 4,
-    status: "under_review",
-    comment: "Great facility, well-maintained court!",
-    adminResponse: null,
-  },
-};
-
-const PROGRAMS_FACILITIES = [
-  { id: "pf-001", name: "Local Scholarship Grant 2026",       category: "Program",  date: "March 18, 2026", status: "ongoing"   },
-  { id: "pf-002", name: "Senior Citizen Health Assistance",   category: "Program",  date: "March 15, 2026", status: "completed" },
-  { id: "pf-003", name: "Livelihood Training — April Batch",  category: "Program",  date: "March 10, 2026", status: "open"      },
-  { id: "pf-004", name: "Community Health & Wellness Program",category: "Facility", date: "March 8, 2026",  status: "completed" },
-  { id: "pf-005", name: "Free Tutorial & Career Orientation", category: "Program",  date: "March 3, 2026",  status: "completed" },
-];
-
-const DOCUMENTS = [
-  { id: "doc-001", name: "Barangay Clearance",               dateRequested: "March 15, 2026", status: "ready",      refId: "DOC-2026-441" },
-  { id: "doc-002", name: "Certificate of Indigency",         dateRequested: "March 10, 2026", status: "completed",  refId: "DOC-2026-389" },
-  { id: "doc-003", name: "First Time Job Seeker Certificate",dateRequested: "March 5, 2026",  status: "processing", refId: "DOC-2026-320" },
-  { id: "doc-004", name: "Building Permit Endorsement",      dateRequested: "Feb 28, 2026",   status: "rejected",   refId: "DOC-2026-275" },
-  { id: "doc-005", name: "Certificate of Good Moral",        dateRequested: "Feb 20, 2026",   status: "completed",  refId: "DOC-2026-201" },
-];
-
-const RESERVATIONS = [
-  { id: "rsv-001", purpose: "Birthday Celebration",        facility: "Barangay Multi-Purpose Hall", date: "April 5, 2026",  time: "3:00 PM – 9:00 PM",  status: "approved",  remarks: null },
-  { id: "rsv-002", purpose: "Community Sports Tournament", facility: "Basketball Court",            date: "March 25, 2026", time: "6:00 AM – 6:00 PM",  status: "completed", remarks: null },
-  { id: "rsv-003", purpose: "Business Meeting / Seminar",  facility: "Barangay Multi-Purpose Hall", date: "March 30, 2026", time: "9:00 AM – 12:00 PM", status: "rejected",  remarks: "The facility is already booked for a barangay assembly on this date. Please choose another date." },
-  { id: "rsv-004", purpose: "Family Reunion",              facility: "Barangay Multi-Purpose Hall", date: "May 1, 2026",    time: "10:00 AM – 8:00 PM", status: "pending",   remarks: null },
-];
 
 // ── Reusable Components ──
-
 function StatusBadge({ status }) {
-  const s = STATUS[status] || STATUS.pending;
+  const safeStatus = status ? status.toLowerCase().replace(/ /g, "_") : "pending";
+  const s = STATUS[safeStatus] || STATUS.pending;
   return (
     <span className="act2-status" style={{ background: s.bg, color: s.color }}>
       {s.label}
     </span>
-  );
-}
-
-function StarRating({ rating }) {
-  return (
-    <div className="act2-stars">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <svg
-          key={s}
-          width="24"
-          height="25"
-          viewBox="0 0 24 24"
-          fill={s <= rating ? "#f59e0b" : "none"}
-          stroke={s <= rating ? "#f59e0b" : "#d1d5db"}
-          strokeWidth="1.5"
-          style={{ flexShrink: 0 }}
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ))}
-      <span className="act2-stars__label">{rating}/5</span>
-    </div>
   );
 }
 
@@ -126,153 +48,176 @@ function EmptyState({ message }) {
   );
 }
 
-// ── Inline Feedback Block ──
-// Shown below a divider inside completed items.
-// - If feedback exists: shows rating, comment, admin response or awaiting notice
-// - If no feedback: shows a neutral "no feedback submitted" message
-function InlineFeedback({ itemId }) {
-  const fb = FEEDBACK_MAP[itemId];
+// ── MAIN ACTIVITY PAGE ──
+export default function ActivityPage({ onNavigate }) {
+  const [activeTab, setActiveTab] = useState("programs");
+  const [loading, setLoading] = useState(true);
 
-  if (!fb) {
+  // Dynamic Data States
+  const [programs, setPrograms] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [reservations, setReservations] = useState([]);
+
+  // Grab the specific user's ID right out of local storage
+  const activeUserId = getSaved("userID", null);
+
+  // --- FIREBASE REAL-TIME LISTENERS ---
+  useEffect(() => {
+    if (!activeUserId) {
+      setLoading(true);
+      return; 
+    }
+
+    setLoading(false);
+
+    // A. Fetch Programs/Facilities
+    const qPrograms = query(
+      collectionGroup(db, "attendees"), 
+      where("userID", "==", activeUserId),
+      orderBy("createdAt", "desc")
+    );
+    const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
+      setPrograms(snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        name: doc.data().programName, 
+        date: doc.data().programDate,
+        ...doc.data() 
+      })));
+    });
+
+    // B. Fetch Documents
+    const qDocs = query(
+      collection(db, "documentRequests"),
+      where("userID", "==", activeUserId),
+      orderBy("createdAt", "desc")
+    );
+    const unsubDocs = onSnapshot(qDocs, (snapshot) => {
+      setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // C. Fetch Reservations
+    const qReservations = query(
+      collection(db, "facilityReservations"),
+      where("userID", "==", activeUserId),
+      orderBy("createdAt", "desc")
+    );
+    const unsubReservations = onSnapshot(qReservations, (snapshot) => {
+      setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false); 
+    });
+
+    return () => {
+      unsubPrograms();
+      unsubDocs();
+      unsubReservations();
+    };
+  }, [activeUserId]);
+
+  // Helper to format Firestore Timestamps safely
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "Unknown Date";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  };
+
+
+  // ── 6.1 Programs & Facilities Tab ──
+  const ProgramsFacilitiesTab = () => {
+    if (programs.length === 0) return <EmptyState message="You have not availed any programs or facilities yet." />;
     return (
-      <div className="act2-card__extra">
-        <span className="act2-card__no-rating">No feedback submitted for this service.</span>
+      <div className="act2-list">
+        {programs.map((item) => (
+          <div key={item.id} className="act2-card">
+            <div className="act2-card__row">
+              <div className="act2-card__main">
+                <span className="act2-card__cat">{item.category || "Program"}</span>
+                <div className="act2-card__title">{item.name || item.eventName}</div>
+                <div className="act2-card__meta">Date: {formatDate(item.createdAt || item.date)}</div>
+              </div>
+              <StatusBadge status={item.status} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ── 6.2 Documents Tab ──
+  const DocumentsTab = () => {
+    if (documents.length === 0) return <EmptyState message="You have not requested any documents yet." />;
+    return (
+      <div className="act2-list">
+        {documents.map((item) => (
+          <div key={item.id} className="act2-card">
+            <div className="act2-card__row">
+              <div className="act2-card__main">
+                <div className="act2-card__title">{item.documentType || item.name}</div>
+                <div className="act2-card__meta">Date Requested: {formatDate(item.createdAt)}</div>
+                <div className="act2-card__ref">Ref: {item.refId || item.id}</div>
+              </div>
+              <StatusBadge status={item.status} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ── 6.3 Reservations Tab ──
+  const ReservationsTab = () => {
+    if (reservations.length === 0) return <EmptyState message="You have no facility reservations yet." />;
+    return (
+      <div className="act2-list">
+        {reservations.map((item) => (
+          <div key={item.id} className="act2-card">
+            <div className="act2-card__row">
+              <div className="act2-card__main">
+                <div className="act2-card__title">{item.purpose || item.eventName}</div>
+                <div className="act2-card__subtitle">{item.facility || item.facilityName}</div>
+                <div className="act2-card__meta">{formatDate(item.date || item.createdAt)} · {item.time || "TBA"}</div>
+              </div>
+              <StatusBadge status={item.status} />
+            </div>
+
+            {/* Rejection Remarks */}
+            {item.status?.toLowerCase() === "rejected" && item.remarks && (
+              <div className="act2-card__remarks">
+                <div className="act2-card__remarks-header">
+                  <AlertCircleIcon /> Remarks
+                </div>
+                <p className="act2-card__remarks-body">{item.remarks}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ── TABS CONFIG ──
+  const TABS = [
+    { key: "programs",     label: "Programs & Facilities", icon: <ProgramIcon />,     count: programs.length,     component: <ProgramsFacilitiesTab /> },
+    { key: "documents",    label: "Documents",             icon: <DocumentIcon />,    count: documents.length,    component: <DocumentsTab /> },
+    { key: "reservations", label: "Reservations",          icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+  ];
+
+  const current = TABS.find((t) => t.key === activeTab);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
+        Loading your activity...
       </div>
     );
   }
 
-  return (
-    <div className="act2-card__extra act2-card__extra--col">
-      <StarRating rating={fb.rating} />
-
-      {fb.comment && (
-        <p className="act2-card__comment">"{fb.comment}"</p>
-      )}
-
-      {fb.adminResponse ? (
-        <div className="act2-card__response">
-          <div className="act2-card__response-header">
-            <ShieldCheckIcon />
-            <span>Official Barangay Response</span>
-          </div>
-          <p className="act2-card__response-body">{fb.adminResponse}</p>
-        </div>
-      ) : (
-        fb.status !== "received" && (
-          <div className="act2-card__awaiting">
-            <AlertCircleIcon />
-            <span>Awaiting official response from the barangay.</span>
-          </div>
-        )
-      )}
-    </div>
-  );
-}
-
-// ── 6.1 Programs & Facilities Tab ──
-function ProgramsFacilitiesTab() {
-  if (PROGRAMS_FACILITIES.length === 0)
-    return <EmptyState message="You have not availed any programs or facilities yet." />;
-
-  return (
-    <div className="act2-list">
-      {PROGRAMS_FACILITIES.map((item) => (
-        <div key={item.id} className="act2-card">
-          <div className="act2-card__row">
-            <div className="act2-card__main">
-              <span className="act2-card__cat">{item.category}</span>
-              <div className="act2-card__title">{item.name}</div>
-              <div className="act2-card__meta">Date: {item.date}</div>
-            </div>
-            <StatusBadge status={item.status} />
-          </div>
-
-          {item.status === "completed" && (
-            <InlineFeedback itemId={item.id} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── 6.2 Documents Tab ──
-function DocumentsTab() {
-  if (DOCUMENTS.length === 0)
-    return <EmptyState message="You have not requested any documents yet." />;
-
-  return (
-    <div className="act2-list">
-      {DOCUMENTS.map((item) => (
-        <div key={item.id} className="act2-card">
-          <div className="act2-card__row">
-            <div className="act2-card__main">
-              <div className="act2-card__title">{item.name}</div>
-              <div className="act2-card__meta">Date Requested: {item.dateRequested}</div>
-              <div className="act2-card__ref">Ref: {item.refId}</div>
-            </div>
-            <StatusBadge status={item.status} />
-          </div>
-
-          {item.status === "completed" && (
-            <InlineFeedback itemId={item.id} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── 6.3 Reservations Tab ──
-function ReservationsTab() {
-  if (RESERVATIONS.length === 0)
-    return <EmptyState message="You have no facility reservations yet." />;
-
-  return (
-    <div className="act2-list">
-      {RESERVATIONS.map((item) => (
-        <div key={item.id} className="act2-card">
-          <div className="act2-card__row">
-            <div className="act2-card__main">
-              <div className="act2-card__title">{item.purpose}</div>
-              <div className="act2-card__subtitle">{item.facility}</div>
-              <div className="act2-card__meta">{item.date} · {item.time}</div>
-            </div>
-            <StatusBadge status={item.status} />
-          </div>
-
-          {/* Rejection Remarks */}
-          {item.status === "rejected" && item.remarks && (
-            <div className="act2-card__remarks">
-              <div className="act2-card__remarks-header">
-                <AlertCircleIcon /> Remarks
-              </div>
-              <p className="act2-card__remarks-body">{item.remarks}</p>
-            </div>
-          )}
-
-          {item.status === "completed" && (
-            <InlineFeedback itemId={item.id} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── TABS CONFIG (Feedback tab removed) ──
-
-const TABS = [
-  { key: "programs",     label: "Programs & Facilities", icon: <ProgramIcon />,     count: PROGRAMS_FACILITIES.length, component: <ProgramsFacilitiesTab /> },
-  { key: "documents",    label: "Documents",             icon: <DocumentIcon />,    count: DOCUMENTS.length,           component: <DocumentsTab />           },
-  { key: "reservations", label: "Reservations",          icon: <ReservationIcon />, count: RESERVATIONS.length,        component: <ReservationsTab />        },
-];
-
-// ── MAIN ACTIVITY PAGE ──
-
-export default function ActivityPage({ onNavigate, userName = "Juan Dela Cruz" }) {
-  const [activeTab, setActiveTab] = useState("programs");
-  const current = TABS.find((t) => t.key === activeTab);
+  if (!activeUserId) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
+        Please select a profile to view activity history.
+      </div>
+    );
+  }
 
   return (
     <main className="act2-page" style={{ minHeight: 'calc(100vh - 116px)', display: 'flex', flexDirection: 'column' }}>
