@@ -93,6 +93,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
         const initials = ((m.firstName?.[0] || "") + (m.lastName?.[0] || "M")).toUpperCase();
         return {
           id: m.id,
+          userID: m.userID || "",
           name: fullName,
           initials: initials || "M",
           role: m.role === "head" ? "head" : "member",
@@ -183,8 +184,9 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setTimeout(() => {
       if (onSuccess) onSuccess({
         ...selectedProfile,
-        memberId:    selectedProfile.id,
+        memberID:    selectedProfile.id,
         householdID: hhNumber.trim(),
+        userID:      selectedProfile.userID || "",
       });
     }, 2200);
   }

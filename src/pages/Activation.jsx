@@ -27,7 +27,7 @@ const GUIDE_STEPS = [
 
 export default function Activation({ onBack, onLoginClick, onSuccess }) {
   const [screen, setScreen] = useState("activate");
-  const [hhId, setHhId] = useState("");
+  const [householdID, setHouseholdID] = useState("");
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
   const [showPw1, setShowPw1] = useState(false);
@@ -46,12 +46,12 @@ export default function Activation({ onBack, onLoginClick, onSuccess }) {
   const strengthWidths = ["33%", "66%", "100%"];
 
   const handleActivate = async () => {
-    if (!hhId.trim())   { alert("Please enter your Household ID."); return; }
+    if (!householdID.trim())   { alert("Please enter your Household ID."); return; }
     if (pw1.length < 8) { alert("Password must be at least 8 characters."); return; }
     if (pw1 !== pw2)    { alert("Passwords do not match."); return; }
 
     try {
-      const result = await activateAccount(hhId.trim(), pw1, pw2);
+      const result = await activateAccount(householdID.trim(), pw1, pw2);
       setConfirmedId(result.householdID);
       setHouseholdData(result);
       setScreen("success");
@@ -113,8 +113,8 @@ export default function Activation({ onBack, onLoginClick, onSuccess }) {
                     type="text"
                     className="act-input"
                     placeholder="HH-2024-00142"
-                    value={hhId}
-                    onChange={e => setHhId(e.target.value)}
+                    value={householdID}
+                    onChange={e => setHouseholdID(e.target.value)}
                     autoComplete="off"
                   />
                 </div>

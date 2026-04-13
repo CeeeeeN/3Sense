@@ -122,7 +122,7 @@ function DesktopBlock() {
 export default function ScanPage({
   onNavigate,
   userName = "Juan Dela Cruz",
-  hhId = "HH-2026-00142",
+  householdID = "HH-2026-00142",
   availedServices = [],
 }) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 769);

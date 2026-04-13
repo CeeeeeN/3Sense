@@ -333,7 +333,7 @@ export default function AdminRequests() {
                     </div>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Household Number</label>
-                      <p className="detail-value">{selectedRequest.allData?.hhId || 'N/A'}</p>
+                      <p className="detail-value">{selectedRequest.allData?.householdID || 'N/A'}</p>
                     </div>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{activeTab === 'Facility' ? 'Facility' : 'Document Type'}</label>
@@ -460,7 +460,7 @@ export default function AdminRequests() {
                           'timeSlot', 'documentType', 'facility', 'referenceNumber', 'allData', 'docId', 'facilityName',
                           'collectionName', 'category', 'type', 'rejectionReason', 'birthDate', 'dateOfBirth', 'dob',
                           'civilStatus', 'address', 'residingSince', 'paxCount', 'mobile', 'ctc', 'notes', 'attendees',
-                          'date', 'startTime', 'endTime', 'facilityId', 'documentId', 'processingDays', 'fee', 'refNum', 'validIdFileName', 'hhId', 'submittedAt'
+                          'date', 'startTime', 'endTime', 'facilityId', 'documentId', 'processingDays', 'fee', 'refNum', 'validIdFileName', 'householdID', 'submittedAt'
                         ];
                         return !standardFields.includes(key) && typeof value !== 'object' && value !== '';
                       })
@@ -473,7 +473,7 @@ export default function AdminRequests() {
 
                     {(!selectedRequest.allData || Object.entries(selectedRequest.allData)
                       .filter(([key, value]) => {
-                        const standardFields = ['id', 'status', 'firstName', 'middleName', 'lastName', 'residentName', 'requesterName', 'fullName', 'email', 'contact', 'contactNumber', 'purpose', 'dateRequested', 'dateNeeded', 'reservationDate', 'timeSlot', 'documentType', 'facility', 'referenceNumber', 'allData', 'docId', 'facilityName', 'collectionName', 'category', 'type', 'rejectionReason', 'birthDate', 'dateOfBirth', 'dob', 'civilStatus', 'address', 'residingSince', 'paxCount', 'mobile', 'ctc', 'notes', 'attendees', 'date', 'startTime', 'endTime', 'facilityId', 'documentId', 'processingDays', 'fee', 'refNum', 'validIdFileName', 'hhId', 'submittedAt'];
+                        const standardFields = ['id', 'status', 'firstName', 'middleName', 'lastName', 'residentName', 'requesterName', 'fullName', 'email', 'contact', 'contactNumber', 'purpose', 'dateRequested', 'dateNeeded', 'reservationDate', 'timeSlot', 'documentType', 'facility', 'referenceNumber', 'allData', 'docId', 'facilityName', 'collectionName', 'category', 'type', 'rejectionReason', 'birthDate', 'dateOfBirth', 'dob', 'civilStatus', 'address', 'residingSince', 'paxCount', 'mobile', 'ctc', 'notes', 'attendees', 'date', 'startTime', 'endTime', 'facilityId', 'documentId', 'processingDays', 'fee', 'refNum', 'validIdFileName', 'householdID', 'submittedAt'];
                         return !standardFields.includes(key) && typeof value !== 'object' && value !== '';
                       }).length === 0) && (
                         <p style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No additional requirements answered for this request.</p>

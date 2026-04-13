@@ -91,7 +91,7 @@ function formatHistoryDate(isoString) {
   }
 }
 
-export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }) {
+export default function Profile({ onBack, onNavigate, householdID, memberID, userRole }) {
   const [data, setData]       = useState({ ...BLANK });
   const [draft, setDraft]     = useState({ ...BLANK });
   const [open, setOpen]       = useState(false);
@@ -105,13 +105,13 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
 
   // Load member profile from Firestore on mount
   useEffect(() => {
-    console.log("[Profile] hhId:", hhId, "memberId:", memberId);
-    if (!hhId || !memberId) {
-      console.warn("[Profile] Missing hhId or memberId — skipping load.");
+    console.log("[Profile] householdID:", householdID, "memberID:", memberID);
+    if (!householdID || !memberID) {
+      console.warn("[Profile] Missing householdID or memberID — skipping load.");
       setLoading(false);
       return;
     }
-    getMemberProfile(hhId, memberId)
+    getMemberProfile(householdID, memberID)
       .then(profile => {
         console.log("[Profile] Loaded:", profile);
         setData(profile);
@@ -121,14 +121,14 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
         console.error("[Profile] Error:", err);
         setLoading(false);
       });
-  }, [hhId, memberId]);
+  }, [householdID, memberID]);
 
-  // Generate QR code whenever fullName or hhId changes
+  // Generate QR code whenever fullName or householdID changes
   useEffect(() => {
-    if (!fullName && !hhId) return;
+    if (!fullName && !householdID) return;
     const qrData = JSON.stringify({
-      householdID: hhId,
-      memberID: memberId,
+      householdID: householdID,
+      memberID: memberID,
       name: fullName || "Resident",
       role: data.role || "member",
       barangay: data.barangay || "Malanday",
@@ -136,7 +136,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
     QRCode.toDataURL(qrData, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
       .then(url => setQrUrl(url))
       .catch(console.error);
-  }, [fullName, hhId, memberId, data.role, data.barangay]);
+  }, [fullName, householdID, memberID, data.role, data.barangay]);
 
   const openModal  = () => { setDraft({ ...data }); setTab(0); setOpen(true); };
   const closeModal = () => setOpen(false);
@@ -151,11 +151,11 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
   };
 
   const save = async () => {
-    if (!hhId || !memberId) { alert("Missing household or member info."); return; }
+    if (!householdID || !memberID) { alert("Missing household or member info."); return; }
     setSaving(true);
     try {
       const payload = { ...draft, sameAddress: computeSameAddress() };
-      await updateMemberProfile(hhId, memberId, payload);
+      await updateMemberProfile(householdID, memberID, payload);
       setData({ ...payload });
       setOpen(false);
     } catch (err) {
@@ -168,7 +168,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
   const downloadQR = () => {
     if (!qrUrl) return;
     const link = document.createElement("a");
-    link.download = `${hhId}-${fullName || "member"}-QR.png`;
+    link.download = `${householdID}-${fullName || "member"}-QR.png`;
     link.href = qrUrl;
     link.click();
   };
@@ -213,7 +213,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
   return (
     <div className="pf-root">
       {/* NAV */}
-      <Navbar activePage="profile" hhId={hhId} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} />
+      <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} />
 
       {loading && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "var(--muted)", fontSize: "0.9rem" }}>
@@ -245,7 +245,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
             </div>
             <div className="pf-qr-info">
               <div className="pf-qr-name">{fullName || "Your Full Name"}</div>
-              <div className="pf-qr-id">{hhId || "HH-XXXX-XXXXX"} · {data.role === "head" ? "Household Head" : "Member"}</div>
+              <div className="pf-qr-id">{householdID || "HH-XXXX-XXXXX"} · {data.role === "head" ? "Household Head" : "Member"}</div>
               <div className="pf-qr-verified"><span className="dot" /> Verified Resident</div>
               <div className="pf-qr-meta">
                 <div><div className="pf-qr-ml">Barangay</div><div className="pf-qr-mv">{data.barangay || "—"}</div></div>
@@ -335,7 +335,7 @@ export default function Profile({ onBack, onNavigate, hhId, memberId, userRole }
         {/* 6. HOUSEHOLD */}
         <Card icon={IconHome2} title="Household Information">
           <div className="pf-info-grid c3">
-            <InfoItem label="Household ID" value={hhId} />
+            <InfoItem label="Household ID" value={householdID} />
             <InfoItem label="Total Members" value={data.totalMembers} />
             <InfoItem label="Classification" value={data.householdClassification} />
           </div>
