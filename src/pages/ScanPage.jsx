@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { processQRScan } from "../services/qrScanner";
 
 // ── Load jsQR from CDN (no new npm dep needed) ──────────────────────────────
 const loadJsQR = () =>
@@ -123,7 +124,7 @@ export default function ScanPage({
   onNavigate,
   userName = "Juan Dela Cruz",
   householdID = "HH-2026-00142",
-  availedServices = [],
+  userID = "",
 }) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 769);
   // idle | requesting | active | error
@@ -211,29 +212,42 @@ export default function ScanPage({
     });
   };
 
-  const onQRDetected = (data) => {
+  const onQRDetected = async (data) => {
     scanning.current = false;
     try {
-      const url = new URL(data);
-      const serviceId = url.searchParams.get("service");
-      const matched = availedServices.find((s) => s.id === serviceId);
-      if (matched) {
+      setCamState("requesting"); // visually pause/indicate loading optionally
+      const result = await processQRScan({ qrUrl: data, userID, householdID });
+      
+      if (result.isValid) {
         setFlash(true);
         setTimeout(() => {
           setFlash(false);
           stopCamera();
           setCamState("idle");
-          setVerifiedService(matched);
+          // Re-map the generic info to work with the VerifiedPopup and later Feedback Form
+          setVerifiedService({
+            id: result.data.serviceID || result.data.programID || result.data.facilityID || result.data.documentID,
+            name: result.data.serviceName,
+            category: result.data.category,
+            fullName: result.data.serviceName,
+            bg: "#eff6ff",
+            border: "#bfdbfe",
+            color: "#1d4ed8",
+            icon: "✅"
+          });
           setShowPopup(true);
         }, 750);
       } else {
-        // Unknown service — resume scanning
+        // Validation conceptually failed logic block (though the server error should be thrown)
         scanning.current = true;
         tick();
       }
-    } catch {
-      // Not a valid URL — resume scanning
+    } catch (e) {
+      console.error("QR Validation failed:", e);
+      // Optional: you could show a quick toast error here
+      // For now we just resume scanning to allow another try naturally
       scanning.current = true;
+      setCamState("active"); 
       tick();
     }
   };

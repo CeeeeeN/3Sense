@@ -71,7 +71,7 @@ export default function UserApp() {
   });
 
   const [householdID, setHouseholdID] = useState(() => getSaved("householdID", ""));
-  const [userID, setUserID]           = useState(() => getSaved("userID", ""));
+  const [userID, setUserID] = useState(() => getSaved("userID", ""));
   const [userName, setUserName] = useState(() => getSaved("userName", ""));
   const [memberID, setMemberID] = useState(() => getSaved("memberID", null));
   const [userRole, setUserRole] = useState(() =>
@@ -104,7 +104,7 @@ export default function UserApp() {
       } else {
         localStorage.removeItem("brgy_session");
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [page, householdID, userID, userName, memberID, userRole]);
 
   // Scroll to top on page change
@@ -160,10 +160,10 @@ export default function UserApp() {
         onForgotPassword={() => setPage("forgot")}
         onSuccess={(selectedProfile) => {
           if (selectedProfile?.householdID) setHouseholdID(selectedProfile.householdID);
-          if (selectedProfile?.userID)      setUserID(selectedProfile.userID);
-          if (selectedProfile?.memberID)    setMemberID(selectedProfile.memberID);
-          if (selectedProfile?.name)        setUserName(selectedProfile.name);
-          if (selectedProfile?.role)        setUserRole(selectedProfile.role);
+          if (selectedProfile?.userID) setUserID(selectedProfile.userID);
+          if (selectedProfile?.memberID) setMemberID(selectedProfile.memberID);
+          if (selectedProfile?.name) setUserName(selectedProfile.name);
+          if (selectedProfile?.role) setUserRole(selectedProfile.role);
           setPage("home");
         }}
         onRegister={() => setPage("register")}
@@ -280,7 +280,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
         />
-        <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} />
+        <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} userID={userID} />
       </div>
     );
   }
