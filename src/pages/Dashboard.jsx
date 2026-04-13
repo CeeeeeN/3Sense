@@ -358,11 +358,6 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
                 <div className="ann-row__date">{a.date}</div>
               </div>
             ))}
-          </div>
-
-              <div className="ann-row__date">{a.date}</div>
-            </div>
-          ))}
         </SectionCard>
       </div>
 
