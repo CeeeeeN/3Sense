@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { db } from '../firebase/firebase'; 
+import { auth, db } from '../firebase/firebase'; 
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon, MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon } from '../components/Icons';
 
 // STAR RATING LABEL
@@ -88,6 +89,20 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
   const [serviceId, setServiceId] = useState("general");
   const [serviceName, setServiceName] = useState("General Barangay Service");
   const [category, setCategory] = useState("General"); 
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // Not authenticated in Firebase, force logout / login screen
+        if (onNavigate) onNavigate("logout");
+      } else {
+        setAuthChecked(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [onNavigate]);
 
   useEffect(() => {
     if (service && service.name) {
@@ -107,6 +122,11 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       }
     }
   }, [service]);
+
+  // Prevent rendering the form until Firebase fully confirms the user's active session
+  if (!authChecked) {
+    return <main className="fb-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading authentication...</main>;
+  }
 
   const currentService = service || {
     description: "Your feedback helps us improve public services.",
