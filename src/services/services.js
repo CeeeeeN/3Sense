@@ -83,10 +83,10 @@ export async function submitFacilityReservation(householdID, userID, userName, f
 // ══════════════════════════════
 // 🚔 INCIDENT REPORTS
 // ══════════════════════════════
-export async function submitIncidentReport(householdID, form) {
+export async function submitIncidentReport(householdID, userID, form) {
   const refNum = `PO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "incidentReports"), {
-    refNum, householdID,
+    refNum, householdID, userID,
     isAnonymous: form.isAnonymous,
     reporterName: form.isAnonymous ? "Anonymous" : form.reporterName || "",
     contact: form.isAnonymous ? "" : form.contact || "",
@@ -118,9 +118,9 @@ export async function trackIncidentReport(refNum) {
 // ══════════════════════════════
 // 💚 BSWD REPORTS & TIPS
 // ══════════════════════════════
-export async function submitBSWDReport(householdID, form) {
+export async function submitBSWDReport(householdID, userID, form) {
   await addDoc(collection(db, "bswdReports"), {
-    householdID,
+    householdID, userID,
     type: "homeless_report",
     reporterName: form.name || "Anonymous",
     location: form.location,
@@ -131,9 +131,9 @@ export async function submitBSWDReport(householdID, form) {
   });
 }
 
-export async function submitBSWDTip(householdID, form) {
+export async function submitBSWDTip(householdID, userID, form) {
   await addDoc(collection(db, "bswdReports"), {
-    householdID,
+    householdID, userID,
     type: "tip",
     about: form.about,
     tip: form.tip,
@@ -146,10 +146,10 @@ export async function submitBSWDTip(householdID, form) {
 // ══════════════════════════════
 // 💼 LIVELIHOOD REGISTRATIONS
 // ══════════════════════════════
-export async function submitLivelihoodRegistration(householdID, form, program) {
+export async function submitLivelihoodRegistration(householdID, userID, form, program) {
   const regNum = `LH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "livelihoodRegistrations"), {
-    regNum, householdID,
+    regNum, householdID, userID,
     fullName: `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
     firstName: form.firstName,
     middleName: form.middleName || "",
