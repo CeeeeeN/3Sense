@@ -3,12 +3,20 @@ import { getMemberProfile } from "../services/profile";
 import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport, submitBSWDReport, submitBSWDTip } from "../services/services";
 import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
 import { db } from "../firebase/firebase";
-// --- UPDATED IMPORTS: Added doc and runTransaction for the registration logic ---
 import { collection, onSnapshot, doc, runTransaction } from "firebase/firestore";
 
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
+
+// ── SESSION HELPER ──
+const getSaved = (key, fallback) => {
+  try {
+    return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 // ── Step Indicator ──
 function StepIndicator({ step }) {
@@ -780,17 +788,21 @@ function ProgramsTab({ userData }) {
     return () => unsubscribe();
   }, []);
 
-  // --- ADDED: The Transaction Logic ---
+  // --- UPDATED: The Transaction Logic ---
   const handleRegister = async (programId) => {
-    if (!userData || !userData.userID) {
-      return alert("Please ensure you are logged in and have selected a profile.");
+    // 1. Pull the ID directly from the browser session!
+    const activeUserId = getSaved("userID", null);
+    const activeUserName = getSaved("userName", "Resident");
+
+    if (!activeUserId) {
+      return alert("Session expired or profile not selected. Please log in again.");
     }
     
     setIsRegistering(true);
     
     try {
       const programRef = doc(db, "Programs", programId);
-      const attendeeRef = doc(db, "Programs", programId, "attendees", userData.userID);
+      const attendeeRef = doc(db, "Programs", programId, "attendees", activeUserId);
 
       await runTransaction(db, async (transaction) => {
         const progDoc = await transaction.get(programRef);
@@ -807,10 +819,10 @@ function ProgramsTab({ userData }) {
         const checkAttendee = await transaction.get(attendeeRef);
         if (checkAttendee.exists()) throw new Error("You are already registered for this program!");
 
-        // Add to subcollection
+        // Add to subcollection using the Session Data
         transaction.set(attendeeRef, {
-          userID: userData.userID,
-          userName: [userData.firstName, userData.lastName].filter(Boolean).join(" "),
+          userID: activeUserId,
+          userName: activeUserName,
           programId: programId,
           programName: data.description || data.title || "Program",
           programDate: data.date,
