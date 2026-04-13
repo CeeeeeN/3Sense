@@ -3,6 +3,7 @@ import { getMemberProfile } from "../services/profile";
 import { submitDocumentRequest, submitLivelihoodRegistration, submitFacilityReservation, submitIncidentReport, submitBSWDReport, submitBSWDTip } from "../services/services";
 import {ProgramsIcon, FacilitiesIcon, DocumentsIcon, ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon, BuildingIcon, ServiceInfoIcon, ServicesMenuIcon, ServiceShieldIcon, HeartIcon, UsersIcon, ServiceAlertTriangleIcon, PhoneCallIcon, ServiceMapPinIcon, SendIcon, SirenIcon, BriefcaseIcon, BadgeIcon} from "../components/Icons";
 import { db } from "../firebase/firebase";
+// --- UPDATED IMPORTS: Added doc and runTransaction for the registration logic ---
 import { collection, onSnapshot, doc, runTransaction } from "firebase/firestore";
 
 
@@ -2159,10 +2160,10 @@ function BADACTab() {
 // ── Services Sub-Tab Data ──
 const SERVICES_SUBTABS = [
   { key: "vawc",       label: "VAWC",          color: "#e03e3e", icon: <ServiceShieldIcon />,    category: "legal"     },
-  { key: "peace",      label: "Peace & Order", color: "#1a56a0", icon: <SirenIcon />,     category: "legal"     },
-  { key: "badac",      label: "BADAC",         color: "#92400e", icon: <BadgeIcon />,     category: "legal"     },
-  { key: "bosca",      label: "BOSCA",         color: "#703381", icon: <UsersIcon />,     category: "community" },
-  { key: "bswd",       label: "BSWD",          color: "#317D89", icon: <HeartIcon />,     category: "community" },
+  { key: "peace",      label: "Peace & Order", color: "#1a56a0", icon: <SirenIcon />,      category: "legal"     },
+  { key: "badac",      label: "BADAC",         color: "#92400e", icon: <BadgeIcon />,      category: "legal"     },
+  { key: "bosca",      label: "BOSCA",         color: "#703381", icon: <UsersIcon />,      category: "community" },
+  { key: "bswd",       label: "BSWD",          color: "#317D89", icon: <HeartIcon />,      category: "community" },
   { key: "livelihood", label: "Livelihood",    color: "#1e8a5e", icon: <BriefcaseIcon />, category: "community" },
 ];
 
@@ -2170,7 +2171,7 @@ const SVC_CARD_META = {
   vawc:       { fullName: "Violence Against Women & Children",        desc: "Hotlines, protection orders, and guided support for VAWC cases.",              bg: "rgba(220,38,38,0.06)",  border: "rgba(220,38,38,0.18)",  text: "#b91c1c" },
   bosca:      { fullName: "Barangay Office for Senior Citizens Assoc.",desc: "Senior citizen membership, benefits, welfare programs and how to join.",      bg: "rgba(112,51,129,0.06)", border: "rgba(112,51,129,0.18)", text: "#703381" },
   bswd:       { fullName: "Barangay Social Welfare and Development",   desc: "Report homeless individuals, send tips, and access social welfare services.", bg: "rgba(49,125,137,0.06)", border: "rgba(49,125,137,0.18)", text: "#317D89" },
-  peace:      { fullName: "Peace & Order",                            desc: "Emergency hotline, file an incident report, and track your report status.",   bg: "rgba(26,86,160,0.06)",  border: "rgba(26,86,160,0.18)",  text: "#1a56a0" },
+  peace:      { fullName: "Peace & Order",                             desc: "Emergency hotline, file an incident report, and track your report status.",   bg: "rgba(26,86,160,0.06)",  border: "rgba(26,86,160,0.18)",  text: "#1a56a0" },
   livelihood: { fullName: "Livelihood Skills Training",               desc: "Register for free skills training programs and track your enrollment status.", bg: "rgba(30,138,94,0.06)",  border: "rgba(30,138,94,0.18)",  text: "#1e8a5e" },
   badac:      { fullName: "Barangay Anti-Drug Abuse Council",         desc: "Confidential assistance, free drug testing, and rehabilitation referral.",     bg: "rgba(146,64,14,0.06)",  border: "rgba(146,64,14,0.18)",  text: "#92400e" },
 };
@@ -2310,7 +2311,8 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                   <div><div className="sc-card-title">Barangay Programs</div><div className="sc-card-subtitle">Active programs available to residents</div></div>
                 </div>
               </div>
-              <ProgramsTab />
+              {/* Passed userData down to the ProgramsTab */}
+              <ProgramsTab userData={userData} />
             </>
           )}
 
