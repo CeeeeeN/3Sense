@@ -178,50 +178,6 @@ function SubLabel({ icon, label }) {
 }
 
 export default function Dashboard({ userName = "Mark", onNavigate }) {
-  const [selectedAlert, setSelectedAlert] = useState(null);
-  const [selectedAnn, setSelectedAnn]     = useState(null);
-  const [showAllAnns, setShowAllAnns]     = useState(false);
-  const [realUserName, setRealUserName]   = useState(userName);
-  const [dataLoading, setDataLoading]     = useState(true);
-
-  const [widgets, setWidgets] = useState([
-    { icon: <VerifiedVisitIcon />, color: "teal",   value: "...", label: "Verified Visits",   sub: "via QR scans",     badge: "Active",  badgeIcon: <TrendUpIcon /> },
-    { icon: <DocumentIcon />,      color: "amber",  value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
-    { icon: <FeedbackIcon />,      color: "green",  value: "...", label: "Feedback",          sub: "submitted",        badge: "Done",    badgeIcon: <CheckSmallIcon /> },
-    { icon: <BarangayStatusIcon />,color: "purple", value: "...", label: "Barangay Status",   sub: "current standing", badge: "Active",  badgeIcon: <TrendUpIcon /> },
-  ]);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) { setDataLoading(false); return; }
-      try {
-        const hhQ = query(collection(db, "households"), where("userUID", "==", user.uid));
-        const hhSnap = await getDocs(hhQ);
-        if (hhSnap.empty) { setDataLoading(false); return; }
-
-        const hhDoc = hhSnap.docs[0];
-        const hhId = hhDoc.id;
-
-        let firstName = userName;
-        let adminStatus = "Clear";
-
-        const headRef = doc(db, "households", hhId, "residents", "head");
-        const headSnap = await getDoc(headRef);
-        if (headSnap.exists()) {
-          firstName = headSnap.data().firstName || userName;
-          adminStatus = headSnap.data().adminStatus || "Clear";
-        }
-
-        const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("hhId", "==", hhId)));
-        const drSnap = await getDocs(query(collection(db, "documentRequests"),     where("hhId", "==", hhId)));
-        const fbSnap = await getDocs(query(collection(db, "Feedback"),             where("hhId", "==", hhId)));
-
-        setWidgets([
-          { icon: <VerifiedVisitIcon />, color: "teal",   value: frSnap.size.toString(), label: "Verified Visits",   sub: "via QR scans",     badge: "Active",                                       badgeIcon: <TrendUpIcon /> },
-          { icon: <DocumentIcon />,      color: "amber",  value: drSnap.size.toString(), label: "Document Requests", sub: "currently active", badge: "Updated",                                      badgeIcon: <ClockIcon /> },
-          { icon: <FeedbackIcon />,      color: "green",  value: fbSnap.size.toString(), label: "Feedback",          sub: "submitted",        badge: "Done",                                         badgeIcon: <CheckSmallIcon /> },
-          { icon: <BarangayStatusIcon />,color: "purple", value: adminStatus,            label: "Barangay Status",   sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
-export default function Dashboard({ userName = "Mark", onNavigate }) {
   const [selectedAlert, setSelectedAlert]   = useState(null);
   const [selectedAnn, setSelectedAnn]       = useState(null);
   const [showAllAnns, setShowAllAnns]       = useState(false);
