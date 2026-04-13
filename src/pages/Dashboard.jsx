@@ -153,6 +153,74 @@ function AnnouncementDetailPopup({ ann, onClose }) {
   );
 }
 
+/* ── Sub-section label divider ── */
+function SubLabel({ icon, label }) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "0.5rem",
+      padding: "0.85rem 0 0.75rem",
+      borderBottom: "1.5px solid #f0f4f9",
+      marginBottom: "1rem",
+      color: "#5e7a99",
+    }}>
+      {icon}
+      <span style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontSize: "0.72rem",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+      }}>{label}</span>
+    </div>
+  );
+}
+
+export default function Dashboard({ userName = "Mark", onNavigate }) {
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [selectedAnn, setSelectedAnn]     = useState(null);
+  const [showAllAnns, setShowAllAnns]     = useState(false);
+  const [realUserName, setRealUserName]   = useState(userName);
+  const [dataLoading, setDataLoading]     = useState(true);
+
+  const [widgets, setWidgets] = useState([
+    { icon: <VerifiedVisitIcon />, color: "teal",   value: "...", label: "Verified Visits",   sub: "via QR scans",     badge: "Active",  badgeIcon: <TrendUpIcon /> },
+    { icon: <DocumentIcon />,      color: "amber",  value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
+    { icon: <FeedbackIcon />,      color: "green",  value: "...", label: "Feedback",          sub: "submitted",        badge: "Done",    badgeIcon: <CheckSmallIcon /> },
+    { icon: <BarangayStatusIcon />,color: "purple", value: "...", label: "Barangay Status",   sub: "current standing", badge: "Active",  badgeIcon: <TrendUpIcon /> },
+  ]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) { setDataLoading(false); return; }
+      try {
+        const hhQ = query(collection(db, "households"), where("userUID", "==", user.uid));
+        const hhSnap = await getDocs(hhQ);
+        if (hhSnap.empty) { setDataLoading(false); return; }
+
+        const hhDoc = hhSnap.docs[0];
+        const hhId = hhDoc.id;
+
+        let firstName = userName;
+        let adminStatus = "Clear";
+
+        const headRef = doc(db, "households", hhId, "residents", "head");
+        const headSnap = await getDoc(headRef);
+        if (headSnap.exists()) {
+          firstName = headSnap.data().firstName || userName;
+          adminStatus = headSnap.data().adminStatus || "Clear";
+        }
+
+        const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("hhId", "==", hhId)));
+        const drSnap = await getDocs(query(collection(db, "documentRequests"),     where("hhId", "==", hhId)));
+        const fbSnap = await getDocs(query(collection(db, "Feedback"),             where("hhId", "==", hhId)));
+
+        setWidgets([
+          { icon: <VerifiedVisitIcon />, color: "teal",   value: frSnap.size.toString(), label: "Verified Visits",   sub: "via QR scans",     badge: "Active",                                       badgeIcon: <TrendUpIcon /> },
+          { icon: <DocumentIcon />,      color: "amber",  value: drSnap.size.toString(), label: "Document Requests", sub: "currently active", badge: "Updated",                                      badgeIcon: <ClockIcon /> },
+          { icon: <FeedbackIcon />,      color: "green",  value: fbSnap.size.toString(), label: "Feedback",          sub: "submitted",        badge: "Done",                                         badgeIcon: <CheckSmallIcon /> },
+          { icon: <BarangayStatusIcon />,color: "purple", value: adminStatus,            label: "Barangay Status",   sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
 export default function Dashboard({ userName = "Mark", onNavigate }) {
   const [selectedAlert, setSelectedAlert]   = useState(null);
   const [selectedAnn, setSelectedAnn]       = useState(null);
@@ -230,6 +298,8 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
       </div>
 
       <div className="db-content">
+
+        {/* ── 1. Your Summary ── */}
         <SectionCard icon={<BoltIcon />} title="Smart Alerts for You" subtitle="Personalized based on your profile">
           <div className="db-alerts-grid">
             {ALERTS.map((a) => (
@@ -266,6 +336,56 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
           </div>
         </SectionCard>
 
+        {/* ── 2. Alerts & Announcements (merged into one card) ── */}
+        <SectionCard
+          icon={<BoltIcon />}
+          title="Alerts & Announcements"
+          subtitle="Personalized alerts and latest barangay news"
+          action={
+            <button className="db-view-all-btn" onClick={() => setShowAllAnns(true)}>
+              View All <ArrowRightIcon />
+            </button>
+          }
+        >
+
+          {/* Smart Alerts sub-section */}
+          <div style={{ padding: "0 1.5rem" }}>
+            <SubLabel icon={<BoltIcon />} label="Smart Alerts for You" />
+            <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
+              {ALERTS.map((a) => (
+                <div key={a.id} className={`alert-card alert-card--${a.color}`}>
+                  <div className="alert-card__header">
+                    <div className="alert-card__icon-wrap">{a.icon}</div>
+                    <span className="alert-card__tag">{a.tag}</span>
+                  </div>
+                  <div className="alert-card__body">
+                    <div className="alert-card__title">{a.title}</div>
+                    <div className="alert-card__desc">{a.desc}</div>
+                    <button className="alert-card__cta" onClick={() => setSelectedAlert(a)}>
+                      View Details <ArrowRightIcon />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Announcements sub-section */}
+          <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
+            <SubLabel icon={<BellIcon />} label="Barangay Announcements" />
+            {ANNOUNCEMENTS.map((a, i) => (
+              <div
+                key={a.id}
+                className={`ann-row${i === ANNOUNCEMENTS.length - 1 ? " ann-row--last" : ""}`}
+                onClick={() => setSelectedAnn(a)}
+                style={{ cursor: "pointer" }}
+              >
+                <div className="ann-row__body">
+                  <div className="ann-row__title-line">
+                    <div className={`ann-row__dot db-dot-${a.dotColor}`} />
+                    <span className="ann-row__title">{a.title}</span>
+                  </div>
+                  <div className="ann-row__desc">{a.desc}</div>
         <SectionCard 
           icon={<BellIcon />} 
           title="Barangay Announcements" 
@@ -279,19 +399,28 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
                   <div className={`ann-row__dot db-dot-${a.dotColor}`} />
                   <span className="ann-row__title">{a.title}</span>
                 </div>
-                <div className="ann-row__desc">{a.desc}</div>
+                <div className="ann-row__date">{a.date}</div>
               </div>
+            ))}
+          </div>
+
               <div className="ann-row__date">{a.date}</div>
             </div>
           ))}
         </SectionCard>
       </div>
 
+      {/* ── Footer ── */}
+      <footer className="db-footer" style={{ marginTop: 'auto' }}>
       <footer className="db-footer">
         <div className="db-footer-inner">
           <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
         </div>
       </footer>
+      
+      {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
+      {selectedAnn   && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
+
 
       {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
       {selectedAnn && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
