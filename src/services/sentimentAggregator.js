@@ -1,5 +1,3 @@
-// utils/sentimentAggregator.js
-
 export function calculateMoodCardData(feedbacks) {
   // 1. Set up the baseline structure for the 4 required categories
   const categoryStats = {

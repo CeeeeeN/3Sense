@@ -4,6 +4,8 @@ import "../AdminStyle.css";
 import { db } from "../firebase/firebase"; 
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 
+import { getSmartSuggestions } from "../services/suggestionEngine"; 
+
 // --- STAR RATING HELPER ---
 const StarRating = ({ rating }) => {
   return (
@@ -64,7 +66,8 @@ export default function AdminFeedback() {
                   data.Status === 'pending' ? 'Under Review' : 'Resolved',
           text: data.Comment || "",
           confidence: data.Confidence ? `${Math.round(data.Confidence * 100)}%` : "N/A",
-          //keyIndicators: data.keyIndicators || "" 
+          detectedIssue: data.DetectedIssue || "None",
+          issueConfidence: data.IssueConfidence ? `${Math.round(data.IssueConfidence * 100)}%` : "N/A",
         };
       });
       setFeedbacks(liveData);
@@ -73,26 +76,25 @@ export default function AdminFeedback() {
     return () => unsubscribe();
   }, []);
 
-  // 3. Extract Unique Services dynamically for the dropdown
   const uniqueServices = ["All", ...new Set(feedbacks.map(item => item.service))];
 
-  // 4. The Filtering Engine (Runs instantly when you type or select a dropdown)
   const filteredFeedbacks = useMemo(() => {
     return feedbacks.filter((item) => {
-      // Check Search Bar (searches Name and the Feedback text)
       const matchesSearch = 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.text.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Check Dropdowns
       const matchesService = filterService === "All" || item.service === filterService;
       const matchesTag = filterTag === "All" || item.tag === filterTag;
       const matchesStatus = filterStatus === "All" || item.status === filterStatus;
 
-      // Only show the row if it matches ALL active filters
       return matchesSearch && matchesService && matchesTag && matchesStatus;
     });
   }, [feedbacks, searchTerm, filterService, filterTag, filterStatus]);
+
+  const activeSuggestions = selectedFeedback && selectedFeedback.tag === "Negative" 
+    ? getSmartSuggestions(selectedFeedback.detectedIssue) 
+    : null;
 
   return (
     <AdminLayout>
@@ -119,7 +121,6 @@ export default function AdminFeedback() {
           <div className="af-filters">
             <span className="af-filter-label">Filters:</span>
             
-            {/* Dynamic Service Dropdown */}
             <select 
               className="af-select"
               value={filterService}
@@ -130,7 +131,6 @@ export default function AdminFeedback() {
               ))}
             </select>
 
-            {/* Tag/Sentiment Dropdown */}
             <select 
               className="af-select"
               value={filterTag}
@@ -143,7 +143,6 @@ export default function AdminFeedback() {
               <option value="Pending">Pending AI</option>
             </select>
 
-            {/* Status Dropdown */}
             <select 
               className="af-select"
               value={filterStatus}
@@ -177,7 +176,6 @@ export default function AdminFeedback() {
               ) : filteredFeedbacks.length === 0 ? (
                 <tr><td colSpan="7" style={{ textAlign: 'center' }}>No feedbacks found matching your filters.</td></tr>
               ) : (
-                // CRITICAL FIX: We map over filteredFeedbacks instead of feedbacks
                 filteredFeedbacks.map((item) => (
                   <tr key={item.id}>
                     <td>{item.date}</td>
@@ -206,25 +204,66 @@ export default function AdminFeedback() {
       {/* --- POPUP MODAL --- */}
       {selectedFeedback && (
         <div className="af-modal-overlay">
-          <div className="af-modal-content">
+          <div className="af-modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="af-modal-header">
               <h2>Feedback Response</h2>
               <button className="af-modal-close" onClick={() => setSelectedFeedback(null)}>&times;</button>
             </div>
             <div className="af-modal-body">
               <h3>Feedback - {selectedFeedback.name}</h3>
-              <p>{selectedFeedback.text}</p>
+              <p style={{ fontStyle: 'italic', color: '#4b5563', backgroundColor: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
+                "{selectedFeedback.text}"
+              </p>
+              
               <h3>AI Sentiment Classification</h3>
               <ul className="af-sentiment-list">
                 <li>
                   <strong>Overall Sentiment: </strong>
                   <span className={getBadgeClass(selectedFeedback.tag)}>{selectedFeedback.tag}</span>
                 </li>
-                <li><strong>Confidence Score:</strong> {selectedFeedback.confidence}</li>
-                {selectedFeedback.keyIndicators && (
-                  <li><strong>Key Indicators:</strong> {selectedFeedback.keyIndicators}</li>
+                <li><strong>AI Confidence:</strong> {selectedFeedback.confidence}</li>
+                {selectedFeedback.tag === "Negative" && selectedFeedback.detectedIssue !== "None" && (
+                  <li style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #e5e7eb' }}>
+                    <strong>Detected Issue: </strong>
+                    <span style={{ fontWeight: 'bold', color: '#b91c1c' }}>{selectedFeedback.detectedIssue}</span>
+                    <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '8px' }}>(Confidence: {selectedFeedback.issueConfidence})</span>
+                  </li>
                 )}
               </ul>
+
+              {activeSuggestions && (
+                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                  <h3 style={{ color: '#166534', marginTop: 0, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    AI Smart Suggestions
+                  </h3>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ fontSize: '14px', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Immediate Actions (24-48 Hours):
+                    </strong>
+                    <ul style={{ margin: '6px 0 0 0', paddingLeft: '24px', fontSize: '14px', color: '#374151' }}>
+                      {activeSuggestions.actions.map((act, i) => (
+                        <li key={i} style={{ marginBottom: '4px' }}>{act}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <strong style={{ fontSize: '14px', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Long-Term Strategies:
+                    </strong>
+                    <ul style={{ margin: '6px 0 0 0', paddingLeft: '24px', fontSize: '14px', color: '#374151' }}>
+                      {activeSuggestions.strategy.map((strat, i) => (
+                        <li key={i} style={{ marginBottom: '4px' }}>{strat}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

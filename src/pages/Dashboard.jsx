@@ -221,6 +221,53 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
           { icon: <DocumentIcon />,      color: "amber",  value: drSnap.size.toString(), label: "Document Requests", sub: "currently active", badge: "Updated",                                      badgeIcon: <ClockIcon /> },
           { icon: <FeedbackIcon />,      color: "green",  value: fbSnap.size.toString(), label: "Feedback",          sub: "submitted",        badge: "Done",                                         badgeIcon: <CheckSmallIcon /> },
           { icon: <BarangayStatusIcon />,color: "purple", value: adminStatus,            label: "Barangay Status",   sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
+export default function Dashboard({ userName = "Mark", onNavigate }) {
+  const [selectedAlert, setSelectedAlert]   = useState(null);
+  const [selectedAnn, setSelectedAnn]       = useState(null);
+  const [showAllAnns, setShowAllAnns]       = useState(false);
+
+  const [realUserName, setRealUserName]     = useState(userName);
+  const [dataLoading, setDataLoading]       = useState(true);
+  
+  const [widgets, setWidgets] = useState([
+    { icon: <VerifiedVisitIcon />, color: "teal",   value: "...", label: "Verified Visits",   sub: "via QR scans",    badge: "Active",    badgeIcon: <TrendUpIcon /> },
+    { icon: <DocumentIcon />,      color: "amber",  value: "...", label: "Document Requests", sub: "currently active", badge: "Loading",   badgeIcon: <ClockIcon />   },
+    { icon: <FeedbackIcon />,      color: "green",  value: "...", label: "Feedback",          sub: "submitted",        badge: "Done",      badgeIcon: <CheckSmallIcon /> },
+    { icon: <BarangayStatusIcon />,color: "purple", value: "...", label: "Barangay Status",   sub: "current standing", badge: "Active",    badgeIcon: <TrendUpIcon /> },
+  ]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) { setDataLoading(false); return; }
+      try {
+        const hhQ = query(collection(db, "households"), where("userUID", "==", user.uid));
+        const hhSnap = await getDocs(hhQ);
+        if (hhSnap.empty) { setDataLoading(false); return; }
+
+        const hhDoc = hhSnap.docs[0];
+        const hhId = hhDoc.id;
+
+        let firstName = userName;
+        let adminStatus = "Clear";
+
+        const headRef = doc(db, "households", hhId, "residents", "head");
+        const headSnap = await getDoc(headRef);
+        if (headSnap.exists()) {
+          firstName = headSnap.data().firstName || userName;
+          adminStatus = headSnap.data().adminStatus || "Clear";
+        }
+
+        setRealUserName(firstName);
+
+        const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("hhId", "==", hhId)));
+        const drSnap = await getDocs(query(collection(db, "documentRequests"), where("hhId", "==", hhId)));
+        const fbSnap = await getDocs(query(collection(db, "Feedback"), where("hhId", "==", hhId)));
+
+        setWidgets([
+          { icon: <VerifiedVisitIcon />, color: "teal", value: frSnap.size.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
+          { icon: <DocumentIcon />, color: "amber", value: drSnap.size.toString(), label: "Document Requests", sub: "currently active", badge: "Updated", badgeIcon: <ClockIcon /> },
+          { icon: <FeedbackIcon />, color: "green", value: fbSnap.size.toString(), label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
+          { icon: <BarangayStatusIcon />, color: "purple", value: adminStatus, label: "Barangay Status", sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
         ]);
       } catch (err) {
         console.error(err);
@@ -240,8 +287,6 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
 
   return (
     <main className="db-page">
-
-      {/* ── Welcome Banner ── */}
       <div className="db-welcome-banner">
         <div className="db-welcome-banner-inner">
           <div className="db-welcome-left">
@@ -255,6 +300,25 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
       <div className="db-content">
 
         {/* ── 1. Your Summary ── */}
+        <SectionCard icon={<BoltIcon />} title="Smart Alerts for You" subtitle="Personalized based on your profile">
+          <div className="db-alerts-grid">
+            {ALERTS.map((a) => (
+              <div key={a.id} className={`alert-card alert-card--${a.color}`}>
+                <div className="alert-card__header">
+                  <div className="alert-card__icon-wrap">{a.icon}</div>
+                  <span className="alert-card__tag">{a.tag}</span>
+                </div>
+                <div className="alert-card__body">
+                  <div className="alert-card__title">{a.title}</div>
+                  <div className="alert-card__desc">{a.desc}</div>
+                  <button className="alert-card__cta" onClick={() => setSelectedAlert(a)}>View Details <ArrowRightIcon /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* Your Summary Section - "View All Activity" Button Removed */}
         <SectionCard icon={<GridIcon />} title="Your Summary" subtitle="Overview of your barangay activity">
           <div className="db-widgets-grid">
             {widgets.map((w, i) => (
@@ -322,44 +386,44 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
                     <span className="ann-row__title">{a.title}</span>
                   </div>
                   <div className="ann-row__desc">{a.desc}</div>
+        <SectionCard 
+          icon={<BellIcon />} 
+          title="Barangay Announcements" 
+          subtitle="Stay updated with the latest news"
+          action={<button className="db-view-all-btn" onClick={() => setShowAllAnns(true)}>View All <ArrowRightIcon /></button>}
+        >
+          {ANNOUNCEMENTS.map((a) => (
+            <div key={a.id} className="ann-row" onClick={() => setSelectedAnn(a)} style={{ cursor: "pointer" }}>
+              <div className="ann-row__body">
+                <div className="ann-row__title-line">
+                  <div className={`ann-row__dot db-dot-${a.dotColor}`} />
+                  <span className="ann-row__title">{a.title}</span>
                 </div>
                 <div className="ann-row__date">{a.date}</div>
               </div>
             ))}
           </div>
 
+              <div className="ann-row__date">{a.date}</div>
+            </div>
+          ))}
         </SectionCard>
-
       </div>
 
       {/* ── Footer ── */}
       <footer className="db-footer" style={{ marginTop: 'auto' }}>
+      <footer className="db-footer">
         <div className="db-footer-inner">
-          <div className="db-footer-top">
-            <div className="db-footer-brand">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              <span>Barangay 3S+ Malanday</span>
-              <span className="db-footer-divider">|</span>
-              <span className="db-footer-tagline">Community Management System</span>
-            </div>
-            <nav className="db-footer-links">
-              <a className="db-footer-link" href="#">Privacy Policy</a>
-              <a className="db-footer-link" href="#">Terms of Use</a>
-              <a className="db-footer-link" href="#">Contact Support</a>
-            </nav>
-          </div>
-          <div className="db-footer-bottom">
-            <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
-            <p>Powered by the Barangay 3S+ Community Management System</p>
-          </div>
+          <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
         </div>
       </footer>
       
       {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
       {selectedAnn   && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
 
+
+      {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
+      {selectedAnn && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
     </main>
   );
 }
