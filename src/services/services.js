@@ -16,10 +16,10 @@ const generateRef = () => {
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
 // ══════════════════════════════
-export async function submitDocumentRequest(hhId, userName, docType, form, customData = {}) {
+export async function submitDocumentRequest(householdID, userID, userName, docType, form, customData = {}) {
   const refNum = generateRef();
   await addDoc(collection(db, "documentRequests"), {
-    refNum, hhId,
+    refNum, householdID, userID,
     requesterName: userName,
     documentType: docType.name || docType.title,
     documentId: docType.id,
@@ -44,10 +44,10 @@ export async function submitDocumentRequest(hhId, userName, docType, form, custo
   return refNum;
 }
 
-export async function getDocumentRequests(hhId) {
+export async function getDocumentRequests(householdID) {
   const q = query(
     collection(db, "documentRequests"),
-    where("hhId", "==", hhId),
+    where("householdID", "==", householdID),
     orderBy("submittedAt", "desc")
   );
   const snapshot = await getDocs(q);
@@ -57,10 +57,10 @@ export async function getDocumentRequests(hhId) {
 // ══════════════════════════════
 // 🏢 FACILITY RESERVATIONS
 // ══════════════════════════════
-export async function submitFacilityReservation(hhId, userName, facility, form, customData = {}) {
+export async function submitFacilityReservation(householdID, userID, userName, facility, form, customData = {}) {
   const refNum = generateRef();
   await addDoc(collection(db, "facilityReservations"), {
-    refNum, hhId,
+    refNum, householdID, userID,
     requesterName: form.fullName || userName,
     fullName: form.fullName || userName,
     email: form.email || "",
@@ -83,10 +83,10 @@ export async function submitFacilityReservation(hhId, userName, facility, form, 
 // ══════════════════════════════
 // 🚔 INCIDENT REPORTS
 // ══════════════════════════════
-export async function submitIncidentReport(hhId, form) {
+export async function submitIncidentReport(householdID, form) {
   const refNum = `PO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "incidentReports"), {
-    refNum, hhId,
+    refNum, householdID,
     isAnonymous: form.isAnonymous,
     reporterName: form.isAnonymous ? "Anonymous" : form.reporterName || "",
     contact: form.isAnonymous ? "" : form.contact || "",
@@ -118,9 +118,9 @@ export async function trackIncidentReport(refNum) {
 // ══════════════════════════════
 // 💚 BSWD REPORTS & TIPS
 // ══════════════════════════════
-export async function submitBSWDReport(hhId, form) {
+export async function submitBSWDReport(householdID, form) {
   await addDoc(collection(db, "bswdReports"), {
-    hhId,
+    householdID,
     type: "homeless_report",
     reporterName: form.name || "Anonymous",
     location: form.location,
@@ -131,9 +131,9 @@ export async function submitBSWDReport(hhId, form) {
   });
 }
 
-export async function submitBSWDTip(hhId, form) {
+export async function submitBSWDTip(householdID, form) {
   await addDoc(collection(db, "bswdReports"), {
-    hhId,
+    householdID,
     type: "tip",
     about: form.about,
     tip: form.tip,
@@ -146,10 +146,10 @@ export async function submitBSWDTip(hhId, form) {
 // ══════════════════════════════
 // 💼 LIVELIHOOD REGISTRATIONS
 // ══════════════════════════════
-export async function submitLivelihoodRegistration(hhId, form, program) {
+export async function submitLivelihoodRegistration(householdID, form, program) {
   const regNum = `LH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "livelihoodRegistrations"), {
-    regNum, hhId,
+    regNum, householdID,
     fullName: `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
     firstName: form.firstName,
     middleName: form.middleName || "",
@@ -169,10 +169,10 @@ export async function submitLivelihoodRegistration(hhId, form, program) {
   return regNum;
 }
 
-export async function getLivelihoodRegistrations(hhId) {
+export async function getLivelihoodRegistrations(householdID) {
   const q = query(
     collection(db, "livelihoodRegistrations"),
-    where("hhId", "==", hhId),
+    where("householdID", "==", householdID),
     orderBy("submittedAt", "desc")
   );
   const snapshot = await getDocs(q);

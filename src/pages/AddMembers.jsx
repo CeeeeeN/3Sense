@@ -54,7 +54,7 @@ const BLANK_FORM = {
 
 const TABS = ["Personal Info", "Address", "Category", "Education"];
 
-export default function AddMembers({ onBack, onDone, hhId, hhAddress }) {
+export default function AddMembers({ onBack, onDone, householdID, hhAddress }) {
   const [members, setMembers] = useState([]);
   const [tab, setTab] = useState(1);
   const [form, setForm] = useState({ ...BLANK_FORM });
@@ -120,7 +120,7 @@ const addMember = async () => {
   const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
 
   try {
-    await addHouseholdMember(hhId, {
+    await addHouseholdMember(householdID, {
       // identity
       isHead: form.isHead,
       // personal info
@@ -188,7 +188,7 @@ const addMember = async () => {
         </div>
         <div className="am-hh-badge">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span>{hhId || "HH-XXXX-XXXXX"}</span>
+          <span>{householdID || "HH-XXXX-XXXXX"}</span>
         </div>
       </nav>
 

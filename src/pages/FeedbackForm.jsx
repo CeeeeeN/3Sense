@@ -74,7 +74,7 @@ function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
 }
 
 // MAIN FEEDBACK FORM
-export default function FeedbackForm({ onNavigate, service, userName = "Resident" }) {
+export default function FeedbackForm({ onNavigate, service, userName = "Resident", householdID, userID }) {
   const [rating, setRating]         = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment]       = useState("");
@@ -207,6 +207,8 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         IssueConfidence: finalIssueConfidence, // <--- ADDED TO DATABASE
         CreatedAt: serverTimestamp(),
         UserName: userName,
+        householdID: householdID || "",
+        userID: userID || "",
         HasPhoto: !!photo,
       });
 

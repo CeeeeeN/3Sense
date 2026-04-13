@@ -70,9 +70,10 @@ export default function UserApp() {
     return "landing";
   });
 
-  const [hhId, setHhId] = useState(() => getSaved("hhId", ""));
+  const [householdID, setHouseholdID] = useState(() => getSaved("householdID", ""));
+  const [userID, setUserID]           = useState(() => getSaved("userID", ""));
   const [userName, setUserName] = useState(() => getSaved("userName", ""));
-  const [memberId, setMemberId] = useState(() => getSaved("memberId", null));
+  const [memberID, setMemberID] = useState(() => getSaved("memberID", null));
   const [userRole, setUserRole] = useState(() =>
     getSaved("userRole", "member"),
   );
@@ -98,13 +99,13 @@ export default function UserApp() {
       if (LOGGED_IN_PAGES.includes(page)) {
         localStorage.setItem(
           "brgy_session",
-          JSON.stringify({ hhId, userName, memberId, userRole }),
+          JSON.stringify({ householdID, userID, userName, memberID, userRole }),
         );
       } else {
         localStorage.removeItem("brgy_session");
       }
     } catch (e) {}
-  }, [page, hhId, userName, memberId, userRole]);
+  }, [page, householdID, userID, userName, memberID, userRole]);
 
   // Scroll to top on page change
   useEffect(() => {
@@ -158,11 +159,11 @@ export default function UserApp() {
         onBack={() => setPage("landing")}
         onForgotPassword={() => setPage("forgot")}
         onSuccess={(selectedProfile) => {
-          if (selectedProfile?.householdID)
-            setHhId(selectedProfile.householdID);
-          if (selectedProfile?.id) setMemberId(selectedProfile.id);
-          if (selectedProfile?.name) setUserName(selectedProfile.name);
-          if (selectedProfile?.role) setUserRole(selectedProfile.role);
+          if (selectedProfile?.householdID) setHouseholdID(selectedProfile.householdID);
+          if (selectedProfile?.userID)      setUserID(selectedProfile.userID);
+          if (selectedProfile?.memberID)    setMemberID(selectedProfile.memberID);
+          if (selectedProfile?.name)        setUserName(selectedProfile.name);
+          if (selectedProfile?.role)        setUserRole(selectedProfile.role);
           setPage("home");
         }}
         onRegister={() => setPage("register")}
@@ -202,7 +203,7 @@ export default function UserApp() {
         onBack={() => setPage("landing")}
         onLoginClick={() => setPage("login")}
         onSuccess={(data) => {
-          if (data?.householdID) setHhId(data.householdID);
+          if (data?.householdID) setHouseholdID(data.householdID);
           if (data?.address) setHhAddress(data.address);
           setPage("add-members");
         }}
@@ -216,7 +217,7 @@ export default function UserApp() {
       <AddMembers
         onBack={() => setPage("landing")}
         onDone={() => setPage("home")}
-        hhId={hhId}
+        householdID={householdID}
         hhAddress={hhAddress}
       />
     );
@@ -228,9 +229,9 @@ export default function UserApp() {
       <Profile
         onBack={() => setPage("home")}
         onNavigate={handleNav}
-        hhId={hhId}
+        householdID={householdID}
         userName={userName}
-        memberId={memberId}
+        memberID={memberID}
         userRole={userRole}
       />
     );
@@ -243,7 +244,7 @@ export default function UserApp() {
         <Navbar
           activePage="home"
           onNavigate={handleNav}
-          hhId={hhId}
+          householdID={householdID}
           userName={userName}
           userRole={userRole}
         />
@@ -259,11 +260,11 @@ export default function UserApp() {
         <Navbar
           activePage="services"
           onNavigate={handleNav}
-          hhId={hhId}
+          householdID={householdID}
           userName={userName}
           userRole={userRole}
         />
-        <ServicesPage onNavigate={handleNav} hhId={hhId} memberId={memberId} userName={userName} />
+        <ServicesPage onNavigate={handleNav} householdID={householdID} memberID={memberID} userName={userName} />
       </div>
     );
   }
@@ -275,11 +276,11 @@ export default function UserApp() {
         <Navbar
           activePage="scan"
           onNavigate={handleNav}
-          hhId={hhId}
+          householdID={householdID}
           userName={userName}
           userRole={userRole}
         />
-        <ScanPage onNavigate={handleNav} userName={userName} hhId={hhId} />
+        <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} />
       </div>
     );
   }
@@ -296,7 +297,7 @@ export default function UserApp() {
         <Navbar
           activePage="scan"
           onNavigate={handleNav}
-          hhId={hhId}
+          householdID={householdID}
           userName={userName}
           userRole={userRole}
         />
@@ -307,7 +308,8 @@ export default function UserApp() {
           }}
           service={feedbackService}
           userName={userName}
-          hhId={hhId}
+          householdID={householdID}
+          userID={userID}
         />
       </div>
     );
@@ -320,7 +322,7 @@ export default function UserApp() {
         <Navbar
           activePage="activity"
           onNavigate={handleNav}
-          hhId={hhId}
+          householdID={householdID}
           userName={userName}
           userRole={userRole}
         />
@@ -336,7 +338,7 @@ export default function UserApp() {
         <Navbar
           activePage="emergency"
           onNavigate={handleNav}
-          hhId={hhId}
+          householdID={householdID}
           userName={userName}
           userRole={userRole}
         />

@@ -329,7 +329,7 @@ function Step4({ refNum, onReset }) {
 }
 
 // ── Documents Tab ──
-function DocumentsTab({ userData, hhId, userName }) {
+function DocumentsTab({ userData, householdID, userName }) {
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep]       = useState(1);
   const [docType, setDocType] = useState(null);
@@ -404,7 +404,7 @@ function DocumentsTab({ userData, hhId, userName }) {
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
-        const generatedRef = await submitDocumentRequest(hhId, userName || "Unknown", docType, form, customData);
+        const generatedRef = await submitDocumentRequest(householdID, userData?.userID || "", userName || "Unknown", docType, form, customData);
         setRefNum(generatedRef);
       } catch (error) {
         console.error("Failed to submit document request:", error);
@@ -506,7 +506,7 @@ function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates
 }
 
 // ── Reservation Form ──
-function ReservationForm({ onBack, facility, userData, hhId, userName }) {
+function ReservationForm({ onBack, facility, userData, householdID, userName }) {
   const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
@@ -604,7 +604,7 @@ function ReservationForm({ onBack, facility, userData, hhId, userName }) {
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
-      const generatedRef = await submitFacilityReservation(hhId, userName || "User", facility, form, customData);
+      const generatedRef = await submitFacilityReservation(householdID, userData?.userID || "", userName || "User", facility, form, customData);
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {
@@ -1396,7 +1396,7 @@ const STATUS_CONFIG = {
   resolved:  { label: "Resolved",  color: "#2DB17B", bg: "rgba(45,177,123,0.1)",   icon: "✅" },
 };
 
-function PeaceOrderTab({ userData, hhId }) {
+function PeaceOrderTab({ userData, householdID }) {
   const [view, setView]             = useState("home");
   const [refNum, setRefNum]         = useState("");
   const [trackInput, setTrackInput] = useState("");
@@ -1440,7 +1440,7 @@ function PeaceOrderTab({ userData, hhId }) {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     try {
-      await submitIncidentReport(hhId, form);
+      await submitIncidentReport(householdID, form);
       setRefNum(Array.from({length:8}, ()=>"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join(""));
       setView("submitted");
     } catch (error) {
@@ -1734,7 +1734,7 @@ const REG_STATUS = {
   completed: { label: "Completed", color: "#5e7a99", bg: "rgba(94,122,153,0.1)" },
 };
 
-function LivelihoodTab({ userData, hhId, userName }) {
+function LivelihoodTab({ userData, householdID, userName }) {
   const [view, setView]     = useState("main");
   const [step, setStep]     = useState(1);
   const [regNum, setRegNum] = useState("");
@@ -1780,7 +1780,7 @@ function LivelihoodTab({ userData, hhId, userName }) {
     if (step === 2 && !validateStep2()) return;
     if (step === 3) {
       try {
-        await submitLivelihoodRegistration(hhId, form, selectedProgram);
+        await submitLivelihoodRegistration(householdID, form, selectedProgram);
         setRegNum(`LH-2026-${Math.floor(10000 + Math.random() * 90000)}`);
         setStep(4);
       } catch (error) {
@@ -2147,7 +2147,7 @@ const FILTERS = [
   { key: "community", label: "Community" },
 ];
 
-function ServicesTab({ userData, hhId, userName }) {
+function ServicesTab({ userData, householdID, userName }) {
   const [sub, setSub]       = useState(null);
   const [filter, setFilter] = useState("all");
 
@@ -2162,8 +2162,8 @@ function ServicesTab({ userData, hhId, userName }) {
         {sub === "vawc"       && <VAWCTab />}
         {sub === "bosca"      && <BOSCATab />}
         {sub === "bswd"       && <BSWDTab userData={userData} />}
-        {sub === "peace"      && <PeaceOrderTab userData={userData} hhId={hhId} />}
-        {sub === "livelihood" && <LivelihoodTab userData={userData} hhId={hhId} userName={userName} />}
+        {sub === "peace"      && <PeaceOrderTab userData={userData} householdID={householdID} />}
+        {sub === "livelihood" && <LivelihoodTab userData={userData} householdID={householdID} userName={userName} />}
         {sub === "badac"      && <BADACTab />}
       </div>
     );
@@ -2227,7 +2227,7 @@ const TABS = [
 ];
 
 // ── Main Services Page ──
-export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
+export default function ServicesPage({ onNavigate, householdID, memberID, userName }) {
   const [activeTab, setActiveTab] = useState("services");
   const [reservationFacility, setReservationFacility] = useState(null);
 
@@ -2236,12 +2236,12 @@ export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
 
   // Fetch profile data on mount
   useEffect(() => {
-    if (hhId && memberId) {
-      getMemberProfile(hhId, memberId)
+    if (householdID && memberID) {
+      getMemberProfile(householdID, memberID)
         .then(data => setUserData(data))
         .catch(console.error);
     }
-  }, [hhId, memberId]);
+  }, [householdID, memberID]);
 
   return (
     <main className="db-page sv-page">
@@ -2300,10 +2300,11 @@ export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
                   <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online</div></div>
                 </div>
               </div>
-              <DocumentsTab userData={userData} hhId={hhId} userName={userName} />            </>
+              <DocumentsTab userData={userData} householdID={householdID} userName={userName} />
+            </>
           )}
 
-          {activeTab === "services" && <ServicesTab userData={userData} hhId={hhId} userName={userName} />}
+          {activeTab === "services" && <ServicesTab userData={userData} householdID={householdID} userName={userName} />}
         </div>
       </div>
 
@@ -2313,7 +2314,7 @@ export default function ServicesPage({ onNavigate, hhId, memberId, userName }) {
             <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-            <ReservationForm facility={reservationFacility} onBack={() => setReservationFacility(null)} userData={userData} hhId={hhId} userName={userName} />
+            <ReservationForm facility={reservationFacility} onBack={() => setReservationFacility(null)} userData={userData} householdID={householdID} userName={userName} />
           </div>
         </div>
       )}

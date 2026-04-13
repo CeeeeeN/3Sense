@@ -177,12 +177,12 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
         if (hhSnap.empty) { setDataLoading(false); return; }
 
         const hhDoc = hhSnap.docs[0];
-        const hhId = hhDoc.id;
+        const householdID = hhDoc.id;
 
         let firstName = userName;
         let adminStatus = "Clear";
 
-        const headRef = doc(db, "households", hhId, "residents", "head");
+        const headRef = doc(db, "households", householdID, "residents", "head");
         const headSnap = await getDoc(headRef);
         if (headSnap.exists()) {
           firstName = headSnap.data().firstName || userName;
@@ -191,9 +191,9 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
 
         setRealUserName(firstName);
 
-        const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("hhId", "==", hhId)));
-        const drSnap = await getDocs(query(collection(db, "documentRequests"), where("hhId", "==", hhId)));
-        const fbSnap = await getDocs(query(collection(db, "Feedback"), where("hhId", "==", hhId)));
+        const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("householdID", "==", householdID)));
+        const drSnap = await getDocs(query(collection(db, "documentRequests"), where("householdID", "==", householdID)));
+        const fbSnap = await getDocs(query(collection(db, "Feedback"), where("householdID", "==", householdID)));
 
         setWidgets([
           { icon: <VerifiedVisitIcon />, color: "teal", value: frSnap.size.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
