@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { BriefcaseIcon } from "../../Icons";
 
 // ── Livelihood Tab ──
 const LIVELIHOOD_PROGRAMS = [

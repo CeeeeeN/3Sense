@@ -126,8 +126,8 @@ export default function ActivityPage({ onNavigate }) {
     if (programs.length === 0) return <EmptyState message="You have not availed any programs or facilities yet." />;
     return (
       <div className="act2-list">
-        {programs.map((item) => (
-          <div key={item.id} className="act2-card">
+        {programs.map((item, index) => (
+          <div key={`${item.programId}-${index}`} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item.category || "Program"}</span>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { UsersIcon } from "../../Icons";
 
 // ── BOSCA Tab ──
 export default function BOSCATab() {

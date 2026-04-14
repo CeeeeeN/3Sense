@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { BadgeIcon } from "../../Icons";
 
 // ── BADAC Tab ──
 const BADAC_STEPS_DATA = [
