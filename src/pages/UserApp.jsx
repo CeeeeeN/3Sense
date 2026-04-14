@@ -64,9 +64,12 @@ export default function UserApp() {
 
   // State
   const [page, setPage] = useState(() => {
-    if (scannedServiceId) return "feedback";
+    const hasSession = localStorage.getItem("brgy_session");
+    if (scannedServiceId) {
+      return hasSession ? "feedback" : "login";
+    }
     const fromPath = PATH_TO_PAGE[window.location.pathname];
-    if (fromPath && localStorage.getItem("brgy_session")) return fromPath;
+    if (fromPath && hasSession) return fromPath;
     return "landing";
   });
 
@@ -164,7 +167,7 @@ export default function UserApp() {
           if (selectedProfile?.memberID) setMemberID(selectedProfile.memberID);
           if (selectedProfile?.name) setUserName(selectedProfile.name);
           if (selectedProfile?.role) setUserRole(selectedProfile.role);
-          setPage("home");
+          setPage(feedbackService ? "feedback" : "home");
         }}
         onRegister={() => setPage("register")}
         onActivate={() => setPage("activate")}
