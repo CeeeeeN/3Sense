@@ -1,12 +1,16 @@
-import { useState, useEffect } from "react";
-import { ServiceMapPinIcon, HeartIcon, SendIcon } from "../../Icons";
+import React, { useState, useEffect } from "react";
+import { HeartIcon, ServiceMapPinIcon, SendIcon } from "../../Icons";
 import { submitBSWDReport, submitBSWDTip } from "../../../services/services";
 
-// ── BSWD Tab ──
 export default function BSWDTab({ userData, householdID }) {
   const [reportForm, setReportForm] = useState({ name: "", location: "", description: "", photo: "" });
   const [reportErrors, setReportErrors]   = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  
+  // --- ADDED: States for Cloudinary Upload ---
+  const [reportFile, setReportFile] = useState(null); 
+  const [isSubmitting, setIsSubmitting] = useState(false); 
+  
   const [tipForm, setTipForm]             = useState({ about: "", tip: "", contact: "" });
   const [tipSubmitted, setTipSubmitted]   = useState(false);
   const [tipErrors, setTipErrors]         = useState({});
@@ -23,19 +27,56 @@ export default function BSWDTab({ userData, householdID }) {
   const setR = (k, v) => setReportForm(f => ({ ...f, [k]: v }));
   const setT = (k, v) => setTipForm(f => ({ ...f, [k]: v }));
 
+  // ── 1. FUNCTIONAL REPORT SUBMISSION WITH CLOUDINARY ──
   const submitReport = async () => {
     const e = {};
     if (!reportForm.location.trim())    e.location    = "Location is required.";
     if (!reportForm.description.trim()) e.description = "Please describe what you observed.";
     if (Object.keys(e).length) { setReportErrors(e); return; }
     
+    setIsSubmitting(true); // Disable button & show loading state
+    
     try {
-      await submitBSWDReport(householdID || "Public", userData?.userID || "", reportForm);
+      let finalPhotoUrl = "None";
+
+      // 1. Upload to Cloudinary if a file was selected
+      if (reportFile) {
+        const formData = new FormData();
+        formData.append("file", reportFile);
+        formData.append("upload_preset", "3Sense+"); 
+        const uploadRes = await fetch("https://api.cloudinary.com/v1_1/dfnqeiksu/image/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const uploadData = await uploadRes.json();
+        
+        if (uploadData.secure_url) {
+          finalPhotoUrl = uploadData.secure_url;
+        } else {
+          console.error("Cloudinary Error:", uploadData);
+          throw new Error("Image upload failed");
+        }
+      }
+
+      // 2. Prepare data for Firestore, overriding the local photo name with the live URL
+      const finalReportData = {
+        ...reportForm,
+        photo: finalPhotoUrl 
+      };
+
+      // 3. Save to Firestore via your services.js
+      await submitBSWDReport(householdID || "Public", userData?.userID || "", finalReportData);
+      
       setReportErrors({}); 
       setReportSubmitted(true);
+      setReportFile(null); // Clear the actual file from memory
+      
     } catch (err) {
       console.error("BSWD Report failed:", err);
       setReportErrors({ submit: "Failed to submit report. Please try again." });
+    } finally {
+      setIsSubmitting(false); // Turn off loading state
     }
   };
 
@@ -57,6 +98,7 @@ export default function BSWDTab({ userData, householdID }) {
 
   return (
     <div className="bswd-page">
+      {/* ── HERO BANNER ── */}
       <div className="svc-hero svc-hero--teal">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
@@ -85,9 +127,11 @@ export default function BSWDTab({ userData, householdID }) {
         </div>
       </div>
 
+      {/* ── REPORT SECTION ── */}
       <div className="bswd-section">
         <div className="bswd-section__title"><ServiceMapPinIcon /> Report a Homeless or Displaced Person</div>
         <p className="bswd-section__sub">If you see a homeless or displaced individual who may need assistance, please let us know.</p>
+        
         {reportSubmitted ? (
           <div className="bswd-submitted">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -95,30 +139,45 @@ export default function BSWDTab({ userData, householdID }) {
               <div className="bswd-submitted-title">Report Submitted</div>
               <div className="bswd-submitted-sub">Thank you. Our BSWD officer will follow up within 24–48 hours.</div>
             </div>
-            <button className="sv-btn-outline" style={{ fontSize: "0.75rem", padding: "0.4rem 0.9rem" }} onClick={() => { setReportForm({ name: "", location: "", description: "", photo: "" }); setReportSubmitted(false); }}>Submit Another</button>
+            <button className="sv-btn-outline" style={{ fontSize: "0.75rem", padding: "0.4rem 0.9rem" }} onClick={() => { setReportForm({ name: "", location: "", description: "", photo: "" }); setReportSubmitted(false); setReportFile(null); }}>Submit Another</button>
           </div>
         ) : (
           <div className="bswd-form-card">
             <div className="dr-field-row dr-field-row--wrap">
               <div className="dr-field">
                 <label className="sv-label">Your Name <span className="sv-optional">(Optional)</span></label>
-                <input className="sv-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder="Leave blank to stay anonymous" />
+                <input className="sv-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder="Leave blank to stay anonymous" disabled={isSubmitting} />
               </div>
               <div className="dr-field">
                 <label className="sv-label">Location of Person <span className="sv-required">*</span></label>
-                <input className={`sv-input${reportErrors.location ? " sv-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="Street, landmark, or area" />
+                <input className={`sv-input${reportErrors.location ? " sv-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="Street, landmark, or area" disabled={isSubmitting} />
                 {reportErrors.location && <span className="sv-error-msg">{reportErrors.location}</span>}
               </div>
             </div>
             <div className="dr-field" style={{ marginTop: "0.75rem" }}>
               <label className="sv-label">Description of Concern <span className="sv-required">*</span></label>
-              <textarea className={`sv-textarea${reportErrors.description ? " sv-input--error" : ""}`} rows={3} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder="Describe what you observed..." />
+              <textarea className={`sv-textarea${reportErrors.description ? " sv-input--error" : ""}`} rows={3} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder="Describe what you observed..." disabled={isSubmitting} />
               {reportErrors.description && <span className="sv-error-msg">{reportErrors.description}</span>}
             </div>
+            
+            {reportErrors.submit && <div className="sv-error-msg" style={{ marginTop: "1rem", padding: "0.75rem", background: "#fef2f2", borderRadius: "8px" }}>{reportErrors.submit}</div>}
+            
             <div className="dr-field" style={{ marginTop: "0.75rem" }}>
               <label className="sv-label">Photo <span className="sv-optional">(Optional)</span></label>
-              <label className="dr-upload-box">
-                <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && setR("photo", e.target.files[0].name)} />
+              <label className="dr-upload-box" style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  style={{ display: "none" }} 
+                  disabled={isSubmitting}
+                  onChange={e => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setReportFile(file);          // Store actual file for upload
+                      setR("photo", file.name);    // Store name for UI display
+                    }
+                  }} 
+                />
                 {reportForm.photo ? (
                   <div className="dr-upload-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{reportForm.photo}</div>
                 ) : (
@@ -130,15 +189,24 @@ export default function BSWDTab({ userData, householdID }) {
               </label>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-              <button className="sv-btn-primary" onClick={submitReport}><SendIcon /> Submit Report</button>
+              <button 
+                className="sv-btn-primary" 
+                onClick={submitReport} 
+                disabled={isSubmitting}
+                style={{ opacity: isSubmitting ? 0.7 : 1 }}
+              >
+                <SendIcon /> {isSubmitting ? "Uploading Report..." : "Submit Report"}
+              </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* ── TIP SECTION ── */}
       <div className="bswd-section bswd-section--last">
         <div className="bswd-section__title"><SendIcon /> Send a Tip or Additional Information</div>
         <p className="bswd-section__sub">Do you have information about a homeless individual that could help us assist them?</p>
+        
         {tipSubmitted ? (
           <div className="bswd-submitted">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -164,6 +232,9 @@ export default function BSWDTab({ userData, householdID }) {
               <label className="sv-label">Your Contact (Optional)</label>
               <input className="sv-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder="Phone or email — only if you wish to be contacted" />
             </div>
+            
+            {tipErrors.submit && <div className="sv-error-msg" style={{ marginTop: "1rem", padding: "0.75rem", background: "#fef2f2", borderRadius: "8px" }}>{tipErrors.submit}</div>}
+
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
               <button className="sv-btn-primary" onClick={submitTip}><SendIcon /> Send Tip</button>
             </div>
