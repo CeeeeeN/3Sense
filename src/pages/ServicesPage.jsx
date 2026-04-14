@@ -9,6 +9,15 @@ import { collection, onSnapshot, doc, runTransaction } from "firebase/firestore"
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
 
+// ── SESSION HELPER ──
+const getSaved = (key, fallback) => {
+  try {
+    return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 // ── Step Indicator ──
 function StepIndicator({ step }) {
   return (
@@ -779,17 +788,21 @@ function ProgramsTab({ userData }) {
     return () => unsubscribe();
   }, []);
 
-  // --- ADDED: The Transaction Logic ---
+  // --- UPDATED: The Transaction Logic ---
   const handleRegister = async (programId) => {
-    if (!userData || !userData.userID) {
-      return alert("Please ensure you are logged in and have selected a profile.");
+    // 1. Pull the ID directly from the browser session!
+    const activeUserId = getSaved("userID", null);
+    const activeUserName = getSaved("userName", "Resident");
+
+    if (!activeUserId) {
+      return alert("Session expired or profile not selected. Please log in again.");
     }
     
     setIsRegistering(true);
     
     try {
       const programRef = doc(db, "Programs", programId);
-      const attendeeRef = doc(db, "Programs", programId, "attendees", userData.userID);
+      const attendeeRef = doc(db, "Programs", programId, "attendees", activeUserId);
 
       await runTransaction(db, async (transaction) => {
         const progDoc = await transaction.get(programRef);
@@ -806,10 +819,10 @@ function ProgramsTab({ userData }) {
         const checkAttendee = await transaction.get(attendeeRef);
         if (checkAttendee.exists()) throw new Error("You are already registered for this program!");
 
-        // Add to subcollection
+        // Add to subcollection using the Session Data
         transaction.set(attendeeRef, {
-          userID: userData.userID,
-          userName: [userData.firstName, userData.lastName].filter(Boolean).join(" "),
+          userID: activeUserId,
+          userName: activeUserName,
           programId: programId,
           programName: data.description || data.title || "Program",
           programDate: data.date,
@@ -2159,10 +2172,10 @@ function BADACTab() {
 // ── Services Sub-Tab Data ──
 const SERVICES_SUBTABS = [
   { key: "vawc",       label: "VAWC",          color: "#e03e3e", icon: <ServiceShieldIcon />,    category: "legal"     },
-  { key: "peace",      label: "Peace & Order", color: "#1a56a0", icon: <SirenIcon />,     category: "legal"     },
-  { key: "badac",      label: "BADAC",         color: "#92400e", icon: <BadgeIcon />,     category: "legal"     },
-  { key: "bosca",      label: "BOSCA",         color: "#703381", icon: <UsersIcon />,     category: "community" },
-  { key: "bswd",       label: "BSWD",          color: "#317D89", icon: <HeartIcon />,     category: "community" },
+  { key: "peace",      label: "Peace & Order", color: "#1a56a0", icon: <SirenIcon />,      category: "legal"     },
+  { key: "badac",      label: "BADAC",         color: "#92400e", icon: <BadgeIcon />,      category: "legal"     },
+  { key: "bosca",      label: "BOSCA",         color: "#703381", icon: <UsersIcon />,      category: "community" },
+  { key: "bswd",       label: "BSWD",          color: "#317D89", icon: <HeartIcon />,      category: "community" },
   { key: "livelihood", label: "Livelihood",    color: "#1e8a5e", icon: <BriefcaseIcon />, category: "community" },
 ];
 
@@ -2170,7 +2183,7 @@ const SVC_CARD_META = {
   vawc:       { fullName: "Violence Against Women & Children",        desc: "Hotlines, protection orders, and guided support for VAWC cases.",              bg: "rgba(220,38,38,0.06)",  border: "rgba(220,38,38,0.18)",  text: "#b91c1c" },
   bosca:      { fullName: "Barangay Office for Senior Citizens Assoc.",desc: "Senior citizen membership, benefits, welfare programs and how to join.",      bg: "rgba(112,51,129,0.06)", border: "rgba(112,51,129,0.18)", text: "#703381" },
   bswd:       { fullName: "Barangay Social Welfare and Development",   desc: "Report homeless individuals, send tips, and access social welfare services.", bg: "rgba(49,125,137,0.06)", border: "rgba(49,125,137,0.18)", text: "#317D89" },
-  peace:      { fullName: "Peace & Order",                            desc: "Emergency hotline, file an incident report, and track your report status.",   bg: "rgba(26,86,160,0.06)",  border: "rgba(26,86,160,0.18)",  text: "#1a56a0" },
+  peace:      { fullName: "Peace & Order",                             desc: "Emergency hotline, file an incident report, and track your report status.",   bg: "rgba(26,86,160,0.06)",  border: "rgba(26,86,160,0.18)",  text: "#1a56a0" },
   livelihood: { fullName: "Livelihood Skills Training",               desc: "Register for free skills training programs and track your enrollment status.", bg: "rgba(30,138,94,0.06)",  border: "rgba(30,138,94,0.18)",  text: "#1e8a5e" },
   badac:      { fullName: "Barangay Anti-Drug Abuse Council",         desc: "Confidential assistance, free drug testing, and rehabilitation referral.",     bg: "rgba(146,64,14,0.06)",  border: "rgba(146,64,14,0.18)",  text: "#92400e" },
 };
@@ -2310,7 +2323,8 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                   <div><div className="sc-card-title">Barangay Programs</div><div className="sc-card-subtitle">Active programs available to residents</div></div>
                 </div>
               </div>
-              <ProgramsTab />
+              {/* Passed userData down to the ProgramsTab */}
+              <ProgramsTab userData={userData} />
             </>
           )}
 
