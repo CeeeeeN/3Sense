@@ -251,7 +251,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
         />
-        <Dashboard userName={userName} onNavigate={handleNav} />
+        <Dashboard userName={userName} onNavigate={handleNav} householdID={householdID} memberID={memberID} userRole={userRole} />
       </div>
     );
   }

@@ -173,7 +173,7 @@ const addMember = async () => {
     ? [hhAddress.houseNumber, hhAddress.street, hhAddress.barangay, hhAddress.city].filter(Boolean).join(", ")
     : "No address found from registration.";
 
-  const isPwd = Array.isArray(form.categories) && form.categories.includes("♿ PWD");
+  const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
   return (
     <div className="am-root">
@@ -404,7 +404,7 @@ const addMember = async () => {
             <div>
               <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 <div className="am-checkbox-grid">
-                  {["🎓 Student","👴 Senior Citizen","👩 Solo Parent","✈️ OFW","🌈 LGBT","🌿 Indigenous","♿ PWD"].map(cat => (
+                  {["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"].map(cat => (
                     <label key={cat} className="am-check-option">
                       <input type="checkbox" checked={form.categories.includes(cat)} onChange={() => toggleCategory(cat)} />
                       <span className="am-check-label">

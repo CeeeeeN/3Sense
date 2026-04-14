@@ -2,81 +2,13 @@ import { useState, useEffect } from "react";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { subscribeToAnnouncements } from "../services/announcements";
 import {
   ScholarshipIcon, AcademicIcon, HealthIcon, AssistanceIcon,
   VerifiedVisitIcon, DocumentIcon, FeedbackIcon, BarangayStatusIcon,
   TrendUpIcon, ClockIcon, CheckSmallIcon, BoltIcon, GridIcon, BellIcon,
   ArrowRightIcon, ChevronIcon, XIcon, CalendarIcon, MapPinIcon
 } from "../components/Icons";
-
-const ALERTS = [
-  {
-    id: 1, color: "teal", icon: <ScholarshipIcon />, tag: "Student",
-    title: "Scholarship Programs Now Open",
-    desc: "Applications for the 2026 Local Scholarship Grant are accepted at the barangay hall. Deadline: April 15.",
-    fullDesc: "The Barangay 3S+ Malanday Local Scholarship Grant provides financial assistance to qualified residents enrolled in college or TESDA-accredited vocational programs.",
-    date: "April 15, 2026",
-    location: "Barangay 3S+ Hall, Malanday, Valenzuela City",
-    requirements: ["Valid barangay ID", "School enrollment form", "1×1 ID photo", "Grade / transcript of records"],
-  },
-  {
-    id: 2, color: "amber", icon: <AcademicIcon />, tag: "Student",
-    title: "Academic Events This Month",
-    desc: "Free tutorial sessions and career orientation seminar on March 18–22 at the community center.",
-    fullDesc: "A week-long learning event offering free academic tutorial sessions in Math, Science, and English.",
-    date: "March 18–22, 2026",
-    location: "Barangay Multi-Purpose Hall",
-    requirements: ["Barangay residency", "Registration form (on-site)"],
-  },
-  {
-    id: 3, color: "green", icon: <HealthIcon />, tag: "Senior / PWD",
-    title: "Free Health Checkup – March 15",
-    desc: "Free medical consultation for senior citizens and PWDs. Bring your barangay ID and health record.",
-    fullDesc: "A monthly barangay health program offering free blood pressure monitoring and blood sugar testing.",
-    date: "Every 2nd Saturday",
-    location: "Barangay Health Center",
-    requirements: ["Senior Citizen ID", "Health booklet (if available)"],
-  },
-  {
-    id: 4, color: "purple", icon: <AssistanceIcon />, tag: "Senior / PWD",
-    title: "Assistance Programs Available",
-    desc: "Social welfare assistance for qualified senior citizens and PWD residents. Deadline is March 31.",
-    fullDesc: "This program provides financial and social welfare assistance to persons with disabilities (PWD).",
-    date: "April 1–30, 2026",
-    location: "Barangay 3S+ Hall – Social Welfare Desk",
-    requirements: ["PWD ID", "Medical certificate", "Barangay clearance"],
-  },
-];
-
-const ANNOUNCEMENTS = [
-  {
-    id: 1, dotColor: "teal", title: "Free Medical Consultation – March 15",
-    cat: "Health", catClass: "db-cat-health",
-    desc: "Free medical check-up at Barangay Hall, 8AM–4PM. All residents welcome.",
-    fullDesc: "The Barangay Health Center will be conducting a free medical consultation event on March 15, 2026.",
-    date: "March 9, 2026", unread: true,
-    location: "Barangay Hall Grounds",
-    postedBy: "Barangay Health Officer",
-  },
-  {
-    id: 2, dotColor: "blue", title: "Community Clean-Up Drive – March 22",
-    cat: "Event", catClass: "db-cat-event",
-    desc: "Join the monthly clean-up drive. Volunteers receive a certificate.",
-    fullDesc: "The Barangay 3S+ Malanday invites all residents to join the monthly Community Clean-Up Drive.",
-    date: "March 7, 2026", unread: false,
-    location: "Barangay Hall — Assembly Point",
-    postedBy: "Barangay Environmental Committee",
-  },
-  {
-    id: 3, dotColor: "green", title: "Barangay ID Renewal Now Open",
-    cat: "Service", catClass: "db-cat-service",
-    desc: "Submit your renewal online or visit the barangay hall Mon–Fri, 8AM–5PM.",
-    fullDesc: "The Barangay ID Renewal Program is now open for all residents with expired IDs.",
-    date: "March 5, 2026", unread: false,
-    location: "Barangay Hall — Records Section",
-    postedBy: "Barangay Secretary",
-  },
-];
 
 function SectionCard({ icon, title, subtitle, action, children }) {
   return (
@@ -96,36 +28,66 @@ function SectionCard({ icon, title, subtitle, action, children }) {
   );
 }
 
-function AlertDetailPopup({ alert, onClose }) {
+// Unified detail popup for both Smart Alerts and General Announcements
+function UnifiedAnnouncementPopup({ ann, onClose }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const colorMap = {
-    teal:   { bar: "#317D89", badge: "rgba(49,125,137,0.10)",  text: "#317D89" },
-    amber:  { bar: "#BDBD64", badge: "rgba(189,189,100,0.15)", text: "#7a7200" },
-    green:  { bar: "#2DB17B", badge: "rgba(45,177,123,0.10)",  text: "#1e8a5e" },
-    purple: { bar: "#703381", badge: "rgba(112,51,129,0.10)",  text: "#703381" },
+  const dotColors = {
+    teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
+    amber: "#e8a020", red: "#e03e3e",
   };
-  const c = colorMap[alert.color] || colorMap.teal;
+
+  const annColor = dotColors[ann.dotColor] || "#317D89";
 
   return (
     <div className="db-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="db-popup-modal">
-        <div className="db-popup-bar" style={{ background: c.bar }} />
+        <div className="db-popup-bar" style={{ background: annColor }} />
         <button className="db-popup-close" onClick={onClose}><XIcon /></button>
         <div className="db-popup-scroll">
           <div className="db-popup-header">
-            <span className="db-popup-badge" style={{ background: c.badge, color: c.text }}>{alert.tag}</span>
-            <h2 className="db-popup-title">{alert.title}</h2>
-            <p className="db-popup-desc">{alert.fullDesc}</p>
+            <div className="db-popup-tags">
+              <span className={`ann-row__cat-tag ${ann.catClass || "db-cat-service"}`}>{ann.announcementCategory || "General"}</span>
+              <span className="db-popup-badge" style={{ background: `${annColor}1A`, color: annColor, marginLeft: '8px' }}>Target: {ann.category}</span>
+            </div>
+            <h2 className="db-popup-title">{ann.title}</h2>
+            <p className="db-popup-desc" style={{ whiteSpace: 'pre-wrap' }}>{ann.description}</p>
           </div>
           <div className="db-popup-details">
             <div className="db-popup-detail-item">
               <span className="db-popup-detail-icon"><CalendarIcon /></span>
-              <div><div className="db-popup-detail-label">Date</div><div className="db-popup-detail-value">{alert.date}</div></div>
+              <div>
+                <div className="db-popup-detail-label">Date & Time</div>
+                <div className="db-popup-detail-value">{ann.time ? new Date(ann.time).toLocaleString() : ann.date}</div>
+              </div>
             </div>
+            <div className="db-popup-detail-item">
+              <span className="db-popup-detail-icon"><MapPinIcon /></span>
+              <div>
+                <div className="db-popup-detail-label">Location</div>
+                <div className="db-popup-detail-value">{ann.location || "TBA"}</div>
+              </div>
+            </div>
+          </div>
+          {ann.requirements && (
+            <div className="db-popup-section">
+              <div className="db-popup-section-title">Requirements</div>
+              <ul className="db-popup-req-list">
+                {ann.requirements.map((r, i) => (
+                  <li key={i} className="db-popup-req-item">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={annColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="db-popup-section">
+            <div className="db-popup-section-title">Posted by</div>
+            <div className="db-popup-posted-by">{ann.postedBy || "Barangay Admin"}</div>
           </div>
         </div>
       </div>
@@ -133,11 +95,17 @@ function AlertDetailPopup({ alert, onClose }) {
   );
 }
 
-function AnnouncementDetailPopup({ ann, onClose }) {
+// ALL ANNOUNCEMENTS POPUP
+function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  const dotColors = {
+    teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
+    amber: "#e8a020", red: "#e03e3e",
+  };
 
   return (
     <div className="db-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -145,15 +113,44 @@ function AnnouncementDetailPopup({ ann, onClose }) {
         <div className="db-popup-bar" style={{ background: "#317D89" }} />
         <button className="db-popup-close" onClick={onClose}><XIcon /></button>
         <div className="db-popup-scroll">
-          <h2 className="db-popup-title">{ann.title}</h2>
-          <p className="db-popup-desc">{ann.fullDesc}</p>
+          <div className="db-popup-header">
+            <div className="db-popup-tags">
+              <span className="db-popup-badge" style={{ background: "rgba(49,125,137,0.1)", color: "#317D89" }}>
+                {announcements.length} Announcements
+              </span>
+            </div>
+            <h2 className="db-popup-title">All Announcements</h2>
+            <p className="db-popup-desc" style={{ marginBottom: 0 }}>Showing combined smart alerts and general announcements.</p>
+          </div>
+          <div className="db-popup-ann-list">
+            {announcements.map((ann) => (
+              <button key={ann.id} className="db-popup-ann-row" onClick={() => onSelectAnn(ann)}>
+                <div className="db-popup-ann-dot" style={{ background: dotColors[ann.dotColor] || "#317D89" }} />
+                <div className="db-popup-ann-body">
+                  <div className="db-popup-ann-top">
+                    {ann.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48", marginRight: '8px' }}>ALERT</span>}
+                    <span className={`ann-row__cat-tag ${ann.catClass || "db-cat-service"}`}>{ann.announcementCategory}</span>
+                    <span className="db-popup-ann-date">{ann.date}</span>
+                  </div>
+                  <div className="db-popup-ann-title">{ann.title}</div>
+                  <div className="db-popup-ann-desc" style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                  }}>{ann.description}</div>
+                </div>
+                <ChevronIcon />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Sub-section label divider ── */
 function SubLabel({ icon, label }) {
   return (
     <div style={{
@@ -177,20 +174,29 @@ function SubLabel({ icon, label }) {
   );
 }
 
-export default function Dashboard({ userName = "Mark", onNavigate }) {
-  const [selectedAlert, setSelectedAlert]   = useState(null);
-  const [selectedAnn, setSelectedAnn]       = useState(null);
-  const [showAllAnns, setShowAllAnns]       = useState(false);
+export default function Dashboard({ userName = "Mark", onNavigate, householdID: propsHouseholdID, memberID, userRole }) {
+  const [selectedAnn, setSelectedAnn] = useState(null);
+  const [showAllAnns, setShowAllAnns] = useState(false);
 
-  const [realUserName, setRealUserName]     = useState(userName);
-  const [dataLoading, setDataLoading]       = useState(true);
+  const [realUserName, setRealUserName] = useState(userName);
+  const [dataLoading, setDataLoading] = useState(true);
   
+  const [announcementsData, setAnnouncementsData] = useState([]);
+  const [userCategories, setUserCategories] = useState([]);
+
   const [widgets, setWidgets] = useState([
-    { icon: <VerifiedVisitIcon />, color: "teal",   value: "...", label: "Verified Visits",   sub: "via QR scans",    badge: "Active",    badgeIcon: <TrendUpIcon /> },
-    { icon: <DocumentIcon />,      color: "amber",  value: "...", label: "Document Requests", sub: "currently active", badge: "Loading",   badgeIcon: <ClockIcon />   },
-    { icon: <FeedbackIcon />,      color: "green",  value: "...", label: "Feedback",          sub: "submitted",        badge: "Done",      badgeIcon: <CheckSmallIcon /> },
-    { icon: <BarangayStatusIcon />,color: "purple", value: "...", label: "Barangay Status",   sub: "current standing", badge: "Active",    badgeIcon: <TrendUpIcon /> },
+    { icon: <VerifiedVisitIcon />, color: "teal", value: "...", label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
+    { icon: <DocumentIcon />, color: "amber", value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
+    { icon: <FeedbackIcon />, color: "green", value: "...", label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
+    { icon: <BarangayStatusIcon />, color: "purple", value: "...", label: "Barangay Status", sub: "current standing", badge: "Active", badgeIcon: <TrendUpIcon /> },
   ]);
+
+  useEffect(() => {
+    const unsubAnns = subscribeToAnnouncements((data) => {
+      setAnnouncementsData(data);
+    });
+    return () => unsubAnns();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -205,15 +211,29 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
 
         let firstName = userName;
         let adminStatus = "Clear";
+        let uCats = [];
 
-        const headRef = doc(db, "households", householdID, "residents", "head");
+        const residentIdToFetch = String(userRole).toLowerCase() === "head" ? "head" : (memberID || "head");
+        const headRef = doc(db, "households", householdID, "residents", residentIdToFetch);
         const headSnap = await getDoc(headRef);
         if (headSnap.exists()) {
-          firstName = headSnap.data().firstName || userName;
-          adminStatus = headSnap.data().adminStatus || "Clear";
+          const d = headSnap.data();
+          firstName = d.firstName || userName;
+          adminStatus = d.adminStatus || "Clear";
+          const normalizedCategories = Array.isArray(d.categories)
+            ? d.categories
+            : d.categories ? String(d.categories).split(",").map(c=>c.trim()) : [];
+            
+          // Strip emojis and weird characters from categories so string matches "LGBT", "Student", etc
+          uCats = normalizedCategories.map(c => {
+             let cln = c.replace(/[^\w\s-]/gi, '').trim();
+             if (cln === "Indigenous") cln = "Indigenous People";
+             return cln;
+          });
         }
 
         setRealUserName(firstName);
+        setUserCategories(uCats);
 
         const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("householdID", "==", householdID)));
         const drSnap = await getDocs(query(collection(db, "documentRequests"), where("householdID", "==", householdID)));
@@ -240,6 +260,34 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
     if (h < 18) return "Good Afternoon";
     return "Good Evening";
   };
+  
+  const mapAnnouncements = (data) => {
+      return data.map(ann => {
+        let dc = "teal";
+        let cc = "db-cat-service";
+        let icon = <BoltIcon />;
+        const acType = (ann.announcementCategory || "").toLowerCase();
+        
+        switch (acType) {
+            case "health": dc="green"; cc="db-cat-health"; icon=<HealthIcon />; break;
+            case "event": dc="blue"; cc="db-cat-event"; icon=<AssistanceIcon />; break;
+            case "documents": dc="amber"; cc="db-cat-service"; icon=<DocumentIcon />; break;
+            case "programs": dc="purple"; cc="db-cat-service"; icon=<ScholarshipIcon />; break;
+            case "facilities": dc="amber"; cc="db-cat-service"; icon=<VerifiedVisitIcon />; break;
+            default: break;
+        }
+
+        const annCatClean = (ann.category || "").trim().toLowerCase();
+        const isAlert = userCategories.some(uc => uc.trim().toLowerCase() === annCatClean);
+
+        return { ...ann, dotColor: dc, catClass: cc, icon: icon, isSmartAlert: isAlert };
+      });
+  };
+
+  const processedAnns = mapAnnouncements(announcementsData);
+  const smartAlertsList = processedAnns.filter(a => a.isSmartAlert);
+  // Both are combined in show all, with alerts first
+  const combinedAnns = [...smartAlertsList, ...processedAnns.filter(a => !a.isSmartAlert)];
 
   return (
     <main className="db-page">
@@ -256,25 +304,6 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
       <div className="db-content">
 
         {/* ── 1. Your Summary ── */}
-        <SectionCard icon={<BoltIcon />} title="Smart Alerts for You" subtitle="Personalized based on your profile">
-          <div className="db-alerts-grid">
-            {ALERTS.map((a) => (
-              <div key={a.id} className={`alert-card alert-card--${a.color}`}>
-                <div className="alert-card__header">
-                  <div className="alert-card__icon-wrap">{a.icon}</div>
-                  <span className="alert-card__tag">{a.tag}</span>
-                </div>
-                <div className="alert-card__body">
-                  <div className="alert-card__title">{a.title}</div>
-                  <div className="alert-card__desc">{a.desc}</div>
-                  <button className="alert-card__cta" onClick={() => setSelectedAlert(a)}>View Details <ArrowRightIcon /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* Your Summary Section - "View All Activity" Button Removed */}
         <SectionCard icon={<GridIcon />} title="Your Summary" subtitle="Overview of your barangay activity">
           <div className="db-widgets-grid">
             {widgets.map((w, i) => (
@@ -307,62 +336,119 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
           {/* Smart Alerts sub-section */}
           <div style={{ padding: "0 1.5rem" }}>
             <SubLabel icon={<BoltIcon />} label="Smart Alerts for You" />
-            <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
-              {ALERTS.map((a) => (
-                <div key={a.id} className={`alert-card alert-card--${a.color}`}>
-                  <div className="alert-card__header">
-                    <div className="alert-card__icon-wrap">{a.icon}</div>
-                    <span className="alert-card__tag">{a.tag}</span>
-                  </div>
-                  <div className="alert-card__body">
-                    <div className="alert-card__title">{a.title}</div>
-                    <div className="alert-card__desc">{a.desc}</div>
-                    <button className="alert-card__cta" onClick={() => setSelectedAlert(a)}>
-                      View Details <ArrowRightIcon />
-                    </button>
-                  </div>
+            
+            {smartAlertsList.length === 0 ? (
+                <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new smart alerts based on your profile.</p>
+            ) : (
+                <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
+                  {smartAlertsList.map((a) => (
+                    <div key={a.id} className={`alert-card alert-card--${a.dotColor}`}>
+                      <div className="alert-card__header">
+                        <div className="alert-card__icon-wrap">{a.icon}</div>
+                        <span className="alert-card__tag">{a.category}</span>
+                      </div>
+                      <div className="alert-card__body">
+                        <div className="alert-card__title">{a.title}</div>
+                        <div className="alert-card__desc" style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>{a.description}</div>
+                        <button className="alert-card__cta" onClick={() => setSelectedAnn(a)}>
+                          View Details <ArrowRightIcon />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+            )}
           </div>
 
           {/* Announcements sub-section */}
           <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
             <SubLabel icon={<BellIcon />} label="Barangay Announcements" />
-            {ANNOUNCEMENTS.map((a, i) => (
-              <div
-                key={a.id}
-                className={`ann-row${i === ANNOUNCEMENTS.length - 1 ? " ann-row--last" : ""}`}
-                onClick={() => setSelectedAnn(a)}
-                style={{ cursor: "pointer" }}
-              >
-                <div className="ann-row__body">
-                  <div className="ann-row__title-line">
-                    <div className={`ann-row__dot db-dot-${a.dotColor}`} />
-                    <span className="ann-row__title">{a.title}</span>
-                  </div>
-                  <div className="ann-row__desc">{a.desc}</div>
+
+            {processedAnns.length === 0 ? (
+                 <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new announcements at this time.</p>
+            ) : (
+                <>
+                <div className="ann-table-header">
+                  {["TITLE", "DATE", "CATEGORY", ""].map((h, i) => (
+                    <div key={i} className="ann-table-header__cell">{h}</div>
+                  ))}
                 </div>
-                <div className="ann-row__date">{a.date}</div>
-              </div>
-              ))}
+
+                {combinedAnns.slice(0, 5).map((a, idx) => (
+                  <div
+                    key={a.id}
+                    className={`ann-row${idx === 4 ? " ann-row--last" : ""}`}
+                    onClick={() => setSelectedAnn(a)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="ann-row__body">
+                      <div className="ann-row__title-line">
+                        <div className={`ann-row__dot db-dot-${a.dotColor}`} />
+                        <span className="ann-row__title">{a.title}</span>
+                        {a.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48" }}>ALERT</span>}
+                      </div>
+                      <div className="ann-row__desc" style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                      }}>{a.description}</div>
+                    </div>
+                    <div className="ann-row__date">{a.time ? new Date(a.time).toLocaleDateString() : a.date}</div>
+                    <div className="ann-row__cat">
+                      <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
+                    </div>
+                    <button className="ann-row__chevron" onClick={e => { e.stopPropagation(); setSelectedAnn(a); }}>
+                      <ChevronIcon />
+                    </button>
+                  </div>
+                ))}
+                </>
+            )}
           </div>
         </SectionCard>
       </div>
 
       {/* ── Footer ── */}
-      <footer className="db-footer">
+      <footer className="db-footer" style={{ marginTop: 0 }}>
         <div className="db-footer-inner">
-          <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
+          <div className="db-footer-top">
+            <div className="db-footer-brand">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span>Barangay 3S+ Malanday</span>
+              <span className="db-footer-divider">|</span>
+              <span className="db-footer-tagline">Community Management System</span>
+            </div>
+            <nav className="db-footer-links">
+              <a className="db-footer-link" href="#">Privacy Policy</a>
+              <a className="db-footer-link" href="#">Terms of Use</a>
+              <a className="db-footer-link" href="#">Contact Support</a>
+            </nav>
+          </div>
+          <div className="db-footer-bottom">
+            <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
+            <p>Powered by the Barangay 3S+ Community Management System</p>
+          </div>
         </div>
       </footer>
-      
-      {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
-      {selectedAnn   && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
 
-
-      {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
-      {selectedAnn && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
+      {showAllAnns && !selectedAnn && (
+        <AllAnnouncementsPopup
+          announcements={combinedAnns}
+          onClose={() => setShowAllAnns(false)}
+          onSelectAnn={(ann) => { setShowAllAnns(false); setSelectedAnn(ann); }}
+        />
+      )}
+      {selectedAnn && <UnifiedAnnouncementPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
     </main>
   );
 }
