@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ServiceShieldIcon, PhoneCallIcon, ServiceAlertTriangleIcon, HeartIcon } from "../../Icons";
 
 // ── VAWC Decision Tree ──
 function VAWCDecisionTree() {
