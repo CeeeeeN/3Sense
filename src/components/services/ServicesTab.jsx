@@ -1,3 +1,24 @@
+import React, { useState } from "react";
+
+// 1. Import all the Icons this specific tab uses!
+import { 
+  ServiceShieldIcon, 
+  SirenIcon, 
+  BadgeIcon, 
+  UsersIcon, 
+  HeartIcon, 
+  BriefcaseIcon, 
+  ServicesMenuIcon 
+} from "../Icons";
+
+// 2. Import the actual sub-components you created
+import VAWCTab from "./subtabs/VAWCTab";
+import BOSCATab from "./subtabs/BOSCATab";
+import BSWDTab from "./subtabs/BSWDTab";
+import PeaceOrderTab from "./subtabs/PeaceOrderTab";
+import LivelihoodTab from "./subtabs/LivelihoodTab";
+import BADACTab from "./subtabs/BADACTab";
+
 // ── Services Sub-Tab Data ──
 const SERVICES_SUBTABS = [
   { key: "vawc",       label: "VAWC",          color: "#e03e3e", icon: <ServiceShieldIcon />,    category: "legal"     },
@@ -60,7 +81,7 @@ export default function ServicesTab({ userData, householdID, userName }) {
       </div>
       <div className="svc-filter-tabbar">
         {FILTERS.map(f => (
-          <button key={f.id} className={`svc-filter-tab${filter === f.key ? " svc-filter-tab--active" : ""}`} onClick={() => setFilter(f.key)}>
+          <button key={f.key} className={`svc-filter-tab${filter === f.key ? " svc-filter-tab--active" : ""}`} onClick={() => setFilter(f.key)}>
             {f.label}
             {f.key !== "all" && (
               <span className="svc-filter-tab__count">{SERVICES_SUBTABS.filter(s => s.category === f.key).length}</span>

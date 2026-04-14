@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 // ── VAWC Decision Tree ──
 function VAWCDecisionTree() {
   const [step, setStep]               = useState(null);
@@ -185,7 +187,7 @@ function VAWCDecisionTree() {
 }
 
 // ── VAWC Tab ──
-function VAWCTab() {
+export default function VAWCTab() {
   const HOTLINES_ALL = [
     { name: "PNP Emergency",               number: "911",              type: "emergency", desc: "For immediate life-threatening situations" },
     { name: "PNP Women & Children Desk",   number: "117",              type: "emergency", desc: "Specialized assistance for women and children" },

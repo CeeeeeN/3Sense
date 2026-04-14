@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
+
 // ── BOSCA Tab ──
-function BOSCATab() {
+export default function BOSCATab() {
   const BENEFITS = [
     "20% discount on medicines, medical services, and basic necessities",
     "Free medical and dental consultations at public health centers",
