@@ -4,42 +4,44 @@ import AdminLayout from "../components/AdminLayout";
 import { calculateMoodCardData } from "../services/sentimentAggregator";
 import AIInsightsWidget from "../components/AIInsightsWidget";
 import { db } from "../firebase/firebase";
-import { 
-  collection, 
+import {
+  collection,
   collectionGroup,
-  onSnapshot, 
-  query, 
-  orderBy, 
-  where 
+  onSnapshot,
+  query,
+  orderBy,
+  where
 } from "firebase/firestore";
 
-// --- REUSABLE SVG ICONS ---
+// ─── Sentiment Icons ───────────────────────────────────────────
 const SmileIcon = () => (
   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="9" cy="9" r="1.2" fill="currentColor" /><circle cx="15" cy="9" r="1.2" fill="currentColor" /><path d="M8 14c1.5 2 6.5 2 8 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
 );
+
 const NeutralIcon = () => (
   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="9" cy="9" r="1.2" fill="currentColor" /><circle cx="15" cy="9" r="1.2" fill="currentColor" /><line x1="8" y1="14" x2="16" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
 );
+
 const FrownIcon = () => (
   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="9" cy="9" r="1.2" fill="currentColor" /><circle cx="15" cy="9" r="1.2" fill="currentColor" /><path d="M8 16c1.5-2 6.5-2 8 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
 );
 
+// ─── Admin Dashboard ───────────────────────────────────────────
 export default function AdminDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // --- DASHBOARD STATISTICS STATE ---
   const [stats, setStats] = useState({
     households: 0,
     residents: 0,
-    docRequests: 0,      // Tracking documents
-    facilityRequests: 0, // Tracking facilities
+    docRequests: 0,
+    facilityRequests: 0,
     pendingApprovals: 0
   });
 
-  // --- FIREBASE REAL-TIME LISTENERS ---
+  // ─── Firebase Listeners ────────────────────────────────────
   useEffect(() => {
-    // 1. Listen to Feedbacks
+    // Feedbacks
     const qFeedbacks = query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"));
     const unsubFeedbacks = onSnapshot(qFeedbacks, (snapshot) => {
       const liveData = [];
@@ -48,34 +50,33 @@ export default function AdminDashboard() {
       setLoading(false);
     });
 
-    // 2. Listen to Total Households 
+    // Households
     const unsubHouseholds = onSnapshot(collection(db, "households"), (snapshot) => {
       setStats(prev => ({ ...prev, households: snapshot.size }));
     });
 
-    // 3. Listen to Total Residents (Using collectionGroup for nested subcollections!)
+    // Residents
     const unsubResidents = onSnapshot(collectionGroup(db, "members"), (snapshot) => {
       setStats(prev => ({ ...prev, residents: snapshot.size }));
     });
 
-    // 4. Listen to Active Document Requests (Assuming "status" field is "Pending")
+    // Document Requests
     const qDocRequests = query(collection(db, "documentRequests"), where("status", "==", "Pending"));
     const unsubDocRequests = onSnapshot(qDocRequests, (snapshot) => {
       setStats(prev => ({ ...prev, docRequests: snapshot.size }));
     });
 
-    // 5. Listen to Active Facility Reservations (Assuming "status" field is "Pending")
+    // Facility Reservations
     const qFacilityRequests = query(collection(db, "facilityReservations"), where("status", "==", "Pending"));
     const unsubFacilityRequests = onSnapshot(qFacilityRequests, (snapshot) => {
       setStats(prev => ({ ...prev, facilityRequests: snapshot.size }));
     });
 
-    // 6. Listen to Pending Admin Approvals
+    // Pending Admin Approvals
     const unsubApprovals = onSnapshot(collection(db, "pending_registrations"), (snapshot) => {
       setStats(prev => ({ ...prev, pendingApprovals: snapshot.size }));
     });
 
-    // Cleanup listeners on unmount
     return () => {
       unsubFeedbacks();
       unsubHouseholds();
@@ -86,10 +87,7 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // Calculate combined requests
   const totalActiveRequests = stats.docRequests + stats.facilityRequests;
-  
-  // Run the math function on our live data
   const moodCardData = calculateMoodCardData(feedbacks);
 
   if (loading) {
@@ -105,8 +103,20 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="main-content">
-        
-        {/* --- DYNAMIC SUMMARY CARDS --- */}
+
+        {/* TOP HEADER (NO MORE NOTIFICATION BELL HERE) */}
+        <div style={{
+          marginBottom: "1.5rem",
+        }}>
+          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "#1e293b" }}>
+            Dashboard
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "#64748b" }}>
+            Welcome back — here's what's happening in your barangay.
+          </p>
+        </div>
+
+        {/* SUMMARY CARDS */}
         <div className="card-grid">
           <div className="card">
             Total Households
@@ -135,7 +145,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* --- AI COMMUNITY SENTIMENT SUMMARY --- */}
+        {/* COMMUNITY SENTIMENT */}
         <div className="section">
           <h2>Community Sentiment Summary</h2>
           <div className="card-grid">
@@ -147,12 +157,10 @@ export default function AdminDashboard() {
                     <span className="face"><SmileIcon /></span>
                     {card.percentages.Positive}%
                   </span>
-
                   <span className="neutral">
                     <span className="face"><NeutralIcon /></span>
                     {card.percentages.Neutral}%
                   </span>
-
                   <span className="negative">
                     <span className="face"><FrownIcon /></span>
                     {card.percentages.Negative}%
@@ -163,20 +171,20 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* --- CHART PLACEHOLDER --- */}
+        {/* CHART PLACEHOLDER */}
         <div className="section">
           <h2>Service Satisfaction Comparison</h2>
           <div className="chart-placeholder">Chart goes here (Bar / Radar)</div>
         </div>
 
-        {/* --- AI INSIGHTS --- */}
+        {/* AI INSIGHTS */}
         <div className="section">
           <div className="dashboard-section">
             <h2 className="section-title">AI Insights & Recommendations</h2>
             <AIInsightsWidget feedbacks={feedbacks} />
           </div>
         </div>
-        
+
       </div>
     </AdminLayout>
   );

@@ -3,9 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import "../AdminStyle.css";
 import { UserIcon, EmailIcon, PhoneIcon, LockIcon, PositionIcon } from "../components/Icons";
 import InputField from "../components/InputField";
-import { auth, db } from "../firebase/firebase";                          // 🆕 import Firebase
-import { createUserWithEmailAndPassword } from "firebase/auth"; // 🆕 signup function
-import { collection, addDoc } from "firebase/firestore";        // 🆕 save to database
+import { auth, db } from "../firebase/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { collection, addDoc } from "firebase/firestore";
+import { createNotification } from "../services/notifications"; // 🆕
 
 const AdminSignup = () => {
   const navigate = useNavigate();
@@ -14,11 +15,10 @@ const AdminSignup = () => {
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [contact, setContact] = useState("");
-  const [email, setEmail] = useState("");       // 🆕 email state for Firebase
-  const [error, setError] = useState("");       // 🆕 show Firebase errors
-  const [loading, setLoading] = useState(false); // 🆕 loading state
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // 🆕 track other fields for saving to Firestore
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [position, setPosition] = useState("");
@@ -33,7 +33,6 @@ const AdminSignup = () => {
     setContact(value);
   };
 
-  // 🆕 Updated handleSubmit — now creates Firebase account + saves profile
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -50,34 +49,40 @@ const AdminSignup = () => {
     setLoading(true);
 
     try {
-      // 🆕 Step 1: Create the account in Firebase Auth using email + password
+      // Step 1: Create Firebase Auth account
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 🆕 Step 2: Save extra profile info to Firestore under "pendingAdmins"
-      // (They go here first because they need barangay approval before becoming admins)
+      // Step 2: Save to pendingAdmins collection
       await addDoc(collection(db, "pendingAdmins"), {
-        uid: user.uid,           // link to their Firebase Auth account
+        uid: user.uid,
         fullName: fullName,
         email: email,
         contact: contact,
         username: username,
         position: position,
-        status: "pending",       // 🆕 approval status — starts as "pending"
+        status: "pending",
         createdAt: new Date()
       });
 
-      // 🆕 Step 3: Redirect to approval pending page
+      // 🆕 Step 3: Notify all admins about new admin registration request
+      await createNotification(
+        "new_admin",
+        `New admin registration request from ${fullName} (${position}). Awaiting approval.`,
+        email,
+        ""
+      );
+
+      // Step 4: Redirect to approval pending page
       navigate("/approval-pending");
 
     } catch (err) {
-      // 🆕 Show Firebase error (e.g. "email already in use")
       setError(err.message);
       setLoading(false);
     }
   };
 
-  // Password rules (unchanged)
+  // Password strength
   const hasUpper = /[A-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasLength = password.length >= 8;
@@ -87,7 +92,7 @@ const AdminSignup = () => {
 
   return (
     <div>
-      {/* NAVBAR — unchanged */}
+      {/* NAVBAR */}
       <nav>
         <a href="/" className="nav-logo">
           <img src="/icons/logo.png" className="logo-img" />
@@ -100,7 +105,6 @@ const AdminSignup = () => {
           <h2 className="auth-title">Admin Registration Request</h2>
           <p className="auth-sub">Submit your credentials for Barangay approval.</p>
 
-          {/* 🆕 Show Firebase error message */}
           {error && (
             <p style={{ color: "#d9534f", fontSize: "14px", marginBottom: "10px" }}>
               {error}
@@ -108,7 +112,6 @@ const AdminSignup = () => {
           )}
 
           <form className="adminSignupForm" onSubmit={handleSubmit}>
-            {/* 🆕 Added onChange to capture value */}
             <InputField
               label="Full Name"
               required
@@ -119,7 +122,6 @@ const AdminSignup = () => {
               onChange={(e) => setFullName(e.target.value)}
             />
 
-            {/* 🆕 Added value and onChange — Firebase needs this email */}
             <InputField
               label="Email Address"
               required
@@ -139,7 +141,6 @@ const AdminSignup = () => {
               onChange={handleContactChange}
             />
 
-            {/* 🆕 Added onChange to capture value */}
             <InputField
               label="Username"
               required
@@ -149,7 +150,6 @@ const AdminSignup = () => {
               onChange={(e) => setUsername(e.target.value)}
             />
 
-            {/* 🆕 Added onChange to capture value */}
             <InputField
               label="Position"
               required
@@ -159,7 +159,7 @@ const AdminSignup = () => {
               onChange={(e) => setPosition(e.target.value)}
             />
 
-            {/* PASSWORD — unchanged */}
+            {/* PASSWORD */}
             <div className="password-container">
               <InputField
                 label="Password"
@@ -196,7 +196,7 @@ const AdminSignup = () => {
               </div>
             </div>
 
-            {/* CONFIRM PASSWORD — unchanged */}
+            {/* CONFIRM PASSWORD */}
             <div className="password-container">
               <InputField
                 label="Confirm Password"
@@ -229,7 +229,6 @@ const AdminSignup = () => {
               </div>
             </div>
 
-            {/* 🆕 Button shows "Registering..." while Firebase is working */}
             <button type="submit" className="btn-main full-width" disabled={loading}>
               {loading ? "Registering..." : "Register"}
             </button>
