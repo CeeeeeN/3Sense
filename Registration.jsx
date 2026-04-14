@@ -1,6 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect } from "react";
 import { submitRegistration } from "../services/registration";
+import { createNotification } from "../services/notifications"; // 🆕
 import { RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone, RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook, IconUsers, RegisIconHeart, IconFlag, RegisIconShield, RegisIconInfo, RegisIconReligion, RegisIconGradCap } from "../components/Icons";
 
 const STEPS = [
@@ -85,13 +86,25 @@ export default function Registration({ onBack }) {
   const goNext = async () => {
     if (step < total) { setStep(s => s + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }
     else {
-      try{
+      try {
         await submitRegistration(form);
-      const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
-      setRefNumber(ref);
-      setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      } catch(error){
+
+        const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
+
+        // 🆕 Notify all admins about new household registration
+        const fullName = [form.firstName, form.middleName, form.lastName, form.suffix]
+          .filter(Boolean).join(" ") || "Unknown";
+        await createNotification(
+          "household_registration",
+          `New household registration submitted by ${fullName}.`,
+          form.email || fullName,
+          ref
+        );
+
+        setRefNumber(ref);
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (error) {
         console.error("Submission error:", error);
         alert("Failed to submit registration.");
       }
@@ -304,15 +317,12 @@ export default function Registration({ onBack }) {
                           <option>BARMM</option>
                         </SelectField>
                       </Field>
-                      {/* ── STEP 2: Address ── */}
                       <Field label="Province" required>
                         <InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} />
                       </Field>
-
                       <Field label="City / Municipality" required>
                         <InputField icon={RegisIconPin} type="text" placeholder="Valenzuela City" value={form.city} onChange={set("city")} />
                       </Field>
-
                       <Field label="Barangay" required>
                         <InputField icon={RegisIconPin} type="text" placeholder="Malanday" value={form.barangay} onChange={set("barangay")} />
                       </Field>
@@ -461,7 +471,6 @@ export default function Registration({ onBack }) {
                     <ReviewField label="Province" value={rv(form.province)} />
                     <ReviewField label="Region" value={rv(form.region)} full />
                   </ReviewSection>
-
 
                   <ReviewSection icon="🏷️" title="Category">
                     {form.categories.length === 0 ? (

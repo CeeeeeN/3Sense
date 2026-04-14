@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
+import { createNotification } from "../../services/notifications"; // 🆕
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
@@ -138,7 +139,6 @@ function Step2({ docType, form, setForm, errors }) {
           <label className="sv-label">Email Address</label>
           <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
         </div>
-
       </div>
       <div className="dr-field">
         <label className="sv-label">Purpose <span className="sv-required">*</span></label>
@@ -261,6 +261,36 @@ function Step4({ refNum, onReset }) {
   );
 }
 
+// ── submitDocumentRequest (inline helper) ──
+async function submitDocumentRequest(householdID, userID, userName, docType, form, customData) {
+  const refNum = `BM-${new Date().getFullYear()}-${String(Math.floor(10000 + Math.random() * 90000))}`;
+  await addDoc(collection(db, "documentRequests"), {
+    refNum,
+    householdID: householdID || "",
+    userID: userID || "",
+    fullName: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "),
+    firstName: form.firstName,
+    middleName: form.middleName,
+    lastName: form.lastName,
+    dob: form.dob,
+    civilStatus: form.civilStatus,
+    address: form.address,
+    contact: form.contact,
+    email: form.email,
+    residingSince: form.residingSince,
+    purpose: form.purpose,
+    validIdFileName: form.validId || "",
+    documentId: docType.id,
+    documentType: docType.title || docType.name,
+    fee: docType.fee || "",
+    processingDays: docType.processingTime || docType.days || "",
+    status: "Pending",
+    submittedAt: serverTimestamp(),
+    ...customData,
+  });
+  return refNum;
+}
+
 // ── Documents Tab ──
 export default function DocumentsTab({ userData, householdID, userName }) {
   const [docTypes, setDocTypes] = useState([]);
@@ -287,7 +317,6 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     if (userData) {
       const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city]
         .filter(Boolean).join(", ");
-        
       setForm(f => ({
         ...f,
         firstName: userData.firstName || "",
@@ -314,8 +343,8 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     if (!form.dob)                           e.dob          = "Required.";
     if (!form.address.trim())                e.address      = "Required.";
     if (!String(form.contact || "").trim())  e.contact      = "Required.";
-        if (!form.residingSince)                 e.residingSince = "Required.";
-    if (!form.purpose.trim())               e.purpose      = "Required.";
+    if (!form.residingSince)                 e.residingSince = "Required.";
+    if (!form.purpose.trim())                e.purpose      = "Required.";
     if (!form.validId)                       e.validId      = "Please upload a valid ID.";
     const extra = docType?.customFields || [];
     extra.forEach(f => {
@@ -339,6 +368,15 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         });
         const generatedRef = await submitDocumentRequest(householdID, userData?.userID || "", userName || "Unknown", docType, form, customData);
         setRefNum(generatedRef);
+
+        // 🆕 Notify all admins about new document request
+        const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") || userName || "Unknown";
+        await createNotification(
+          "document_request",
+          `New document request (${docType.title || docType.name}) submitted by ${fullName}.`,
+          form.email || fullName,
+          generatedRef
+        );
       } catch (error) {
         console.error("Failed to submit document request:", error);
         setErrors({ submit: "Failed to submit. Please try again." });
