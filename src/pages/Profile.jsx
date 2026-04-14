@@ -13,7 +13,7 @@ const QR_PAT = [
 ];
 
 const TABS = ["Personal", "Address", "Category", "Education", "Household"];
-const CATS = ["🎓 Student", "👴 Senior Citizen", "👩 Solo Parent", "✈️ OFW", "🌈 LGBT", "🌿 Indigenous", "♿ PWD"];
+const CATS = ["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"];
 
 const BLANK = {
   firstName:"", middleName:"", lastName:"", suffix:"",
@@ -174,9 +174,16 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   };
 
   const normalizeCategories = (cats) => {
-    if (Array.isArray(cats)) return cats;
-    if (typeof cats === "string") return cats.split(",").map(s => s.trim()).filter(Boolean);
-    return [];
+    let list = [];
+    if (Array.isArray(cats)) list = cats;
+    else if (typeof cats === "string") list = cats.split(",").map(s => s.trim()).filter(Boolean);
+    
+    // strip out emojis to clean up old DB state
+    return list.map(c => {
+       let cln = c.replace(/[^\w\s-]/gi, '').trim();
+       if (cln === "Indigenous") cln = "Indigenous People";
+       return cln;
+    });
   };
 
   const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
@@ -202,8 +209,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
   const normalizedDataCategories = normalizeCategories(data.categories);
   const normalizedDraftCategories = normalizeCategories(draft.categories);
-  const isPwd = normalizedDataCategories.includes("♿ PWD");
-  const draftPwd = normalizedDraftCategories.includes("♿ PWD");
+  const isPwd = normalizedDataCategories.includes("PWD");
+  const draftPwd = normalizedDraftCategories.includes("PWD");
 
   // Live record status from Firestore
   const currentStatus = data.adminStatus || "Clear Case";

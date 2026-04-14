@@ -80,7 +80,7 @@ export default function Registration({ onBack }) {
 
   const total = STEPS.length;
   const progress = ((step - 1) / (total - 1)) * 100;
-  const isPwd = form.categories.includes("♿ PWD");
+  const isPwd = form.categories.includes("PWD");
 
   const goNext = async () => {
     if (step < total) { setStep(s => s + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }
@@ -330,7 +330,7 @@ export default function Registration({ onBack }) {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                     <div className="reg-checkbox-grid">
-                      {["🎓 Student","👴 Senior Citizen","👩 Solo Parent","✈️ OFW","🌈 LGBT","🌿 Indigenous People","♿ PWD"].map(cat => (
+                      {["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"].map(cat => (
                         <label key={cat} className="reg-check-option">
                           <input type="checkbox" checked={form.categories.includes(cat)} onChange={() => toggleCategory(cat)} />
                           <span className="reg-check-label">
