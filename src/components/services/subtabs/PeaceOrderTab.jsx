@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 // ── Peace & Order Tab ──
 const INCIDENT_TYPES = [
   "Fight / Physical Altercation", "Noise Complaint", "Theft / Robbery",
@@ -23,7 +25,7 @@ const STATUS_CONFIG = {
   resolved:  { label: "Resolved",  color: "#2DB17B", bg: "rgba(45,177,123,0.1)",   icon: "✅" },
 };
 
-function PeaceOrderTab({ userData, householdID }) {
+export default function PeaceOrderTab({ userData, householdID }) {
   const [view, setView]             = useState("home");
   const [refNum, setRefNum]         = useState("");
   const [trackInput, setTrackInput] = useState("");

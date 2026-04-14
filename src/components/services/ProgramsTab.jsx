@@ -1,3 +1,8 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, doc, runTransaction } from "firebase/firestore";
+import { db } from "../../firebase/firebase"; 
+import { ChevronRightIcon } from "../Icons";
+
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
   try {

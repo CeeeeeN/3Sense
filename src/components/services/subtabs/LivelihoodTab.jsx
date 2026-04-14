@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 // ── Livelihood Tab ──
 const LIVELIHOOD_PROGRAMS = [
   { id: 1, name: "Food Processing & Packaging",      desc: "Learn longganisa, bottled goods, and basic food safety standards.", date: "April 7–9, 2026",   time: "9:00 AM – 4:00 PM",  location: "Barangay Multi-Purpose Hall", slots: 40, enrolled: 27, tag: "Manufacturing", tagColor: "#1e8a5e" },
@@ -17,7 +19,7 @@ const REG_STATUS = {
   completed: { label: "Completed", color: "#5e7a99", bg: "rgba(94,122,153,0.1)" },
 };
 
-function LivelihoodTab({ userData, householdID, userName }) {
+export default function LivelihoodTab({ userData, householdID, userName }) {
   const [view, setView]     = useState("main");
   const [step, setStep]     = useState(1);
   const [regNum, setRegNum] = useState("");

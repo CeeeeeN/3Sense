@@ -1,3 +1,10 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase/firebase";
+
+const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
+const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
+
 // ── Step Indicator ──
 function StepIndicator({ step }) {
   return (

@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
+
 // ── BSWD Tab ──
-function BSWDTab({ userData, householdID }) {
+export default function BSWDTab({ userData, householdID }) {
   const [reportForm, setReportForm] = useState({ name: "", location: "", description: "", photo: "" });
   const [reportErrors, setReportErrors]   = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);

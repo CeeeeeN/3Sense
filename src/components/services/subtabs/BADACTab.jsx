@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 // ── BADAC Tab ──
 const BADAC_STEPS_DATA = [
   { n: "1", icon: "🏛️", title: "Visit the BADAC Office",     desc: "Go to Barangay 3S+ Hall and look for the BADAC desk. Walk-in only — no appointment needed. All visits are strictly confidential." },
@@ -15,7 +17,7 @@ const BADAC_FAQS_DATA = [
   { q: "What is the difference between BADAC and the police?",  a: "BADAC is a barangay-level welfare body focused on rehabilitation and support — not law enforcement. Visiting BADAC is not the same as surrendering to police." },
 ];
 
-function BADACTab() {
+export default function BADACTab() {
   const [openFaq, setOpenFaq] = useState(null);
 
   return (
