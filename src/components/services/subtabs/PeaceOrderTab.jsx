@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
-import { SirenIcon, SendIcon } from "../../Icons";
+import React, { useState, useEffect } from "react";
+// --- ADDED: Firestore query functions ---
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { db } from "../../../firebase/firebase"; 
 import { submitIncidentReport } from "../../../services/services";
+import { SirenIcon, SendIcon } from "../../Icons"; 
 
-// ── Peace & Order Tab ──
 const INCIDENT_TYPES = [
   "Fight / Physical Altercation", "Noise Complaint", "Theft / Robbery",
   "Disturbance / Disorderly Conduct", "Public Intoxication", "Vandalism / Property Damage",
@@ -14,12 +16,6 @@ const URGENCY_LEVELS = [
   { value: "urgent",    label: "⚠️ Urgent",            desc: "Needs response within the hour" },
   { value: "docs",      label: "📋 For Documentation", desc: "No immediate danger, for records only" },
 ];
-
-const MOCK_REPORTS = {
-  "PO-2026-11423": { type: "Noise Complaint",             location: "Purok 3, Near Sari-sari Store", date: "March 15, 2026", status: "resolved",  updates: ["March 15 – Report received", "March 15 – Tanod dispatched", "March 15 – Issue resolved"] },
-  "PO-2026-98712": { type: "Fight / Physical Altercation",location: "Basketball Court Area",         date: "March 14, 2026", status: "responded", updates: ["March 14 – Report received", "March 14 – Tanod responded on-site"] },
-  "PO-2026-55301": { type: "Suspicious Person / Activity",location: "Purok 7",                       date: "March 16, 2026", status: "received",  updates: ["March 16 – Report received, under review"] },
-};
 
 const STATUS_CONFIG = {
   received:  { label: "Received",  color: "#317D89", bg: "rgba(49,125,137,0.1)",   icon: "📥" },
@@ -33,7 +29,9 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const [trackInput, setTrackInput] = useState("");
   const [trackResult, setTrackResult] = useState(null);
   const [trackError, setTrackError]   = useState("");
+  const [isSearching, setIsSearching] = useState(false); // Added loading state for tracking
   const [callExpanded, setCallExpanded] = useState(false);
+  
   const [form, setForm] = useState({
     reporterName: "", isAnonymous: false, contact: "", reporterAddress: "",
     incidentType: "", location: "", date: "", time: "", description: "", urgency: "", photo: "",
@@ -67,12 +65,18 @@ export default function PeaceOrderTab({ userData, householdID }) {
     return e;
   };
 
+  // --- UPDATED: Submit Logic ---
   const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     try {
-      await submitIncidentReport(householdID, userData?.userID || "", form);
-      setRefNum(Array.from({length:8}, ()=>"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join(""));
+      // We try to capture the REAL ID returned by your submit function
+      const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", form);
+      
+      // Fallback to generating a random one ONLY if your function doesn't return an ID yet
+      const finalRef = generatedRef || Array.from({length:8}, ()=>"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join("");
+      
+      setRefNum(finalRef);
       setView("submitted");
     } catch (error) {
       console.error("Failed to submit incident report:", error);
@@ -80,13 +84,74 @@ export default function PeaceOrderTab({ userData, householdID }) {
     }
   };
 
-  const handleTrack = () => {
-    setTrackError(""); setTrackResult(null);
-    const key = trackInput.trim().toUpperCase();
-    if (!key) { setTrackError("Please enter a reference number."); return; }
-    const result = MOCK_REPORTS[key];
-    if (result) { setTrackResult({ ...result, ref: key }); }
-    else { setTrackError("No report found with that reference number. Please check and try again."); }
+  // --- UPDATED: Real-time Firestore Tracking Logic ---
+  const handleTrack = async () => {
+    setTrackError(""); 
+    setTrackResult(null);
+    const key = trackInput.trim(); // Removed toUpperCase() so it matches case-sensitive doc IDs
+    
+    if (!key) { 
+      setTrackError("Please enter a reference number."); 
+      return; 
+    }
+
+    setIsSearching(true);
+
+    try {
+      let reportData = null;
+
+      // 1. First, check if there's a document where a field named "refNum" matches the input
+      // (Change "refNum" to "refId" or whatever field you use if needed)
+      const q = query(collection(db, "incidentReports"), where("refNum", "==", key));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        reportData = querySnapshot.docs[0].data();
+      } else {
+        // 2. If no field matched, let's assume the user typed in the actual Firestore Document ID!
+        const docRef = doc(db, "incidentReports", key);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          reportData = docSnap.data();
+        }
+      }
+
+      // 3. If we still didn't find anything, show an error
+      if (!reportData) {
+        setTrackError("No report found with that reference number. Please check and try again.");
+        setIsSearching(false);
+        return;
+      }
+
+      // 4. Safely format the data for our UI
+      let reportDate = "Unknown Date";
+      if (reportData.createdAt?.toDate) {
+        reportDate = reportData.createdAt.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      } else if (reportData.date) {
+        reportDate = reportData.date;
+      }
+
+      // 5. If your DB doesn't have an "updates" array yet, we generate a basic timeline
+      const timeline = reportData.updates || [
+        `${reportDate} – Report received and under review by Barangay Tanod`
+      ];
+
+      setTrackResult({
+        ref: key,
+        status: (reportData.status || "received").toLowerCase(),
+        type: reportData.incidentType || reportData.type || "Incident Report",
+        location: reportData.location || "N/A",
+        date: reportDate,
+        updates: timeline
+      });
+
+    } catch (error) {
+      console.error("Error searching for report:", error);
+      setTrackError("An error occurred while communicating with the database.");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   if (view === "home") return (
@@ -298,22 +363,19 @@ export default function PeaceOrderTab({ userData, householdID }) {
         <div className="po-form-section">
           <div className="po-form-section__title">Enter your Reference Number</div>
           <div className="po-track-input-row">
-            <input className="sv-input" value={trackInput} onChange={e => { setTrackInput(e.target.value.toUpperCase()); setTrackError(""); setTrackResult(null); }}
-              placeholder="e.g. PO-2026-12345" onKeyDown={e => e.key === "Enter" && handleTrack()}
+            <input className="sv-input" value={trackInput} onChange={e => { setTrackInput(e.target.value); setTrackError(""); setTrackResult(null); }}
+              placeholder="Enter your reference ID" onKeyDown={e => e.key === "Enter" && handleTrack()}
               style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, letterSpacing: "0.05em" }} />
-            <button className="sv-btn-primary" onClick={handleTrack}>
+            <button className="sv-btn-primary" onClick={handleTrack} disabled={isSearching}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              Search
+              {isSearching ? "Searching..." : "Search"}
             </button>
           </div>
           {trackError && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{trackError}</span>}
-          <div className="po-track-hint">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Try: <strong>PO-2026-11423</strong>, <strong>PO-2026-98712</strong>, or <strong>PO-2026-55301</strong>
-          </div>
         </div>
         {trackResult && (() => {
-          const sc = STATUS_CONFIG[trackResult.status];
+          // Fallback safely if status config doesn't perfectly match
+          const sc = STATUS_CONFIG[trackResult.status] || STATUS_CONFIG.received;
           return (
             <div className="po-track-result">
               <div className="po-track-result__header">
@@ -342,6 +404,4 @@ export default function PeaceOrderTab({ userData, householdID }) {
       </div>
     </div>
   );
-
-  return null;
 }
