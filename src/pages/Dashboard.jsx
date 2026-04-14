@@ -103,10 +103,10 @@ function AlertDetailPopup({ alert, onClose }) {
   }, []);
 
   const colorMap = {
-    teal:   { bar: "#317D89", badge: "rgba(49,125,137,0.10)",  text: "#317D89" },
-    amber:  { bar: "#BDBD64", badge: "rgba(189,189,100,0.15)", text: "#7a7200" },
-    green:  { bar: "#2DB17B", badge: "rgba(45,177,123,0.10)",  text: "#1e8a5e" },
-    purple: { bar: "#703381", badge: "rgba(112,51,129,0.10)",  text: "#703381" },
+    teal: { bar: "#317D89", badge: "rgba(49,125,137,0.10)", text: "#317D89" },
+    amber: { bar: "#BDBD64", badge: "rgba(189,189,100,0.15)", text: "#7a7200" },
+    green: { bar: "#2DB17B", badge: "rgba(45,177,123,0.10)", text: "#1e8a5e" },
+    purple: { bar: "#703381", badge: "rgba(112,51,129,0.10)", text: "#703381" },
   };
   const c = colorMap[alert.color] || colorMap.teal;
 
@@ -117,15 +117,38 @@ function AlertDetailPopup({ alert, onClose }) {
         <button className="db-popup-close" onClick={onClose}><XIcon /></button>
         <div className="db-popup-scroll">
           <div className="db-popup-header">
-            <span className="db-popup-badge" style={{ background: c.badge, color: c.text }}>{alert.tag}</span>
+            <div className="db-popup-tags">
+              <span className="db-popup-badge" style={{ background: c.badge, color: c.text }}>{alert.tag}</span>
+            </div>
             <h2 className="db-popup-title">{alert.title}</h2>
             <p className="db-popup-desc">{alert.fullDesc}</p>
           </div>
           <div className="db-popup-details">
             <div className="db-popup-detail-item">
               <span className="db-popup-detail-icon"><CalendarIcon /></span>
-              <div><div className="db-popup-detail-label">Date</div><div className="db-popup-detail-value">{alert.date}</div></div>
+              <div>
+                <div className="db-popup-detail-label">Date</div>
+                <div className="db-popup-detail-value">{alert.date}</div>
+              </div>
             </div>
+            <div className="db-popup-detail-item">
+              <span className="db-popup-detail-icon"><MapPinIcon /></span>
+              <div>
+                <div className="db-popup-detail-label">Location</div>
+                <div className="db-popup-detail-value">{alert.location}</div>
+              </div>
+            </div>
+          </div>
+          <div className="db-popup-section">
+            <div className="db-popup-section-title">Requirements</div>
+            <ul className="db-popup-req-list">
+              {alert.requirements.map((r, i) => (
+                <li key={i} className="db-popup-req-item">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={c.text} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  {r}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
@@ -139,14 +162,96 @@ function AnnouncementDetailPopup({ ann, onClose }) {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
+  const dotColors = {
+    teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
+    amber: "#e8a020", red: "#e03e3e",
+  };
+
+  return (
+    <div className="db-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="db-popup-modal">
+        <div className="db-popup-bar" style={{ background: dotColors[ann.dotColor] || "#317D89" }} />
+        <button className="db-popup-close" onClick={onClose}><XIcon /></button>
+        <div className="db-popup-scroll">
+          <div className="db-popup-header">
+            <div className="db-popup-tags">
+              <span className={`ann-row__cat-tag ${ann.catClass}`}>{ann.cat}</span>
+              {ann.unread && <span className="ann-row__new-badge">NEW</span>}
+            </div>
+            <h2 className="db-popup-title">{ann.title}</h2>
+            <p className="db-popup-desc">{ann.fullDesc}</p>
+          </div>
+          <div className="db-popup-details">
+            <div className="db-popup-detail-item">
+              <span className="db-popup-detail-icon"><CalendarIcon /></span>
+              <div>
+                <div className="db-popup-detail-label">Posted</div>
+                <div className="db-popup-detail-value">{ann.date}</div>
+              </div>
+            </div>
+            <div className="db-popup-detail-item">
+              <span className="db-popup-detail-icon"><MapPinIcon /></span>
+              <div>
+                <div className="db-popup-detail-label">Location</div>
+                <div className="db-popup-detail-value">{ann.location}</div>
+              </div>
+            </div>
+          </div>
+          <div className="db-popup-section">
+            <div className="db-popup-section-title">Posted by</div>
+            <div className="db-popup-posted-by">{ann.postedBy}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ALL ANNOUNCEMENT POPUP
+
+function AllAnnouncementsPopup({ onClose, onSelectAnn }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  const dotColors = {
+    teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
+    amber: "#e8a020", red: "#e03e3e",
+  };
+
   return (
     <div className="db-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="db-popup-modal">
         <div className="db-popup-bar" style={{ background: "#317D89" }} />
         <button className="db-popup-close" onClick={onClose}><XIcon /></button>
         <div className="db-popup-scroll">
-          <h2 className="db-popup-title">{ann.title}</h2>
-          <p className="db-popup-desc">{ann.fullDesc}</p>
+          <div className="db-popup-header">
+            <div className="db-popup-tags">
+              <span className="db-popup-badge" style={{ background: "rgba(49,125,137,0.1)", color: "#317D89" }}>
+                {ANNOUNCEMENTS.length} Announcements
+              </span>
+            </div>
+            <h2 className="db-popup-title">Barangay Announcements</h2>
+            <p className="db-popup-desc" style={{ marginBottom: 0 }}>All recent announcements from Barangay 3S+ Malanday.</p>
+          </div>
+          <div className="db-popup-ann-list">
+            {ANNOUNCEMENTS.map((ann) => (
+              <button key={ann.id} className="db-popup-ann-row" onClick={() => onSelectAnn(ann)}>
+                <div className="db-popup-ann-dot" style={{ background: dotColors[ann.dotColor] || "#317D89" }} />
+                <div className="db-popup-ann-body">
+                  <div className="db-popup-ann-top">
+                    <span className={`ann-row__cat-tag ${ann.catClass}`}>{ann.cat}</span>
+                    {ann.unread && <span className="ann-row__new-badge">NEW</span>}
+                    <span className="db-popup-ann-date">{ann.date}</span>
+                  </div>
+                  <div className="db-popup-ann-title">{ann.title}</div>
+                  <div className="db-popup-ann-desc">{ann.desc}</div>
+                </div>
+                <ChevronIcon />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -178,18 +283,18 @@ function SubLabel({ icon, label }) {
 }
 
 export default function Dashboard({ userName = "Mark", onNavigate }) {
-  const [selectedAlert, setSelectedAlert]   = useState(null);
-  const [selectedAnn, setSelectedAnn]       = useState(null);
-  const [showAllAnns, setShowAllAnns]       = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [selectedAnn, setSelectedAnn] = useState(null);
+  const [showAllAnns, setShowAllAnns] = useState(false);
 
-  const [realUserName, setRealUserName]     = useState(userName);
-  const [dataLoading, setDataLoading]       = useState(true);
-  
+  const [realUserName, setRealUserName] = useState(userName);
+  const [dataLoading, setDataLoading] = useState(true);
+
   const [widgets, setWidgets] = useState([
-    { icon: <VerifiedVisitIcon />, color: "teal",   value: "...", label: "Verified Visits",   sub: "via QR scans",    badge: "Active",    badgeIcon: <TrendUpIcon /> },
-    { icon: <DocumentIcon />,      color: "amber",  value: "...", label: "Document Requests", sub: "currently active", badge: "Loading",   badgeIcon: <ClockIcon />   },
-    { icon: <FeedbackIcon />,      color: "green",  value: "...", label: "Feedback",          sub: "submitted",        badge: "Done",      badgeIcon: <CheckSmallIcon /> },
-    { icon: <BarangayStatusIcon />,color: "purple", value: "...", label: "Barangay Status",   sub: "current standing", badge: "Active",    badgeIcon: <TrendUpIcon /> },
+    { icon: <VerifiedVisitIcon />, color: "teal", value: "...", label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
+    { icon: <DocumentIcon />, color: "amber", value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
+    { icon: <FeedbackIcon />, color: "green", value: "...", label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
+    { icon: <BarangayStatusIcon />, color: "purple", value: "...", label: "Barangay Status", sub: "current standing", badge: "Active", badgeIcon: <TrendUpIcon /> },
   ]);
 
   useEffect(() => {
@@ -256,25 +361,6 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
       <div className="db-content">
 
         {/* ── 1. Your Summary ── */}
-        <SectionCard icon={<BoltIcon />} title="Smart Alerts for You" subtitle="Personalized based on your profile">
-          <div className="db-alerts-grid">
-            {ALERTS.map((a) => (
-              <div key={a.id} className={`alert-card alert-card--${a.color}`}>
-                <div className="alert-card__header">
-                  <div className="alert-card__icon-wrap">{a.icon}</div>
-                  <span className="alert-card__tag">{a.tag}</span>
-                </div>
-                <div className="alert-card__body">
-                  <div className="alert-card__title">{a.title}</div>
-                  <div className="alert-card__desc">{a.desc}</div>
-                  <button className="alert-card__cta" onClick={() => setSelectedAlert(a)}>View Details <ArrowRightIcon /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* Your Summary Section - "View All Activity" Button Removed */}
         <SectionCard icon={<GridIcon />} title="Your Summary" subtitle="Overview of your barangay activity">
           <div className="db-widgets-grid">
             {widgets.map((w, i) => (
@@ -329,23 +415,38 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
           {/* Announcements sub-section */}
           <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
             <SubLabel icon={<BellIcon />} label="Barangay Announcements" />
-            {ANNOUNCEMENTS.map((a, i) => (
+
+            <div className="ann-table-header">
+              {["TITLE", "DATE", "CATEGORY", ""].map((h, i) => (
+                <div key={i} className="ann-table-header__cell">{h}</div>
+              ))}
+            </div>
+
+
+            {ANNOUNCEMENTS.slice(0, 4).map((a, idx) => (
               <div
                 key={a.id}
-                className={`ann-row${i === ANNOUNCEMENTS.length - 1 ? " ann-row--last" : ""}`}
+                className={`ann-row${a.unread ? " ann-row--unread" : ""}${idx === 3 ? " ann-row--last" : ""}`}
                 onClick={() => setSelectedAnn(a)}
                 style={{ cursor: "pointer" }}
               >
-                <div className="ann-row__body">
+                <div className={`ann-row__body${a.unread ? " ann-row__body--unread" : ""}`}>
                   <div className="ann-row__title-line">
                     <div className={`ann-row__dot db-dot-${a.dotColor}`} />
                     <span className="ann-row__title">{a.title}</span>
+                    {a.unread && <span className="ann-row__new-badge">NEW</span>}
                   </div>
                   <div className="ann-row__desc">{a.desc}</div>
                 </div>
                 <div className="ann-row__date">{a.date}</div>
+                <div className="ann-row__cat">
+                  <span className={`ann-row__cat-tag ${a.catClass}`}>{a.cat}</span>
+                </div>
+                <button className="ann-row__chevron" onClick={e => { e.stopPropagation(); setSelectedAnn(a); }}>
+                  <ChevronIcon />
+                </button>
               </div>
-              ))}
+            ))}
           </div>
         </SectionCard>
       </div>
@@ -356,12 +457,14 @@ export default function Dashboard({ userName = "Mark", onNavigate }) {
           <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
         </div>
       </footer>
-      
-      {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
-      {selectedAnn   && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
-
 
       {selectedAlert && <AlertDetailPopup alert={selectedAlert} onClose={() => setSelectedAlert(null)} />}
+      {showAllAnns && !selectedAnn && (
+        <AllAnnouncementsPopup
+          onClose={() => setShowAllAnns(false)}
+          onSelectAnn={(ann) => { setShowAllAnns(false); setSelectedAnn(ann); }}
+        />
+      )}
       {selectedAnn && <AnnouncementDetailPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
     </main>
   );
