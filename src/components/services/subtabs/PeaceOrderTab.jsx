@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-// --- ADDED: Firestore query functions ---
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
-import { db } from "../../../firebase/firebase"; 
+import { db } from "../../../firebase/firebase";
 import { submitIncidentReport } from "../../../services/services";
-import { SirenIcon, SendIcon } from "../../Icons"; 
+import { createNotification } from "../../../services/notifications"; // 🆕
+import { SirenIcon, SendIcon } from "../../Icons";
 
 const INCIDENT_TYPES = [
   "Fight / Physical Altercation", "Noise Complaint", "Theft / Robbery",
@@ -24,14 +24,14 @@ const STATUS_CONFIG = {
 };
 
 export default function PeaceOrderTab({ userData, householdID }) {
-  const [view, setView]             = useState("home");
-  const [refNum, setRefNum]         = useState("");
-  const [trackInput, setTrackInput] = useState("");
+  const [view, setView]               = useState("home");
+  const [refNum, setRefNum]           = useState("");
+  const [trackInput, setTrackInput]   = useState("");
   const [trackResult, setTrackResult] = useState(null);
   const [trackError, setTrackError]   = useState("");
-  const [isSearching, setIsSearching] = useState(false); // Added loading state for tracking
+  const [isSearching, setIsSearching] = useState(false);
   const [callExpanded, setCallExpanded] = useState(false);
-  
+
   const [form, setForm] = useState({
     reporterName: "", isAnonymous: false, contact: "", reporterAddress: "",
     incidentType: "", location: "", date: "", time: "", description: "", urgency: "", photo: "",
@@ -41,13 +41,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
     if (userData && !form.isAnonymous) {
       const name = [userData.firstName, userData.lastName].filter(Boolean).join(" ");
       const fullAddress = [userData.houseNumber, userData.street, userData.barangay].filter(Boolean).join(", ");
-      
-      setForm(f => ({
-        ...f,
-        reporterName: name,
-        contact: userData.contactNumber || "",
-        reporterAddress: fullAddress
-      }));
+      setForm(f => ({ ...f, reporterName: name, contact: userData.contactNumber || "", reporterAddress: fullAddress }));
     }
   }, [userData, form.isAnonymous]);
 
@@ -65,17 +59,22 @@ export default function PeaceOrderTab({ userData, householdID }) {
     return e;
   };
 
-  // --- UPDATED: Submit Logic ---
   const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     try {
-      // We try to capture the REAL ID returned by your submit function
       const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", form);
-      
-      // Fallback to generating a random one ONLY if your function doesn't return an ID yet
-      const finalRef = generatedRef || Array.from({length:8}, ()=>"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join("");
-      
+      const finalRef = generatedRef || Array.from({length:8}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join("");
+
+      // 🆕 Notify admins about new incident report
+      const reporterLabel = form.isAnonymous ? "Anonymous" : (form.reporterName || "Unknown");
+      await createNotification(
+        "feedback", // closest available type; shows as "Feedback" in bell
+        `New incident report (${form.incidentType}) filed by ${reporterLabel} at ${form.location}.`,
+        reporterLabel,
+        finalRef
+      );
+
       setRefNum(finalRef);
       setView("submitted");
     } catch (error) {
@@ -84,59 +83,29 @@ export default function PeaceOrderTab({ userData, householdID }) {
     }
   };
 
-  // --- UPDATED: Real-time Firestore Tracking Logic ---
   const handleTrack = async () => {
-    setTrackError(""); 
-    setTrackResult(null);
-    const key = trackInput.trim(); // Removed toUpperCase() so it matches case-sensitive doc IDs
-    
-    if (!key) { 
-      setTrackError("Please enter a reference number."); 
-      return; 
-    }
-
+    setTrackError(""); setTrackResult(null);
+    const key = trackInput.trim();
+    if (!key) { setTrackError("Please enter a reference number."); return; }
     setIsSearching(true);
-
     try {
       let reportData = null;
-
-      // 1. First, check if there's a document where a field named "refNum" matches the input
-      // (Change "refNum" to "refId" or whatever field you use if needed)
       const q = query(collection(db, "incidentReports"), where("refNum", "==", key));
       const querySnapshot = await getDocs(q);
-
       if (!querySnapshot.empty) {
         reportData = querySnapshot.docs[0].data();
       } else {
-        // 2. If no field matched, let's assume the user typed in the actual Firestore Document ID!
         const docRef = doc(db, "incidentReports", key);
         const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          reportData = docSnap.data();
-        }
+        if (docSnap.exists()) reportData = docSnap.data();
       }
+      if (!reportData) { setTrackError("No report found with that reference number. Please check and try again."); setIsSearching(false); return; }
 
-      // 3. If we still didn't find anything, show an error
-      if (!reportData) {
-        setTrackError("No report found with that reference number. Please check and try again.");
-        setIsSearching(false);
-        return;
-      }
-
-      // 4. Safely format the data for our UI
       let reportDate = "Unknown Date";
-      if (reportData.createdAt?.toDate) {
-        reportDate = reportData.createdAt.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      } else if (reportData.date) {
-        reportDate = reportData.date;
-      }
+      if (reportData.createdAt?.toDate) reportDate = reportData.createdAt.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      else if (reportData.date) reportDate = reportData.date;
 
-      // 5. If your DB doesn't have an "updates" array yet, we generate a basic timeline
-      const timeline = reportData.updates || [
-        `${reportDate} – Report received and under review by Barangay Tanod`
-      ];
-
+      const timeline = reportData.updates || [`${reportDate} – Report received and under review by Barangay Tanod`];
       setTrackResult({
         ref: key,
         status: (reportData.status || "received").toLowerCase(),
@@ -145,7 +114,6 @@ export default function PeaceOrderTab({ userData, householdID }) {
         date: reportDate,
         updates: timeline
       });
-
     } catch (error) {
       console.error("Error searching for report:", error);
       setTrackError("An error occurred while communicating with the database.");
@@ -204,17 +172,13 @@ export default function PeaceOrderTab({ userData, householdID }) {
 
       <div className="po-actions">
         <button className="po-action-card po-action-card--report" onClick={() => setView("report")}>
-          <div className="po-action-card__icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-          </div>
+          <div className="po-action-card__icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></div>
           <div className="po-action-card__title">File a Report</div>
           <div className="po-action-card__desc">Submit an incident report online. Anonymous reporting available.</div>
           <div className="po-action-card__cta">Start Report →</div>
         </button>
         <button className="po-action-card po-action-card--track" onClick={() => setView("track")}>
-          <div className="po-action-card__icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </div>
+          <div className="po-action-card__icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
           <div className="po-action-card__title">Track a Report</div>
           <div className="po-action-card__desc">Check the status of a previously filed report using your reference number.</div>
           <div className="po-action-card__cta">Track Now →</div>
@@ -238,18 +202,9 @@ export default function PeaceOrderTab({ userData, householdID }) {
           </label>
           {!form.isAnonymous && (
             <div className="dr-field-row" style={{ marginTop: "0.85rem" }}>
-              <div className="dr-field">
-                <label className="sv-label">Your Name</label>
-                <input className="sv-input" value={form.reporterName} onChange={e => set("reporterName", e.target.value)} placeholder="Juan Dela Cruz" />
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Contact Number</label>
-                <input className="sv-input" value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Your Address</label>
-                <input className="sv-input" value={form.reporterAddress} onChange={e => set("reporterAddress", e.target.value)} placeholder="Purok / Street" />
-              </div>
+              <div className="dr-field"><label className="sv-label">Your Name</label><input className="sv-input" value={form.reporterName} onChange={e => set("reporterName", e.target.value)} placeholder="Juan Dela Cruz" /></div>
+              <div className="dr-field"><label className="sv-label">Contact Number</label><input className="sv-input" value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" /></div>
+              <div className="dr-field"><label className="sv-label">Your Address</label><input className="sv-input" value={form.reporterAddress} onChange={e => set("reporterAddress", e.target.value)} placeholder="Purok / Street" /></div>
             </div>
           )}
         </div>
@@ -303,14 +258,10 @@ export default function PeaceOrderTab({ userData, householdID }) {
             <label className="sv-label">Upload Photo <span className="sv-optional">(Optional)</span></label>
             <label className="dr-upload-box">
               <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && set("photo", e.target.files[0].name)} />
-              {form.photo ? (
-                <div className="dr-upload-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{form.photo}</div>
-              ) : (
-                <div className="dr-upload-placeholder">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  <span>Upload photo evidence</span><span className="dr-upload-hint">JPG or PNG · Max 5MB</span>
-                </div>
-              )}
+              {form.photo
+                ? <div className="dr-upload-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{form.photo}</div>
+                : <div className="dr-upload-placeholder"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>Upload photo evidence</span><span className="dr-upload-hint">JPG or PNG · Max 5MB</span></div>
+              }
             </label>
           </div>
         </div>
@@ -325,9 +276,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
   if (view === "submitted") return (
     <div className="po-page">
       <div className="po-submitted-wrap">
-        <div className="po-submitted-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        </div>
+        <div className="po-submitted-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
         <h3 className="po-submitted-title">Report Submitted</h3>
         <p className="po-submitted-sub">Your incident report has been received by the Barangay Tanod.</p>
         <div className="po-ref-box">
@@ -336,14 +285,8 @@ export default function PeaceOrderTab({ userData, householdID }) {
           <div className="po-ref-hint">Save this number to track your report's status</div>
         </div>
         <div className="po-submitted-notes">
-          <div className="po-submitted-note">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z"/></svg>
-            Barangay Tanod will respond to your report.
-          </div>
-          <div className="po-submitted-note">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            For emergencies, call <strong>0927-373-6727</strong> directly.
-          </div>
+          <div className="po-submitted-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z"/></svg>Barangay Tanod will respond to your report.</div>
+          <div className="po-submitted-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>For emergencies, call <strong>0927-373-6727</strong> directly.</div>
         </div>
         <div className="po-submitted-btns">
           <button className="sv-btn-outline" onClick={() => { setTrackInput(refNum); setView("track"); }}>Track This Report</button>
@@ -374,7 +317,6 @@ export default function PeaceOrderTab({ userData, householdID }) {
           {trackError && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{trackError}</span>}
         </div>
         {trackResult && (() => {
-          // Fallback safely if status config doesn't perfectly match
           const sc = STATUS_CONFIG[trackResult.status] || STATUS_CONFIG.received;
           return (
             <div className="po-track-result">
@@ -391,8 +333,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
                 <div className="po-timeline__title">Status Timeline</div>
                 {trackResult.updates.map((u, i) => (
                   <div key={i} className="po-timeline-item">
-                    <div className={`po-timeline-dot${i === trackResult.updates.length - 1 ? " po-timeline-dot--active" : ""}`}
-                      style={i === trackResult.updates.length - 1 ? { background: sc.color, borderColor: sc.color } : {}} />
+                    <div className={`po-timeline-dot${i === trackResult.updates.length - 1 ? " po-timeline-dot--active" : ""}`} style={i === trackResult.updates.length - 1 ? { background: sc.color, borderColor: sc.color } : {}} />
                     {i < trackResult.updates.length - 1 && <div className="po-timeline-line" />}
                     <div className="po-timeline-text">{u}</div>
                   </div>

@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
 import { BriefcaseIcon } from "../../Icons";
 import { db } from "../../../firebase/firebase";
-import {
-  collection, onSnapshot, query, where,
-  addDoc, serverTimestamp, orderBy,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, where, addDoc, serverTimestamp, orderBy } from "firebase/firestore";
+import { createNotification } from "../../../services/notifications"; // 🆕
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 const generateRegNum = () => {
   const year = new Date().getFullYear();
   const rand = Math.floor(10000 + Math.random() * 90000);
@@ -24,18 +21,17 @@ const TAG_MAP = {
 
 const getTag = (demographic = "") => {
   const d = demographic.toLowerCase();
-  if (d.includes("farm") || d.includes("garden"))  return TAG_MAP.agriculture;
-  if (d.includes("craft") || d.includes("sew"))     return TAG_MAP.crafts;
-  if (d.includes("tech") || d.includes("computer")) return TAG_MAP.technology;
-  if (d.includes("food") || d.includes("process"))  return TAG_MAP.manufacturing;
+  if (d.includes("farm") || d.includes("garden"))     return TAG_MAP.agriculture;
+  if (d.includes("craft") || d.includes("sew"))       return TAG_MAP.crafts;
+  if (d.includes("tech") || d.includes("computer"))   return TAG_MAP.technology;
+  if (d.includes("food") || d.includes("process"))    return TAG_MAP.manufacturing;
   if (d.includes("business") || d.includes("negosyo")) return TAG_MAP.business;
-  return TAG_MAP.business; // default
+  return TAG_MAP.business;
 };
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
+  return new Date(dateStr).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
 };
 
 const formatTime = (t) => {
@@ -54,39 +50,28 @@ const REG_STATUS_STYLE = {
   completed:{ label: "Completed", color: "#5e7a99", bg: "rgba(94,122,153,0.1)" },
 };
 
-// ── Component ──────────────────────────────────────────────────────────────────
 export default function LivelihoodTab({ userData, householdID, userName }) {
-  const [view, setView]     = useState("main");
-  const [step, setStep]     = useState(1);
-  const [regNum, setRegNum] = useState("");
-  const [errors, setErrors] = useState({});
+  const [view, setView]       = useState("main");
+  const [step, setStep]       = useState(1);
+  const [regNum, setRegNum]   = useState("");
+  const [errors, setErrors]   = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Programs from Firestore ──────────────────────────────────────
-  const [programs, setPrograms]         = useState([]);
+  const [programs, setPrograms]               = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const [enrolledMap, setEnrolledMap]         = useState({});
+  const [myRegs, setMyRegs]                   = useState([]);
+  const [loadingMyRegs, setLoadingMyRegs]     = useState(false);
 
-  // ── Enrolled counts per program (from livelihoodRegistrations) ───
-  const [enrolledMap, setEnrolledMap]   = useState({}); // { programId: count }
-
-  // ── My Registrations ─────────────────────────────────────────────
-  const [myRegs, setMyRegs]             = useState([]);
-  const [loadingMyRegs, setLoadingMyRegs] = useState(false);
-
-  // ── Form state ───────────────────────────────────────────────────
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     address: "", contact: "", email: "",
     idFile: "", programId: "",
   });
 
-  // Pre-fill form from userData
   useEffect(() => {
     if (userData) {
-      const fullAddress = [
-        userData.houseNumber, userData.street,
-        userData.barangay,    userData.city,
-      ].filter(Boolean).join(", ");
+      const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city].filter(Boolean).join(", ");
       setForm(f => ({
         ...f,
         firstName:  userData.firstName  || "",
@@ -99,7 +84,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     }
   }, [userData]);
 
-  // ── Real-time: Programs ──────────────────────────────────────────
   useEffect(() => {
     const q = query(collection(db, "Programs"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -121,16 +105,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       });
       setPrograms(data);
       setLoadingPrograms(false);
-    }, (err) => {
-      console.error("Programs listener error:", err);
-      setLoadingPrograms(false);
-    });
+    }, (err) => { console.error("Programs listener error:", err); setLoadingPrograms(false); });
     return () => unsub();
   }, []);
 
-  // ── Real-time: Enrolled counts from livelihoodRegistrations ──────
-  // We listen to the whole collection and group by programId client-side
-  // (avoids multiple listeners; collection is not expected to be huge)
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "livelihoodRegistrations"), (snap) => {
       const counts = {};
@@ -143,15 +121,11 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     return () => unsub();
   }, []);
 
-  // ── Real-time: My Registrations (filtered by householdID or userID) ──
   useEffect(() => {
     if (!householdID && !userData?.userID) return;
     setLoadingMyRegs(true);
-
-    // Query by hhId (household) — matches how admin ServiceLivelihood stores it
     const filterField = householdID ? "hhId" : "userId";
     const filterValue = householdID || userData?.userID;
-
     const q = query(
       collection(db, "livelihoodRegistrations"),
       where(filterField, "==", filterValue),
@@ -160,24 +134,18 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     const unsub = onSnapshot(q, (snap) => {
       setMyRegs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingMyRegs(false);
-    }, (err) => {
-      console.error("My regs listener error:", err);
-      setLoadingMyRegs(false);
-    });
+    }, (err) => { console.error("My regs listener error:", err); setLoadingMyRegs(false); });
     return () => unsub();
   }, [householdID, userData?.userID]);
 
-  // ── Helpers ──────────────────────────────────────────────────────
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const selectedProgram = programs.find(p => p.id === form.programId);
 
   const getSlotsLeft = (prog) => {
-    if (!prog.slots) return null; // no slot limit defined
-    const enrolled = enrolledMap[prog.id] || 0;
-    return prog.slots - enrolled;
+    if (!prog.slots) return null;
+    return prog.slots - (enrolledMap[prog.id] || 0);
   };
 
-  // ── Validation ───────────────────────────────────────────────────
   const validateStep1 = () => {
     const e = {};
     if (!form.firstName.trim())             e.firstName = "Required.";
@@ -196,7 +164,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     return Object.keys(e).length === 0;
   };
 
-  // ── Submit to Firestore ──────────────────────────────────────────
   const handleNext = async () => {
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
@@ -209,31 +176,36 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           : "";
 
         await addDoc(collection(db, "livelihoodRegistrations"), {
-          regNum:       reg,
-          // Identity
-          firstName:    form.firstName,
-          middleName:   form.middleName || "",
-          lastName:     form.lastName,
-          fullName:     [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "),
-          address:      form.address,
-          contact:      form.contact,
-          contactNumber:form.contact,
-          email:        form.email || "",
-          idFileName:   form.idFile || "",
-          // Household / user link
-          hhId:         householdID  || "",
-          userId:       userData?.userID || "",
-          // Program info (denormalised for easy reading in admin)
-          programId:    selectedProgram?.id    || "",
-          programName:  selectedProgram?.title || "",
-          programDate:  selectedProgram?.date  || "",
-          programTime:  timeLabel,
+          regNum:          reg,
+          firstName:       form.firstName,
+          middleName:      form.middleName || "",
+          lastName:        form.lastName,
+          fullName:        [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "),
+          address:         form.address,
+          contact:         form.contact,
+          contactNumber:   form.contact,
+          email:           form.email || "",
+          idFileName:      form.idFile || "",
+          hhId:            householdID  || "",
+          userId:          userData?.userID || "",
+          programId:       selectedProgram?.id    || "",
+          programName:     selectedProgram?.title || "",
+          programDate:     selectedProgram?.date  || "",
+          programTime:     timeLabel,
           programLocation: selectedProgram?.location || "",
-          // Meta
-          status:       "pending",
-          submittedAt:  serverTimestamp(),
-          updatedAt:    serverTimestamp(),
+          status:          "pending",
+          submittedAt:     serverTimestamp(),
+          updatedAt:       serverTimestamp(),
         });
+
+        // 🆕 Notify admins about new livelihood registration
+        const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") || userName || "Unknown";
+        await createNotification(
+          "feedback", // re-using closest type; or add "livelihood_registration" to NOTIF_META in AdminDashboard
+          `New livelihood registration for "${selectedProgram?.title || "a program"}" by ${fullName}.`,
+          form.email || fullName,
+          reg
+        );
 
         setRegNum(reg);
         setStep(4);
@@ -255,26 +227,16 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   const STEP_LABELS_LH = ["Personal Info", "Choose Program", "Confirmation"];
 
-  // ════════════════════════════════════════════════════════════════
-  // VIEWS
-  // ════════════════════════════════════════════════════════════════
-
-  // ── Main: Program list ──────────────────────────────────────────
+  // ── Main: Program list ──
   if (view === "main") return (
     <div className="lh-page">
       <div className="svc-hero svc-hero--green">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow">
-              <span className="svc-hero__eyebrow-icon"><BriefcaseIcon /></span>
-              Barangay Livelihood Program
-            </div>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BriefcaseIcon /></span>Barangay Livelihood Program</div>
             <h2 className="svc-hero__title">Livelihood Skills Training</h2>
             <p className="svc-hero__abbr">FREE · OPEN TO ALL RESIDENTS</p>
-            <p className="svc-hero__sub">
-              Build new skills, earn more, and grow your small business.
-              All training programs are free for qualified Barangay Malanday residents.
-            </p>
+            <p className="svc-hero__sub">Build new skills, earn more, and grow your small business. All training programs are free for qualified Barangay Malanday residents.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               In partnership with DOLE · Open to residents 18 and above
@@ -291,15 +253,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
       <div className="lh-programs-section">
         <div className="lh-section-label">Available Programs</div>
-
         {loadingPrograms ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>
-            Loading programs…
-          </div>
+          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>Loading programs…</div>
         ) : programs.length === 0 ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>
-            No programs available at the moment. Please check back later.
-          </div>
+          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>No programs available at the moment. Please check back later.</div>
         ) : (
           <div className="lh-programs-grid">
             {programs.map(p => {
@@ -308,65 +265,30 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
               const low       = slotsLeft !== null && slotsLeft > 0 && slotsLeft <= 5;
               const tagStyle  = getTag(p.demographic || p.title);
               const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
-
               return (
                 <div key={p.id} className={`lh-prog-card${full ? " lh-prog-card--full" : ""}`}>
                   <div className="lh-prog-card__head">
-                    <span className="lh-prog-card__tag" style={{ background: `${tagStyle.color}15`, color: tagStyle.color }}>
-                      {tagStyle.label}
-                    </span>
+                    <span className="lh-prog-card__tag" style={{ background: `${tagStyle.color}15`, color: tagStyle.color }}>{tagStyle.label}</span>
                     {slotsLeft !== null && (
                       <span className={`lh-prog-card__slots${full ? " lh-prog-card__slots--full" : low ? " lh-prog-card__slots--low" : ""}`}>
                         {full ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}
                       </span>
                     )}
                   </div>
-
                   <div className="lh-prog-card__name">{p.title}</div>
                   <div className="lh-prog-card__desc">{p.description || "—"}</div>
-
                   <div className="lh-prog-card__meta">
-                    {p.date && (
-                      <span className="lh-prog-meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        {formatDate(p.date)}
-                      </span>
-                    )}
-                    {timeLabel && (
-                      <span className="lh-prog-meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        {timeLabel}
-                      </span>
-                    )}
-                    {p.location && (
-                      <span className="lh-prog-meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        {p.location}
-                      </span>
-                    )}
+                    {p.date && <span className="lh-prog-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>{formatDate(p.date)}</span>}
+                    {timeLabel && <span className="lh-prog-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>{timeLabel}</span>}
+                    {p.location && <span className="lh-prog-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>{p.location}</span>}
                   </div>
-
-                  {/* Slots progress bar */}
                   {p.slots > 0 && (
                     <div className="lh-prog-card__slots-bar">
-                      <div
-                        className="lh-prog-card__slots-fill"
-                        style={{
-                          width: `${Math.min(((enrolledMap[p.id] || 0) / p.slots) * 100, 100)}%`,
-                          background: full ? "#e03e3e" : low ? "#ca8a04" : "#1e8a5e",
-                        }}
-                      />
+                      <div className="lh-prog-card__slots-fill" style={{ width: `${Math.min(((enrolledMap[p.id] || 0) / p.slots) * 100, 100)}%`, background: full ? "#e03e3e" : low ? "#ca8a04" : "#1e8a5e" }} />
                     </div>
                   )}
-
-                  <button
-                    className="sv-btn-primary"
-                    disabled={full}
-                    style={{ fontSize: "0.78rem", marginTop: "0.75rem", width: "100%", justifyContent: "center", opacity: full ? 0.45 : 1 }}
-                    onClick={() => {
-                      if (!full) { set("programId", p.id); setView("register"); setStep(1); }
-                    }}
-                  >
+                  <button className="sv-btn-primary" disabled={full} style={{ fontSize: "0.78rem", marginTop: "0.75rem", width: "100%", justifyContent: "center", opacity: full ? 0.45 : 1 }}
+                    onClick={() => { if (!full) { set("programId", p.id); setView("register"); setStep(1); } }}>
                     {full ? "Program Full" : "Register Now →"}
                   </button>
                 </div>
@@ -378,7 +300,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     </div>
   );
 
-  // ── My Registrations ────────────────────────────────────────────
+  // ── My Registrations ──
   if (view === "myregs") return (
     <div className="lh-page">
       <div className="po-form-topbar">
@@ -405,9 +327,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                       <div className="lh-reg-card__program">{r.programName || "—"}</div>
                       <div className="lh-reg-card__date">{r.programDate || "—"}</div>
                     </div>
-                    <span className="lh-reg-status" style={{ background: sc.bg, color: sc.color }}>
-                      {sc.label}
-                    </span>
+                    <span className="lh-reg-status" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
                   </div>
                   <div className="lh-reg-card__ref">Ref: {r.regNum || r.id}</div>
                   {r.status === "rejected" && r.rejectReason && (
@@ -424,7 +344,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     </div>
   );
 
-  // ── Registration Form ────────────────────────────────────────────
+  // ── Registration Form ──
   return (
     <div className="lh-page">
       <div className="po-form-topbar">
@@ -434,7 +354,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
         <div className="po-form-topbar__title">Register for Training</div>
       </div>
 
-      {/* Step indicator */}
       {step < 4 && (
         <div className="lh-steps">
           {STEP_LABELS_LH.map((label, i) => {
@@ -442,9 +361,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             return (
               <div key={i} className="dr-step-item">
                 <div className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
-                  {done
-                    ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    : n}
+                  {done ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> : n}
                 </div>
                 <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
                 {i < STEP_LABELS_LH.length - 1 && <div className={`dr-step-line${done ? " dr-step-line--done" : ""}`} />}
@@ -455,8 +372,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       )}
 
       <div className="lh-form-body">
-
-        {/* Step 1 — Personal Info */}
+        {/* Step 1 */}
         {step === 1 && (
           <div className="lh-form-section">
             <div className="dr-field-row">
@@ -497,11 +413,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                 <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: "none" }} onChange={e => e.target.files[0] && set("idFile", e.target.files[0].name)} />
                 {form.idFile
                   ? <div className="dr-upload-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{form.idFile}</div>
-                  : <div className="dr-upload-placeholder">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      <span>Click to upload</span>
-                      <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
-                    </div>
+                  : <div className="dr-upload-placeholder"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Click to upload</span><span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span></div>
                 }
               </label>
               {errors.idFile && <span className="sv-error-msg">{errors.idFile}</span>}
@@ -509,7 +421,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           </div>
         )}
 
-        {/* Step 2 — Choose Program */}
+        {/* Step 2 */}
         {step === 2 && (
           <div className="lh-form-section">
             <p className="dr-step-hint">Select the training program you want to join.</p>
@@ -523,31 +435,15 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                   const selected  = form.programId === p.id;
                   const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
                   return (
-                    <button
-                      key={p.id}
-                      className={`lh-prog-select-item${selected ? " lh-prog-select-item--active" : ""}${full ? " lh-prog-select-item--disabled" : ""}`}
-                      disabled={full}
-                      onClick={() => !full && set("programId", p.id)}
-                    >
-                      <div className="lh-prog-select-item__check">
-                        {selected && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                      </div>
+                    <button key={p.id} className={`lh-prog-select-item${selected ? " lh-prog-select-item--active" : ""}${full ? " lh-prog-select-item--disabled" : ""}`} disabled={full} onClick={() => !full && set("programId", p.id)}>
+                      <div className="lh-prog-select-item__check">{selected && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}</div>
                       <div className="lh-prog-select-item__body">
-                        <div className="lh-prog-select-item__name">
-                          {p.title}
-                          {full && <span className="lh-full-badge">Full</span>}
-                        </div>
-                        {(p.date || timeLabel) && (
-                          <div className="lh-prog-select-item__meta">
-                            {formatDate(p.date)}{timeLabel ? ` · ${timeLabel}` : ""}
-                          </div>
-                        )}
+                        <div className="lh-prog-select-item__name">{p.title}{full && <span className="lh-full-badge">Full</span>}</div>
+                        {(p.date || timeLabel) && <div className="lh-prog-select-item__meta">{formatDate(p.date)}{timeLabel ? ` · ${timeLabel}` : ""}</div>}
                         {p.location && <div className="lh-prog-select-item__meta">{p.location}</div>}
                       </div>
                       {slotsLeft !== null && (
-                        <div className="lh-prog-select-item__slots" style={{ color: full ? "#e03e3e" : slotsLeft <= 5 ? "#ca8a04" : "#1e8a5e" }}>
-                          {full ? "Full" : `${slotsLeft} left`}
-                        </div>
+                        <div className="lh-prog-select-item__slots" style={{ color: full ? "#e03e3e" : slotsLeft <= 5 ? "#ca8a04" : "#1e8a5e" }}>{full ? "Full" : `${slotsLeft} left`}</div>
                       )}
                     </button>
                   );
@@ -564,15 +460,15 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             <p className="dr-step-hint">Review your information before submitting.</p>
             <div className="dr-review-grid">
               {[
-                { label: "Full Name",    value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "), full: true },
-                { label: "Address",      value: form.address,          full: true },
-                { label: "Contact",      value: form.contact },
-                { label: "Email",        value: form.email || "—" },
-                { label: "ID Uploaded",  value: form.idFile || "—",    full: true },
-                { label: "Program",      value: selectedProgram?.title || "—", full: true },
-                { label: "Date",         value: formatDate(selectedProgram?.date) },
-                { label: "Time",         value: [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ") || "—" },
-                { label: "Location",     value: selectedProgram?.location || "—", full: true },
+                { label: "Full Name",   value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "), full: true },
+                { label: "Address",     value: form.address,        full: true },
+                { label: "Contact",     value: form.contact },
+                { label: "Email",       value: form.email || "—" },
+                { label: "ID Uploaded", value: form.idFile || "—",  full: true },
+                { label: "Program",     value: selectedProgram?.title || "—", full: true },
+                { label: "Date",        value: formatDate(selectedProgram?.date) },
+                { label: "Time",        value: [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ") || "—" },
+                { label: "Location",    value: selectedProgram?.location || "—", full: true },
               ].map((r, i) => (
                 <div key={i} className={`dr-review-row${r.full ? " dr-review-row--full" : ""}`}>
                   <span className="dr-review-label">{r.label}</span>
@@ -580,51 +476,33 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                 </div>
               ))}
             </div>
-            {errors.submit && (
-              <div style={{ marginTop: "12px", color: "#e03e3e", fontSize: "0.85rem", padding: "10px", background: "rgba(224,62,62,0.07)", borderRadius: "8px" }}>
-                {errors.submit}
-              </div>
-            )}
+            {errors.submit && <div style={{ marginTop: "12px", color: "#e03e3e", fontSize: "0.85rem", padding: "10px", background: "rgba(224,62,62,0.07)", borderRadius: "8px" }}>{errors.submit}</div>}
           </div>
         )}
 
         {/* Step 4 — Success */}
         {step === 4 && (
           <div className="lh-success-wrap">
-            <div className="po-submitted-icon">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            </div>
+            <div className="po-submitted-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <h3 className="po-submitted-title">Registration Submitted!</h3>
-            <p className="po-submitted-sub">
-              You have successfully registered for <strong>{selectedProgram?.title}</strong>.
-            </p>
+            <p className="po-submitted-sub">You have successfully registered for <strong>{selectedProgram?.title}</strong>.</p>
             <div className="po-ref-box" style={{ borderColor: "rgba(30,138,94,0.2)", background: "rgba(30,138,94,0.05)" }}>
               <div className="po-ref-label">Registration Number</div>
               <div className="po-ref-num" style={{ color: "#1e8a5e" }}>{regNum}</div>
               <div className="po-ref-hint">Save this to track your registration status</div>
             </div>
             <div className="po-submitted-btns">
-              <button className="sv-btn-primary" style={{ background: "#1e8a5e" }} onClick={() => setView("myregs")}>
-                View My Registrations
-              </button>
+              <button className="sv-btn-primary" style={{ background: "#1e8a5e" }} onClick={() => setView("myregs")}>View My Registrations</button>
               <button className="sv-btn-ghost" onClick={resetForm}>Done</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Action buttons */}
       {step < 4 && (
         <div className="po-form-actions">
-          <button className="sv-btn-ghost" onClick={() => { step > 1 ? setStep(s => s - 1) : setView("main"); setErrors({}); }}>
-            {step === 1 ? "Cancel" : "Previous"}
-          </button>
-          <button
-            className="sv-btn-primary"
-            style={{ background: "#1e8a5e" }}
-            onClick={handleNext}
-            disabled={submitting}
-          >
+          <button className="sv-btn-ghost" onClick={() => { step > 1 ? setStep(s => s - 1) : setView("main"); setErrors({}); }}>{step === 1 ? "Cancel" : "Previous"}</button>
+          <button className="sv-btn-primary" style={{ background: "#1e8a5e" }} onClick={handleNext} disabled={submitting}>
             {submitting ? "Submitting…" : step === 3 ? "Submit Registration" : "Next →"}
           </button>
         </div>

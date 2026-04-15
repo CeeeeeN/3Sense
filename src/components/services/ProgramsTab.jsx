@@ -1,18 +1,14 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, runTransaction } from "firebase/firestore";
-import { db } from "../../firebase/firebase"; 
+import { db } from "../../firebase/firebase";
+import { createNotification } from "../../services/notifications"; // 🆕
 import { ChevronRightIcon } from "../Icons";
 
-// ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
-  try {
-    return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback;
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
 };
 
-// ── Program Detail Modal ──
 const COLOR_MAP = {
   teal:   { bar: "#317D89", badge: "rgba(49,125,137,0.10)",  text: "#317D89" },
   amber:  { bar: "#BDBD64", badge: "rgba(189,189,100,0.15)", text: "#7a7200" },
@@ -22,8 +18,6 @@ const COLOR_MAP = {
 
 function ProgramModal({ program, onClose, onRegister, isRegistering }) {
   const c = COLOR_MAP[program.color] || COLOR_MAP.teal;
-  
-  // Calculate if the program is fully booked
   const slotsLeft = parseInt(program.slots || "0", 10);
   const isFull = slotsLeft <= 0;
 
@@ -48,7 +42,6 @@ function ProgramModal({ program, onClose, onRegister, isRegistering }) {
             <h2 className="pm-title">{program.title || program.description}</h2>
             <p className="pm-fulldesc">{program.fullDesc || program.description}</p>
           </div>
-
           <div className="pm-details-grid">
             {[
               { icon: "calendar", label: "Date",             value: program.date },
@@ -72,7 +65,6 @@ function ProgramModal({ program, onClose, onRegister, isRegistering }) {
               </div>
             ))}
           </div>
-
           {program.requirements && program.requirements.length > 0 && (
             <div className="pm-section pm-section--last">
               <div className="pm-section-title">Requirements</div>
@@ -87,55 +79,40 @@ function ProgramModal({ program, onClose, onRegister, isRegistering }) {
             </div>
           )}
         </div>
-        
-        {/* --- ADDED: Action Bar for Registration --- */}
         <div style={{ padding: "20px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "12px", borderBottomLeftRadius: "12px", borderBottomRightRadius: "12px" }}>
           <button className="sv-btn-ghost" onClick={onClose} disabled={isRegistering}>Cancel</button>
-          <button 
-            className="sv-btn-primary" 
-            style={{ background: isFull ? "#9ca3af" : c.text, opacity: isFull ? 0.7 : 1 }} 
-            disabled={isFull || isRegistering}
-            onClick={onRegister}
-          >
+          <button className="sv-btn-primary" style={{ background: isFull ? "#9ca3af" : c.text, opacity: isFull ? 0.7 : 1 }} disabled={isFull || isRegistering} onClick={onRegister}>
             {isRegistering ? "Registering..." : isFull ? "Program Full" : "Register Now"}
           </button>
         </div>
-        
       </div>
     </div>
   );
 }
 
-// ── Programs Tab ──
 export default function ProgramsTab({ userData }) {
   const [activeProgram, setActiveProgram] = useState(null);
-  const [programs, setPrograms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [programs, setPrograms]           = useState([]);
+  const [loading, setLoading]             = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "Programs"), (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPrograms(data);
+      setPrograms(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- UPDATED: The Transaction Logic ---
   const handleRegister = async (programId) => {
-    // 1. Pull the ID directly from the browser session!
-    const activeUserId = getSaved("userID", null);
+    const activeUserId   = getSaved("userID", null);
     const activeUserName = getSaved("userName", "Resident");
 
-    if (!activeUserId) {
-      return alert("Session expired or profile not selected. Please log in again.");
-    }
-    
+    if (!activeUserId) return alert("Session expired or profile not selected. Please log in again.");
     setIsRegistering(true);
-    
+
     try {
-      const programRef = doc(db, "Programs", programId);
+      const programRef  = doc(db, "Programs", programId);
       const attendeeRef = doc(db, "Programs", programId, "attendees", activeUserId);
 
       await runTransaction(db, async (transaction) => {
@@ -143,35 +120,37 @@ export default function ProgramsTab({ userData }) {
         if (!progDoc.exists()) throw new Error("Program does not exist!");
 
         const data = progDoc.data();
-        const currentSlotsStr = data.slots;
-        if (!currentSlotsStr) throw new Error("This program does not have a slot limit configured.");
-        
-        const currentSlots = parseInt(currentSlotsStr, 10);
+        const currentSlots = parseInt(data.slots, 10);
+        if (!data.slots) throw new Error("This program does not have a slot limit configured.");
         if (currentSlots <= 0) throw new Error("Sorry, this program is fully booked!");
 
-        // Check if already registered
         const checkAttendee = await transaction.get(attendeeRef);
         if (checkAttendee.exists()) throw new Error("You are already registered for this program!");
 
-        // Add to subcollection using the Session Data
         transaction.set(attendeeRef, {
-          userID: activeUserId,
-          userName: activeUserName,
-          programId: programId,
+          userID:      activeUserId,
+          userName:    activeUserName,
+          programId:   programId,
           programName: data.description || data.title || "Program",
           programDate: data.date,
-          status: "Registered",
-          createdAt: new Date()
+          status:      "Registered",
+          createdAt:   new Date()
         });
 
-        // Decrement slot
-        transaction.update(programRef, {
-          slots: (currentSlots - 1).toString()
-        });
+        transaction.update(programRef, { slots: (currentSlots - 1).toString() });
       });
 
+      // 🆕 Notify admins about new program registration
+      const programTitle = activeProgram?.description || activeProgram?.title || "a program";
+      await createNotification(
+        "feedback",
+        `${activeUserName} registered for the program "${programTitle}".`,
+        activeUserName,
+        ""
+      );
+
       alert("Successfully registered for the program!");
-      setActiveProgram(null); // Close the modal upon success
+      setActiveProgram(null);
     } catch (error) {
       console.error("Registration failed:", error);
       alert(error.message);
@@ -180,50 +159,37 @@ export default function ProgramsTab({ userData }) {
     }
   };
 
-  if (loading) return (
-    <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>
-      Loading programs...
-    </div>
-  );
-
-  if (programs.length === 0) return (
-    <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>
-      No programs available at the moment.
-    </div>
-  );
+  if (loading) return <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>Loading programs...</div>;
+  if (programs.length === 0) return <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>No programs available at the moment.</div>;
 
   return (
     <>
       <div className="sv-programs-grid">
         {programs.map(p => (
-          <div key={p.id} className={`sv-program-card sv-program-card--teal`}>
+          <div key={p.id} className="sv-program-card sv-program-card--teal">
             <div className="sv-program-card__bar" />
             <div className="sv-program-card__head">
               <span className="sv-program-card__tag">{p.demographic || "General"}</span>
-              <span className={`sv-program-card__status sv-program-card__status--${p.status === "Open" ? "open" : "ongoing"}`}>
-                {p.status || "Upcoming"}
-              </span>
+              <span className={`sv-program-card__status sv-program-card__status--${p.status === "Open" ? "open" : "ongoing"}`}>{p.status || "Upcoming"}</span>
             </div>
             <div className="sv-program-card__title">{p.description || p.title}</div>
             <div className="sv-program-card__desc">{p.fullDescription || p.description}</div>
-            <button className="sv-program-card__cta" onClick={() => setActiveProgram(p)}>
-              Learn More <ChevronRightIcon />
-            </button>
+            <button className="sv-program-card__cta" onClick={() => setActiveProgram(p)}>Learn More <ChevronRightIcon /></button>
           </div>
         ))}
       </div>
       {activeProgram && (
-        <ProgramModal 
+        <ProgramModal
           program={{
             ...activeProgram,
             color: "teal",
-            tag: activeProgram.demographic || "General",
-            title: activeProgram.description || activeProgram.title,
+            tag:      activeProgram.demographic || "General",
+            title:    activeProgram.description || activeProgram.title,
             fullDesc: activeProgram.fullDescription || activeProgram.description,
-            time: activeProgram.time || `${activeProgram.startTime} - ${activeProgram.endTime}`,
+            time:     activeProgram.time || `${activeProgram.startTime} - ${activeProgram.endTime}`,
             requirements: activeProgram.requirements || [],
-          }} 
-          onClose={() => setActiveProgram(null)} 
+          }}
+          onClose={() => setActiveProgram(null)}
           onRegister={() => handleRegister(activeProgram.id)}
           isRegistering={isRegistering}
         />

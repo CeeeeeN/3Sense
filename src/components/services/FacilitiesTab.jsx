@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase/firebase"; 
-import { submitFacilityReservation } from "../../services/services"; 
+import { db } from "../../firebase/firebase";
+import { submitFacilityReservation } from "../../services/services";
+import { createNotification } from "../../services/notifications"; // 🆕
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
 
-// ── Calendar Constants ──
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-// ── 1. Main Facilities Tab Component ──
 export default function FacilitiesTab({ userData, householdID, userName }) {
   const [facilities, setFacilities] = useState([]);
-  
-  // This state MUST be inside the main component!
   const [reservationFacility, setReservationFacility] = useState(null);
-  
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "facilities"), snapshot => {
       setFacilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -54,19 +51,18 @@ export default function FacilitiesTab({ userData, householdID, userName }) {
         ))}
       </div>
 
-      {/* ── THE MODAL ── (This must also be inside the return statement of the main component) */}
       {reservationFacility && (
         <div className="rsv-overlay" onClick={e => e.target === e.currentTarget && setReservationFacility(null)}>
           <div className="rsv-modal">
             <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-            <ReservationForm 
-              facility={reservationFacility} 
-              onBack={() => setReservationFacility(null)} 
-              userData={userData} 
-              householdID={householdID} 
-              userName={userName} 
+            <ReservationForm
+              facility={reservationFacility}
+              onBack={() => setReservationFacility(null)}
+              userData={userData}
+              householdID={householdID}
+              userName={userName}
             />
           </div>
         </div>
@@ -75,7 +71,7 @@ export default function FacilitiesTab({ userData, householdID, userName }) {
   );
 }
 
-// ── 2. Calendar Component ──
+// ── Calendar ──
 function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates = [], blockedDates = [] }) {
   const today = new Date();
   const [viewYear, setViewYear]   = useState(today.getFullYear());
@@ -137,13 +133,13 @@ function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates
   );
 }
 
-// ── 3. Reservation Form Component ──
+// ── Reservation Form ──
 function ReservationForm({ onBack, facility, userData, householdID, userName }) {
   const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
     : "Reserve a facility for your event. Approval is required before confirmation.";
-  
+
   const [reservations, setReservations] = useState([]);
   const [pendingDates, setPendingDates] = useState([]);
 
@@ -155,17 +151,11 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
       snapshot.docs.forEach(doc => {
         const data = doc.data();
         if (String(data.facilityId) === String(facility.id) && data.date) {
-            const stat = (data.status || "").toLowerCase();
-            if (stat !== "rejected") {
-                allRes.push({
-                   id: doc.id,
-                   date: data.date,
-                   startTime: data.startTime,
-                   endTime: data.endTime,
-                   status: stat
-                });
-                datesWithRes.add(data.date);
-            }
+          const stat = (data.status || "").toLowerCase();
+          if (stat !== "rejected") {
+            allRes.push({ id: doc.id, date: data.date, startTime: data.startTime, endTime: data.endTime, status: stat });
+            datesWithRes.add(data.date);
+          }
         }
       });
       setReservations(allRes);
@@ -179,13 +169,12 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
     purpose: "", date: "", startTime: "", endTime: "",
     attendees: "", notes: ""
   });
-  const [refNum, setRefNum]             = useState("");
-  const [dateStatus, setDateStatus]     = useState(null);
-  const [submitted, setSubmitted]       = useState(false);
-  const [errors, setErrors]             = useState({});
+  const [refNum, setRefNum]         = useState("");
+  const [dateStatus, setDateStatus] = useState(null);
+  const [submitted, setSubmitted]   = useState(false);
+  const [errors, setErrors]         = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Auto-fill form when userData loads
   useEffect(() => {
     if (userData) {
       const name = [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ");
@@ -206,7 +195,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
     if (!form.startTime)       e.startTime = "Start time is required.";
     if (!form.endTime)         e.endTime   = "End time is required.";
     if (form.startTime && form.endTime && form.startTime >= form.endTime) e.endTime = "End time must be after start time.";
-    
     const extra = facility?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
@@ -219,8 +207,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
   const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    
-    // Check for overlap
+
     const hasOverlap = reservations.some(r => {
       if (r.date !== form.date) return false;
       return form.startTime < r.endTime && r.startTime < form.endTime;
@@ -237,6 +224,15 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
       const generatedRef = await submitFacilityReservation(householdID, userData?.userID || "", userName || "User", facility, form, customData);
+
+      // 🆕 Notify admins about new facility reservation
+      await createNotification(
+        "facility_request",
+        `New facility reservation for "${facilityName}" on ${form.date} by ${form.fullName || userName || "a resident"}.`,
+        form.email || form.fullName || userName || "Unknown",
+        generatedRef || ""
+      );
+
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {
@@ -250,12 +246,10 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
       <div className="sv-success-icon"><ServiceCheckCircleIcon /></div>
       <h3 className="sv-success-title">Reservation Submitted</h3>
       <p className="sv-success-sub">Your reservation request has been submitted and is awaiting barangay approval.</p>
-      
       <div className="dr-ref-box" style={{ margin: '1.5rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
         <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
         <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
       </div>
-
       <div className="sv-status-badge"><ServiceClockIcon /> Pending Approval</div>
       <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>Close</button>
     </div>
@@ -287,9 +281,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
             <label className="sv-label">Email Address <span className="sv-required">*</span></label>
             <input
               className={`sv-input${errors.email ? " sv-input--error" : ""}`}
-              type="email"
-              placeholder="your@email.com"
-              value={form.email}
+              type="email" placeholder="your@email.com" value={form.email}
               onChange={e => { set("email", e.target.value); setErrors(p => ({...p, email: ""})); }}
             />
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
@@ -321,6 +313,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
             <textarea className="sv-textarea" placeholder="Any special setup requirements, equipment needed, etc." rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
           </div>
         </div>
+
         {facility?.customFields?.length > 0 && (
           <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
             <div className="sv-field-section-label">Additional Information</div>
@@ -348,11 +341,18 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
             </div>
           </div>
         )}
+
         <div className="sv-calendar-col">
           <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
-          <Calendar selectedDate={form.date} reservedDates={[]} pendingDates={pendingDates} blockedDates={facility?.blockedDates || []} onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({...p, date: ""})); }} />
+          <Calendar
+            selectedDate={form.date}
+            reservedDates={[]}
+            pendingDates={pendingDates}
+            blockedDates={facility?.blockedDates || []}
+            onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({...p, date: ""})); }}
+          />
           {errors.date && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{errors.date}</span>}
-          {errors.timeOverlap && <div className="sv-error-msg" style={{marginTop:"0.5rem", padding:"0.75rem", background:"#fef2f2", border:"1px solid #fecaca", borderRadius:"0.375rem", color:"#b91c1c"}}>{errors.timeOverlap}</div>}
+          {errors.timeOverlap && <div className="sv-error-msg" style={{marginTop:"0.5rem",padding:"0.75rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"0.375rem",color:"#b91c1c"}}>{errors.timeOverlap}</div>}
           {pendingDates.includes(form.date) && !errors.timeOverlap && <div className="sv-cal-warning sv-cal-warning--pending"><ServiceInfoIcon /> This date has existing reservations. Make sure your time slot doesn't overlap.</div>}
         </div>
       </div>
