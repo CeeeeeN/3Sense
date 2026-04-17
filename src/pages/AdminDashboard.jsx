@@ -56,7 +56,7 @@ export default function AdminDashboard() {
     });
 
     // Residents
-    const unsubResidents = onSnapshot(collectionGroup(db, "members"), (snapshot) => {
+    const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (snapshot) => {
       setStats(prev => ({ ...prev, residents: snapshot.size }));
     });
 
