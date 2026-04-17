@@ -14,16 +14,15 @@ export default function SentimentComparisonChart() {
     const unsub = onSnapshot(collection(db, "Feedback"), (snapshot) => {
       const rawFeedbacks = snapshot.docs.map(doc => doc.data());
 
-      // 2. Run the data through your single source of truth
+      // Run the data through the sentiment aggregator
       const aggregatedData = calculateMoodCardData(rawFeedbacks);
 
-      // 3. Reshape the aggregator's output so Recharts can read it
+      // Reshape the aggregator's output so Recharts can read it
       const formattedForChart = aggregatedData.map(card => ({
         name: card.categoryName,
         Positive: card.percentages.Positive,
         Neutral: card.percentages.Neutral,
         Negative: card.percentages.Negative,
-        // Optional: Keep total around in case you want to use it in tooltips later!
         totalFeedbacks: card.totalFeedbacks 
       }));
 
@@ -55,7 +54,6 @@ export default function SentimentComparisonChart() {
   return (
     <div style={{ width: '100%', height: 320 }}>
       <ResponsiveContainer>
-        {/* We removed stackOffset="expand" because your aggregator already does the percentage math! */}
         <BarChart
           data={chartData}
           margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
@@ -68,7 +66,6 @@ export default function SentimentComparisonChart() {
             tick={{ fill: '#6b7280', fontSize: 14, fontWeight: 500 }} 
             dy={10}
           />
-          {/* Lock the Y-Axis to 0-100 since we are feeding it exact percentages */}
           <YAxis 
             domain={[0, 100]}
             tickFormatter={(tick) => `${tick}%`} 
