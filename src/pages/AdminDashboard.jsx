@@ -3,6 +3,7 @@ import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import { calculateMoodCardData } from "../services/sentimentAggregator";
 import AIInsightsWidget from "../components/AIInsightsWidget";
+import SentimentComparisonChart from '../components/SentimentComparisonChart';
 import { db } from "../firebase/firebase";
 import {
   collection,
@@ -173,8 +174,10 @@ export default function AdminDashboard() {
 
         {/* CHART PLACEHOLDER */}
         <div className="section">
-          <h2>Service Satisfaction Comparison</h2>
-          <div className="chart-placeholder">Chart goes here (Bar / Radar)</div>
+          <h3>Service Satisfaction Comparison</h3>
+          <div style={{ background: "#fff", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb", marginTop: "15px" }}>
+            <SentimentComparisonChart />
+          </div>
         </div>
 
         {/* AI INSIGHTS */}
