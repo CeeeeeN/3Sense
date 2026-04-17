@@ -4,7 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { subscribeToAnnouncements } from "../services/announcements";
 import {
-  ScholarshipIcon, AcademicIcon, HealthIcon, AssistanceIcon,
+  ScholarshipIcon, HealthIcon, AssistanceIcon,
   VerifiedVisitIcon, DocumentIcon, FeedbackIcon, BarangayStatusIcon,
   TrendUpIcon, ClockIcon, CheckSmallIcon, BoltIcon, GridIcon, BellIcon,
   ArrowRightIcon, ChevronIcon, XIcon, CalendarIcon, MapPinIcon
@@ -28,7 +28,6 @@ function SectionCard({ icon, title, subtitle, action, children }) {
   );
 }
 
-// Unified detail popup for both Smart Alerts and General Announcements
 function UnifiedAnnouncementPopup({ ann, onClose }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -39,7 +38,6 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
     teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
     amber: "#e8a020", red: "#e03e3e",
   };
-
   const annColor = dotColors[ann.dotColor] || "#317D89";
 
   return (
@@ -60,7 +58,7 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
             <div className="db-popup-detail-item">
               <span className="db-popup-detail-icon"><CalendarIcon /></span>
               <div>
-                <div className="db-popup-detail-label">Date & Time</div>
+                <div className="db-popup-detail-label">Date &amp; Time</div>
                 <div className="db-popup-detail-value">{ann.time ? new Date(ann.time).toLocaleString() : ann.date}</div>
               </div>
             </div>
@@ -72,7 +70,7 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
               </div>
             </div>
           </div>
-          {ann.requirements && (
+          {ann.requirements && ann.requirements.length > 0 && (
             <div className="db-popup-section">
               <div className="db-popup-section-title">Requirements</div>
               <ul className="db-popup-req-list">
@@ -95,17 +93,11 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
   );
 }
 
-// ALL ANNOUNCEMENTS POPUP
 function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
-
-  const dotColors = {
-    teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
-    amber: "#e8a020", red: "#e03e3e",
-  };
 
   return (
     <div className="db-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -125,7 +117,6 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
           <div className="db-popup-ann-list">
             {announcements.map((ann) => (
               <button key={ann.id} className="db-popup-ann-row" onClick={() => onSelectAnn(ann)}>
-                <div className="db-popup-ann-dot" style={{ background: dotColors[ann.dotColor] || "#317D89" }} />
                 <div className="db-popup-ann-body">
                   <div className="db-popup-ann-top">
                     {ann.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48", marginRight: '8px' }}>ALERT</span>}
@@ -134,11 +125,11 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
                   </div>
                   <div className="db-popup-ann-title">{ann.title}</div>
                   <div className="db-popup-ann-desc" style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}>{ann.description}</div>
                 </div>
                 <ChevronIcon />
@@ -174,13 +165,11 @@ function SubLabel({ icon, label }) {
   );
 }
 
-export default function Dashboard({ userName = "Mark", onNavigate, householdID: propsHouseholdID, memberID, userRole }) {
+export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, userRole }) {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [showAllAnns, setShowAllAnns] = useState(false);
-
   const [realUserName, setRealUserName] = useState(userName);
   const [dataLoading, setDataLoading] = useState(true);
-  
   const [announcementsData, setAnnouncementsData] = useState([]);
   const [userCategories, setUserCategories] = useState([]);
 
@@ -216,27 +205,34 @@ export default function Dashboard({ userName = "Mark", onNavigate, householdID: 
         const residentIdToFetch = String(userRole).toLowerCase() === "head" ? "head" : (memberID || "head");
         const headRef = doc(db, "households", householdID, "residents", residentIdToFetch);
         const headSnap = await getDoc(headRef);
+        console.log("[Dashboard] residentIdToFetch", residentIdToFetch, "exists", headSnap.exists());
         if (headSnap.exists()) {
           const d = headSnap.data();
           firstName = d.firstName || userName;
           adminStatus = d.adminStatus || "Clear";
-          const normalizedCategories = Array.isArray(d.categories)
-            ? d.categories
-            : d.categories ? String(d.categories).split(",").map(c=>c.trim()) : [];
-            
-          // Strip emojis and weird characters from categories so string matches "LGBT", "Student", etc
+          // categories may be an array or a comma‑separated string
+          let rawCats = d.categories || d.category;
+          console.log("[Dashboard] rawCats raw", rawCats);
+          let normalizedCategories = [];
+          if (Array.isArray(rawCats)) {
+            normalizedCategories = rawCats;
+          } else if (typeof rawCats === "string") {
+            normalizedCategories = rawCats.split(",").map(c => c.trim());
+          }
+          // Strip emojis and special chars
           uCats = normalizedCategories.map(c => {
-             let cln = c.replace(/[^\w\s-]/gi, '').trim();
-             if (cln === "Indigenous") cln = "Indigenous People";
-             return cln;
+            let cln = typeof c === "string" ? c.replace(/[^\w\s-]/gi, '').trim() : String(c).trim();
+            if (cln === "Indigenous") cln = "Indigenous People";
+            return cln;
           });
+          console.log("[Dashboard] parsed uCats", uCats);
         }
 
         setRealUserName(firstName);
         setUserCategories(uCats);
 
-        const frSnap = await getDocs(query(collection(db, "facilityReservations"), where("householdID", "==", householdID)));
-        const drSnap = await getDocs(query(collection(db, "documentRequests"), where("householdID", "==", householdID)));
+        const frSnap = await getDocs(query(collection(db, "facility_reservations"), where("householdID", "==", householdID)));
+        const drSnap = await getDocs(query(collection(db, "document_requests"), where("householdID", "==", householdID)));
         const fbSnap = await getDocs(query(collection(db, "Feedback"), where("householdID", "==", householdID)));
 
         setWidgets([
@@ -260,34 +256,45 @@ export default function Dashboard({ userName = "Mark", onNavigate, householdID: 
     if (h < 18) return "Good Afternoon";
     return "Good Evening";
   };
-  
+
   const mapAnnouncements = (data) => {
-      return data.map(ann => {
-        let dc = "teal";
-        let cc = "db-cat-service";
-        let icon = <BoltIcon />;
-        const acType = (ann.announcementCategory || "").toLowerCase();
-        
-        switch (acType) {
-            case "health": dc="green"; cc="db-cat-health"; icon=<HealthIcon />; break;
-            case "event": dc="blue"; cc="db-cat-event"; icon=<AssistanceIcon />; break;
-            case "documents": dc="amber"; cc="db-cat-service"; icon=<DocumentIcon />; break;
-            case "programs": dc="purple"; cc="db-cat-service"; icon=<ScholarshipIcon />; break;
-            case "facilities": dc="amber"; cc="db-cat-service"; icon=<VerifiedVisitIcon />; break;
-            default: break;
-        }
+    return data.map(ann => {
+      let dc = "teal";
+      let cc = "db-cat-service";
+      let icon = <BoltIcon />;
+      const acType = (ann.announcementCategory || "").toLowerCase();
 
-        const annCatClean = (ann.category || "").trim().toLowerCase();
-        const isAlert = userCategories.some(uc => uc.trim().toLowerCase() === annCatClean);
+      switch (acType) {
+        case "health":     dc = "green";  cc = "db-cat-health";  icon = <HealthIcon />;        break;
+        case "event":      dc = "blue";   cc = "db-cat-event";   icon = <AssistanceIcon />;    break;
+        case "documents":  dc = "amber";  cc = "db-cat-service"; icon = <DocumentIcon />;      break;
+        case "programs":   dc = "purple"; cc = "db-cat-service"; icon = <ScholarshipIcon />;   break;
+        case "facilities": dc = "amber";  cc = "db-cat-service"; icon = <VerifiedVisitIcon />; break;
+        default: break;
+      }
 
-        return { ...ann, dotColor: dc, catClass: cc, icon: icon, isSmartAlert: isAlert };
+      const annCatClean = (ann.category || "").trim().toLowerCase();
+      const annAudienceClean = (ann.targetAudience || "").trim().toLowerCase();
+
+      // "All Residents" → general announcements only, NOT smart alerts
+      const targetsEveryone = annCatClean === "all residents" || annAudienceClean === "all residents";
+
+      // Match: user's category string should be contained in the announcement's target audience, or vice-versa
+      const isAlert = !targetsEveryone && userCategories.some(uc => {
+        const u = uc.trim().toLowerCase();
+        if (!u) return false;
+        return annCatClean.includes(u) || u.includes(annCatClean) || 
+               annAudienceClean.includes(u) || u.includes(annAudienceClean);
       });
+
+      return { ...ann, dotColor: dc, catClass: cc, icon, isSmartAlert: isAlert };
+    });
   };
 
   const processedAnns = mapAnnouncements(announcementsData);
   const smartAlertsList = processedAnns.filter(a => a.isSmartAlert);
-  // Both are combined in show all, with alerts first
-  const combinedAnns = [...smartAlertsList, ...processedAnns.filter(a => !a.isSmartAlert)];
+  const generalAnnsList = processedAnns.filter(a => !a.isSmartAlert);
+  const combinedAnns = [...smartAlertsList, ...generalAnnsList];
 
   return (
     <main className="db-page">
@@ -321,7 +328,7 @@ export default function Dashboard({ userName = "Mark", onNavigate, householdID: 
           </div>
         </SectionCard>
 
-        {/* ── 2. Alerts & Announcements (merged into one card) ── */}
+        {/* ── 2. Alerts & Announcements ── */}
         <SectionCard
           icon={<BoltIcon />}
           title="Alerts & Announcements"
@@ -332,55 +339,51 @@ export default function Dashboard({ userName = "Mark", onNavigate, householdID: 
             </button>
           }
         >
-
-          {/* Smart Alerts sub-section */}
+          {/* Smart Alerts */}
           <div style={{ padding: "0 1.5rem" }}>
             <SubLabel icon={<BoltIcon />} label="Smart Alerts for You" />
-            
             {smartAlertsList.length === 0 ? (
-                <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new smart alerts based on your profile.</p>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new smart alerts based on your profile.</p>
             ) : (
-                <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
-                  {smartAlertsList.map((a) => (
-                    <div key={a.id} className={`alert-card alert-card--${a.dotColor}`}>
-                      <div className="alert-card__header">
-                        <div className="alert-card__icon-wrap">{a.icon}</div>
-                        <span className="alert-card__tag">{a.category}</span>
-                      </div>
-                      <div className="alert-card__body">
-                        <div className="alert-card__title">{a.title}</div>
-                        <div className="alert-card__desc" style={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}>{a.description}</div>
-                        <button className="alert-card__cta" onClick={() => setSelectedAnn(a)}>
-                          View Details <ArrowRightIcon />
-                        </button>
-                      </div>
+              <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
+                {smartAlertsList.map((a) => (
+                  <div key={a.id} className={`alert-card alert-card--${a.dotColor}`}>
+                    <div className="alert-card__header">
+                      <div className="alert-card__icon-wrap">{a.icon}</div>
+                      <span className="alert-card__tag">{a.category}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="alert-card__body">
+                      <div className="alert-card__title">{a.title}</div>
+                      <div className="alert-card__desc" style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>{a.description}</div>
+                      <button className="alert-card__cta" onClick={() => setSelectedAnn(a)}>
+                        View Details <ArrowRightIcon />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Announcements sub-section */}
+          {/* Barangay Announcements */}
           <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
             <SubLabel icon={<BellIcon />} label="Barangay Announcements" />
-
-            {processedAnns.length === 0 ? (
-                 <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new announcements at this time.</p>
+            {generalAnnsList.length === 0 ? (
+              <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new announcements at this time.</p>
             ) : (
-                <>
+              <>
                 <div className="ann-table-header">
                   {["TITLE", "DATE", "CATEGORY", ""].map((h, i) => (
                     <div key={i} className="ann-table-header__cell">{h}</div>
                   ))}
                 </div>
-
-                {combinedAnns.slice(0, 5).map((a, idx) => (
+                {generalAnnsList.slice(0, 5).map((a, idx) => (
                   <div
                     key={a.id}
                     className={`ann-row${idx === 4 ? " ann-row--last" : ""}`}
@@ -389,16 +392,15 @@ export default function Dashboard({ userName = "Mark", onNavigate, householdID: 
                   >
                     <div className="ann-row__body">
                       <div className="ann-row__title-line">
-                        <div className={`ann-row__dot db-dot-${a.dotColor}`} />
                         <span className="ann-row__title">{a.title}</span>
                         {a.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48" }}>ALERT</span>}
                       </div>
                       <div className="ann-row__desc" style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 1,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
+                        display: '-webkit-box',
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}>{a.description}</div>
                     </div>
                     <div className="ann-row__date">{a.time ? new Date(a.time).toLocaleDateString() : a.date}</div>
@@ -410,7 +412,7 @@ export default function Dashboard({ userName = "Mark", onNavigate, householdID: 
                     </button>
                   </div>
                 ))}
-                </>
+              </>
             )}
           </div>
         </SectionCard>

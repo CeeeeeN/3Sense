@@ -161,6 +161,9 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         occupation: updatedData.occupation || "",
         employmentStatus: updatedData.employmentStatus || "",
 
+        // Always store householdID so the resident knows their household (foreign key)
+        householdID,
+
         updatedAt: serverTimestamp(),
     };
 

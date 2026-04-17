@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import barangayLogo from "./barangay-logo.jpg";
 import Navbar from "./Navbar";
 import { getMemberProfile, updateMemberProfile } from "../services/profile";
+import { fetchUserTransactions } from "../services/services";
 import QRCode from "qrcode";
 
 const QR_PAT = [
@@ -100,6 +101,10 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const [saving, setSaving]   = useState(false);
   const [qrUrl, setQrUrl]     = useState("");
   const qrCanvasRef           = useRef(null);
+  const [transactions, setTransactions] = useState([]);
+  const [txLoading, setTxLoading]       = useState(true);
+  const [txPage, setTxPage]             = useState(1);
+  const txPerPage = 8;
 
   const fullName = [data.firstName, data.middleName, data.lastName, data.suffix].filter(Boolean).join(" ");
 
@@ -122,6 +127,20 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         setLoading(false);
       });
   }, [householdID, memberID]);
+
+  // Fetch transaction history
+  useEffect(() => {
+    if (!memberID) { setTxLoading(false); return; }
+    fetchUserTransactions(memberID)
+      .then(data => {
+        setTransactions(data);
+        setTxLoading(false);
+      })
+      .catch(err => {
+        console.error("[Profile] Transaction fetch error:", err);
+        setTxLoading(false);
+      });
+  }, [memberID]);
 
   // Generate QR code whenever fullName or householdID changes
   useEffect(() => {
@@ -220,7 +239,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   return (
     <div className="pf-root">
       {/* NAV */}
-      <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} />
+      <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} memberID={memberID} />
 
       {loading && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "var(--muted)", fontSize: "0.9rem" }}>
@@ -438,33 +457,73 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               <thead>
                 <tr>
                   <th>Service Name</th>
+                  <th>Ref #</th>
                   <th>Date</th>
                   <th>Status</th>
-                  <th>Remarks</th>
+                  <th>Category</th>
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { service: "Barangay Clearance",           date: "Feb 14, 2026", status: "completed", remarks: "Issued successfully" },
-                  { service: "Certificate of Indigency",     date: "Jan 30, 2026", status: "completed", remarks: "Issued successfully" },
-                  { service: "Business Permit Endorsement",  date: "Jan 15, 2026", status: "rejected",  remarks: "Incomplete requirements" },
-                  { service: "MPH Reservation",              date: "Dec 20, 2025", status: "completed", remarks: "Event completed" },
-                  { service: "Barangay ID Request",          date: "Nov 11, 2025", status: "pending",   remarks: "Under processing" },
-                ].map((tx, i) => (
-                  <tr key={i}>
-                    <td><div className="pf-tx-name">{tx.service}</div></td>
-                    <td><div className="pf-tx-date">{tx.date}</div></td>
-                    <td>
-                      <span className={`pf-tx-badge ${tx.status}`}>
-                        <span className="pf-tx-bdot" />
-                        {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{tx.remarks}</td>
-                  </tr>
-                ))}
+                {txLoading ? (
+                  <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>Loading transactions...</td></tr>
+                ) : transactions.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>No transactions found.</td></tr>
+                ) : (
+                  transactions.slice((txPage - 1) * txPerPage, txPage * txPerPage).map((tx, i) => {
+                    const dateStr = tx.date?.toDate
+                      ? tx.date.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : tx.date ? new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+                    const statusLower = (tx.status || "pending").toLowerCase().replace(/\s+/g, "-");
+                    return (
+                      <tr key={tx.id || i}>
+                        <td><div className="pf-tx-name">{tx.serviceName}</div></td>
+                        <td><div className="pf-tx-date" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem" }}>{tx.refNum || "—"}</div></td>
+                        <td><div className="pf-tx-date">{dateStr}</div></td>
+                        <td>
+                          <span className={`pf-tx-badge ${statusLower}`}>
+                            <span className="pf-tx-bdot" />
+                            {tx.status}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{tx.category}</td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
+            
+            {/* Pagination Controls */}
+            {transactions.length > txPerPage && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "1rem", gap: "0.5rem" }}>
+                <button
+                  onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                  disabled={txPage === 1}
+                  style={{
+                    padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
+                    background: txPage === 1 ? "#f1f5f9" : "var(--primary)", color: txPage === 1 ? "#94a3b8" : "#fff",
+                    border: "none", cursor: txPage === 1 ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Prev
+                </button>
+                <div style={{ fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", color: "var(--text)", margin: "0 0.5rem" }}>
+                  Page {txPage} of {Math.ceil(transactions.length / txPerPage)}
+                </div>
+                <button
+                  onClick={() => setTxPage(p => Math.min(Math.ceil(transactions.length / txPerPage), p + 1))}
+                  disabled={txPage === Math.ceil(transactions.length / txPerPage)}
+                  style={{
+                    padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
+                    background: txPage === Math.ceil(transactions.length / txPerPage) ? "#f1f5f9" : "var(--primary)",
+                    color: txPage === Math.ceil(transactions.length / txPerPage) ? "#94a3b8" : "#fff",
+                    border: "none", cursor: txPage === Math.ceil(transactions.length / txPerPage) ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </Card>
 

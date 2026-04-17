@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import barangayLogo from "./barangay-logo.jpg";
 import { IconBell, NavIconUser, IconProfile2, IconSettings, IconHelp, IconLogout } from "../components/Icons";
-
-const NOTIFICATIONS = [
-  { id:1, icon:"📢", bg:"rgba(49,125,137,0.1)",  title:"Free Medical Mission",         desc:"Register now for the free medical mission on March 15.", time:"2 hours ago", unread:true },
-  { id:2, icon:"🎓", bg:"rgba(232,160,32,0.1)",   title:"Scholarship Applications Open", desc:"Submit your applications before March 30.",               time:"Yesterday",  unread:true },
-  { id:3, icon:"✅", bg:"rgba(13,122,85,0.1)",    title:"Clearance Ready",               desc:"Your barangay clearance is ready for pickup.",             time:"Feb 14",     unread:false },
-  { id:4, icon:"🚨", bg:"rgba(224,62,62,0.1)",    title:"Barangay Clean-Up Drive",       desc:"Join the clean-up drive on March 10 at 7:00 AM.",          time:"Feb 10",     unread:false },
-];
+import {
+  subscribeToUserNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteUserNotification,
+} from "../services/userNotifications";
 
 const NAV_ITEMS = [
   { key:"home",      label:"Home",      icon: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
@@ -17,14 +16,45 @@ const NAV_ITEMS = [
   { key:"emergency", label:"Emergency", icon: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, emergency:true },
 ];
 
-export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member" }) {
+const NOTIF_ICONS = {
+  document_update: { icon: "📄", bg: "rgba(232,160,32,0.1)" },
+  facility_update: { icon: "🏛️", bg: "rgba(49,125,137,0.1)" },
+  program_reminder: { icon: "📢", bg: "rgba(13,122,85,0.1)" },
+  general: { icon: "🔔", bg: "rgba(100,100,200,0.1)" },
+};
+
+function formatNotifTime(timestamp) {
+  if (!timestamp) return "";
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "" }) {
   const [notifOpen, setNotifOpen]         = useState(false);
   const [userOpen, setUserOpen]           = useState(false);
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const notifRef  = useRef(null);
   const userRef   = useRef(null);
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // Subscribe to real-time notifications for this member
+  useEffect(() => {
+    if (!memberID) return;
+    const unsub = subscribeToUserNotifications(memberID, (data) => {
+      setNotifications(data);
+    });
+    return () => unsub();
+  }, [memberID]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -42,8 +72,12 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
     return () => { document.body.style.overflow = ""; };
   }, [notifOpen, userOpen]);
 
-  const clearAll = () => setNotifications(n => n.map(x => ({ ...x, unread: false })));
-  const markRead = (id) => setNotifications(n => n.map(x => x.id === id ? { ...x, unread: false } : x));
+  const clearAll = () => markAllNotificationsAsRead(notifications);
+  const markRead = (id) => markNotificationAsRead(id);
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    await deleteUserNotification(id);
+  };
   const nav = (page) => { if (onNavigate) onNavigate(page); };
 
   return (
@@ -83,17 +117,44 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                   <h4>Notifications {unreadCount > 0 && <span className="nb-notif-count">{unreadCount}</span>}</h4>
                   {unreadCount > 0 && <button className="nb-notif-clear" onClick={clearAll}>Mark all read</button>}
                 </div>
-                {notifications.map(n => (
-                  <div key={n.id} className={`nb-notif-item${n.unread ? " unread" : ""}`} onClick={() => markRead(n.id)}>
-                    <div className="nb-notif-icon" style={{ background: n.bg }}>{n.icon}</div>
-                    <div className="nb-notif-body">
-                      <div className="nb-notif-title">{n.title}</div>
-                      <div className="nb-notif-desc">{n.desc}</div>
-                      <div className="nb-notif-time">{n.time}</div>
+                <div className="nb-notif-body-wrap" style={{ maxHeight: "350px", overflowY: "auto" }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "1.5rem 1rem", textAlign: "center", color: "var(--muted)", fontSize: "0.85rem" }}>
+                      No notifications yet.
                     </div>
-                    {n.unread && <div className="nb-unread-dot" />}
-                  </div>
-                ))}
+                  ) : (
+                    notifications.map(n => {
+                      const style = NOTIF_ICONS[n.type] || NOTIF_ICONS.general;
+                      return (
+                        <div key={n.id} className={`nb-notif-item${!n.isRead ? " unread" : ""}`} onClick={() => markRead(n.id)}>
+                          <div className="nb-notif-icon" style={{ background: style.bg }}>{style.icon}</div>
+                          <div className="nb-notif-body">
+                            <div className="nb-notif-title">{n.title}</div>
+                            <div className="nb-notif-desc">{n.message}</div>
+                            <div className="nb-notif-time">{formatNotifTime(n.createdAt)}</div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+                            {!n.isRead && <div className="nb-unread-dot" />}
+                            <button
+                              className="nb-notif-delete-btn"
+                              title="Delete"
+                              onClick={(e) => handleDelete(e, n.id)}
+                              style={{
+                                background: "none", border: "none", cursor: "pointer",
+                                padding: "4px", borderRadius: "4px", color: "var(--muted)",
+                                fontSize: "0.7rem", lineHeight: 1, display: "flex",
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.color = "#e03e3e"}
+                              onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>

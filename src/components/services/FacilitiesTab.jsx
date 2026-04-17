@@ -8,7 +8,8 @@ import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, Servi
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-export default function FacilitiesTab({ userData, householdID, userName }) {
+// ── 1. Main Facilities Tab Component ──
+export default function FacilitiesTab({ userData, householdID, userName, userID }) {
   const [facilities, setFacilities] = useState([]);
   const [reservationFacility, setReservationFacility] = useState(null);
 
@@ -57,12 +58,13 @@ export default function FacilitiesTab({ userData, householdID, userName }) {
             <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-            <ReservationForm
-              facility={reservationFacility}
-              onBack={() => setReservationFacility(null)}
-              userData={userData}
-              householdID={householdID}
-              userName={userName}
+            <ReservationForm 
+              facility={reservationFacility} 
+              onBack={() => setReservationFacility(null)} 
+              userData={userData} 
+              householdID={householdID} 
+              userName={userName} 
+              userID={userID}
             />
           </div>
         </div>
@@ -133,8 +135,8 @@ function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates
   );
 }
 
-// ── Reservation Form ──
-function ReservationForm({ onBack, facility, userData, householdID, userName }) {
+// ── 3. Reservation Form Component ──
+function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
   const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
@@ -145,7 +147,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
 
   useEffect(() => {
     if (!facility) return;
-    const unsub = onSnapshot(collection(db, "facilityReservations"), (snapshot) => {
+    const unsub = onSnapshot(collection(db, "facility_reservations"), (snapshot) => {
       const allRes = [];
       const datesWithRes = new Set();
       snapshot.docs.forEach(doc => {
@@ -223,16 +225,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
-      const generatedRef = await submitFacilityReservation(householdID, userData?.userID || "", userName || "User", facility, form, customData);
-
-      // 🆕 Notify admins about new facility reservation
-      await createNotification(
-        "facility_request",
-        `New facility reservation for "${facilityName}" on ${form.date} by ${form.fullName || userName || "a resident"}.`,
-        form.email || form.fullName || userName || "Unknown",
-        generatedRef || ""
-      );
-
+      const generatedRef = await submitFacilityReservation(householdID, userID || "", userName || "Unknown", facility, form, customData);
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {

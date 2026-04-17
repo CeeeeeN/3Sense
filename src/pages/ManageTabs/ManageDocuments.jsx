@@ -15,7 +15,7 @@ export default function ManageDocuments() {
   const [newDocument, setNewDocument] = useState({ title: "", processingTime: "", fee: "", description: "", reminder: "", customFields: [] });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "document_types"), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setDocuments(data);
     });
@@ -38,7 +38,7 @@ export default function ManageDocuments() {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this document type?")) {
       try {
-        await deleteDoc(doc(db, "document_types", id));
+        await deleteDoc(doc(db, "documents", id));
       } catch(error) {
         console.error("Error deleting document type: ", error);
       }
@@ -49,9 +49,9 @@ export default function ManageDocuments() {
     e.preventDefault();
     try {
       if (editingDocId) {
-        await updateDoc(doc(db, "document_types", editingDocId), { ...newDocument });
+        await updateDoc(doc(db, "documents", editingDocId), { ...newDocument });
       } else {
-        await addDoc(collection(db, "document_types"), { ...newDocument, createdAt: serverTimestamp() });
+        await addDoc(collection(db, "documents"), { ...newDocument, createdAt: serverTimestamp() });
       }
       setNewDocument({ title: "", processingTime: "", fee: "", description: "", reminder: "", customFields: [] });
       setEditingDocId(null);

@@ -5,7 +5,6 @@ export const createAnnouncement = async (data, adminID) => {
   const announcementsRef = collection(db, "announcements");
   await addDoc(announcementsRef, {
     adminID: adminID || "Admin",
-    userID: data.userID || "",
     title: data.title || "",
     description: data.description || "",
     category: data.category || "All Residents", // Target Audience

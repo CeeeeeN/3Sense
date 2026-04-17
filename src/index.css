@@ -14540,6 +14540,21 @@ h1,h2,h3,h4,.poppins {
   color: #c0392b;
 }
 
+.pf-tx-badge.approved {
+  background: rgba(13,122,85,0.1);
+  color: #0d7a55;
+}
+
+.pf-tx-badge.ready-for-pickup {
+  background: rgba(26,79,138,0.1);
+  color: #1a4f8a;
+}
+
+.pf-tx-badge.claimed {
+  background: rgba(100,100,200,0.08);
+  color: #5a5aaf;
+}
+
 .pf-tx-bdot {
   width: 5px;
   height: 5px;

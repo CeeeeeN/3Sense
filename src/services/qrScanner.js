@@ -67,7 +67,7 @@ export async function processQRScan({ qrUrl, userID, householdID }) {
       if (serviceId === "documents_global") {
         isValid = true;
       } else {
-        const docRef = doc(db, "document_types", serviceId);
+        const docRef = doc(db, "documents", serviceId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           isValid = true;

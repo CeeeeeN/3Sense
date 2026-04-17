@@ -5,12 +5,9 @@ import {
 } from "firebase/firestore";
 
 const generateRef = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  const year = new Date().getFullYear();
+  const rand = String(Math.floor(10000 + Math.random() * 90000));
+  return `BM-${year}-${rand}`;
 };
 
 // ══════════════════════════════
@@ -18,7 +15,7 @@ const generateRef = () => {
 // ══════════════════════════════
 export async function submitDocumentRequest(householdID, userID, userName, docType, form, customData = {}) {
   const refNum = generateRef();
-  await addDoc(collection(db, "documentRequests"), {
+  await addDoc(collection(db, "document_requests"), {
     refNum, householdID, userID,
     requesterName: userName,
     documentType: docType.name || docType.title,
@@ -38,7 +35,7 @@ export async function submitDocumentRequest(householdID, userID, userName, docTy
     purpose: form.purpose,
     validIdFileName: form.validId || "",
     status: "Pending",
-    ...customData,
+    customFields: customData,
     submittedAt: serverTimestamp(),
   });
   return refNum;
@@ -46,7 +43,7 @@ export async function submitDocumentRequest(householdID, userID, userName, docTy
 
 export async function getDocumentRequests(householdID) {
   const q = query(
-    collection(db, "documentRequests"),
+    collection(db, "document_requests"),
     where("householdID", "==", householdID),
     orderBy("submittedAt", "desc")
   );
@@ -59,7 +56,7 @@ export async function getDocumentRequests(householdID) {
 // ══════════════════════════════
 export async function submitFacilityReservation(householdID, userID, userName, facility, form, customData = {}) {
   const refNum = generateRef();
-  await addDoc(collection(db, "facilityReservations"), {
+  await addDoc(collection(db, "facility_reservations"), {
     refNum, householdID, userID,
     requesterName: form.fullName || userName,
     fullName: form.fullName || userName,
@@ -74,7 +71,7 @@ export async function submitFacilityReservation(householdID, userID, userName, f
     attendees: form.attendees || "",
     notes: form.notes || "",
     status: "Pending",
-    ...customData,
+    customFields: customData,
     submittedAt: serverTimestamp(),
   });
   return refNum;
@@ -177,4 +174,53 @@ export async function getLivelihoodRegistrations(householdID) {
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+// ══════════════════════════════
+// 📋 USER TRANSACTION HISTORY
+// ══════════════════════════════
+export async function fetchUserTransactions(userID) {
+  if (!userID) return [];
+
+  // Fetch document requests
+  const docQ = query(
+    collection(db, "document_requests"),
+    where("userID", "==", userID)
+  );
+  const docSnap = await getDocs(docQ);
+  const docs = docSnap.docs.map(d => ({
+    id: d.id,
+    category: "Document",
+    serviceName: d.data().documentType || "Document Request",
+    refNum: d.data().refNum || "",
+    status: d.data().status || "Pending",
+    date: d.data().submittedAt,
+    ...d.data(),
+  }));
+
+  // Fetch facility reservations
+  const facQ = query(
+    collection(db, "facility_reservations"),
+    where("userID", "==", userID)
+  );
+  const facSnap = await getDocs(facQ);
+  const facs = facSnap.docs.map(d => ({
+    id: d.id,
+    category: "Facility",
+    serviceName: d.data().facilityName || "Facility Reservation",
+    refNum: d.data().refNum || "",
+    status: d.data().status || "Pending",
+    date: d.data().submittedAt,
+    ...d.data(),
+  }));
+
+  // Merge and sort by date descending
+  const all = [...docs, ...facs];
+  all.sort((a, b) => {
+    const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+    const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+    return tb - ta;
+  });
+
+  return all;
 }
