@@ -9,7 +9,7 @@ const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 // ── 1. Main Facilities Tab Component ──
-export default function FacilitiesTab({ userData, householdID, userName }) {
+export default function FacilitiesTab({ userData, householdID, userName, userID }) {
   const [facilities, setFacilities] = useState([]);
   
   // This state MUST be inside the main component!
@@ -67,6 +67,7 @@ export default function FacilitiesTab({ userData, householdID, userName }) {
               userData={userData} 
               householdID={householdID} 
               userName={userName} 
+              userID={userID}
             />
           </div>
         </div>
@@ -138,7 +139,7 @@ function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates
 }
 
 // ── 3. Reservation Form Component ──
-function ReservationForm({ onBack, facility, userData, householdID, userName }) {
+function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
   const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
@@ -149,7 +150,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
 
   useEffect(() => {
     if (!facility) return;
-    const unsub = onSnapshot(collection(db, "facilityReservations"), (snapshot) => {
+    const unsub = onSnapshot(collection(db, "facility_reservations"), (snapshot) => {
       const allRes = [];
       const datesWithRes = new Set();
       snapshot.docs.forEach(doc => {
@@ -236,7 +237,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName }) 
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
-      const generatedRef = await submitFacilityReservation(householdID, userData?.userID || "", userName || "User", facility, form, customData);
+      const generatedRef = await submitFacilityReservation(householdID, userID || "", userName || "Unknown", facility, form, customData);
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {

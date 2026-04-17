@@ -250,6 +250,7 @@ export default function UserApp() {
           householdID={householdID}
           userName={userName}
           userRole={userRole}
+          memberID={memberID}
         />
         <Dashboard userName={userName} onNavigate={handleNav} householdID={householdID} memberID={memberID} userRole={userRole} />
       </div>
@@ -266,6 +267,7 @@ export default function UserApp() {
           householdID={householdID}
           userName={userName}
           userRole={userRole}
+          memberID={memberID}
         />
         <ServicesPage onNavigate={handleNav} householdID={householdID} memberID={memberID} userName={userName} />
       </div>
@@ -282,6 +284,7 @@ export default function UserApp() {
           householdID={householdID}
           userName={userName}
           userRole={userRole}
+          memberID={memberID}
         />
         <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} userID={userID} />
       </div>
@@ -303,6 +306,7 @@ export default function UserApp() {
           householdID={householdID}
           userName={userName}
           userRole={userRole}
+          memberID={memberID}
         />
         <FeedbackForm
           onNavigate={(p, data) => {
@@ -328,6 +332,7 @@ export default function UserApp() {
           householdID={householdID}
           userName={userName}
           userRole={userRole}
+          memberID={memberID}
         />
         <ActivityPage onNavigate={handleNav} userName={userName} />
       </div>
@@ -344,6 +349,7 @@ export default function UserApp() {
           householdID={householdID}
           userName={userName}
           userRole={userRole}
+          memberID={memberID}
         />
         <EmergencyPage onNavigate={handleNav} userName={userName} />
       </div>

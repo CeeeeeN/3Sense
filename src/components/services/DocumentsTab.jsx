@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
-import { createNotification } from "../../services/notifications"; // 🆕
+import { submitDocumentRequest } from "../../services/services";
+import { createNotification } from "../../services/notifications";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
-const STEP_LABELS  = ["Select Document", "Personal Details", "Review", "Done"];
+const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
 
 // ── Step Indicator ──
 function StepIndicator({ step }) {
@@ -12,13 +13,13 @@ function StepIndicator({ step }) {
     <div className="dr-steps">
       {STEP_LABELS.map((label, i) => {
         const num = i + 1;
-        const done   = num < step;
+        const done = num < step;
         const active = num === step;
         return (
           <div key={i} className="dr-step-item">
             <div className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
               {done
-                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 : num}
             </div>
             <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
@@ -42,7 +43,7 @@ function Step1({ docTypes, selected, onSelect }) {
             className={`dr-doc-row${selected?.id === d.id ? " dr-doc-row--selected" : ""}`}
             onClick={() => onSelect(d)}
           >
-            <div className="dr-doc-row__icon">{d.icon || <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>}</div>
+            <div className="dr-doc-row__icon">{d.icon || <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}</div>
             <div className="dr-doc-row__body">
               <div className="dr-doc-row__name">{d.title || d.name}</div>
               <div className="dr-doc-row__desc">{d.description || d.desc}</div>
@@ -53,8 +54,8 @@ function Step1({ docTypes, selected, onSelect }) {
             </div>
             <div className="dr-doc-row__check">
               {selected?.id === d.id
-                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               }
             </div>
           </button>
@@ -153,12 +154,12 @@ function Step2({ docType, form, setForm, errors }) {
           <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
           {form.validId ? (
             <div className="dr-upload-done">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               <span>{form.validId}</span>
             </div>
           ) : (
             <div className="dr-upload-placeholder">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
               <span>Click to upload</span>
               <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
             </div>
@@ -202,16 +203,16 @@ function Step2({ docType, form, setForm, errors }) {
 function Step3({ docType, form }) {
   const extraFields = docType?.customFields || [];
   const rows = [
-    { label: "Document Type",    value: docType?.title || docType?.name, full: true },
-    { label: "Full Name",        value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
-    { label: "Date of Birth",    value: form.dob },
-    { label: "Civil Status",     value: form.civilStatus },
-    { label: "Residing Since",   value: form.residingSince ? `${form.residingSince} up to present` : "—" },
-    { label: "Address",          value: form.address, full: true },
-    { label: "Contact Number",   value: form.contact },
-    { label: "Email",            value: form.email || "—" },
-    { label: "Purpose",          value: form.purpose, full: true },
-    { label: "Valid ID Uploaded",value: form.validId || "—" },
+    { label: "Document Type", value: docType?.title || docType?.name, full: true },
+    { label: "Full Name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
+    { label: "Date of Birth", value: form.dob },
+    { label: "Civil Status", value: form.civilStatus },
+    { label: "Residing Since", value: form.residingSince ? `${form.residingSince} up to present` : "—" },
+    { label: "Address", value: form.address, full: true },
+    { label: "Contact Number", value: form.contact },
+    { label: "Email", value: form.email || "—" },
+    { label: "Purpose", value: form.purpose, full: true },
+    { label: "Valid ID Uploaded", value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
     ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
   ];
@@ -237,7 +238,7 @@ function Step4({ refNum, onReset }) {
     <div className="sv-success-wrap">
       <div className="sv-success-icon" style={{ width: 64, height: 64 }}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
         </svg>
       </div>
       <h3 className="sv-success-title">Request Submitted!</h3>
@@ -248,11 +249,11 @@ function Step4({ refNum, onReset }) {
       </div>
       <div className="dr-success-info">
         <div className="dr-success-info-item">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></svg>
           You will receive an SMS notification once your request is processed.
         </div>
         <div className="dr-success-info-item">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
           Processing time: 2–3 business days.
         </div>
       </div>
@@ -261,43 +262,15 @@ function Step4({ refNum, onReset }) {
   );
 }
 
-// ── submitDocumentRequest (inline helper) ──
-async function submitDocumentRequest(householdID, userID, userName, docType, form, customData) {
-  const refNum = `BM-${new Date().getFullYear()}-${String(Math.floor(10000 + Math.random() * 90000))}`;
-  await addDoc(collection(db, "documentRequests"), {
-    refNum,
-    householdID: householdID || "",
-    userID: userID || "",
-    fullName: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "),
-    firstName: form.firstName,
-    middleName: form.middleName,
-    lastName: form.lastName,
-    dob: form.dob,
-    civilStatus: form.civilStatus,
-    address: form.address,
-    contact: form.contact,
-    email: form.email,
-    residingSince: form.residingSince,
-    purpose: form.purpose,
-    validIdFileName: form.validId || "",
-    documentId: docType.id,
-    documentType: docType.title || docType.name,
-    fee: docType.fee || "",
-    processingDays: docType.processingTime || docType.days || "",
-    status: "Pending",
-    submittedAt: serverTimestamp(),
-    ...customData,
-  });
-  return refNum;
-}
+
 
 // ── Documents Tab ──
-export default function DocumentsTab({ userData, householdID, userName }) {
+export default function DocumentsTab({ userData, householdID, userName, userID }) {
   const [docTypes, setDocTypes] = useState([]);
-  const [step, setStep]       = useState(1);
+  const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
-  const [errors, setErrors]   = useState({});
-  const [refNum, setRefNum]   = useState(() => `BM-2026-${Math.floor(10000 + Math.random() * 90000)}`);
+  const [errors, setErrors] = useState({});
+  const [refNum, setRefNum] = useState("");
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
@@ -306,7 +279,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "document_types"), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
       setDocTypes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
@@ -317,6 +290,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     if (userData) {
       const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city]
         .filter(Boolean).join(", ");
+
       setForm(f => ({
         ...f,
         firstName: userData.firstName || "",
@@ -337,15 +311,15 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   };
 
   const validateStep2 = () => {
-    const e = {};
-    if (!form.firstName.trim())              e.firstName    = "Required.";
-    if (!form.lastName.trim())               e.lastName     = "Required.";
-    if (!form.dob)                           e.dob          = "Required.";
-    if (!form.address.trim())                e.address      = "Required.";
-    if (!String(form.contact || "").trim())  e.contact      = "Required.";
-    if (!form.residingSince)                 e.residingSince = "Required.";
-    if (!form.purpose.trim())                e.purpose      = "Required.";
-    if (!form.validId)                       e.validId      = "Please upload a valid ID.";
+    const e = {}
+    if (!form.firstName.trim()) e.firstName = "Required.";
+    if (!form.lastName.trim()) e.lastName = "Required.";
+    if (!form.dob) e.dob = "Required.";
+    if (!form.address.trim()) e.address = "Required.";
+    if (!String(form.contact || "").trim()) e.contact = "Required.";
+    if (!form.residingSince) e.residingSince = "Required.";
+    if (!form.purpose.trim()) e.purpose = "Required.";
+    if (!form.validId) e.validId = "Please upload a valid ID.";
     const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
@@ -366,13 +340,13 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
-        const generatedRef = await submitDocumentRequest(householdID, userData?.userID || "", userName || "Unknown", docType, form, customData);
+        const generatedRef = await submitDocumentRequest(householdID, userID || "", userName || "Unknown", docType, form, customData);
         setRefNum(generatedRef);
 
         // 🆕 Notify all admins about new document request
         const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") || userName || "Unknown";
         await createNotification(
-          "document_request",
+          "document_requests",
           `New document request (${docType.title || docType.name}) submitted by ${fullName}.`,
           form.email || fullName,
           generatedRef

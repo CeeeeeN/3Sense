@@ -80,7 +80,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                   <div><div className="sc-card-title">Barangay Facilities</div><div className="sc-card-subtitle">Check availability and reserve a facility</div></div>
                 </div>
               </div>
-              <FacilitiesTab userData={userData} householdID={householdID} userName={userName} />
+              <FacilitiesTab userData={userData} householdID={householdID} userName={userName} userID={memberID} />
             </>
           )}
 
@@ -92,12 +92,12 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                   <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online</div></div>
                 </div>
               </div>
-              <DocumentsTab userData={userData} householdID={householdID} userName={userName} />
+              <DocumentsTab userData={userData} householdID={householdID} userName={userName} userID={memberID} />
             </>
           )}
 
           {activeTab === "services" && (
-            <ServicesTab userData={userData} householdID={householdID} userName={userName} />
+            <ServicesTab userData={userData} householdID={householdID} userName={userName} userID={memberID} />
           )}
         </div>
       </div>

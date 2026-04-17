@@ -87,7 +87,7 @@ export default function ActivityPage({ onNavigate }) {
 
     // B. Fetch Documents
     const qDocs = query(
-      collection(db, "documentRequests"),
+      collection(db, "document_requests"),
       where("userID", "==", activeUserId),
       orderBy("createdAt", "desc")
     );
@@ -97,7 +97,7 @@ export default function ActivityPage({ onNavigate }) {
 
     // C. Fetch Reservations
     const qReservations = query(
-      collection(db, "facilityReservations"),
+      collection(db, "facility_reservations"),
       where("userID", "==", activeUserId),
       orderBy("createdAt", "desc")
     );

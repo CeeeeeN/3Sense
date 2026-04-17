@@ -4,6 +4,7 @@ import AdminLayout from "../components/AdminLayout";
 import { Search, Eye, CheckCircle, XCircle, X, Calendar, FileText, User, Info, Clock } from 'lucide-react';
 import { db } from '../firebase/firebase';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { createUserNotification } from '../services/userNotifications';
 
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
@@ -46,47 +47,54 @@ export default function AdminRequests() {
 
   // --- REAL-TIME FIREBASE FETCH ---
   useEffect(() => {
-    const unsubscribeDocs = onSnapshot(collection(db, 'documentRequests'), (snapshot) => {
+    const unsubscribeDocs = onSnapshot(collection(db, 'document_requests'), (snapshot) => {
       const docData = snapshot.docs.map(doc => {
         const data = doc.data();
+        let rawDate = data.submittedAt || data.dateRequested || null;
         return {
           docId: doc.id,
-          collectionName: 'documentRequests',
+          collectionName: 'document_requests',
           id: data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
           residentName: data.fullName || data.residentName || formatName(data.firstName, data.middleName, data.lastName),
           contact: data.email || 'No email provided',
           category: 'Document',
           type: data.documentType || 'Unknown Document',
           purpose: data.purpose || 'No purpose stated',
-          dateRequested: formatDate(data.submittedAt || data.dateRequested),
+          dateRequested: formatDate(rawDate),
+          rawDate: rawDate,
           dateNeeded: formatDate(data.dateNeeded),
           status: data.status || 'Pending',
           allData: data // Store all data for the View modal
         };
       });
 
-      const unsubscribeFacilities = onSnapshot(collection(db, 'facilityReservations'), (facSnapshot) => {
+      const unsubscribeFacilities = onSnapshot(collection(db, 'facility_reservations'), (facSnapshot) => {
         const facData = facSnapshot.docs.map(doc => {
           const data = doc.data();
           const time = data.timeSlot ? ` (${data.timeSlot})` : '';
-
+          let rawDate = data.submittedAt || data.dateRequested || null;
           return {
             docId: doc.id,
-            collectionName: 'facilityReservations',
+            collectionName: 'facility_reservations',
             id: data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
             residentName: data.requesterName,
             contact: data.email || 'No email provided',
             category: 'Facility',
             type: data.facilityName || data.facility || 'Unknown Facility',
             purpose: data.purpose || 'No purpose stated',
-            dateRequested: formatDate(data.submittedAt || data.dateRequested),
+            dateRequested: formatDate(rawDate),
+            rawDate: rawDate,
             dateNeeded: data.date ? `${data.date} (${formatTime(data.startTime)} - ${formatTime(data.endTime)})` : (formatDate(data.reservationDate) + time),
             status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
             allData: data
           };
         });
 
-        const combined = [...docData, ...facData].sort((a, b) => b.id.localeCompare(a.id));
+        const combined = [...docData, ...facData].sort((a, b) => {
+          const dateA = a.rawDate?.toDate ? a.rawDate.toDate().getTime() : (a.rawDate ? new Date(a.rawDate).getTime() : 0);
+          const dateB = b.rawDate?.toDate ? b.rawDate.toDate().getTime() : (b.rawDate ? new Date(b.rawDate).getTime() : 0);
+          return dateB - dateA;
+        });
         setRequests(combined);
         setLoading(false);
       });
@@ -154,12 +162,81 @@ export default function AdminRequests() {
 
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'approved' });
+      await updateDoc(requestRef, { status: 'Approved' });
+
+      // Notify the resident
+      const memberID = target.allData?.userID || "";
+      const refNum = target.id || "";
+      if (memberID) {
+        const label = target.category === 'Document' ? target.type : target.type;
+        await createUserNotification(
+          memberID,
+          `${target.category} Request Approved`,
+          `Your request for "${label}" has been approved.`,
+          target.category === 'Document' ? 'document_update' : 'facility_update',
+          refNum
+        );
+      }
+
       alert("Request Approved Successfully!");
       closeModal();
     } catch (error) {
       console.error("Error approving request: ", error);
       alert("Failed to approve request.");
+    }
+  };
+
+  const handleReadyForPickup = async (req) => {
+    const target = req || selectedRequest;
+    if (!target) return;
+    try {
+      const requestRef = doc(db, target.collectionName, target.docId);
+      await updateDoc(requestRef, { status: 'Ready for Pickup' });
+
+      const memberID = target.allData?.userID || "";
+      const refNum = target.id || "";
+      if (memberID) {
+        await createUserNotification(
+          memberID,
+          "Document Ready for Pickup",
+          `Your document "${target.type}" is now ready for pickup at the Barangay Hall.`,
+          'document_update',
+          refNum
+        );
+      }
+
+      alert("Request Marked as Ready for Pickup.");
+      closeModal();
+    } catch (error) {
+      console.error("Error updating request: ", error);
+      alert("Failed to update request.");
+    }
+  };
+
+  const handleClaimed = async (req) => {
+    const target = req || selectedRequest;
+    if (!target) return;
+    try {
+      const requestRef = doc(db, target.collectionName, target.docId);
+      await updateDoc(requestRef, { status: 'Claimed' });
+
+      const memberID = target.allData?.userID || "";
+      const refNum = target.id || "";
+      if (memberID) {
+        await createUserNotification(
+          memberID,
+          "Document Claimed",
+          `Your document "${target.type}" has been marked as claimed. Thank you!`,
+          'document_update',
+          refNum
+        );
+      }
+
+      alert("Request Marked as Claimed.");
+      closeModal();
+    } catch (error) {
+      console.error("Error updating request: ", error);
+      alert("Failed to update request.");
     }
   };
 
@@ -172,9 +249,23 @@ export default function AdminRequests() {
     try {
       const requestRef = doc(db, selectedRequest.collectionName, selectedRequest.docId);
       await updateDoc(requestRef, {
-        status: 'rejected',
+        status: 'Rejected',
         rejectionReason: rejectReason
       });
+
+      const memberID = selectedRequest.allData?.userID || "";
+      const refNum = selectedRequest.id || "";
+      if (memberID) {
+        const label = selectedRequest.type || 'Request';
+        await createUserNotification(
+          memberID,
+          `${selectedRequest.category} Request Rejected`,
+          `Your request for "${label}" has been rejected. Reason: ${rejectReason}`,
+          selectedRequest.category === 'Document' ? 'document_update' : 'facility_update',
+          refNum
+        );
+      }
+
       alert("Request Rejected.");
       closeModal();
     } catch (error) {
@@ -230,6 +321,8 @@ export default function AdminRequests() {
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
+              <option value="Ready for Pickup">Ready for Pickup</option>
+              <option value="Claimed">Claimed</option>
               <option value="Rejected">Rejected</option>
             </select>
           </div>
@@ -300,6 +393,16 @@ export default function AdminRequests() {
                               <XCircle size={16} /> Reject
                             </button>
                           </>
+                        )}
+                        {req.status.toLowerCase() === 'approved' && req.category === 'Document' && (
+                          <button className="btn-approve" title="Ready for Pickup" onClick={(e) => { e.stopPropagation(); handleReadyForPickup(req); }}>
+                            <CheckCircle size={16} /> Mark Ready
+                          </button>
+                        )}
+                        {req.status.toLowerCase() === 'ready for pickup' && req.category === 'Document' && (
+                          <button className="btn-approve" title="Claimed" onClick={(e) => { e.stopPropagation(); handleClaimed(req); }}>
+                            <CheckCircle size={16} /> Mark Claimed
+                          </button>
                         )}
                         <button className="btn-view" title="View Details" onClick={(e) => { e.stopPropagation(); openViewModal(req); }}>
                           <Eye size={16} /> View
@@ -452,18 +555,8 @@ export default function AdminRequests() {
                   <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>Section 3: Additional Specific Requirements</h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                     {/* Dynamic Fields Mapping */}
-                    {selectedRequest.allData && Object.entries(selectedRequest.allData)
-                      .filter(([key, value]) => {
-                        const standardFields = [
-                          'id', 'status', 'firstName', 'middleName', 'lastName', 'residentName', 'requesterName', 'fullName',
-                          'email', 'contact', 'contactNumber', 'purpose', 'dateRequested', 'dateNeeded', 'reservationDate',
-                          'timeSlot', 'documentType', 'facility', 'referenceNumber', 'allData', 'docId', 'facilityName',
-                          'collectionName', 'category', 'type', 'rejectionReason', 'birthDate', 'dateOfBirth', 'dob',
-                          'civilStatus', 'address', 'residingSince', 'paxCount', 'mobile', 'ctc', 'notes', 'attendees',
-                          'date', 'startTime', 'endTime', 'facilityId', 'documentId', 'processingDays', 'fee', 'refNum', 'validIdFileName', 'householdID', 'submittedAt'
-                        ];
-                        return !standardFields.includes(key) && typeof value !== 'object' && value !== '';
-                      })
+                    {selectedRequest.allData?.customFields && Object.entries(selectedRequest.allData.customFields)
+                      .filter(([key, value]) => typeof value !== 'object' && value !== '')
                       .map(([key, value]) => (
                         <div className="detail-item" key={key}>
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</label>
@@ -471,11 +564,8 @@ export default function AdminRequests() {
                         </div>
                       ))}
 
-                    {(!selectedRequest.allData || Object.entries(selectedRequest.allData)
-                      .filter(([key, value]) => {
-                        const standardFields = ['id', 'status', 'firstName', 'middleName', 'lastName', 'residentName', 'requesterName', 'fullName', 'email', 'contact', 'contactNumber', 'purpose', 'dateRequested', 'dateNeeded', 'reservationDate', 'timeSlot', 'documentType', 'facility', 'referenceNumber', 'allData', 'docId', 'facilityName', 'collectionName', 'category', 'type', 'rejectionReason', 'birthDate', 'dateOfBirth', 'dob', 'civilStatus', 'address', 'residingSince', 'paxCount', 'mobile', 'ctc', 'notes', 'attendees', 'date', 'startTime', 'endTime', 'facilityId', 'documentId', 'processingDays', 'fee', 'refNum', 'validIdFileName', 'householdID', 'submittedAt'];
-                        return !standardFields.includes(key) && typeof value !== 'object' && value !== '';
-                      }).length === 0) && (
+                    {(!selectedRequest.allData?.customFields || Object.entries(selectedRequest.allData.customFields)
+                      .filter(([key, value]) => typeof value !== 'object' && value !== '').length === 0) && (
                         <p style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No additional requirements answered for this request.</p>
                       )}
 
@@ -499,6 +589,16 @@ export default function AdminRequests() {
                       <CheckCircle size={16} /> Approve
                     </button>
                   </>
+                )}
+                {selectedRequest.status.toLowerCase() === 'approved' && selectedRequest.category === 'Document' && (
+                  <button className="btn-approve" onClick={() => handleReadyForPickup()}>
+                    <CheckCircle size={16} /> Mark Ready for Pickup
+                  </button>
+                )}
+                {selectedRequest.status.toLowerCase() === 'ready for pickup' && selectedRequest.category === 'Document' && (
+                  <button className="btn-approve" onClick={() => handleClaimed()}>
+                    <CheckCircle size={16} /> Mark Claimed
+                  </button>
                 )}
               </div>
             </div>

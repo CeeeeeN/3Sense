@@ -61,13 +61,13 @@ export default function AdminDashboard() {
     });
 
     // Document Requests
-    const qDocRequests = query(collection(db, "documentRequests"), where("status", "==", "Pending"));
+    const qDocRequests = query(collection(db, "document_requests"), where("status", "==", "Pending"));
     const unsubDocRequests = onSnapshot(qDocRequests, (snapshot) => {
       setStats(prev => ({ ...prev, docRequests: snapshot.size }));
     });
 
     // Facility Reservations
-    const qFacilityRequests = query(collection(db, "facilityReservations"), where("status", "==", "Pending"));
+    const qFacilityRequests = query(collection(db, "facility_reservations"), where("status", "==", "Pending"));
     const unsubFacilityRequests = onSnapshot(qFacilityRequests, (snapshot) => {
       setStats(prev => ({ ...prev, facilityRequests: snapshot.size }));
     });

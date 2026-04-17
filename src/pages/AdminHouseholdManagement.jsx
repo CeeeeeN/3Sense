@@ -16,6 +16,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { approveRegistration } from "../services/admin";
+import { createUserNotification } from "../services/userNotifications";
 
 export default function HouseholdManagement() {
 
@@ -312,6 +313,12 @@ export default function HouseholdManagement() {
         // Append to history array (Firestore arrayUnion won't deduplicate objects, use array append instead)
         statusHistory: arrayUnion(historyEntry),
       });
+
+      // 🆕 Notify Resident
+      const notifMsg = statusData.status === "Clear Case" 
+        ? "Your barangay status is now Clear." 
+        : `Your barangay status has been updated to: ${statusData.status}.`;
+      await createUserNotification(statusData.id, "Status Update", notifMsg, "general");
 
       setShowStatusModal(false);
       setStatusData(null);
