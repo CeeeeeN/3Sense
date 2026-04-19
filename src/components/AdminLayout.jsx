@@ -151,13 +151,25 @@ export default function AdminLayout({ children }) {
     }
   };
 
+  const handleLinkClick = () => {
+    setIsOpen(false);
+  };
+
   return (
     <div className="admin-layout">
       
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          style={{ position: "fixed", inset: 0, zIndex: 40, backgroundColor: "rgba(0,0,0,0.5)" }} 
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <div className={`left-panel ${isOpen ? "active" : ""}`}>
+      <div className={`left-panel ${isOpen ? "active" : ""}`} style={{ zIndex: 50 }}>
         <div className="left-logo">
-          <img src="/icons/logo.png" className="logo-img" />
+          <img src="/icons/logo.png" className="logo-img" alt="Logo" />
           <div className="logo-text-group">
             <div className="admin-panel-label">Admin Panel</div>
             <div className="left-logo-text">Barangay 3S+ Malanday</div>
@@ -165,21 +177,31 @@ export default function AdminLayout({ children }) {
         </div>
 
         <div className="nav-links">
-          <Link className={location.pathname === "/admin/dashboard" ? "active" : ""} to="/admin/dashboard">Dashboard</Link>
-          <Link className={location.pathname === "/admin/manage" ? "active" : ""} to="/admin/manage">Manage</Link>
-          <Link className={location.pathname === "/admin/requests" ? "active" : ""} to="/admin/requests">Requests</Link>
-          <Link className={location.pathname === "/admin/feedback" ? "active" : ""} to="/admin/feedback">Feedback</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/dashboard" ? "active" : ""} to="/admin/dashboard">Dashboard</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/manage" ? "active" : ""} to="/admin/manage">Manage</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/requests" ? "active" : ""} to="/admin/requests">Requests</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/feedback" ? "active" : ""} to="/admin/feedback">Feedback</Link>
 
           <div className="nav-divider"></div>
 
-          <Link className={location.pathname === "/admin/admin-management" ? "active" : ""} to="/admin/admin-management">Admin Management</Link>
-          <Link className={location.pathname === "/admin/household-management" ? "active" : ""} to="/admin/household-management">Household Management</Link>
-          <Link className={location.pathname === "/admin/reports" ? "active" : ""} to="/admin/reports">Reports</Link>
-          <Link className={location.pathname === "/admin/profile" ? "active" : ""} to="/admin/profile">My Profile</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/admin-management" ? "active" : ""} to="/admin/admin-management">Admin Management</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/household-management" ? "active" : ""} to="/admin/household-management">Household Management</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/reports" ? "active" : ""} to="/admin/reports">Reports</Link>
+          <Link onClick={handleLinkClick} className={location.pathname === "/admin/profile" ? "active" : ""} to="/admin/profile">My Profile</Link>
         </div>
 
         <div className="sidebar-bottom">
-          <a href="#" className="logout-link" onClick={(e) => { e.preventDefault(); setShowLogoutModal(true); }}>
+          <a 
+            href="#" 
+            className="logout-link" 
+            onClick={(e) => { e.preventDefault(); setShowLogoutModal(true); }}
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              position: "relative", 
+              zIndex: 10 
+            }}
+          >
             Logout
           </a>
         </div>
@@ -187,7 +209,6 @@ export default function AdminLayout({ children }) {
 
       {/* RIGHT PANEL */}
       <div className="right-panel">
-        <button className="burger-menu" onClick={() => setIsOpen(!isOpen)}>☰</button>
 
         <div className="top-bar">
           <h1>{topBarTitle}</h1>
@@ -246,6 +267,8 @@ export default function AdminLayout({ children }) {
               <p className="admin-name">{currentUserData.fullName}</p>
               <div className="dropdown-role">{currentUserData.position}</div>
             </div>
+
+            {/* The hamburger button that was here has been removed! */}
 
           </div>
         </div>
