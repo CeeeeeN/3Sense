@@ -34,6 +34,8 @@ export default function AdminFeedback() {
   const [filterService, setFilterService] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Change this to show more/less items per page
 
   // Helper to assign CSS classes
   const getBadgeClass = (text) => {
@@ -91,6 +93,48 @@ export default function AdminFeedback() {
       return matchesSearch && matchesService && matchesTag && matchesStatus;
     });
   }, [feedbacks, searchTerm, filterService, filterTag, filterStatus]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterService, filterTag, filterStatus]);
+
+  const totalPages = Math.ceil(filteredFeedbacks.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  // This is the slice of data actually shown on the table
+  const currentFeedbacks = filteredFeedbacks.slice(startIndex, startIndex + itemsPerPage); 
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => typeof page === 'number' ? setCurrentPage(page) : null}
+        disabled={typeof page !== 'number'}
+        style={{ 
+          cursor: typeof page === 'number' ? 'pointer' : 'default', 
+          border: typeof page !== 'number' ? 'none' : '',
+          background: typeof page !== 'number' ? 'transparent' : ''
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   const activeSuggestions = selectedFeedback && selectedFeedback.tag === "Negative" 
     ? getSmartSuggestions(selectedFeedback.detectedIssue) 
@@ -173,10 +217,11 @@ export default function AdminFeedback() {
             <tbody>
               {loading ? (
                 <tr><td colSpan="7" style={{ textAlign: 'center' }}>Loading feedbacks...</td></tr>
-              ) : filteredFeedbacks.length === 0 ? (
+              ) : currentFeedbacks.length === 0 ? (
                 <tr><td colSpan="7" style={{ textAlign: 'center' }}>No feedbacks found matching your filters.</td></tr>
               ) : (
-                filteredFeedbacks.map((item) => (
+                /* --- UPDATED: Map over currentFeedbacks instead of filteredFeedbacks --- */
+                currentFeedbacks.map((item) => (
                   <tr key={item.id}>
                     <td>{item.date}</td>
                     <td>{item.service}</td>
@@ -193,11 +238,29 @@ export default function AdminFeedback() {
             </tbody>
           </table>
           
-          <div className="af-pagination">
-            <button className="af-page-btn">Previous</button>
-            <button className="af-page-btn active">1</button>
-            <button className="af-page-btn">Next</button>
-          </div>
+          {totalPages > 1 && (
+            <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
+              <button 
+                className="af-page-btn" 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              >
+                Previous
+              </button>
+              
+              {renderPageNumbers()}
+              
+              <button 
+                className="af-page-btn" 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
