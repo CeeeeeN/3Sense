@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { auth, db } from '../firebase/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { createNotification } from '../services/notifications'; // 🆕
+import { createNotification } from '../services/notifications'; 
 import { StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon, MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon } from '../components/Icons';
 
 const STAR_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
 const generateRefId = () => {
   const num = Math.floor(Math.random() * 900) + 100;
-  return `MAL-2026-${num}`; // adjust based on year or format as needed
+  return `MAL-2026-${num}`; 
 };
 
 function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
@@ -136,54 +136,33 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     try {
       const ref = generateRefId();
 
-      let finalSentiment = null, finalConfidence = null, finalHybridScore = null, finalTextScore = null;
-      let finalStatus = 'pending';
-      let finalDetectedIssue = "None", finalIssueConfidence = null;
-
-      try {
-        const aiResponse = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: comment, rating })
-        });
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          finalSentiment      = aiData.sentiment      || null;
-          finalConfidence     = aiData.confidence     || null;
-          finalHybridScore    = aiData.hybridScore    || null;
-          finalTextScore      = aiData.textScore      || null;
-          finalDetectedIssue  = aiData.detectedIssue  || "None";
-          finalIssueConfidence = aiData.issueConfidence || null;
-          finalStatus = finalSentiment ? 'analyzed' : 'pending';
-        } else {
-          finalStatus = 'analysis_failed';
-        }
-      } catch {
-        finalStatus = 'analysis_failed';
-      }
-
-      await addDoc(collection(db, "Feedback"), {
+      // 1. SAVE TO FIREBASE
+      const docRef = await addDoc(collection(db, "Feedback"), {
         ReferenceID: ref,
         FacilityID:  serviceId,
         FacilityName: serviceName,
         Category:    category,
-        Sentiment:   finalSentiment,
         Rating:      rating,
         Comment:     comment,
-        Status:      finalStatus,
-        Confidence:  finalConfidence,
-        HybridScore: finalHybridScore,
-        TextScore:   finalTextScore,
-        DetectedIssue:    finalDetectedIssue,
-        IssueConfidence:  finalIssueConfidence,
+        Status:      'pending_ai', // Initial status while AI thinks
         CreatedAt:   serverTimestamp(),
         UserName:    userName,
         householdID: householdID || "",
         userID:      userID      || "",
         HasPhoto:    !!photo,
+        // Set placeholders for AI data
+        Sentiment: null, Confidence: null, HybridScore: null, TextScore: null, DetectedIssue: "None", IssueConfidence: null
       });
 
-      // 🆕 Notify admins about new feedback
+      // 2. SHOW SUCCESS SCREEN TO USER INSTANTLY!
+      setRefId(ref);
+      setSubmitted(true);
+      setSubmitting(false);
+
+      // 3. RUN AI IN THE BACKGROUND
+      analyzeAndSyncFeedback(docRef.id, comment, rating);
+
+      // 4. Send Notification
       await createNotification(
         "feedback",
         `New ${STAR_LABELS[rating]} (${rating}★) feedback on "${serviceName}" submitted by ${userName}.`,
@@ -191,15 +170,41 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         ref
       );
 
-      setRefId(ref);
-      setSubmitted(true);
     } catch (error) {
       console.error("Full Error Details:", error);
       alert(`System Error: ${error.message}`);
-    } finally {
-      setSubmitting(false);
+      setSubmitting(false); // Only reset if there was a hard crash
+    } 
+  };
+
+  const analyzeAndSyncFeedback = async (documentId, text, rtg) => {
+    try {
+      const aiResponse = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, rating: rtg })
+      });
+
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        await updateDoc(doc(db, "Feedback", documentId), {
+          Sentiment:       aiData.sentiment || null,
+          Confidence:      aiData.confidence || null,
+          HybridScore:     aiData.hybridScore || null,
+          TextScore:       aiData.textScore || null,
+          DetectedIssue:   aiData.detectedIssue || "None",
+          IssueConfidence: aiData.issueConfidence || null,
+          Status:          aiData.sentiment ? 'analyzed' : 'pending'
+        });
+      } else {
+        await updateDoc(doc(db, "Feedback", documentId), { Status: 'analysis_failed' });
+      }
+    } catch (err) {
+      console.error("Background AI Analysis Failed:", err);
+      await updateDoc(doc(db, "Feedback", documentId), { Status: 'analysis_failed' });
     }
   };
+
 
   if (submitted) {
     return (
