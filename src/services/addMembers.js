@@ -13,7 +13,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
 
     const resident = {
         role: memberData.isHead ? "head" : "member",
-        userID: memberData.isHead ? hhUserID : newMemberRef.id,
+        userID: hhUserID,
         firstName: memberData.firstName || "",
         middleName: memberData.middleName || "",
         lastName: memberData.lastName || "",
