@@ -94,7 +94,7 @@ export default function ActivityPage({ onNavigate }) {
   useEffect(() => {
     if (!activeUserId) return;
     const qDocs = query(
-      collection(db, "documentRequests"),
+      collection(db, "document_requests"),
       where("userID", "==", activeUserId),
       orderBy("submittedAt", "desc"),
       limit(docLimit)
@@ -109,7 +109,7 @@ export default function ActivityPage({ onNavigate }) {
   useEffect(() => {
     if (!activeUserId) return;
     const qReservations = query(
-      collection(db, "facilityReservations"),
+      collection(db, "facility_reservations"),
       where("userID", "==", activeUserId),
       orderBy("submittedAt", "desc"),
       limit(resLimit)
