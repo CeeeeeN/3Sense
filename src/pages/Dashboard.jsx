@@ -165,9 +165,49 @@ function SubLabel({ icon, label }) {
   );
 }
 
+const ITEMS_PER_PAGE = 4;
+
+function PaginationBar({ current, total, onChange }) {
+  if (total <= 1) return null;
+  return (
+    <div className="db-pagination">
+      <button
+        className="db-pagination__btn"
+        disabled={current === 1}
+        onClick={() => onChange(current - 1)}
+        aria-label="Previous page"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+      </button>
+      <div className="db-pagination__pages">
+        {Array.from({ length: total }, (_, i) => i + 1).map((p) => (
+          <button
+            key={p}
+            className={`db-pagination__dot${p === current ? ' db-pagination__dot--active' : ''}`}
+            onClick={() => onChange(p)}
+            aria-label={`Page ${p}`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+      <button
+        className="db-pagination__btn"
+        disabled={current === total}
+        onClick={() => onChange(current + 1)}
+        aria-label="Next page"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
+    </div>
+  );
+}
+
 export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, userRole }) {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [showAllAnns, setShowAllAnns] = useState(false);
+  const [alertPage, setAlertPage] = useState(1);
+  const [annPage, setAnnPage] = useState(1);
   const [realUserName, setRealUserName] = useState(userName);
   const [dataLoading, setDataLoading] = useState(true);
   const [announcementsData, setAnnouncementsData] = useState([]);
@@ -292,9 +332,19 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   };
 
   const processedAnns = mapAnnouncements(announcementsData);
+  // Already ordered newest-first by Firestore (orderBy createdAt desc)
   const smartAlertsList = processedAnns.filter(a => a.isSmartAlert);
   const generalAnnsList = processedAnns.filter(a => !a.isSmartAlert);
   const combinedAnns = [...smartAlertsList, ...generalAnnsList];
+
+  // Pagination derived values
+  const alertTotalPages = Math.max(1, Math.ceil(smartAlertsList.length / ITEMS_PER_PAGE));
+  const annTotalPages   = Math.max(1, Math.ceil(generalAnnsList.length  / ITEMS_PER_PAGE));
+  const pagedAlerts = smartAlertsList.slice((alertPage - 1) * ITEMS_PER_PAGE, alertPage * ITEMS_PER_PAGE);
+  const pagedAnns   = generalAnnsList.slice((annPage   - 1) * ITEMS_PER_PAGE, annPage   * ITEMS_PER_PAGE);
+
+  // Reset pages when data refreshes
+  // (safe because these are render-time derivations, not effects)
 
   return (
     <main className="db-page">
@@ -345,29 +395,32 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
             {smartAlertsList.length === 0 ? (
               <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new smart alerts based on your profile.</p>
             ) : (
-              <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
-                {smartAlertsList.map((a) => (
-                  <div key={a.id} className={`alert-card alert-card--${a.dotColor}`}>
-                    <div className="alert-card__header">
-                      <div className="alert-card__icon-wrap">{a.icon}</div>
-                      <span className="alert-card__tag">{a.category}</span>
+              <>
+                <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
+                  {pagedAlerts.map((a) => (
+                    <div key={a.id} className={`alert-card alert-card--${a.dotColor}`}>
+                      <div className="alert-card__header">
+                        <div className="alert-card__icon-wrap">{a.icon}</div>
+                        <span className="alert-card__tag">{a.category}</span>
+                      </div>
+                      <div className="alert-card__body">
+                        <div className="alert-card__title">{a.title}</div>
+                        <div className="alert-card__desc" style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>{a.description}</div>
+                        <button className="alert-card__cta" onClick={() => setSelectedAnn(a)}>
+                          View Details <ArrowRightIcon />
+                        </button>
+                      </div>
                     </div>
-                    <div className="alert-card__body">
-                      <div className="alert-card__title">{a.title}</div>
-                      <div className="alert-card__desc" style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>{a.description}</div>
-                      <button className="alert-card__cta" onClick={() => setSelectedAnn(a)}>
-                        View Details <ArrowRightIcon />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                <PaginationBar current={alertPage} total={alertTotalPages} onChange={setAlertPage} />
+              </>
             )}
           </div>
 
@@ -383,10 +436,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                     <div key={i} className="ann-table-header__cell">{h}</div>
                   ))}
                 </div>
-                {generalAnnsList.slice(0, 5).map((a, idx) => (
+                {pagedAnns.map((a, idx) => (
                   <div
                     key={a.id}
-                    className={`ann-row${idx === 4 ? " ann-row--last" : ""}`}
+                    className={`ann-row${idx === pagedAnns.length - 1 ? " ann-row--last" : ""}`}
                     onClick={() => setSelectedAnn(a)}
                     style={{ cursor: "pointer" }}
                   >
@@ -412,6 +465,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                     </button>
                   </div>
                 ))}
+                <PaginationBar current={annPage} total={annTotalPages} onChange={setAnnPage} />
               </>
             )}
           </div>

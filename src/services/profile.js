@@ -83,6 +83,7 @@ export const getMemberProfile = async (householdID, residentID) => {
         citizenship: d.citizenship || "",
         contactNumber: d.contactNumber ?? null,
         email: d.email || "",
+        residingSinceYear: d.residingSinceYear ? Number(d.residingSinceYear) : null,
 
         ...address,
         sameAddress,
@@ -148,6 +149,7 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
             ? Number(String(updatedData.contactNumber).replace(/\D/g, ""))
             : null,
         email: updatedData.email || "",
+        residingSinceYear: updatedData.residingSinceYear ? Number(updatedData.residingSinceYear) : null,
 
         categories: normalizedCategories,
         pwdStatus: updatedData.pwdStatus || "",

@@ -26,6 +26,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
         civilStatus: memberData.civilStatus || "",
         religion: memberData.religion || "",
         citizenship: memberData.citizenship || "",
+        residingSinceYear: memberData.residingSinceYear ? Number(memberData.residingSinceYear) : null,
         contactNumber: memberData.contactNumber
             ? Number(String(memberData.contactNumber).replace(/\D/g, ""))
             : null,

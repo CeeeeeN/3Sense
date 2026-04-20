@@ -5530,6 +5530,79 @@ h1,h2,h3,h4,.poppins {
   background: rgba(49,125,137,0.08);
 }
 
+/* ── Dashboard Pagination Bar ── */
+.db-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.5rem 1rem;
+}
+
+.db-pagination__pages {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.db-pagination__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #d8e4f0;
+  background: #fff;
+  color: #5e7a99;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.db-pagination__btn:hover:not(:disabled) {
+  background: rgba(49,125,137,0.08);
+  color: #31547c;
+  border-color: rgba(49,125,137,0.25);
+}
+
+.db-pagination__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.db-pagination__dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #d8e4f0;
+  background: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #5e7a99;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.db-pagination__dot:hover:not(.db-pagination__dot--active) {
+  background: rgba(49,125,137,0.07);
+  color: #31547c;
+  border-color: rgba(49,125,137,0.2);
+}
+
+.db-pagination__dot--active {
+  background: #31547c;
+  color: #fff;
+  border-color: #31547c;
+  cursor: default;
+  font-weight: 700;
+}
+
 /* ── 2.2 Smart Alert Cards (legacy, kept for backward compat) ── */
 .db-alert-card {
   background: #ffffff;

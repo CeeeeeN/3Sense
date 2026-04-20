@@ -31,6 +31,9 @@ export default function HouseholdManagement() {
   const [selectedResident, setSelectedResident] = useState(null);
   const [showResidentModal, setShowResidentModal] = useState(false);
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [residentToDelete, setResidentToDelete] = useState(null);
+
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
   const defaultRows = 10;
@@ -233,6 +236,32 @@ export default function HouseholdManagement() {
     }
   };
 
+  const handleDeleteResident = async () => {
+    if (!residentToDelete) return;
+    try {
+      if (residentToDelete.isPendingActivation) {
+        await deleteDoc(doc(db, "households", residentToDelete.householdId));
+      } else {
+        // Pre-check remainder BEFORE deletion to avoid Firestore cache race conditions
+        const residentsQuery = query(collection(db, "households", residentToDelete.householdId, "residents"));
+        const residentsSnapshot = await getDocs(residentsQuery);
+
+        await deleteDoc(doc(db, "households", residentToDelete.householdId, "residents", residentToDelete.id));
+
+        // Auto-cleanup: If it was the last resident standing, obliterate the root Household Document
+        if (residentsSnapshot.size <= 1) {
+          await deleteDoc(doc(db, "households", residentToDelete.householdId));
+        }
+      }
+      setShowDeleteModal(false);
+      setResidentToDelete(null);
+      alert("Resident deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting resident:", error);
+      alert("Error deleting resident: " + error.message);
+    }
+  };
+
   // ================= RESIDENT FILTERS =================
   const filteredResidents = useMemo(() => {
     const seenKeys = new Set();
@@ -315,8 +344,8 @@ export default function HouseholdManagement() {
       });
 
       // 🆕 Notify Resident
-      const notifMsg = statusData.status === "Clear Case" 
-        ? "Your barangay status is now Clear." 
+      const notifMsg = statusData.status === "Clear Case"
+        ? "Your barangay status is now Clear."
         : `Your barangay status has been updated to: ${statusData.status}.`;
       await createUserNotification(statusData.id, "Status Update", notifMsg, "general");
 
@@ -487,10 +516,11 @@ export default function HouseholdManagement() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View Profile</button>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View</button>
                             {!res.isPendingActivation && (
                               <button className="as-btn-aqua" style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
                             )}
+                            <button className="as-btn-aqua" style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#ef4444', color: 'white', borderColor: '#ef4444' }} onClick={() => { setResidentToDelete(res); setShowDeleteModal(true); }}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -761,6 +791,34 @@ export default function HouseholdManagement() {
                   onClick={() => {
                     setShowHhRejectModal(false);
                     setSelectedHhRequest(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= DELETE RESIDENT MODAL ================= */}
+        {showDeleteModal && residentToDelete && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <h3 className="modal-title">Confirm Deletion</h3>
+
+              <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+                Are you sure you want to delete the resident <strong>{residentToDelete.fullName}</strong>? This action cannot be undone.
+              </p>
+
+              <div className="modal-actions">
+                <button className="reject-btn" onClick={handleDeleteResident}>
+                  Delete Resident
+                </button>
+                <button
+                  className="approve-btn"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setResidentToDelete(null);
                   }}
                 >
                   Cancel

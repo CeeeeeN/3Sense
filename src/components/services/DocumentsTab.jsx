@@ -307,6 +307,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         address: fullAddress,
         contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
         email: userData.email || "",
+        residingSince: userData.residingSinceYear ? String(userData.residingSinceYear) : "",
       }));
     }
   }, [userData]);

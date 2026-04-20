@@ -48,12 +48,12 @@ export default function Registration({ onBack }) {
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
     birthDate: "", age: "", birthPlace: "", sex: "Male", civilStatus: "",
-    citizenship: "Filipino", contactNumber: "", email: "",
-    houseNumber: "", street: "", region: "", province: "", city: "", barangay: "",
+    citizenship: "Filipino", contactNumber: "", email: "", residingSinceYear: "",
+    houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
     categories: [],
     pwdStatus: "", disabilityType: "",
     educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
-    householdMembers: "", householdClassification: "",
+    totalMembers: "", householdClassification: "",
   });
 
   const set = (field) => (e) => {
@@ -252,11 +252,14 @@ export default function Registration({ onBack }) {
                       <Field label="Citizenship" required>
                         <InputField icon={IconFlag} type="text" placeholder="Filipino" value={form.citizenship} onChange={set("citizenship")} />
                       </Field>
+                      <Field label="Residing Since (Year)" required>
+                        <InputField icon={RegisIconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} />
+                      </Field>
+                    </div>
+                    <div className="reg-form-grid cols-2">
                       <Field label="Contact Number" required>
                         <InputField icon={RegisIconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} />
                       </Field>
-                    </div>
-                    <div className="reg-form-grid cols-1">
                       <Field label="Email Address" required hint="We'll send your approval notification here.">
                         <InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} />
                       </Field>
@@ -283,26 +286,7 @@ export default function Registration({ onBack }) {
                     </div>
                     <div className="reg-form-grid cols-2">
                       <Field label="Region" required>
-                        <SelectField icon={RegisIconGlobe} value={form.region} onChange={set("region")}>
-                          <option value="">Select region</option>
-                          <option>NCR – National Capital Region</option>
-                          <option>Region I – Ilocos Region</option>
-                          <option>Region II – Cagayan Valley</option>
-                          <option>Region III – Central Luzon</option>
-                          <option>Region IV-A – CALABARZON</option>
-                          <option>Region IV-B – MIMAROPA</option>
-                          <option>Region V – Bicol Region</option>
-                          <option>Region VI – Western Visayas</option>
-                          <option>Region VII – Central Visayas</option>
-                          <option>Region VIII – Eastern Visayas</option>
-                          <option>Region IX – Zamboanga Peninsula</option>
-                          <option>Region X – Northern Mindanao</option>
-                          <option>Region XI – Davao Region</option>
-                          <option>Region XII – SOCCSKSARGEN</option>
-                          <option>Region XIII – Caraga</option>
-                          <option>CAR – Cordillera Administrative Region</option>
-                          <option>BARMM</option>
-                        </SelectField>
+                        <InputField icon={RegisIconGlobe} type="text" value={form.region} readOnly />
                       </Field>
                       {/* ── STEP 2: Address ── */}
                       <Field label="Province" required>
@@ -310,11 +294,11 @@ export default function Registration({ onBack }) {
                       </Field>
 
                       <Field label="City / Municipality" required>
-                        <InputField icon={RegisIconPin} type="text" placeholder="Valenzuela City" value={form.city} onChange={set("city")} />
+                        <InputField icon={RegisIconPin} type="text" value={form.city} readOnly />
                       </Field>
 
                       <Field label="Barangay" required>
-                        <InputField icon={RegisIconPin} type="text" placeholder="Malanday" value={form.barangay} onChange={set("barangay")} />
+                        <InputField icon={RegisIconPin} type="text" value={form.barangay} readOnly />
                       </Field>
                     </div>
                   </div>
@@ -415,7 +399,7 @@ export default function Registration({ onBack }) {
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
                       <Field label="Number of Household Members" required hint="Include yourself in the count.">
-                        <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.householdMembers} onChange={set("householdMembers")} />
+                        <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.totalMembers} onChange={set("totalMembers")} />
                       </Field>
                       <Field label="Household Classification" required>
                         <SelectField icon={RegisIconHome} value={form.householdClassification} onChange={set("householdClassification")}>
@@ -450,6 +434,7 @@ export default function Registration({ onBack }) {
                     <ReviewField label="Civil Status" value={rv(form.civilStatus)} />
                     <ReviewField label="Religion" value={rv(form.religion)} />
                     <ReviewField label="Citizenship" value={rv(form.citizenship)} />
+                    <ReviewField label="Residing Since" value={rv(form.residingSinceYear)} />
                     <ReviewField label="Contact Number" value={rv(form.contactNumber)} />
                     <ReviewField label="Email Address" value={rv(form.email)} full />
                   </ReviewSection>
@@ -488,7 +473,7 @@ export default function Registration({ onBack }) {
                   </ReviewSection>
 
                   <ReviewSection icon="🏠" title="Household Details">
-                    <ReviewField label="No. of Members" value={rv(form.householdMembers)} />
+                    <ReviewField label="No. of Members" value={rv(form.totalMembers)} />
                     <ReviewField label="Classification" value={rv(form.householdClassification)} />
                   </ReviewSection>
 

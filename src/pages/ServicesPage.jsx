@@ -15,7 +15,7 @@ const TABS = [
   { key: "documents",  label: "Documents",  icon: <DocumentsIcon />    },
 ];
 
-export default function ServicesPage({ onNavigate, householdID, memberID, userName }) {
+export default function ServicesPage({ onNavigate, householdID, memberID, userName, userID }) {
   const [activeTab, setActiveTab] = useState("services");
 
   // Hold the user's profile data
@@ -25,10 +25,10 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
   useEffect(() => {
     if (householdID && memberID) {
       getMemberProfile(householdID, memberID)
-        .then(data => setUserData({ ...data, userID: memberID }))
+        .then(data => setUserData({ ...data, userID: userID }))
         .catch(console.error);
     }
-  }, [householdID, memberID]);
+  }, [householdID, memberID, userID]);
 
   return (
     <main className="db-page sv-page">
@@ -79,7 +79,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                   <div><div className="sc-card-title">Barangay Facilities</div><div className="sc-card-subtitle">Check availability and reserve a facility</div></div>
                 </div>
               </div>
-              <FacilitiesTab userData={userData} householdID={householdID} userName={userName} userID={memberID} />
+              <FacilitiesTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
             </>
           )}
 
@@ -91,12 +91,12 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                   <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online</div></div>
                 </div>
               </div>
-              <DocumentsTab userData={userData} householdID={householdID} userName={userName} userID={memberID} />
+              <DocumentsTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
             </>
           )}
 
           {activeTab === "services" && (
-            <ServicesTab userData={userData} householdID={householdID} userName={userName} userID={memberID} />
+            <ServicesTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
           )}
         </div>
       </div>

@@ -43,8 +43,8 @@ function SelectField({ icon: Icon, children, ...props }) {
 const BLANK_FORM = {
   firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
   birthDate: "", age: "", birthPlace: "", sex: "Male", civilStatus: "",
-  contactNumber: "", email: "",
-  houseNumber: "", street: "", region: "", province: "", city: "", barangay: "",
+  contactNumber: "", email: "", residingSinceYear: "",
+  houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
   categories: [],
   pwdStatus: "", disabilityType: "",
   educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
@@ -109,7 +109,7 @@ export default function AddMembers({ onBack, onDone, householdID, hhAddress }) {
       setForm(f => ({
         ...f,
         sameAddress: false,
-        houseNumber: "", street: "", region: "", province: "", city: "", barangay: "",
+        houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
       }));
     }
   };
@@ -137,6 +137,7 @@ const addMember = async () => {
       citizenship:  form.citizenship  || "",
       contactNumber: form.contactNumber || "",
       email:        form.email        || "",
+      residingSinceYear: form.residingSinceYear || "",
       // address — service omits these when sameAddress is true
       sameAddress:  form.sameAddress,
       houseNumber:  form.houseNumber  || "",
@@ -328,12 +329,15 @@ const addMember = async () => {
                     </SelectField>
                   </Field>
                 </div>
-                <div className="am-form-grid cols-2">
+                <div className="am-form-grid cols-3">
                   <Field label="Contact Number">
                     <InputField icon={IconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} />
                   </Field>
                   <Field label="Email Address">
                     <InputField icon={IconMail} type="email" placeholder="email@example.com" value={form.email} onChange={set("email")} />
+                  </Field>
+                  <Field label="Residing Since (Year)" required>
+                    <InputField icon={IconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} />
                   </Field>
                 </div>
               </div>
@@ -358,26 +362,7 @@ const addMember = async () => {
                 </div>
                 <div className="am-form-grid cols-2">
                   <Field label="Region" required>
-                    <SelectField icon={IconGlobe} value={form.region} onChange={set("region")} disabled={form.sameAddress}>
-                      <option value="">Select region</option>
-                      <option>NCR – National Capital Region</option>
-                      <option>Region I – Ilocos Region</option>
-                      <option>Region II – Cagayan Valley</option>
-                      <option>Region III – Central Luzon</option>
-                      <option>Region IV-A – CALABARZON</option>
-                      <option>Region IV-B – MIMAROPA</option>
-                      <option>Region V – Bicol Region</option>
-                      <option>Region VI – Western Visayas</option>
-                      <option>Region VII – Central Visayas</option>
-                      <option>Region VIII – Eastern Visayas</option>
-                      <option>Region IX – Zamboanga Peninsula</option>
-                      <option>Region X – Northern Mindanao</option>
-                      <option>Region XI – Davao Region</option>
-                      <option>Region XII – SOCCSKSARGEN</option>
-                      <option>Region XIII – Caraga</option>
-                      <option>CAR – Cordillera Administrative Region</option>
-                      <option>BARMM</option>
-                    </SelectField>
+                    <InputField icon={IconGlobe} type="text" value={form.region} readOnly />
                   </Field>
                   <Field label="Province" required>
                     <InputField icon={IconPin} type="text" placeholder="Bulacan" value={form.province} readOnly={form.sameAddress} onChange={set("province")} />
@@ -385,10 +370,10 @@ const addMember = async () => {
                 </div>
                 <div className="am-form-grid cols-2">
                   <Field label="City / Municipality" required>
-                    <InputField icon={IconPin} type="text" placeholder="Valenzuela City" value={form.city} readOnly={form.sameAddress} onChange={set("city")} />
+                    <InputField icon={IconPin} type="text" value={form.city} readOnly />
                   </Field>
                   <Field label="Barangay" required>
-                    <InputField icon={IconPin} type="text" placeholder="Malanday" value={form.barangay} readOnly={form.sameAddress} onChange={set("barangay")} />
+                    <InputField icon={IconPin} type="text" value={form.barangay} readOnly />
                   </Field>
                 </div>
               </div>
@@ -493,7 +478,7 @@ const addMember = async () => {
           <strong>{members.length} {members.length === 1 ? "member" : "members"}</strong> added so far
         </div>
         <button className="am-btn-success-outline" onClick={onDone}>
-          Proceed to Dashboard <IconArrow />
+          Proceed to Log In <IconArrow />
         </button>
       </div>
     </div>

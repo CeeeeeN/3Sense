@@ -15,6 +15,7 @@ export const submitRegistration = async (formData) => {
         civilStatus: formData.civilStatus || "",
         religion: formData.religion || "",
         citizenship: formData.citizenship || "",
+        residingSinceYear: formData.residingSinceYear ? Number(formData.residingSinceYear) : null,
         contactNumber: formData.contactNumber ? Number(String(formData.contactNumber).replace(/\D/g, "")) : null,
         email: formData.email || "",
 
