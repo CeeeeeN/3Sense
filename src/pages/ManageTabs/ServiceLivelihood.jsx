@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { UsersIcon } from "../../components/Icons";
 import FormBuilder from "../../components/FormBuilder";
+import { createUserNotification } from "../../services/userNotifications";
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -117,6 +118,17 @@ export default function ServiceLivelihood({ onBack }) {
         status:    "approved",
         updatedAt: serverTimestamp(),
       });
+
+      const p = participants.find(part => part.id === id);
+      if (p && p.userID) {
+        await createUserNotification(
+          p.userID,
+          "Program Registration Approved",
+          `Your registration for the Livelihood Program "${p.programName || 'Unknown Program'}" has been approved.`,
+          "general",
+          p.regNum || p.id
+        );
+      }
     } catch (err) {
       console.error("Error approving:", err);
     }
@@ -139,6 +151,18 @@ export default function ServiceLivelihood({ onBack }) {
         rejectReason: rejectReason.trim(),
         updatedAt:    serverTimestamp(),
       });
+
+      const p = participants.find(part => part.id === rejectTarget);
+      if (p && p.userID) {
+        await createUserNotification(
+          p.userID,
+          "Program Registration Rejected",
+          `Your registration for the Livelihood Program "${p.programName || 'Unknown Program'}" was rejected. Remarks: ${rejectReason.trim()}`,
+          "general",
+          p.regNum || p.id
+        );
+      }
+
       setShowRejectModal(false);
       setRejectTarget(null);
       setRejectReason("");

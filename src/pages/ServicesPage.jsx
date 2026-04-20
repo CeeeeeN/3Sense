@@ -26,7 +26,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
   useEffect(() => {
     if (householdID && memberID) {
       getMemberProfile(householdID, memberID)
-        .then(data => setUserData(data))
+        .then(data => setUserData({ ...data, userID: memberID }))
         .catch(console.error);
     }
   }, [householdID, memberID]);

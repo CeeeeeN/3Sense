@@ -4,6 +4,7 @@ import {
   collection, onSnapshot, doc, updateDoc,
   serverTimestamp, query, orderBy,
 } from "firebase/firestore";
+import { createUserNotification } from "../../services/userNotifications";
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -64,6 +65,21 @@ export default function ServiceBswd({ onBack }) {
         status:    newStatus,
         updatedAt: serverTimestamp(),
       });
+
+      if (newStatus === "responded" || newStatus === "resolved") {
+        const p = reports.find(r => r.id === id);
+        if (p && p.userID) {
+          const typeLabel = p.type === "tip" ? "Community Tip" : "Displacement Report";
+          await createUserNotification(
+            p.userID,
+            `${typeLabel} Update`,
+            `Your ${typeLabel.toLowerCase()} has been marked as ${newStatus}.`,
+            "general",
+            p.id
+          );
+        }
+      }
+
       // Update local selected item status if modal is open
       if (selectedItem && selectedItem.id === id) {
         setSelectedItem(prev => ({ ...prev, status: newStatus }));

@@ -4,6 +4,7 @@ import {
   collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion,
 } from "firebase/firestore";
 import { ServiceAlertTriangleIcon } from "../../components/Icons";
+import { createUserNotification } from "../../services/userNotifications";
 
 const TANOD_LIST = ["Unassigned", "Tanod Reyes", "Tanod Garcia", "Tanod Santos"];
 
@@ -78,6 +79,16 @@ export default function ServicePeaceOrder({ onBack }) {
         updates: arrayUnion(updateEntry),
         updatedAt: serverTimestamp(),
       });
+
+      if ((newStatus === "responded" || newStatus === "resolved") && selectedReport.userID) {
+        await createUserNotification(
+          selectedReport.userID,
+          "Incident Report Update",
+          `Your incident report (${selectedReport.refNum || 'N/A'}) has been marked as ${newStatus}.`,
+          "general",
+          selectedReport.refNum || selectedReport.id
+        );
+      }
     } catch (err) {
       console.error("Error updating status:", err);
     }
