@@ -89,7 +89,7 @@ export default function ActivityPage({ onNavigate }) {
     const qDocs = query(
       collection(db, "document_requests"),
       where("userID", "==", activeUserId),
-      orderBy("createdAt", "desc")
+      orderBy("submittedAt", "desc")
     );
     const unsubDocs = onSnapshot(qDocs, (snapshot) => {
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -99,7 +99,7 @@ export default function ActivityPage({ onNavigate }) {
     const qReservations = query(
       collection(db, "facility_reservations"),
       where("userID", "==", activeUserId),
-      orderBy("createdAt", "desc")
+      orderBy("submittedAt", "desc")
     );
     const unsubReservations = onSnapshot(qReservations, (snapshot) => {
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
