@@ -13,6 +13,7 @@ import ScanPage from "./ScanPage";
 import FeedbackForm from "./FeedbackForm";
 import ActivityPage from "./ActivityPage";
 import EmergencyPage from "./EmergencyPage";
+import { requestPushPermission, listenForForegroundMessages } from "../services/fcm";
 
 // Routing maps
 const PAGE_TO_PATH = {
@@ -95,6 +96,17 @@ export default function UserApp() {
       window.history.pushState({}, "", "/");
     }
   }, [page]);
+
+  // Handle FCM pushing
+  useEffect(() => {
+    if (LOGGED_IN_PAGES.includes(page) && userID) {
+      requestPushPermission(userID);
+      const unsubFcm = listenForForegroundMessages();
+      return () => {
+        if (unsubFcm) unsubFcm();
+      };
+    }
+  }, [userID, page]);
 
   // Save session to localStorage
   useEffect(() => {

@@ -1,10 +1,3 @@
-// src/services/userNotifications.js
-// ─────────────────────────────────────────────────────────────
-// Personal notification system for residents.
-// Uses a top-level "user_notifications" collection where each
-// doc targets a specific memberID (subcollection resident key).
-// ─────────────────────────────────────────────────────────────
-
 import {
   collection, addDoc, updateDoc, deleteDoc, doc,
   query, where, orderBy, onSnapshot, serverTimestamp
@@ -30,6 +23,12 @@ export async function createUserNotification(memberID, title, message, type, ref
       isRead: false,
       createdAt: serverTimestamp(),
     });
+
+    fetch("/api/pushNotification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberID, title, message })
+    }).catch(err => console.log("Silent error from FCM push endpoint", err));
   } catch (err) {
     console.error("Failed to create user notification:", err);
   }
@@ -44,7 +43,7 @@ export async function createUserNotification(memberID, title, message, type, ref
 export function subscribeToUserNotifications(memberID, callback) {
   if (!memberID) {
     callback([]);
-    return () => {};
+    return () => { };
   }
 
   const q = query(
@@ -57,7 +56,7 @@ export function subscribeToUserNotifications(memberID, callback) {
       id: d.id,
       ...d.data(),
     }));
-    
+
     // Sort in memory by createdAt descending
     notifications.sort((a, b) => {
       const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
