@@ -7,6 +7,11 @@ import { createNotification } from "../../services/notifications";
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
 
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 // ── Step Indicator ──
 function StepIndicator({ step }) {
   return (
@@ -265,7 +270,8 @@ function Step4({ refNum, onReset }) {
 
 
 // ── Documents Tab ──
-export default function DocumentsTab({ userData, householdID, userName, userID }) {
+export default function DocumentsTab({ userData, householdID, userName }) {
+  const activeUserId   = getSaved("userID", null);
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -340,7 +346,7 @@ export default function DocumentsTab({ userData, householdID, userName, userID }
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
-        const generatedRef = await submitDocumentRequest(householdID, userID || "", userName || "Unknown", docType, form, customData);
+        const generatedRef = await submitDocumentRequest(householdID, activeUserId || "", userName || "Unknown", docType, form, customData);
         setRefNum(generatedRef);
 
         // 🆕 Notify all admins about new document request

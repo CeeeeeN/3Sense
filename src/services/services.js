@@ -13,10 +13,10 @@ const generateRef = () => {
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
 // ══════════════════════════════
-export async function submitDocumentRequest(householdID, userID, userName, docType, form, customData = {}) {
+export async function submitDocumentRequest(householdID, activeUserId, userName, docType, form, customData = {}) {
   const refNum = generateRef();
   await addDoc(collection(db, "document_requests"), {
-    refNum, householdID, userID,
+    refNum, householdID, userID: activeUserId || "",
     requesterName: userName,
     documentType: docType.name || docType.title,
     documentId: docType.id,
@@ -54,10 +54,10 @@ export async function getDocumentRequests(householdID) {
 // ══════════════════════════════
 // 🏢 FACILITY RESERVATIONS
 // ══════════════════════════════
-export async function submitFacilityReservation(householdID, userID, userName, facility, form, customData = {}) {
+export async function submitFacilityReservation(householdID, activeUserId, userName, facility, form, customData = {}) {
   const refNum = generateRef();
   await addDoc(collection(db, "facility_reservations"), {
-    refNum, householdID, userID,
+    refNum, householdID, userID: activeUserId || "",
     requesterName: form.fullName || userName,
     fullName: form.fullName || userName,
     email: form.email || "",

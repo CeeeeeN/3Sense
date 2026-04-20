@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { getMemberProfile } from "../services/profile";
 import { ProgramsIcon, FacilitiesIcon, DocumentsIcon, ServicesMenuIcon } from "../components/Icons";
 
-// --- IMPORT YOUR NEW SEPARATED COMPONENTS ---
 import ProgramsTab from "../components/services/ProgramsTab";
 import FacilitiesTab from "../components/services/FacilitiesTab";
 import DocumentsTab from "../components/services/DocumentsTab";
