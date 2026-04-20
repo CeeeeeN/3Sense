@@ -100,7 +100,6 @@ export default function UserApp() {
   // Handle FCM pushing
   useEffect(() => {
     if (LOGGED_IN_PAGES.includes(page) && userID) {
-      requestPushPermission(userID);
       const unsubFcm = listenForForegroundMessages();
       return () => {
         if (unsubFcm) unsubFcm();
