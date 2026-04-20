@@ -2,7 +2,7 @@ import { getToken, onMessage } from "firebase/messaging";
 import { messaging, db } from "../firebase/firebase";
 import { doc, setDoc, arrayUnion } from "firebase/firestore";
 
-const VAPID_KEY = import.meta.env.VITE_VAPID_KEY || "BON0Xi3PjKQmETTf4uZ0swDjumIDxt5NOgNLhadGepwcqP7M7ri4YF82Bml8XKKeqiUNtKe4lwDsi7rZu6T3ESQ";
+const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
 // Request notification permission, generate FCM token, and store it for the specified user.
 
