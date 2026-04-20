@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
-import { collection, collectionGroup, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, collectionGroup, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { ActivityIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 
 // ── SESSION HELPER ──
@@ -58,60 +58,67 @@ export default function ActivityPage({ onNavigate }) {
   const [documents, setDocuments] = useState([]);
   const [reservations, setReservations] = useState([]);
 
-  // Grab the specific user's ID right out of local storage
+  // Limits for "Load More" functionality
+  const [progLimit, setProgLimit] = useState(5);
+  const [docLimit, setDocLimit] = useState(5);
+  const [resLimit, setResLimit] = useState(5);
+
   const activeUserId = getSaved("userID", null);
 
   // --- FIREBASE REAL-TIME LISTENERS ---
+
+  // Initial Loading Check
   useEffect(() => {
-    if (!activeUserId) {
-      setLoading(true);
-      return; 
-    }
-
+    if (!activeUserId) { setLoading(true); return; }
     setLoading(false);
+  }, [activeUserId]);
 
-    // A. Fetch Programs/Facilities
+  // A. Fetch Programs/Facilities
+  useEffect(() => {
+    if (!activeUserId) return;
     const qPrograms = query(
       collectionGroup(db, "attendees"), 
       where("userID", "==", activeUserId),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(progLimit)
     );
     const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
       setPrograms(snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        name: doc.data().programName, 
-        date: doc.data().programDate,
-        ...doc.data() 
+        id: doc.id, name: doc.data().programName, date: doc.data().programDate, ...doc.data() 
       })));
     });
+    return () => unsubPrograms();
+  }, [activeUserId, progLimit]);
 
-    // B. Fetch Documents
+  // B. Fetch Documents
+  useEffect(() => {
+    if (!activeUserId) return;
     const qDocs = query(
-      collection(db, "document_requests"),
+      collection(db, "documentRequests"),
       where("userID", "==", activeUserId),
-      orderBy("submittedAt", "desc")
+      orderBy("submittedAt", "desc"),
+      limit(docLimit)
     );
     const unsubDocs = onSnapshot(qDocs, (snapshot) => {
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+    return () => unsubDocs();
+  }, [activeUserId, docLimit]);
 
-    // C. Fetch Reservations
+  // C. Fetch Reservations
+  useEffect(() => {
+    if (!activeUserId) return;
     const qReservations = query(
-      collection(db, "facility_reservations"),
+      collection(db, "facilityReservations"),
       where("userID", "==", activeUserId),
-      orderBy("submittedAt", "desc")
+      orderBy("submittedAt", "desc"),
+      limit(resLimit)
     );
     const unsubReservations = onSnapshot(qReservations, (snapshot) => {
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false); 
     });
-
-    return () => {
-      unsubPrograms();
-      unsubDocs();
-      unsubReservations();
-    };
-  }, [activeUserId]);
+    return () => unsubReservations();
+  }, [activeUserId, resLimit]);
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
@@ -138,6 +145,17 @@ export default function ActivityPage({ onNavigate }) {
             </div>
           </div>
         ))}
+        {/* LOAD MORE BUTTON */}
+        {programs.length >= progLimit && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
+            <button 
+              onClick={() => setProgLimit(prev => prev + 5)}
+              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
+            >
+              Load More
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -152,13 +170,24 @@ export default function ActivityPage({ onNavigate }) {
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <div className="act2-card__title">{item.documentType || item.name}</div>
-                <div className="act2-card__meta">Date Requested: {formatDate(item.createdAt)}</div>
-                <div className="act2-card__ref">Ref: {item.refId || item.id}</div>
+                <div className="act2-card__meta">Date Requested: {formatDate(item.submittedAt || item.createdAt)}</div>
+                <div className="act2-card__ref">Ref: {item.refNum || item.refId || item.id}</div>
               </div>
               <StatusBadge status={item.status} />
             </div>
           </div>
         ))}
+        {/* LOAD MORE BUTTON */}
+        {documents.length >= docLimit && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
+            <button 
+              onClick={() => setDocLimit(prev => prev + 5)}
+              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
+            >
+              Load More
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -173,13 +202,11 @@ export default function ActivityPage({ onNavigate }) {
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <div className="act2-card__title">{item.purpose || item.eventName}</div>
-                <div className="act2-card__subtitle">{item.facility || item.facilityName}</div>
-                <div className="act2-card__meta">{formatDate(item.date || item.createdAt)} · {item.time || "TBA"}</div>
+                <div className="act2-card__subtitle">{item.facilityName || item.facility}</div>
+                <div className="act2-card__meta">{formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || "TBA"}</div>
               </div>
               <StatusBadge status={item.status} />
             </div>
-
-            {/* Rejection Remarks */}
             {item.status?.toLowerCase() === "rejected" && item.remarks && (
               <div className="act2-card__remarks">
                 <div className="act2-card__remarks-header">
@@ -190,6 +217,17 @@ export default function ActivityPage({ onNavigate }) {
             )}
           </div>
         ))}
+        {/* LOAD MORE BUTTON */}
+        {reservations.length >= resLimit && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
+            <button 
+              onClick={() => setResLimit(prev => prev + 5)}
+              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
+            >
+              Load More
+            </button>
+          </div>
+        )}
       </div>
     );
   };
