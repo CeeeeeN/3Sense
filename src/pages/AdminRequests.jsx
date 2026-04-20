@@ -14,6 +14,8 @@ export default function AdminRequests() {
   const [activeTab, setActiveTab] = useState('Facility'); // 'Facility' or 'Document'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Modal State
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -114,6 +116,51 @@ export default function AdminRequests() {
     const matchesStatus = filterStatus === 'All' || req.status.toLowerCase() === filterStatus.toLowerCase();
     return matchesTab && matchesSearch && matchesStatus;
   });
+
+  useEffect(() => {
+    setFilterStatus('All');
+  }, [activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, filterStatus]);
+
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentRequests = filteredRequests.slice(startIndex, startIndex + itemsPerPage);
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => typeof page === 'number' ? setCurrentPage(page) : null}
+        disabled={typeof page !== 'number'}
+        style={{ 
+          cursor: typeof page === 'number' ? 'pointer' : 'default', 
+          border: typeof page !== 'number' ? 'none' : '',
+          background: typeof page !== 'number' ? 'transparent' : ''
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
@@ -321,8 +368,12 @@ export default function AdminRequests() {
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
-              <option value="Ready for Pickup">Ready for Pickup</option>
-              <option value="Claimed">Claimed</option>
+              {activeTab === 'Document' && (
+                <>
+                  <option value="Ready for Pickup">Ready for Pickup</option>
+                  <option value="Claimed">Claimed</option>
+                </>
+              )}
               <option value="Rejected">Rejected</option>
             </select>
           </div>
@@ -351,11 +402,11 @@ export default function AdminRequests() {
                   <th>Scheduled Date</th>
                   <th>Date Submitted</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
-                  <th className="text-right">Actions</th>
+                  <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRequests.map((req) => (
+                {currentRequests.map((req) => (
                   <tr key={req.docId} onClick={() => openViewModal(req)} style={{ cursor: 'pointer' }}>
                     <td style={{ fontWeight: 600, color: '#64748b', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                       {String(req.id).toUpperCase()}
@@ -382,8 +433,8 @@ export default function AdminRequests() {
                         {req.status.charAt(0).toUpperCase() + req.status.slice(1).toLowerCase()}
                       </span>
                     </td>
-                    <td className="text-right">
-                      <div className="req-actions">
+                    <td style={{ textAlign: 'center' }}>
+                      <div className="req-actions" style={{ justifyContent: 'center' }}>
                         {req.status.toLowerCase() === 'pending' && (
                           <>
                             <button className="btn-approve" title="Approve" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>
@@ -413,6 +464,30 @@ export default function AdminRequests() {
                 ))}
               </tbody>
             </table>
+          )}
+          
+          {!loading && filteredRequests.length > 0 && totalPages > 1 && (
+            <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
+              <button 
+                className="af-page-btn" 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              >
+                Previous
+              </button>
+              
+              {renderPageNumbers()}
+              
+              <button 
+                className="af-page-btn" 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                Next
+              </button>
+            </div>
           )}
         </div>
 

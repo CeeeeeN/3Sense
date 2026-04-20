@@ -11,7 +11,20 @@ import { db } from "../firebase/firebase";
 
 export const generateHouseholdID = async () => {
   const snapshot = await getDocs(collection(db, "households"));
-  const count = snapshot.size + 1;
+  let maxCount = 0;
+  
+  snapshot.forEach(doc => {
+    const parts = doc.id.split('-');
+    // Expected format: HH-YYYY-NNNNN
+    if (parts.length === 3) {
+      const num = parseInt(parts[2], 10);
+      if (!isNaN(num) && num > maxCount) {
+        maxCount = num;
+      }
+    }
+  });
+
+  const count = maxCount + 1;
   const year = new Date().getFullYear();
   const padded = String(count).padStart(5, "0");
   return `HH-${year}-${padded}`;
@@ -57,6 +70,7 @@ export const approveRegistration = async (docID) => {
       citizenship: data.citizenship || "",
       contactNumber: data.contactNumber ?? null,
       email: data.email || "",
+      residingSinceYear: data.residingSinceYear ? Number(data.residingSinceYear) : null,
       categories: data.categories || [],
       pwdStatus: data.pwdStatus || "",
       disabilityType: data.disabilityType || "",

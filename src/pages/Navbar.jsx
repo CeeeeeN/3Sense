@@ -39,7 +39,7 @@ function formatNotifTime(timestamp) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "" }) {
+export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
   const [notifOpen, setNotifOpen]         = useState(false);
   const [userOpen, setUserOpen]           = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -48,14 +48,14 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // Subscribe to real-time notifications for this member
+  // Subscribe to real-time notifications for this user
   useEffect(() => {
-    if (!memberID) return;
-    const unsub = subscribeToUserNotifications(memberID, (data) => {
+    if (!userID) return;
+    const unsub = subscribeToUserNotifications(userID, (data) => {
       setNotifications(data);
     });
     return () => unsub();
-  }, [memberID]);
+  }, [userID]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -109,7 +109,7 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
               onClick={() => { 
                 setNotifOpen(v => !v); 
                 setUserOpen(false); 
-                if (memberID) requestPushPermission(memberID);
+                if (userID) requestPushPermission(userID);
               }}
               title="Notifications"
             >

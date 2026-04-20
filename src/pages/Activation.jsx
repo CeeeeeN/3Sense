@@ -22,7 +22,7 @@ const GUIDE_STEPS = [
   { label: "Barangay Approval Received", status: "done" },
   { label: "Activate Your Account ← You are here", status: "active" },
   { label: "Add Household Members", status: "" },
-  { label: "Access Your Dashboard", status: "" },
+  { label: "Log In to Your Account", status: "" },
 ];
 
 export default function Activation({ onBack, onLoginClick, onSuccess }) {

@@ -124,7 +124,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   useEffect(() => {
     if (!householdID && !userData?.userID) return;
     setLoadingMyRegs(true);
-    const filterField = householdID ? "hhId" : "userId";
+    const filterField = householdID ? "hhId" : "userID";
     const filterValue = householdID || userData?.userID;
     const q = query(
       collection(db, "livelihoodRegistrations"),
@@ -187,7 +187,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           email:           form.email || "",
           idFileName:      form.idFile || "",
           hhId:            householdID  || "",
-          userId:          userData?.userID || "",
+          userID:          userData?.userID || "",
           programId:       selectedProgram?.id    || "",
           programName:     selectedProgram?.title || "",
           programDate:     selectedProgram?.date  || "",

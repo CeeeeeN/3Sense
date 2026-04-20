@@ -58,6 +58,7 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         citizenship: head.citizenship || "",
         contactNumber: head.contactNumber ?? null,
         email: head.email || "",
+        residingSinceYear: head.residingSinceYear ? Number(head.residingSinceYear) : null,
 
         categories: Array.isArray(head.categories)
             ? head.categories

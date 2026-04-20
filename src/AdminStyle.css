@@ -1555,8 +1555,8 @@ nav {
   @apply text-[0.8rem] text-[color:var(--muted)];
 }
 .req-type-badge {
-  @apply inline-flex text-sky-700 text-[0.8rem] font-semibold px-[0.8rem] py-[0.3rem] rounded-lg;
-  background: #e0f2fe;
+  @apply inline-flex text-slate-800 text-[0.9rem] font-medium px-0 py-[0.3rem];
+  background: transparent;
 }
 .req-date-cell {
   @apply text-slate-600 text-[0.9rem];

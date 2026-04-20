@@ -173,6 +173,14 @@ export default function UserApp() {
         onBack={() => setPage("landing")}
         onForgotPassword={() => setPage("forgot")}
         onSuccess={(selectedProfile) => {
+          // Clear any stale session first to prevent cross-user data leakage
+          localStorage.removeItem("brgy_session");
+          setHouseholdID("");
+          setUserID("");
+          setMemberID(null);
+          setUserName("");
+          setUserRole("member");
+
           if (selectedProfile?.householdID) setHouseholdID(selectedProfile.householdID);
           if (selectedProfile?.userID) setUserID(selectedProfile.userID);
           if (selectedProfile?.memberID) setMemberID(selectedProfile.memberID);
@@ -230,7 +238,7 @@ export default function UserApp() {
     return (
       <AddMembers
         onBack={() => setPage("landing")}
-        onDone={() => setPage("home")}
+        onDone={() => setPage("login")}
         householdID={householdID}
         hhAddress={hhAddress}
       />
@@ -247,6 +255,7 @@ export default function UserApp() {
         userName={userName}
         memberID={memberID}
         userRole={userRole}
+        userID={userID}
       />
     );
   }
@@ -262,6 +271,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
           memberID={memberID}
+          userID={userID}
         />
         <Dashboard userName={userName} onNavigate={handleNav} householdID={householdID} memberID={memberID} userRole={userRole} />
       </div>
@@ -279,8 +289,9 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
           memberID={memberID}
+          userID={userID}
         />
-        <ServicesPage onNavigate={handleNav} householdID={householdID} memberID={memberID} userName={userName} />
+        <ServicesPage onNavigate={handleNav} householdID={householdID} memberID={memberID} userName={userName} userID={userID} />
       </div>
     );
   }
@@ -296,6 +307,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
           memberID={memberID}
+          userID={userID}
         />
         <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} userID={userID} />
       </div>
@@ -318,6 +330,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
           memberID={memberID}
+          userID={userID}
         />
         <FeedbackForm
           onNavigate={(p, data) => {
@@ -344,6 +357,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
           memberID={memberID}
+          userID={userID}
         />
         <ActivityPage onNavigate={handleNav} userName={userName} />
       </div>
@@ -361,6 +375,7 @@ export default function UserApp() {
           userName={userName}
           userRole={userRole}
           memberID={memberID}
+          userID={userID}
         />
         <EmergencyPage onNavigate={handleNav} userName={userName} />
       </div>

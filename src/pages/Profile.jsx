@@ -19,8 +19,8 @@ const CATS = ["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indige
 const BLANK = {
   firstName:"", middleName:"", lastName:"", suffix:"",
   birthDate:"", birthPlace:"", sex:"Male", civilStatus:"",
-  citizenship:"", religion:"", contactNumber:"", email:"",
-  houseNumber:"", street:"", region:"", province:"", city:"", barangay:"",
+  citizenship:"", religion:"", contactNumber:"", email:"", residingSinceYear: "",
+  houseNumber:"", street:"", region:"NCR", province:"", city:"Valenzuela City", barangay:"Malanday",
   sameAddress: false,
   categories:[],
   pwdStatus:"", disabilityType:"",
@@ -92,7 +92,7 @@ function formatHistoryDate(isoString) {
   }
 }
 
-export default function Profile({ onBack, onNavigate, householdID, memberID, userRole }) {
+export default function Profile({ onBack, onNavigate, householdID, memberID, userRole, userID }) {
   const [data, setData]       = useState({ ...BLANK });
   const [draft, setDraft]     = useState({ ...BLANK });
   const [open, setOpen]       = useState(false);
@@ -130,8 +130,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
   // Fetch transaction history
   useEffect(() => {
-    if (!memberID) { setTxLoading(false); return; }
-    fetchUserTransactions(memberID)
+    if (!userID) { setTxLoading(false); return; }
+    fetchUserTransactions(userID)
       .then(data => {
         setTransactions(data);
         setTxLoading(false);
@@ -140,7 +140,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         console.error("[Profile] Transaction fetch error:", err);
         setTxLoading(false);
       });
-  }, [memberID]);
+  }, [userID]);
 
   // Generate QR code whenever fullName or householdID changes
   useEffect(() => {
@@ -239,7 +239,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   return (
     <div className="pf-root">
       {/* NAV */}
-      <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} memberID={memberID} />
+      <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} memberID={memberID} userID={userID} />
 
       {loading && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "var(--muted)", fontSize: "0.9rem" }}>
@@ -301,6 +301,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               <InfoItem label="Civil Status" value={data.civilStatus} />
               <InfoItem label="Citizenship" value={data.citizenship} />
               <InfoItem label="Religion" value={data.religion} />
+              <InfoItem label="Residing Since" value={data.residingSinceYear} />
               <InfoItem label="Contact Number" value={data.contactNumber} />
               <InfoItem label="Email Address" value={data.email} />
             </div>
@@ -591,9 +592,10 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                     <div className="pf-sel-wrap"><select className="pf-sel" value={draft.civilStatus} onChange={set("civilStatus")}><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
                   </Field>
                 </div>
-                <div className="fg">
+                <div className="fg c3">
                   <Field label="Contact Number"><input className="pf-inp" type="tel" placeholder="09XX XXX XXXX" value={draft.contactNumber} onChange={set("contactNumber")} /></Field>
                   <Field label="Email Address"><input className="pf-inp" type="email" placeholder="email@example.com" value={draft.email} onChange={set("email")} /></Field>
+                  <Field label="Residing Since (Year)" req><input className="pf-inp" type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={draft.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                 </div>
               </>}
 
@@ -605,34 +607,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 </div>
                 <div className="fg">
                   <Field label="Region">
-                    <div className="pf-sel-wrap">
-                      <select className="pf-sel" value={draft.region} onChange={set("region")} disabled={draft.sameAddress}>
-                        <option value="">Select region</option>
-                        <option>NCR – National Capital Region</option>
-                        <option>Region I – Ilocos Region</option>
-                        <option>Region II – Cagayan Valley</option>
-                        <option>Region III – Central Luzon</option>
-                        <option>Region IV-A – CALABARZON</option>
-                        <option>Region IV-B – MIMAROPA</option>
-                        <option>Region V – Bicol Region</option>
-                        <option>Region VI – Western Visayas</option>
-                        <option>Region VII – Central Visayas</option>
-                        <option>Region VIII – Eastern Visayas</option>
-                        <option>Region IX – Zamboanga Peninsula</option>
-                        <option>Region X – Northern Mindanao</option>
-                        <option>Region XI – Davao Region</option>
-                        <option>Region XII – SOCCSKSARGEN</option>
-                        <option>Region XIII – Caraga</option>
-                        <option>CAR – Cordillera Administrative Region</option>
-                        <option>BARMM – Bangsamoro</option>
-                      </select>
-                    </div>
+                    <input className="pf-inp" value="NCR" readOnly />
                   </Field>
                   <Field label="Province"><input className="pf-inp" placeholder="Metro Manila" value={draft.province} onChange={set("province")} readOnly={draft.sameAddress} /></Field>
                 </div>
                 <div className="fg">
-                  <Field label="City / Municipality" req><input className="pf-inp" placeholder="Valenzuela City" value={draft.city} onChange={set("city")} /></Field>
-                  <Field label="Barangay" req><input className="pf-inp" placeholder="Malanday" value={draft.barangay} onChange={set("barangay")} /></Field>
+                  <Field label="City / Municipality"><input className="pf-inp" value="Valenzuela City" readOnly /></Field>
+                  <Field label="Barangay"><input className="pf-inp" value="Malanday" readOnly /></Field>
                 </div>
               </>}
 
@@ -692,7 +673,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <div className="fg">
                   <Field label="Total Members"><input className="pf-inp" type="number" min="1" placeholder="e.g. 4" value={draft.totalMembers} onChange={set("totalMembers")} /></Field>
                   <Field label="Household Classification">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.householdClassification} onChange={set("householdClassification")}><option value="">Select</option><option>Class A</option><option>Class B</option><option>Class C</option><option>Class D</option><option>Class E</option></select></div>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.householdClassification} onChange={set("householdClassification")}><option value="">Select</option><option>Owner</option><option>Rental</option><option>Co-habit / Shared</option><option>Informal Settler</option></select></div>
                   </Field>
                 </div>
               </>}
