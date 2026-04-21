@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Manage_IconQR, IconDownload, IconConfirmCheck, SirenIcon, BriefcaseIcon, InfoIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
-import { db } from "../../firebase/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../../firebase/firebase";
+import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+
+import { ROLE_PERMISSIONS } from "../../services/permissions";
 
 import ServicePeaceOrder from "./ServicePeaceOrder";
 import ServiceLivelihood from "./ServiceLivelihood";
@@ -11,6 +14,7 @@ import ServiceBswd from "./ServiceBswd";
 export default function ManageServices() {
   const [activeDashboard, setActiveDashboard] = useState(null);
   const [selectedServiceQR, setSelectedServiceQR] = useState(null);
+  const [userRole, setUserRole] = useState(null);
 
   // ── Real-time stats ──────────────────────────────────────────────
   const [peaceStats, setPeaceStats]       = useState({ total: 0, byStatus: {}, latest: null });
@@ -41,7 +45,18 @@ export default function ManageServices() {
     };
   };
 
+  // --- ADDED: Fetch User Role on Mount ---
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setUserRole(snap.docs[0].data().role || "Standard Admin");
+        }
+      }
+    });
+
     const unsubPeace = onSnapshot(collection(db, "incidentReports"), snap => {
       setPeaceStats(computeStats(snap, "submittedAt"));
     });
@@ -51,7 +66,13 @@ export default function ManageServices() {
     const unsubBswd = onSnapshot(collection(db, "bswdReports"), snap => {
       setBswdStats(computeStats(snap, "submittedAt"));
     });
-    return () => { unsubPeace(); unsubLivelihood(); unsubBswd(); };
+
+    return () => { 
+      unsubscribeAuth();
+      unsubPeace(); 
+      unsubLivelihood(); 
+      unsubBswd(); 
+    };
   }, []);
 
   // ── QR helpers ───────────────────────────────────────────────────
@@ -116,105 +137,130 @@ export default function ManageServices() {
     );
   };
 
+  // --- ADDED: Determine what the user is allowed to see ---
+  const allowedServices = ROLE_PERMISSIONS[userRole]?.services || [];
+  
+  const hasWorkspaceServices = allowedServices.some(s => ["Peace & Order", "Livelihood", "BSWD"].includes(s));
+  const hasInfoServices = allowedServices.some(s => ["BADAC", "VAWC", "BOSCA"].includes(s));
+
   return (
     <>
       <div className="as-container">
-        <div className="as-header-section">
-          <div className="as-title-wrap">
-            <h1>Services Hub</h1>
-            <p className="as-subtitle">Adaptive workspaces for handling different barangay services and departments</p>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-
-          {/* Peace & Order */}
-          <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-              <div style={{ background: "#eff6ff", color: "#1d4ed8", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Peace &amp; Order</h3>
-                <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Interactive Form &amp; Inbox</span>
+        
+        {/* --- DYNAMIC WORKSPACE SECTION --- */}
+        {hasWorkspaceServices && (
+          <>
+            <div className="as-header-section">
+              <div className="as-title-wrap">
+                <h1>Services Hub</h1>
+                <p className="as-subtitle">Adaptive workspaces for handling different barangay services and departments</p>
               </div>
             </div>
-            <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Monitor incoming incident reports, dispatch barangay tanods, and manage blotters.</p>
-            <StatBar stats={peaceStats} />
-            <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-              <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("peace")}>Workspace &rarr;</button>
-              <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("Peace and Order", "Services")}>
-                <Manage_IconQR /> Generate QR Code
-              </button>
-            </div>
-          </div>
 
-          {/* Livelihood */}
-          <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-              <div style={{ background: "#f0fdf4", color: "#15803d", padding: "12px", borderRadius: "12px" }}><BriefcaseIcon /></div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Livelihood</h3>
-                <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Registration System</span>
-              </div>
-            </div>
-            <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Approve or reject community registrations for training programs and assistance.</p>
-            <StatBar stats={livelihoodStats} />
-            <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-              <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("livelihood")}>Workspace &rarr;</button>
-              <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("Livelihood", "Services")}>
-                <Manage_IconQR /> Generate QR Code
-              </button>
-            </div>
-          </div>
-
-          {/* BSWD */}
-          <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-              <div style={{ background: "#f0fdf2", color: "#115e59", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>BSWD</h3>
-                <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Social Welfare</span>
-              </div>
-            </div>
-            <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Manage reports of displaced persons and community tips regarding resident welfare.</p>
-            <StatBar stats={bswdStats} />
-            <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-              <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("bswd")}>Workspace &rarr;</button>
-              <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("BSWD", "Services")}>
-                <Manage_IconQR /> Generate QR Code
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Informational Services */}
-        <div className="as-header-section" style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
-          <div className="as-title-wrap">
-            <h2>Informational Services</h2>
-            <p className="as-subtitle">Standard content guides mapping to external references or rules.</p>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-          {[
-            { name: "BADAC", color: { bg: "#fef3c7", text: "#b45309" }, desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures." },
-            { name: "VAWC", color: { bg: "#fce7f3", text: "#be185d" }, desc: "Violence Against Women and their Children guides, support numbers, and help." },
-            { name: "BOSCA", color: { bg: "#e0e7ff", text: "#4338ca" }, desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines." },
-          ].map(svc => (
-            <div key={svc.name} className="as-card" style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                <div style={{ background: svc.color.bg, color: svc.color.text, padding: "12px", borderRadius: "12px" }}><InfoIcon /></div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{svc.name}</h3>
-                  <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Informational Content</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
+              
+              {/* Peace & Order */}
+              {allowedServices.includes("Peace & Order") && (
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#eff6ff", color: "#1d4ed8", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Peace &amp; Order</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Interactive Form &amp; Inbox</span>
+                    </div>
+                  </div>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Monitor incoming incident reports, dispatch barangay tanods, and manage blotters.</p>
+                  <StatBar stats={peaceStats} />
+                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("peace")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("Peace and Order", "Services")}>
+                      <Manage_IconQR /> Generate QR Code
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{svc.desc}</p>
-              <button className="as-qr-btn" style={{ width: "100%", marginTop: "16px" }} onClick={() => handleGenerateQR(svc.name, "Services")}>
-                <Manage_IconQR /> Generate QR Code
-              </button>
+              )}
+
+              {/* Livelihood */}
+              {allowedServices.includes("Livelihood") && (
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#f0fdf4", color: "#15803d", padding: "12px", borderRadius: "12px" }}><BriefcaseIcon /></div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Livelihood</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Registration System</span>
+                    </div>
+                  </div>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Approve or reject community registrations for training programs and assistance.</p>
+                  <StatBar stats={livelihoodStats} />
+                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("livelihood")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("Livelihood", "Services")}>
+                      <Manage_IconQR /> Generate QR Code
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* BSWD */}
+              {allowedServices.includes("BSWD") && (
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#f0fdf2", color: "#115e59", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>BSWD</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Social Welfare</span>
+                    </div>
+                  </div>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Manage reports of displaced persons and community tips regarding resident welfare.</p>
+                  <StatBar stats={bswdStats} />
+                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("bswd")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("BSWD", "Services")}>
+                      <Manage_IconQR /> Generate QR Code
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          </>
+        )}
+
+        {/* --- DYNAMIC INFORMATIONAL SERVICES SECTION --- */}
+        {hasInfoServices && (
+          <>
+            <div className="as-header-section" style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
+              <div className="as-title-wrap">
+                <h2>Informational Services</h2>
+                <p className="as-subtitle">Standard content guides mapping to external references or rules.</p>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
+              {[
+                { name: "BADAC", color: { bg: "#fef3c7", text: "#b45309" }, desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures." },
+                { name: "VAWC", color: { bg: "#fce7f3", text: "#be185d" }, desc: "Violence Against Women and their Children guides, support numbers, and help." },
+                { name: "BOSCA", color: { bg: "#e0e7ff", text: "#4338ca" }, desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines." },
+              ]
+              // --- ADDED: Array Filter based on Role Permissions ---
+              .filter(svc => allowedServices.includes(svc.name))
+              .map(svc => (
+                <div key={svc.name} className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: svc.color.bg, color: svc.color.text, padding: "12px", borderRadius: "12px" }}><InfoIcon /></div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{svc.name}</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Informational Content</span>
+                    </div>
+                  </div>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{svc.desc}</p>
+                  <button className="as-qr-btn" style={{ width: "100%", marginTop: "16px" }} onClick={() => handleGenerateQR(svc.name, "Services")}>
+                    <Manage_IconQR /> Generate QR Code
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* QR Modal */}

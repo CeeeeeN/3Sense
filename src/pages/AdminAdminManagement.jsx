@@ -624,7 +624,6 @@ export default function AdminManagement() {
       )}
 
       {/* View Admin Details Modal */}
-      {/* View Admin Details Modal */}
       {showViewModal && selectedAdmin && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "420px" }}>
@@ -655,10 +654,20 @@ export default function AdminManagement() {
                         style={{ padding: "6px 10px", borderRadius: "4px", border: "1px solid #ccc", outline: "none", cursor: "pointer" }}
                       >
                         <option value="Super Admin">Super Admin</option>
-                        <option value="Document Admin">Document Admin</option>
-                        <option value="Facility Admin">Facility Admin</option>
                         <option value="Standard Admin">Standard Admin</option>
                         <option value="Secretary">Secretary</option>
+                        <option value="BSWD Head">BSWD Head</option>
+                        <option value="BSWD Staff">BSWD Staff</option>
+                        <option value="VAWC Head">VAWC Head</option>
+                        <option value="VAWC Staff">VAWC Staff</option>
+                        <option value="BOSCA Head">BOSCA Head</option>
+                        <option value="BOSCA Staff">BOSCA Staff</option>
+                        <option value="Peace&Order Head">Peace&Order Head</option>
+                        <option value="Peace&Order Staff">Peace&Order Staff</option>
+                        <option value="BADAC Head">BADAC Head</option>
+                        <option value="BADAC Staff">BADAC Staff</option>
+                        <option value="Livelihood Head">Livelihood Head</option>
+                        <option value="Livelihood Staff">Livelihood Staff</option>
                       </select>
                     ) : (
                       <span style={{ 

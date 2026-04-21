@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import "../AdminStyle.css";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { ROLE_PERMISSIONS } from "../services/permissions";
 import {
   collection,
   query,
@@ -12,7 +13,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  writeBatch
+  writeBatch,
 } from "firebase/firestore";
 
 export default function AdminLayout({ children }) {
@@ -26,7 +27,7 @@ export default function AdminLayout({ children }) {
     "/admin/admin-management": "Admin Management",
     "/admin/household-management": "Household Management",
     "/admin/reports": "Reports",
-    "/admin/profile": "My Profile"
+    "/admin/profile": "My Profile",
   };
 
   const topBarTitle = titles[location.pathname] || "Dashboard";
@@ -37,7 +38,8 @@ export default function AdminLayout({ children }) {
 
   const [currentUserData, setCurrentUserData] = useState({
     fullName: "Loading...",
-    position: "..."
+    position: "...",
+    role: "...",
   });
 
   // 🔥 REAL-TIME NOTIFICATIONS
@@ -51,7 +53,7 @@ export default function AdminLayout({ children }) {
       if (user) {
         const approvedQ = query(
           collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid)
+          where("uid", "==", user.uid),
         );
         const approvedSnapshot = await getDocs(approvedQ);
 
@@ -59,14 +61,15 @@ export default function AdminLayout({ children }) {
           const data = approvedSnapshot.docs[0].data();
           setCurrentUserData({
             fullName: data.fullName || "Admin",
-            position: data.position || "Admin"
+            position: data.position || "Admin",
+            role: data.role || "Standard Admin",
           });
           return;
         }
 
         const pendingQ = query(
           collection(db, "pendingAdmins"),
-          where("uid", "==", user.uid)
+          where("uid", "==", user.uid),
         );
         const pendingSnapshot = await getDocs(pendingQ);
 
@@ -74,7 +77,8 @@ export default function AdminLayout({ children }) {
           const data = pendingSnapshot.docs[0].data();
           setCurrentUserData({
             fullName: data.fullName || "Admin",
-            position: data.position || "Admin"
+            position: data.position || "Admin",
+            role: data.role || "Standard Admin",
           });
         }
       }
@@ -85,12 +89,15 @@ export default function AdminLayout({ children }) {
 
   // 🔥 REAL-TIME NOTIFICATION LISTENER
   useEffect(() => {
-    const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"));
+    const q = query(
+      collection(db, "notifications"),
+      orderBy("createdAt", "desc"),
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
+      const data = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
       setNotifications(data);
     });
@@ -113,7 +120,7 @@ export default function AdminLayout({ children }) {
   const markAsRead = async (id) => {
     try {
       await updateDoc(doc(db, "notifications", id), {
-        isRead: true
+        isRead: true,
       });
     } catch (err) {
       console.error("Failed to mark as read:", err);
@@ -122,14 +129,14 @@ export default function AdminLayout({ children }) {
 
   // 🔥 MARK ALL AS READ (BATCH)
   const markAllAsRead = async () => {
-    const unread = notifications.filter(n => !n.isRead);
+    const unread = notifications.filter((n) => !n.isRead);
     if (unread.length === 0) return;
 
     const batch = writeBatch(db);
 
-    unread.forEach(n => {
+    unread.forEach((n) => {
       batch.update(doc(db, "notifications", n.id), {
-        isRead: true
+        isRead: true,
       });
     });
 
@@ -140,7 +147,7 @@ export default function AdminLayout({ children }) {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleLogout = async () => {
     try {
@@ -157,17 +164,24 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="admin-layout">
-      
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
-          style={{ position: "fixed", inset: 0, zIndex: 40, backgroundColor: "rgba(0,0,0,0.5)" }} 
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* SIDEBAR */}
-      <div className={`left-panel ${isOpen ? "active" : ""}`} style={{ zIndex: 50 }}>
+      <div
+        className={`left-panel ${isOpen ? "active" : ""}`}
+        style={{ zIndex: 50 }}
+      >
         <div className="left-logo">
           <img src="/icons/logo.png" className="logo-img" alt="Logo" />
           <div className="logo-text-group">
@@ -177,29 +191,132 @@ export default function AdminLayout({ children }) {
         </div>
 
         <div className="nav-links">
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/dashboard" ? "active" : ""} to="/admin/dashboard">Dashboard</Link>
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/manage" ? "active" : ""} to="/admin/manage">Manage</Link>
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/requests" ? "active" : ""} to="/admin/requests">Requests</Link>
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/feedback" ? "active" : ""} to="/admin/feedback">Feedback</Link>
+          {/* Always check if the user's role allows the page before rendering the link */}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/dashboard",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={
+                location.pathname === "/admin/dashboard" ? "active" : ""
+              }
+              to="/admin/dashboard"
+            >
+              Dashboard
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/manage",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/manage" ? "active" : ""}
+              to="/admin/manage"
+            >
+              Manage
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/requests",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={
+                location.pathname === "/admin/requests" ? "active" : ""
+              }
+              to="/admin/requests"
+            >
+              Requests
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/feedback",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={
+                location.pathname === "/admin/feedback" ? "active" : ""
+              }
+              to="/admin/feedback"
+            >
+              Feedback
+            </Link>
+          )}
 
           <div className="nav-divider"></div>
 
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/admin-management" ? "active" : ""} to="/admin/admin-management">Admin Management</Link>
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/household-management" ? "active" : ""} to="/admin/household-management">Household Management</Link>
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/reports" ? "active" : ""} to="/admin/reports">Reports</Link>
-          <Link onClick={handleLinkClick} className={location.pathname === "/admin/profile" ? "active" : ""} to="/admin/profile">My Profile</Link>
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/admin-management",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={
+                location.pathname === "/admin/admin-management" ? "active" : ""
+              }
+              to="/admin/admin-management"
+            >
+              Admin Management
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/household-management",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={
+                location.pathname === "/admin/household-management"
+                  ? "active"
+                  : ""
+              }
+              to="/admin/household-management"
+            >
+              Household Management
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/reports",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/reports" ? "active" : ""}
+              to="/admin/reports"
+            >
+              Reports
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/profile",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/profile" ? "active" : ""}
+              to="/admin/profile"
+            >
+              My Profile
+            </Link>
+          )}
         </div>
 
         <div className="sidebar-bottom">
-          <a 
-            href="#" 
-            className="logout-link" 
-            onClick={(e) => { e.preventDefault(); setShowLogoutModal(true); }}
-            style={{ 
-              display: "block", 
-              width: "100%", 
-              position: "relative", 
-              zIndex: 10 
+          <a
+            href="#"
+            className="logout-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowLogoutModal(true);
+            }}
+            style={{
+              display: "block",
+              width: "100%",
+              position: "relative",
+              zIndex: 10,
             }}
           >
             Logout
@@ -209,15 +326,16 @@ export default function AdminLayout({ children }) {
 
       {/* RIGHT PANEL */}
       <div className="right-panel">
-
         <div className="top-bar">
           <h1>{topBarTitle}</h1>
 
           <div className="top-actions">
-
             {/* 🔔 NOTIFICATIONS */}
             <div className="notif-wrapper" ref={notifRef}>
-              <button className="bell-btn" onClick={() => setShowNotif(!showNotif)}>
+              <button
+                className="bell-btn"
+                onClick={() => setShowNotif(!showNotif)}
+              >
                 🔔
                 {unreadCount > 0 && <span className="notif-dot"></span>}
               </button>
@@ -226,7 +344,8 @@ export default function AdminLayout({ children }) {
                 <div className="notif-dropdown">
                   <div className="notif-header">
                     <div className="notif-title">
-                      Notifications <span className="notif-count">{unreadCount}</span>
+                      Notifications{" "}
+                      <span className="notif-count">{unreadCount}</span>
                     </div>
                     <button onClick={markAllAsRead}>Mark all read</button>
                   </div>
@@ -235,7 +354,7 @@ export default function AdminLayout({ children }) {
                     {notifications.length === 0 ? (
                       <div className="notif-empty">No notifications yet</div>
                     ) : (
-                      notifications.map(n => (
+                      notifications.map((n) => (
                         <div
                           key={n.id}
                           className={`notif-item ${n.isRead ? "read" : ""}`}
@@ -244,7 +363,9 @@ export default function AdminLayout({ children }) {
                           <div className="notif-icon">🔔</div>
 
                           <div className="notif-text">
-                            <strong>{n.type?.replace("_", " ").toUpperCase()}</strong>
+                            <strong>
+                              {n.type?.replace("_", " ").toUpperCase()}
+                            </strong>
                             <p>{n.message}</p>
                             <span className="notif-time">
                               {n.createdAt?.toDate().toLocaleString()}
@@ -269,7 +390,6 @@ export default function AdminLayout({ children }) {
             </div>
 
             {/* The hamburger button that was here has been removed! */}
-
           </div>
         </div>
 
@@ -282,8 +402,15 @@ export default function AdminLayout({ children }) {
             <div className="modal">
               <h3 className="modal-title">Confirm Logout</h3>
               <div className="btn-group modal-actions">
-                <button className="reject-btn" onClick={handleLogout}>Logout</button>
-                <button className="approve-btn" onClick={() => setShowLogoutModal(false)}>Cancel</button>
+                <button className="reject-btn" onClick={handleLogout}>
+                  Logout
+                </button>
+                <button
+                  className="approve-btn"
+                  onClick={() => setShowLogoutModal(false)}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
