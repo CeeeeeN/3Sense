@@ -44,6 +44,9 @@ export default function Registration({ onBack }) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState("");
+  
+  // --- ADDED: Error Message State ---
+  const [errorMsg, setErrorMsg] = useState("");
 
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
@@ -57,6 +60,9 @@ export default function Registration({ onBack }) {
   });
 
   const set = (field) => (e) => {
+    // --- ADDED: Clear error when the user starts fixing it ---
+    setErrorMsg(""); 
+    
     const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
     setForm(f => ({ ...f, [field]: value }));
     if (field === "birthDate" && e.target.value) {
@@ -82,23 +88,92 @@ export default function Registration({ onBack }) {
   const progress = ((step - 1) / (total - 1)) * 100;
   const isPwd = form.categories.includes("PWD");
 
+  // --- ADDED: Validation Logic per Step ---
+  const validateStep = () => {
+    const missing = [];
+    
+    if (step === 1) {
+      if (!form.firstName.trim()) missing.push("First Name");
+      if (!form.lastName.trim()) missing.push("Last Name");
+      if (!form.birthDate) missing.push("Birth Date");
+      if (!form.birthPlace.trim()) missing.push("Birth Place");
+      if (!form.sex) missing.push("Sex");
+      if (!form.civilStatus) missing.push("Civil Status");
+      if (!form.citizenship.trim()) missing.push("Citizenship");
+      if (!form.residingSinceYear) missing.push("Residing Since Year");
+      
+      if (!form.contactNumber.trim()) missing.push("Contact Number");
+      else if (form.contactNumber.length < 10) missing.push("Valid Contact Number");
+      
+      if (!form.email.trim()) missing.push("Email Address");
+      else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+    }
+    
+    if (step === 2) {
+      if (!form.houseNumber.trim()) missing.push("House / Unit Number");
+      if (!form.street.trim()) missing.push("Street");
+      if (!form.region.trim()) missing.push("Region");
+      if (!form.province.trim()) missing.push("Province");
+      if (!form.city.trim()) missing.push("City");
+      if (!form.barangay.trim()) missing.push("Barangay");
+    }
+    
+    if (step === 3 && isPwd) {
+      if (!form.pwdStatus) missing.push("PWD Status");
+      if (!form.disabilityType) missing.push("Disability Type");
+    }
+    
+    if (step === 4) {
+      if (!form.educationAttainment) missing.push("Highest Educational Attainment");
+      if (!form.educationStatus) missing.push("Education Status");
+      if (!form.employmentStatus) missing.push("Employment Status");
+    }
+    
+    if (step === 5) {
+      if (!form.totalMembers) missing.push("Number of Household Members");
+      if (!form.householdClassification) missing.push("Household Classification");
+    }
+
+    if (missing.length > 0) {
+      setErrorMsg(`Please fill in required fields: ${missing.join(", ")}`);
+      return false;
+    }
+    
+    setErrorMsg("");
+    return true;
+  };
+
   const goNext = async () => {
-    if (step < total) { setStep(s => s + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    // --- ADDED: Check validation before moving forward ---
+    if (!validateStep()) {
+      return; 
+    }
+
+    if (step < total) { 
+      setStep(s => s + 1); 
+      window.scrollTo({ top: 0, behavior: "smooth" }); 
+    }
     else {
-      try{
+      try {
         await submitRegistration(form);
-      const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
-      setRefNumber(ref);
-      setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      } catch(error){
+        const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
+        setRefNumber(ref);
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch(error) {
         console.error("Submission error:", error);
         alert("Failed to submit registration.");
       }
     }
   };
 
-  const goBack = () => { if (step > 1) { setStep(s => s - 1); window.scrollTo({ top: 0, behavior: "smooth" }); } };
+  const goBack = () => { 
+    if (step > 1) { 
+      setErrorMsg(""); // Clear errors when going backward
+      setStep(s => s - 1); 
+      window.scrollTo({ top: 0, behavior: "smooth" }); 
+    } 
+  };
 
   const handleCancel = () => {
     if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) {
@@ -288,7 +363,6 @@ export default function Registration({ onBack }) {
                       <Field label="Region" required>
                         <InputField icon={RegisIconGlobe} type="text" value={form.region} readOnly />
                       </Field>
-                      {/* ── STEP 2: Address ── */}
                       <Field label="Province" required>
                         <InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} />
                       </Field>
@@ -489,17 +563,33 @@ export default function Registration({ onBack }) {
 
         {/* FOOTER ACTIONS */}
         {!submitted && (
-          <div className="reg-footer-actions">
-            <button className="reg-btn-cancel" onClick={handleCancel}>Cancel</button>
-            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-              {step > 1 && (
-                <button className="reg-btn-ghost" onClick={goBack}>← Back</button>
-              )}
-              {step < total ? (
-                <button className="reg-btn-primary" onClick={goNext}>Continue →</button>
-              ) : (
-                <button className="reg-btn-success" onClick={goNext}>✓ Confirm & Submit</button>
-              )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
+            {errorMsg && (
+              <div style={{ 
+                padding: '12px 16px', 
+                backgroundColor: '#fef2f2', 
+                borderLeft: '4px solid #ef4444', 
+                color: '#b91c1c', 
+                fontSize: '0.9rem',
+                borderRadius: '4px',
+                fontWeight: '500'
+              }}>
+                ⚠️ {errorMsg}
+              </div>
+            )}
+
+            <div className="reg-footer-actions">
+              <button className="reg-btn-cancel" onClick={handleCancel}>Cancel</button>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                {step > 1 && (
+                  <button className="reg-btn-ghost" onClick={goBack}>← Back</button>
+                )}
+                {step < total ? (
+                  <button className="reg-btn-primary" onClick={goNext}>Continue →</button>
+                ) : (
+                  <button className="reg-btn-success" onClick={goNext}>✓ Confirm & Submit</button>
+                )}
+              </div>
             </div>
           </div>
         )}
