@@ -2,13 +2,25 @@ import React, { useState, useEffect } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Eye, CheckCircle, XCircle, X, Calendar, FileText, User, Info, Clock } from 'lucide-react';
-import { db } from '../firebase/firebase';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/firebase';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from "firebase/auth";
 import { createUserNotification } from '../services/userNotifications';
+import { logTransaction } from '../services/logger';
+
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
 
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState('Facility'); // 'Facility' or 'Document'
@@ -46,6 +58,28 @@ export default function AdminRequests() {
     const mName = middleName ? `${middleName} ` : '';
     return `${firstName || ''} ${mName}${lastName || ''}`.trim() || 'Unknown Resident';
   };
+  
+    useEffect(() => {
+      // Listen for the currently logged-in user
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // Find their document in the approvedAdmins collection
+          const q = query(
+            collection(db, "approvedAdmins"), 
+            where("uid", "==", user.uid)
+          );
+          const snapshot = await getDocs(q);
+  
+          if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            setAdminName(data.fullName || "Admin");
+            setAdminRole(data.role || "Standard Admin");
+          }
+        }
+      });
+  
+      return () => unsubscribe();
+    }, []);
 
   // --- REAL-TIME FIREBASE FETCH ---
   useEffect(() => {
@@ -66,7 +100,7 @@ export default function AdminRequests() {
           rawDate: rawDate,
           dateNeeded: formatDate(data.dateNeeded),
           status: data.status || 'Pending',
-          allData: data // Store all data for the View modal
+          allData: data 
         };
       });
 
@@ -79,7 +113,7 @@ export default function AdminRequests() {
             docId: doc.id,
             collectionName: 'facility_reservations',
             id: data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
-            residentName: data.requesterName,
+            residentName: data.requesterName || 'Unknown Resident',
             contact: data.email || 'No email provided',
             category: 'Facility',
             type: data.facilityName || data.facility || 'Unknown Facility',
@@ -107,13 +141,23 @@ export default function AdminRequests() {
     return () => unsubscribeDocs();
   }, []);
 
-  // --- FILTERING LOGIC ---
+  // --- FILTERING LOGIC (FIXED) ---
   const filteredRequests = requests.filter(req => {
     const matchesTab = req.category === activeTab;
-    const matchesSearch = req.residentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || req.status.toLowerCase() === filterStatus.toLowerCase();
+    
+    const safeSearchTerm = String(searchTerm || "").toLowerCase();
+    const safeResidentName = String(req.residentName || "").toLowerCase();
+    const safeType = String(req.type || "").toLowerCase();
+    const safeId = String(req.id || "").toLowerCase();
+    const safeStatus = String(req.status || "").toLowerCase();
+
+    const matchesSearch = 
+      safeResidentName.includes(safeSearchTerm) ||
+      safeType.includes(safeSearchTerm) ||
+      safeId.includes(safeSearchTerm);
+      
+    const matchesStatus = filterStatus === 'All' || safeStatus === filterStatus.toLowerCase();
+    
     return matchesTab && matchesSearch && matchesStatus;
   });
 
@@ -190,7 +234,7 @@ export default function AdminRequests() {
       const hasOverlap = requests.some(r => {
         if (r.category !== 'Facility') return false;
         if (r.docId === target.docId) return false;
-        if (r.status.toLowerCase() !== 'approved') return false;
+        if (String(r.status || "").toLowerCase() !== 'approved') return false;
 
         const targetData = target.allData;
         const rData = r.allData;
@@ -210,6 +254,13 @@ export default function AdminRequests() {
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
       await updateDoc(requestRef, { status: 'Approved' });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "APPROVED_REQUEST",
+        `Approved ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
+      );
 
       // Notify the resident
       const memberID = target.allData?.userID || "";
@@ -240,6 +291,13 @@ export default function AdminRequests() {
       const requestRef = doc(db, target.collectionName, target.docId);
       await updateDoc(requestRef, { status: 'Ready for Pickup' });
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "READY_FOR_PICKUP",
+        `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`
+      );
+
       const memberID = target.allData?.userID || "";
       const refNum = target.id || "";
       if (memberID) {
@@ -266,6 +324,13 @@ export default function AdminRequests() {
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
       await updateDoc(requestRef, { status: 'Claimed' });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "CLAIMED_REQUEST",
+        `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`
+      );
 
       const memberID = target.allData?.userID || "";
       const refNum = target.id || "";
@@ -299,6 +364,13 @@ export default function AdminRequests() {
         status: 'Rejected',
         rejectionReason: rejectReason
       });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "REJECT_REQUEST",
+        `Rejected ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
+      );
 
       const memberID = selectedRequest.allData?.userID || "";
       const refNum = selectedRequest.id || "";
@@ -429,13 +501,13 @@ export default function AdminRequests() {
                       <div className="req-date-cell">{req.dateRequested}</div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className={`status-badge ${req.status.toLowerCase()}`}>
-                        {req.status.charAt(0).toUpperCase() + req.status.slice(1).toLowerCase()}
+                      <span className={`status-badge ${String(req.status || "pending").toLowerCase()}`}>
+                        {String(req.status || "Pending").charAt(0).toUpperCase() + String(req.status || "Pending").slice(1).toLowerCase()}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div className="req-actions" style={{ justifyContent: 'center' }}>
-                        {req.status.toLowerCase() === 'pending' && (
+                        {String(req.status || "").toLowerCase() === 'pending' && (
                           <>
                             <button className="btn-approve" title="Approve" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>
                               <CheckCircle size={16} /> Approve
@@ -445,12 +517,12 @@ export default function AdminRequests() {
                             </button>
                           </>
                         )}
-                        {req.status.toLowerCase() === 'approved' && req.category === 'Document' && (
+                        {String(req.status || "").toLowerCase() === 'approved' && req.category === 'Document' && (
                           <button className="btn-approve" title="Ready for Pickup" onClick={(e) => { e.stopPropagation(); handleReadyForPickup(req); }}>
                             <CheckCircle size={16} /> Mark Ready
                           </button>
                         )}
-                        {req.status.toLowerCase() === 'ready for pickup' && req.category === 'Document' && (
+                        {String(req.status || "").toLowerCase() === 'ready for pickup' && req.category === 'Document' && (
                           <button className="btn-approve" title="Claimed" onClick={(e) => { e.stopPropagation(); handleClaimed(req); }}>
                             <CheckCircle size={16} /> Mark Claimed
                           </button>
@@ -507,7 +579,7 @@ export default function AdminRequests() {
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Reference Number</label>
-                      <p className="detail-value" style={{ fontWeight: 600, letterSpacing: '1px' }}>{selectedRequest.id?.toUpperCase()}</p>
+                      <p className="detail-value" style={{ fontWeight: 600, letterSpacing: '1px' }}>{String(selectedRequest.id || "").toUpperCase()}</p>
                     </div>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Household Number</label>
@@ -524,8 +596,8 @@ export default function AdminRequests() {
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Status</label>
                       <div className="detail-value badge">
-                        <span className={`status-badge ${selectedRequest.status.toLowerCase()}`}>
-                          {selectedRequest.status}
+                        <span className={`status-badge ${String(selectedRequest.status || "").toLowerCase()}`}>
+                          {selectedRequest.status || "Pending"}
                         </span>
                       </div>
                     </div>
@@ -644,7 +716,7 @@ export default function AdminRequests() {
                         <p style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No additional requirements answered for this request.</p>
                       )}
 
-                    {selectedRequest.status.toLowerCase() === 'rejected' && selectedRequest.allData?.rejectionReason && (
+                    {String(selectedRequest.status || "").toLowerCase() === 'rejected' && selectedRequest.allData?.rejectionReason && (
                       <div className="detail-item" style={{ gridColumn: 'span 2', marginTop: '1rem', background: '#fff1f2', padding: '1rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
                         <label style={{ display: 'block', color: '#e11d48', fontWeight: 700, marginBottom: '0.3rem' }}>Admin Remarks / Rejection Reason</label>
                         <p className="detail-value" style={{ color: '#be123c', fontWeight: 400 }}>{selectedRequest.allData.rejectionReason}</p>
@@ -655,7 +727,7 @@ export default function AdminRequests() {
               </div>
               <div className="modal-footer">
                 <button className="btn-view" onClick={closeModal}>Close</button>
-                {selectedRequest.status.toLowerCase() === 'pending' && (
+                {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
                   <>
                     <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
                       <XCircle size={16} /> Reject
@@ -665,12 +737,12 @@ export default function AdminRequests() {
                     </button>
                   </>
                 )}
-                {selectedRequest.status.toLowerCase() === 'approved' && selectedRequest.category === 'Document' && (
+                {String(selectedRequest.status || "").toLowerCase() === 'approved' && selectedRequest.category === 'Document' && (
                   <button className="btn-approve" onClick={() => handleReadyForPickup()}>
                     <CheckCircle size={16} /> Mark Ready for Pickup
                   </button>
                 )}
-                {selectedRequest.status.toLowerCase() === 'ready for pickup' && selectedRequest.category === 'Document' && (
+                {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && selectedRequest.category === 'Document' && (
                   <button className="btn-approve" onClick={() => handleClaimed()}>
                     <CheckCircle size={16} /> Mark Claimed
                   </button>

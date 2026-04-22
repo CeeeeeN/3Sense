@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Manage_IconLocation, IconAdd } from "../../components/Icons";
 import { auth } from "../../firebase/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../../services/logger";
+import { query, where, getDocs } from "firebase/firestore";
 import {
   subscribeToAnnouncements,
   createAnnouncement,
@@ -15,6 +18,10 @@ export default function ManageAnnouncements() {
   const [editingAnnId, setEditingAnnId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
     description: "",
@@ -24,6 +31,28 @@ export default function ManageAnnouncements() {
     location: "",
     time: ""
   });
+
+    useEffect(() => {
+      // Listen for the currently logged-in user
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // Find their document in the approvedAdmins collection
+          const q = query(
+            collection(db, "approvedAdmins"),
+            where("uid", "==", user.uid),
+          );
+          const snapshot = await getDocs(q);
+  
+          if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            setAdminName(data.fullName || "Admin");
+            setAdminRole(data.role || "Standard Admin");
+          }
+        }
+      });
+  
+      return () => unsubscribe();
+    }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToAnnouncements((data) => {
@@ -59,9 +88,21 @@ export default function ManageAnnouncements() {
     if (window.confirm("Are you sure you want to delete this announcement?")) {
       try {
         await deleteAnnouncement(id);
+        logTransaction(
+          adminName,
+          adminRole,
+          "DELETED_ANNOUNCEMENT",
+          `Deleted announcement with ID: ${id}`,
+        );
       } catch (error) {
         console.error("Error deleting announcement:", error);
         alert("Failed to delete announcement.");
+        logTransaction(
+          adminName,
+          adminRole,
+          "ERROR_DELETING_ANNOUNCEMENT",
+          `Error deleting announcement with ID: ${id} - ${error.message}`,
+        );
       }
     }
   };
@@ -74,11 +115,23 @@ export default function ManageAnnouncements() {
     try {
       if (editingAnnId) {
         await updateAnnouncement(editingAnnId, newAnnouncement);
+        logTransaction(
+          adminName,
+          adminRole,
+          "EDITED_ANNOUNCEMENT",
+          `Edited announcement with ID: ${editingAnnId}`,
+        );
       } else {
         const adminID = auth.currentUser ? auth.currentUser.uid : "Admin";
         const emailHost = auth.currentUser?.email ? auth.currentUser.email.split('@')[0] : "Barangay Admin";
         const autoPostedBy = auth.currentUser?.displayName || emailHost;
         await createAnnouncement({ ...newAnnouncement, postedBy: autoPostedBy }, adminID);
+        logTransaction(
+          adminName,
+          adminRole,
+          "ADDED_ANNOUNCEMENT",
+          `Added new announcement: ${newAnnouncement.title}`,
+        );
       }
       
       setNewAnnouncement({
@@ -89,6 +142,12 @@ export default function ManageAnnouncements() {
     } catch (error) {
       console.error("Error saving announcement:", error);
       alert("Failed to save announcement.");
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_SAVING_ANNOUNCEMENT",
+        `Error saving announcement (${editingAnnId ? "editing" : "adding"}): ${error.message}`,
+      );
     } finally {
       setIsSubmitting(false);
     }

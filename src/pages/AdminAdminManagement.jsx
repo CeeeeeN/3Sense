@@ -3,6 +3,7 @@ import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../services/logger";
 import {
   collection,
   getDocs,
@@ -20,6 +21,10 @@ export default function AdminManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
 
   const [admins, setAdmins] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -45,6 +50,28 @@ export default function AdminManagement() {
 
   const defaultRows = 3;
   const rowsPerPage = 10;
+
+  useEffect(() => {
+        // Listen for the currently logged-in user
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            // Find their document in the approvedAdmins collection
+            const q = query(
+              collection(db, "approvedAdmins"), 
+              where("uid", "==", user.uid)
+            );
+            const snapshot = await getDocs(q);
+    
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              setAdminName(data.fullName || "Admin");
+              setAdminRole(data.role || "Standard Admin");
+            }
+          }
+        });
+    
+        return () => unsubscribe();
+      }, []);
 
   // ================= STEP 1: CHECK IF SERVICE HEAD =================
   useEffect(() => {
@@ -152,10 +179,23 @@ export default function AdminManagement() {
         status: "approved",
       });
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "Approved Admin Request",
+        `Approved admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid})`
+      );
+
       setSelectedRequest(null);
       setShowApproveModal(false);
     } catch (error) {
       console.error("Error approving admin:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Approve Admin",
+        `Failed to approve admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid}). Error: ${error.message}`
+      );
       alert("Failed to approve admin. Please try again.");
     }
   };
@@ -169,10 +209,23 @@ export default function AdminManagement() {
         status: "rejected",
       });
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "Rejected Admin Request",
+        `Rejected admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid})`
+      );
+
       setSelectedRequest(null);
       setShowRejectModal(false);
     } catch (error) {
       console.error("Error rejecting admin:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Reject Admin",
+        `Failed to reject admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid}). Error: ${error.message}`
+      );
       alert("Failed to reject admin. Please try again.");
     }
   };
@@ -184,10 +237,23 @@ export default function AdminManagement() {
     try {
       await deleteDoc(doc(db, "approvedAdmins", selectedAdmin.docId));
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "Deleted Admin Account",
+        `Deleted admin account of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid})`
+      );
+
       setSelectedAdmin(null);
       setShowDeleteModal(false);
     } catch (error) {
       console.error("Error deleting admin:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Delete Admin Account",
+        `Failed to delete admin account of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid}). Error: ${error.message}`
+      );
       alert("Failed to delete admin. Please try again.");
     }
   };
@@ -201,11 +267,24 @@ export default function AdminManagement() {
         role: editedRole,
       });
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "Updated Admin Role",
+        `Updated system role of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid}) to ${editedRole}`
+      );
+
       setSelectedAdmin(null);
       setShowViewModal(false);
       alert("Admin system role updated successfully!");
     } catch (error) {
       console.error("Error updating role:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Update Admin Role",
+        `Failed to update system role of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid}) to ${editedRole}. Error: ${error.message}`
+      );
       alert("Failed to update role. Please try again.");
     }
   };

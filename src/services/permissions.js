@@ -2,7 +2,7 @@
 
 export const ROLE_PERMISSIONS = {
   "Super Admin": {
-    pages: ["/admin/dashboard", "/admin/manage", "/admin/requests", "/admin/feedback", "/admin/admin-management", "/admin/household-management", "/admin/reports", "/admin/profile"],
+    pages: ["/admin/dashboard", "/admin/manage", "/admin/requests", "/admin/feedback", "/admin/admin-management", "/admin/household-management", "/admin/reports", "/admin/profile", "/admin/logs"],
     services: ["Peace & Order", "Livelihood", "BSWD", "BADAC", "VAWC", "BOSCA"]
   },
   "Secretary": {

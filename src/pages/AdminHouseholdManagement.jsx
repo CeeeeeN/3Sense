@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { db, auth } from "../firebase/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../services/logger";
 import {
   collection,
   onSnapshot,
@@ -54,8 +56,34 @@ export default function HouseholdManagement() {
   const [showHhApproveModal, setShowHhApproveModal] = useState(false);
   const [showHhRejectModal, setShowHhRejectModal] = useState(false);
 
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
   // Current admin profile
   const [adminProfile, setAdminProfile] = useState({ fullName: "Admin", position: "" });
+
+  useEffect(() => {
+        // Listen for the currently logged-in user
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            // Find their document in the approvedAdmins collection
+            const q = query(
+              collection(db, "approvedAdmins"), 
+              where("uid", "==", user.uid)
+            );
+            const snapshot = await getDocs(q);
+    
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              setAdminName(data.fullName || "Admin");
+              setAdminRole(data.role || "Standard Admin");
+            }
+          }
+        });
+    
+        return () => unsubscribe();
+      }, []);
 
   // Fetch current admin's display name from Firestore
   useEffect(() => {
@@ -217,9 +245,21 @@ export default function HouseholdManagement() {
       await approveRegistration(selectedHhRequest.id);
       setSelectedHhRequest(null);
       setShowHhApproveModal(false);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Approved Registration",
+        `Approved household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId})`
+      );
       alert("Registration approved successfully. An email has been sent to the head.");
     } catch (error) {
       console.error("Error approving registration:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Approve Registration",
+        `Failed to approve household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId}). Error: ${error.message}`
+      );
       alert("Error approving registration: " + error.message);
     }
   };
@@ -228,10 +268,22 @@ export default function HouseholdManagement() {
     if (!selectedHhRequest) return;
     try {
       await deleteDoc(doc(db, "pending_registrations", selectedHhRequest.id));
+      logTransaction(
+        adminName,
+        adminRole,
+        "Rejected Registration",
+        `Rejected household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId})`
+      );
       setSelectedHhRequest(null);
       setShowHhRejectModal(false);
     } catch (error) {
       console.error("Error rejecting registration:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Reject Registration",
+        `Failed to reject household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId}). Error: ${error.message}`
+      );
       alert("Error rejecting registration: " + error.message);
     }
   };
@@ -241,6 +293,12 @@ export default function HouseholdManagement() {
     try {
       if (residentToDelete.isPendingActivation) {
         await deleteDoc(doc(db, "households", residentToDelete.householdId));
+        logTransaction(
+          adminName,
+          adminRole,
+          "Deleted Unactivated Household",
+          `Deleted unactivated household with ID: ${residentToDelete.householdId} (Head: ${residentToDelete.fullName})`
+        );
       } else {
         // Pre-check remainder BEFORE deletion to avoid Firestore cache race conditions
         const residentsQuery = query(collection(db, "households", residentToDelete.householdId, "residents"));
@@ -248,6 +306,12 @@ export default function HouseholdManagement() {
 
         await deleteDoc(doc(db, "households", residentToDelete.householdId, "residents", residentToDelete.id));
 
+        logTransaction(
+          adminName,
+          adminRole,
+          "Deleted Resident",
+          `Deleted resident ${residentToDelete.fullName} (ID: ${residentToDelete.id}) from household ${residentToDelete.householdId}`
+        );
         // Auto-cleanup: If it was the last resident standing, obliterate the root Household Document
         if (residentsSnapshot.size <= 1) {
           await deleteDoc(doc(db, "households", residentToDelete.householdId));
@@ -258,6 +322,12 @@ export default function HouseholdManagement() {
       alert("Resident deleted successfully.");
     } catch (error) {
       console.error("Error deleting resident:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Delete Resident",
+        `Failed to delete resident ${residentToDelete.fullName} (ID: ${residentToDelete.id}) from household ${residentToDelete.householdId}. Error: ${error.message}`
+      );
       alert("Error deleting resident: " + error.message);
     }
   };
@@ -349,10 +419,23 @@ export default function HouseholdManagement() {
         : `Your barangay status has been updated to: ${statusData.status}.`;
       await createUserNotification(statusData.id, "Status Update", notifMsg, "general");
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "Updated Resident Status",
+        `Updated status for resident ${statusData.fullName} (ID: ${statusData.id}) in household ${statusData.householdId} to "${statusData.status}". Remarks: "${statusData.remarks || "None"}". Incident: "${statusData.incident || "None"}".`
+      );
+
       setShowStatusModal(false);
       setStatusData(null);
     } catch (error) {
       console.error("Error updating resident status:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed to Update Resident Status",
+        `Failed to update status for resident ${statusData.fullName} (ID: ${statusData.id}) in household ${statusData.householdId}. Error: ${error.message}`
+      );
       alert("Failed to update status.");
     }
   };

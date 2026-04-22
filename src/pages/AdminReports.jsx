@@ -2,7 +2,9 @@ import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import { useMemo, useState, useEffect } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { auth, db } from "../firebase/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../services/logger";
 
 export default function Reports() {
 
@@ -12,6 +14,32 @@ export default function Reports() {
   const [feedbackData, setFeedbackData] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
+
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
+  useEffect(() => {
+        // Listen for the currently logged-in user
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            // Find their document in the approvedAdmins collection
+            const q = query(
+              collection(db, "approvedAdmins"), 
+              where("uid", "==", user.uid)
+            );
+            const snapshot = await getDocs(q);
+    
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              setAdminName(data.fullName || "Admin");
+              setAdminRole(data.role || "Standard Admin");
+            }
+          }
+        });
+    
+        return () => unsubscribe();
+      }, []);
 
   // ── Fetch from Firestore (only analyzed docs) ────────────────────────────────
   useEffect(() => {
@@ -166,6 +194,13 @@ export default function Reports() {
     a.download = `performance_report_${startDate || "all"}_to_${endDate || "all"}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+
+    logTransaction(
+      adminName,
+      adminRole,
+      "Exported CSV Report",
+      `Exported performance report as CSV for date range: ${startDate || "All"} to ${endDate || "All"}. Total feedback exported: ${filteredData.length}.`
+    );
   };
 
   // ── PDF Export (jsPDF) ────────────────────────────────────────────────────────
@@ -234,8 +269,21 @@ export default function Reports() {
       write(`Most Negative Service: ${mostNegative.service} (${mostNegative.count} negatives)`, 18, false, 10);
 
       doc.save(`performance_report_${startDate || "all"}_to_${endDate || "all"}.pdf`);
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "Exported PDF Report",
+        `Exported performance report as PDF for date range: ${startDate || "All"} to ${endDate || "All"}. Total feedback included: ${filteredData.length}.`
+      );
     } catch (err) {
       console.error("PDF export failed:", err);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed PDF Export",
+        `Attempted to export performance report as PDF for date range: ${startDate || "All"} to ${endDate || "All"}, but failed. Error: ${err.message}`
+      );
       alert("PDF export failed. Make sure jsPDF is installed:\nnpm install jspdf");
     }
     setExportLoading(false);

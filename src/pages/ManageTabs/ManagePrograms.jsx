@@ -1,42 +1,95 @@
 import React, { useState, useEffect } from "react";
 import {
-  Manage_IconLocation, Manage_IconCalendar, Manage_IconClock,
-  IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck
+  Manage_IconLocation,
+  Manage_IconCalendar,
+  Manage_IconClock,
+  IconAdd,
+  Manage_IconQR,
+  IconDownload,
+  IconConfirmCheck,
 } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import FormBuilder from "../../components/FormBuilder";
-import { db } from "../../firebase/firebase"; // 🆕
+import { auth, db } from "../../firebase/firebase";
 import {
-  collection, addDoc, updateDoc, deleteDoc,
-  doc, onSnapshot, serverTimestamp
-} from "firebase/firestore"; // 🆕
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../../services/logger";
 
 export default function ManagePrograms() {
   // 🆕 Programs now come from Firestore
-  const [programs, setPrograms]         = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
-  const [searchTerm, setSearchTerm]     = useState("");
-  const [selectedQR, setSelectedQR]     = useState(null);
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedQR, setSelectedQR] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProgramId, setEditingProgramId] = useState(null);
-  const [saving, setSaving]             = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [newProgram, setNewProgram] = useState({
-    title: "", description: "", date: "", startTime: "", endTime: "",
-    location: "", demographic: "", slots: "", requirements: [""], customFields: []
+    title: "",
+    description: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    location: "",
+    demographic: "",
+    slots: "",
+    requirements: [""],
+    customFields: [],
   });
+
+  useEffect(() => {
+    // Listen for the currently logged-in user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Find their document in the approvedAdmins collection
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid),
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // 🆕 Real-time listener to Firestore Programs collection
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "Programs"), (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPrograms(data);
-      setLoadingPrograms(false);
-    }, (error) => {
-      console.error("Error fetching programs:", error);
-      setLoadingPrograms(false);
-    });
+    const unsubscribe = onSnapshot(
+      collection(db, "Programs"),
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setPrograms(data);
+        setLoadingPrograms(false);
+      },
+      (error) => {
+        console.error("Error fetching programs:", error);
+        setLoadingPrograms(false);
+      },
+    );
 
     return () => unsubscribe();
   }, []);
@@ -49,15 +102,16 @@ export default function ManagePrograms() {
 
   const handleDownloadQR = () => {
     const svgElement = document.getElementById("as-qr-svg");
-    const svgData    = new XMLSerializer().serializeToString(svgElement);
-    const canvas     = document.createElement("canvas");
-    const ctx        = canvas.getContext("2d");
-    const img        = new Image();
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
     img.onload = () => {
-      canvas.width = img.width; canvas.height = img.height;
+      canvas.width = img.width;
+      canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
       const link = document.createElement("a");
-      link.href     = canvas.toDataURL("image/png");
+      link.href = canvas.toDataURL("image/png");
       link.download = `3Sense-QR-${selectedQR.name}.png`;
       link.click();
     };
@@ -70,8 +124,16 @@ export default function ManagePrograms() {
     setNewProgram({ ...newProgram, requirements: updated });
   };
 
-  const addReqField    = () => setNewProgram({ ...newProgram, requirements: [...newProgram.requirements, ""] });
-  const removeReqField = (index) => setNewProgram({ ...newProgram, requirements: newProgram.requirements.filter((_, i) => i !== index) });
+  const addReqField = () =>
+    setNewProgram({
+      ...newProgram,
+      requirements: [...newProgram.requirements, ""],
+    });
+  const removeReqField = (index) =>
+    setNewProgram({
+      ...newProgram,
+      requirements: newProgram.requirements.filter((_, i) => i !== index),
+    });
 
   const handleEdit = (prog) => {
     setNewProgram({
@@ -84,7 +146,7 @@ export default function ManagePrograms() {
       demographic: prog.demographic || "",
       slots: prog.slots || "",
       requirements: prog.requirements?.length > 0 ? prog.requirements : [""],
-      customFields: prog.customFields || []
+      customFields: prog.customFields || [],
     });
     setEditingProgramId(prog.id);
     setShowAddModal(true);
@@ -92,11 +154,25 @@ export default function ManagePrograms() {
 
   // 🆕 Delete from Firestore
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this program?")) return;
+    if (!window.confirm("Are you sure you want to delete this program?"))
+      return;
     try {
       await deleteDoc(doc(db, "Programs", id));
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_PROGRAM",
+        `Deleted program ${prog.title} ID: ${id}`,
+      );
     } catch (error) {
       console.error("Error deleting program:", error);
+      logTransaction(
+        adminName,
+        adminRole,
+        "FAILED_DELETE_PROGRAM",
+        `Failed to delete program ${prog.title} ID: ${id} - ${error.message}`,
+      );
       alert("Failed to delete program. Please try again.");
     }
   };
@@ -112,41 +188,70 @@ export default function ManagePrograms() {
       date: newProgram.date,
       startTime: newProgram.startTime,
       endTime: newProgram.endTime,
-      time: newProgram.startTime && newProgram.endTime
-        ? `${newProgram.startTime} - ${newProgram.endTime}` : "",
+      time:
+        newProgram.startTime && newProgram.endTime
+          ? `${newProgram.startTime} - ${newProgram.endTime}`
+          : "",
       location: newProgram.location,
       demographic: newProgram.demographic,
       slots: newProgram.slots,
-      requirements: newProgram.requirements.filter(r => r.trim() !== ""),
+      requirements: newProgram.requirements.filter((r) => r.trim() !== ""),
       customFields: newProgram.customFields || [],
     };
 
     try {
       if (editingProgramId) {
-        // ✅ Update existing
+        // Update existing Program
         await updateDoc(doc(db, "Programs", editingProgramId), {
           ...programData,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
+
+        logTransaction(
+          adminName,
+          adminRole,
+          "UPDATED_PROGRAM",
+          `Updated program ${prog.title} ID: ${editingProgramId}`,
+        );
       } else {
-        // ✅ Add new
+        // Add new Program
         await addDoc(collection(db, "Programs"), {
           ...programData,
           status: "Upcoming",
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
         });
+
+        logTransaction(
+          adminName,
+          adminRole,
+          "CREATED_PROGRAM",
+          `Created new program: ${newProgram.title} ID: (new doc ID)`,
+        );
       }
 
       setNewProgram({
-        title: "", description: "", date: "", startTime: "", endTime: "",
-        location: "", demographic: "", slots: "", requirements: [""], customFields: []
+        title: "",
+        description: "",
+        date: "",
+        startTime: "",
+        endTime: "",
+        location: "",
+        demographic: "",
+        slots: "",
+        requirements: [""],
+        customFields: [],
       });
       setEditingProgramId(null);
       setShowAddModal(false);
-
     } catch (error) {
       console.error("Error saving program:", error);
       alert("Failed to save program. Please try again.");
+      logTransaction(
+        adminName,
+        adminRole,
+        editingProgramId ? "FAILED_UPDATE_PROGRAM" : "FAILED_CREATE_PROGRAM",
+        `Failed to ${editingProgramId ? "update" : "create"} program ${newProgram.title} - ${error.message}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -155,14 +260,22 @@ export default function ManagePrograms() {
   const openAddModal = () => {
     setEditingProgramId(null);
     setNewProgram({
-      title: "", description: "", date: "", startTime: "", endTime: "",
-      location: "", demographic: "", slots: "", requirements: [""], customFields: []
+      title: "",
+      description: "",
+      date: "",
+      startTime: "",
+      endTime: "",
+      location: "",
+      demographic: "",
+      slots: "",
+      requirements: [""],
+      customFields: [],
     });
     setShowAddModal(true);
   };
 
-  const filteredPrograms = programs.filter(p =>
-    p.title?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPrograms = programs.filter((p) =>
+    p.title?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -170,7 +283,9 @@ export default function ManagePrograms() {
       <div className="as-header-section">
         <div className="as-title-wrap">
           <h1>Programs</h1>
-          <p className="as-subtitle">Manage barangay programs, slots, and requirements</p>
+          <p className="as-subtitle">
+            Manage barangay programs, slots, and requirements
+          </p>
         </div>
         <button className="as-btn-aqua" onClick={openAddModal}>
           <IconAdd /> Add New Program
@@ -179,24 +294,53 @@ export default function ManagePrograms() {
 
       <div className="as-controls">
         <div className="as-search-box">
-          <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          <svg
+            width="20"
+            height="20"
+            fill="none"
+            stroke="#9CA3AF"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
-            type="text" placeholder="Search programs..."
-            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            type="text"
+            placeholder="Search programs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
       {/* 🆕 Loading state */}
       {loadingPrograms ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "40px",
+            color: "#9ca3af",
+            fontSize: "0.95rem",
+          }}
+        >
           Loading programs...
         </div>
       ) : filteredPrograms.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>
-          {searchTerm ? "No programs match your search." : "No programs yet. Click 'Add New Program' to create one."}
+        <div
+          style={{
+            textAlign: "center",
+            padding: "40px",
+            color: "#9ca3af",
+            fontSize: "0.95rem",
+          }}
+        >
+          {searchTerm
+            ? "No programs match your search."
+            : "No programs yet. Click 'Add New Program' to create one."}
         </div>
       ) : (
         <div className="as-card-grid">
@@ -204,25 +348,67 @@ export default function ManagePrograms() {
             <div className="as-card" key={prog.id}>
               <div className="as-card-header">
                 <h2 className="as-card-title">{prog.title}</h2>
-                <span className={`as-badge ${prog.status?.toLowerCase().replace(" ", "-")}`}>
+                <span
+                  className={`as-badge ${prog.status?.toLowerCase().replace(" ", "-")}`}
+                >
                   {prog.status}
                 </span>
               </div>
               <p className="as-card-desc">{prog.description}</p>
               <ul className="as-card-details">
-                <li><Manage_IconLocation /> {prog.location}</li>
-                <li><Manage_IconCalendar /> {prog.date} • {prog.time}</li>
-                <li><strong>Target:</strong> {prog.demographic}</li>
-                <li><strong>Slots:</strong> {prog.slots || "Unlimited"}</li>
+                <li>
+                  <Manage_IconLocation /> {prog.location}
+                </li>
+                <li>
+                  <Manage_IconCalendar /> {prog.date} • {prog.time}
+                </li>
+                <li>
+                  <strong>Target:</strong> {prog.demographic}
+                </li>
+                <li>
+                  <strong>Slots:</strong> {prog.slots || "Unlimited"}
+                </li>
               </ul>
-              <div style={{ marginTop: "10px", fontSize: "0.85rem", color: "#6B7280" }}>
+              <div
+                style={{
+                  marginTop: "10px",
+                  fontSize: "0.85rem",
+                  color: "#6B7280",
+                }}
+              >
                 <strong>Requirements:</strong>{" "}
-                {prog.requirements?.length > 0 ? prog.requirements.join(", ") : "None"}
+                {prog.requirements?.length > 0
+                  ? prog.requirements.join(", ")
+                  : "None"}
               </div>
-              <div className="as-card-footer" style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}>
-                <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1 }} onClick={() => handleEdit(prog)}>Edit</button>
-                <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1, color: "red", borderColor: "#fca5a5" }} onClick={() => handleDelete(prog.id)}>Delete</button>
-                <button className="as-qr-btn" style={{ width: "100%", marginTop: "5px" }} onClick={() => handleGenerateQR(prog)}>
+              <div
+                className="as-card-footer"
+                style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}
+              >
+                <button
+                  className="as-btn-ghost"
+                  style={{ padding: "8px 16px", flex: 1 }}
+                  onClick={() => handleEdit(prog)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="as-btn-ghost"
+                  style={{
+                    padding: "8px 16px",
+                    flex: 1,
+                    color: "red",
+                    borderColor: "#fca5a5",
+                  }}
+                  onClick={() => handleDelete(prog.id)}
+                >
+                  Delete
+                </button>
+                <button
+                  className="as-qr-btn"
+                  style={{ width: "100%", marginTop: "5px" }}
+                  onClick={() => handleGenerateQR(prog)}
+                >
                   <Manage_IconQR /> Generate QR Code
                 </button>
               </div>
@@ -234,98 +420,255 @@ export default function ManagePrograms() {
       {/* ── Add / Edit Modal ── */}
       {showAddModal && (
         <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "700px", width: "100%" }}
+          >
             <div className="as-modal-header">
               <h2>{editingProgramId ? "Edit Program" : "Add Program"}</h2>
-              <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
+              <button
+                className="as-modal-close"
+                onClick={() => setShowAddModal(false)}
+              >
+                &times;
+              </button>
             </div>
             <div className="as-modal-body" style={{ alignItems: "stretch" }}>
               <form className="as-form" onSubmit={handleAddProgram}>
                 <div className="as-form-group">
                   <label className="as-form-label">Program Title</label>
-                  <input type="text" className="as-form-input" required
-                    value={newProgram.title} onChange={(e) => setNewProgram({ ...newProgram, title: e.target.value })}
+                  <input
+                    type="text"
+                    className="as-form-input"
+                    required
+                    value={newProgram.title}
+                    onChange={(e) =>
+                      setNewProgram({ ...newProgram, title: e.target.value })
+                    }
                   />
                 </div>
                 <div className="as-form-group">
                   <label className="as-form-label">Description</label>
-                  <textarea className="as-form-textarea" required
-                    value={newProgram.description} onChange={(e) => setNewProgram({ ...newProgram, description: e.target.value })}
+                  <textarea
+                    className="as-form-textarea"
+                    required
+                    value={newProgram.description}
+                    onChange={(e) =>
+                      setNewProgram({
+                        ...newProgram,
+                        description: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Location</label>
-                    <input type="text" className="as-form-input" required
-                      value={newProgram.location} onChange={(e) => setNewProgram({ ...newProgram, location: e.target.value })}
+                    <input
+                      type="text"
+                      className="as-form-input"
+                      required
+                      value={newProgram.location}
+                      onChange={(e) =>
+                        setNewProgram({
+                          ...newProgram,
+                          location: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Target Demographic</label>
-                    <input type="text" className="as-form-input" required placeholder="e.g. Students, Seniors"
-                      value={newProgram.demographic} onChange={(e) => setNewProgram({ ...newProgram, demographic: e.target.value })}
+                    <input
+                      type="text"
+                      className="as-form-input"
+                      required
+                      placeholder="e.g. Students, Seniors"
+                      value={newProgram.demographic}
+                      onChange={(e) =>
+                        setNewProgram({
+                          ...newProgram,
+                          demographic: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Date</label>
-                    <input type="date" className="as-form-input" required
-                      value={newProgram.date} onChange={(e) => setNewProgram({ ...newProgram, date: e.target.value })}
+                    <input
+                      type="date"
+                      className="as-form-input"
+                      required
+                      value={newProgram.date}
+                      onChange={(e) =>
+                        setNewProgram({ ...newProgram, date: e.target.value })
+                      }
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Start Time</label>
-                    <input type="time" className="as-form-input" required
-                      value={newProgram.startTime} onChange={(e) => setNewProgram({ ...newProgram, startTime: e.target.value })}
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.startTime}
+                      onChange={(e) =>
+                        setNewProgram({
+                          ...newProgram,
+                          startTime: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">End Time</label>
-                    <input type="time" className="as-form-input" required
-                      value={newProgram.endTime} onChange={(e) => setNewProgram({ ...newProgram, endTime: e.target.value })}
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.endTime}
+                      onChange={(e) =>
+                        setNewProgram({
+                          ...newProgram,
+                          endTime: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Available Slots</label>
-                    <input type="number" className="as-form-input" placeholder="Leave blank if unlimited"
-                      value={newProgram.slots} onChange={(e) => setNewProgram({ ...newProgram, slots: e.target.value })}
+                    <input
+                      type="number"
+                      className="as-form-input"
+                      placeholder="Leave blank if unlimited"
+                      value={newProgram.slots}
+                      onChange={(e) =>
+                        setNewProgram({ ...newProgram, slots: e.target.value })
+                      }
                     />
                   </div>
                 </div>
                 <div className="as-form-group">
                   <label className="as-form-label">Requirements (List)</label>
                   {newProgram.requirements.map((req, i) => (
-                    <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
-                      <input type="text" className="as-form-input" placeholder="e.g. Valid ID"
-                        value={req} onChange={(e) => handleReqChange(i, e.target.value)}
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        gap: "10px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        className="as-form-input"
+                        placeholder="e.g. Valid ID"
+                        value={req}
+                        onChange={(e) => handleReqChange(i, e.target.value)}
                       />
                       {newProgram.requirements.length > 1 && (
-                        <button type="button" className="as-btn-ghost" onClick={() => removeReqField(i)}
-                          style={{ padding: "0 10px", color: "red" }}>&times;</button>
+                        <button
+                          type="button"
+                          className="as-btn-ghost"
+                          onClick={() => removeReqField(i)}
+                          style={{ padding: "0 10px", color: "red" }}
+                        >
+                          &times;
+                        </button>
                       )}
                     </div>
                   ))}
-                  <button type="button" className="as-btn-ghost" onClick={addReqField}
-                    style={{ width: "fit-content", padding: "5px 10px", fontSize: "0.9rem" }}>
+                  <button
+                    type="button"
+                    className="as-btn-ghost"
+                    onClick={addReqField}
+                    style={{
+                      width: "fit-content",
+                      padding: "5px 10px",
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     + Add Requirement
                   </button>
                 </div>
                 <div className="as-form-section" style={{ marginTop: "20px" }}>
-                  <h3 className="as-form-section-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  <h3
+                    className="as-form-section-title"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                     Default Collected Fields
                   </h3>
-                  <p style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: "12px", marginTop: "-10px" }}>
-                    The following information is automatically collected. Do not recreate them in the form builder.
+                  <p
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#6b7280",
+                      marginBottom: "12px",
+                      marginTop: "-10px",
+                    }}
+                  >
+                    The following information is automatically collected. Do not
+                    recreate them in the form builder.
                   </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                    {["Full Name", "Complete Address", "Contact Number", "Email (Optional)", "Upload Valid ID / Clearance"].map(f => (
-                      <span key={f} style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 500, display: "flex", alignItems: "center", gap: "4px" }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  <div
+                    style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                  >
+                    {[
+                      "Full Name",
+                      "Complete Address",
+                      "Contact Number",
+                      "Email (Optional)",
+                      "Upload Valid ID / Clearance",
+                    ].map((f) => (
+                      <span
+                        key={f}
+                        style={{
+                          background: "#f3f4f6",
+                          color: "#4b5563",
+                          padding: "4px 10px",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <rect
+                            x="3"
+                            y="11"
+                            width="18"
+                            height="11"
+                            rx="2"
+                            ry="2"
+                          />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                         </svg>
                         {f}
                       </span>
@@ -334,11 +677,24 @@ export default function ManagePrograms() {
                 </div>
                 <FormBuilder
                   fields={newProgram.customFields}
-                  onChange={(fields) => setNewProgram({ ...newProgram, customFields: fields })}
+                  onChange={(fields) =>
+                    setNewProgram({ ...newProgram, customFields: fields })
+                  }
                 />
                 <div className="as-modal-actions">
-                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>
-                  <button type="submit" className="as-btn-aqua" style={{ padding: "8px 16px", fontSize: "0.9rem" }} disabled={saving}>
+                  <button
+                    type="button"
+                    className="as-btn-ghost"
+                    onClick={() => setShowAddModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="as-btn-aqua"
+                    style={{ padding: "8px 16px", fontSize: "0.9rem" }}
+                    disabled={saving}
+                  >
                     {saving ? "Saving..." : "Save Program"}
                   </button>
                 </div>
@@ -354,16 +710,42 @@ export default function ManagePrograms() {
           <div className="as-modal-content" style={{ maxWidth: "450px" }}>
             <div className="as-modal-header">
               <h2>QR Code Generated</h2>
-              <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>
+              <button
+                className="as-modal-close"
+                onClick={() => setSelectedQR(null)}
+              >
+                &times;
+              </button>
             </div>
             <div className="as-modal-body" style={{ textAlign: "center" }}>
-              <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
-              <h3>{selectedQR.name}</h3>
-              <p className="as-modal-desc">Residents can scan this code to access {selectedQR.name}.</p>
-              <div className="as-qr-holder" style={{ margin: "20px auto", display: "flex", justifyContent: "center" }}>
-                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true} />
+              <div className="as-modal-confirm-icon">
+                <IconConfirmCheck />
               </div>
-              <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: "100%" }}>
+              <h3>{selectedQR.name}</h3>
+              <p className="as-modal-desc">
+                Residents can scan this code to access {selectedQR.name}.
+              </p>
+              <div
+                className="as-qr-holder"
+                style={{
+                  margin: "20px auto",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <QRCodeSVG
+                  id="as-qr-svg"
+                  value={selectedQR.qrValue}
+                  size={150}
+                  level={"H"}
+                  includeMargin={true}
+                />
+              </div>
+              <button
+                className="as-btn-ghost"
+                onClick={handleDownloadQR}
+                style={{ width: "100%" }}
+              >
                 <IconDownload /> Download QR Code (PNG)
               </button>
             </div>
