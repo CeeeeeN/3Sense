@@ -104,12 +104,13 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     return <main className="fb-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading authentication...</main>;
   }
 
-  const currentService = service || {
+  const defaultService = {
     description: "Your feedback helps us improve public services.",
     color: "#317D89",
     bg: "rgba(49,125,137,0.08)",
     border: "rgba(49,125,137,0.2)",
   };
+  const currentService = { ...defaultService, ...(service || {}) };
 
   const displayRating = hoverRating || rating;
 
@@ -317,7 +318,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           className="fb-submit-btn"
           onClick={handleSubmit}
           disabled={submitting}
-          style={{ background: submitting ? "#a0b5c8" : currentService.color }}
+          style={{ background: submitting ? "#a0b5c8" : currentService?.color || "#317D89", cursor: submitting ? "not-allowed" : "pointer" }}
         >
           {submitting ? <><span className="fb-submit-spinner" /> Submitting...</> : "Submit Feedback"}
         </button>
