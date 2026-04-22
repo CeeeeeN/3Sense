@@ -8,14 +8,8 @@ import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, Servi
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-const getSaved = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
-  catch { return fallback; }
-};
-
 // ── 1. Main Facilities Tab Component ──
 export default function FacilitiesTab({ userData, householdID, userName }) {
-  const activeUserId   = getSaved("userID", null);
   const [facilities, setFacilities] = useState([]);
   const [reservationFacility, setReservationFacility] = useState(null);
 

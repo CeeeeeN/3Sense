@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../../firebase/firebase";
+import { auth, db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion,
+  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, query, where, getDocs
 } from "firebase/firestore";
 import { ServiceAlertTriangleIcon } from "../../components/Icons";
 import { createUserNotification } from "../../services/userNotifications";
+import { logTransaction } from '../../services/logger';
+import { onAuthStateChanged } from "firebase/auth";
 
 const TANOD_LIST = ["Unassigned", "Tanod Reyes", "Tanod Garcia", "Tanod Santos"];
 
@@ -43,6 +45,10 @@ export default function ServicePeaceOrder({ onBack }) {
   const [assignedTanod, setAssignedTanod]   = useState("Unassigned");
   const [saving, setSaving]           = useState(false);
 
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
   // ── Real-time listener ──────────────────────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "incidentReports"), (snap) => {
@@ -60,6 +66,28 @@ export default function ServicePeaceOrder({ onBack }) {
     });
     return () => unsub();
   }, []);
+
+    useEffect(() => {
+      // Listen for the currently logged-in user
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // Find their document in the approvedAdmins collection
+          const q = query(
+            collection(db, "approvedAdmins"),
+            where("uid", "==", user.uid),
+          );
+          const snapshot = await getDocs(q);
+  
+          if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            setAdminName(data.fullName || "Admin");
+            setAdminRole(data.role || "Standard Admin");
+          }
+        }
+      });
+  
+      return () => unsubscribe();
+    }, []);
 
   // Sync tanod select when a new report is selected
   useEffect(() => {
@@ -80,6 +108,13 @@ export default function ServicePeaceOrder({ onBack }) {
         updatedAt: serverTimestamp(),
       });
 
+        logTransaction(
+          adminName,
+          adminRole,
+          "UPDATED_REPORT_STATUS",
+          `Updated report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} and assigned tanod ${assignedTanod}`,
+        );
+
       if ((newStatus === "responded" || newStatus === "resolved") && selectedReport.userID) {
         await createUserNotification(
           selectedReport.userID,
@@ -91,6 +126,12 @@ export default function ServicePeaceOrder({ onBack }) {
       }
     } catch (err) {
       console.error("Error updating status:", err);
+        logTransaction(
+          adminName,
+          adminRole,
+          "ERROR_UPDATING_REPORT_STATUS",
+          `Error updating report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} - ${err.message}`,
+         );
     }
     setSaving(false);
   };
@@ -104,8 +145,20 @@ export default function ServicePeaceOrder({ onBack }) {
         tanod: tanodName,
         updatedAt: serverTimestamp(),
       });
+        logTransaction(
+          adminName,
+          adminRole,
+          "UPDATED_REPORT_TANOD",
+          `Updated report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName}`,
+        );
     } catch (err) {
       console.error("Error assigning tanod:", err);
+        logTransaction(
+          adminName,
+          adminRole,
+          "ERROR_UPDATING_REPORT_TANOD",
+          `Error updating report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName} - ${err.message}`,
+         );
     }
   };
 

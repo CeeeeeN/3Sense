@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
-import { db } from "../../firebase/firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../firebase/firebase";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../../services/logger";
 
 export default function ManageFacilities() {
   const [facilities, setFacilities] = useState([]);
@@ -11,8 +13,12 @@ export default function ManageFacilities() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showGlobalQRModal, setShowGlobalQRModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState(null);
-    const [selectedQR, setSelectedQR] = useState(null);
+  const [selectedQR, setSelectedQR] = useState(null);
   const [editingFacilityId, setEditingFacilityId] = useState(null);
+
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
 
   // Mock calendar state
   const today = new Date();
@@ -23,6 +29,28 @@ export default function ManageFacilities() {
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+    useEffect(() => {
+      // Listen for the currently logged-in user
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // Find their document in the approvedAdmins collection
+          const q = query(
+            collection(db, "approvedAdmins"),
+            where("uid", "==", user.uid),
+          );
+          const snapshot = await getDocs(q);
+  
+          if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            setAdminName(data.fullName || "Admin");
+            setAdminRole(data.role || "Standard Admin");
+          }
+        }
+      });
+  
+      return () => unsubscribe();
+    }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "facilities"), (snapshot) => {
@@ -75,8 +103,21 @@ export default function ManageFacilities() {
     if (window.confirm("Are you sure you want to delete this facility?")) {
       try {
         await deleteDoc(doc(db, "facilities", id));
+        logTransaction(
+          adminName,
+          adminRole,
+          "DELETED_FACILITY",
+          `Deleted facility with ID: ${id}`,
+        );
       } catch(error) {
         console.error("Error deleting facility: ", error);
+        logTransaction(
+          adminName,
+          adminRole,
+          "ERROR_DELETING_FACILITY",
+          `Error deleting facility with ID: ${id} - ${error.message}`,
+        );
+
       }
     }
   };
@@ -86,8 +127,20 @@ export default function ManageFacilities() {
     try {
       if (editingFacilityId) {
         await updateDoc(doc(db, "facilities", editingFacilityId), { ...newFacility });
+        logTransaction(
+          adminName,
+          adminRole,
+          "EDITED_FACILITY",
+          `Edited facility with ID: ${editingFacilityId}`,
+        );
       } else {
         await addDoc(collection(db, "facilities"), { ...newFacility, createdAt: serverTimestamp() });
+        logTransaction(
+          adminName,
+          adminRole,
+          "ADDED_FACILITY",
+          `Added new facility: ${newFacility.name} (ID: ${doc.id})`,
+        );
       }
       setNewFacility({ name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: [] });
       setEditingFacilityId(null);

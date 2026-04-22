@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../../firebase/firebase";
+import { auth, db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, addDoc, doc, updateDoc,
-  serverTimestamp, query, orderBy,
+  serverTimestamp, orderBy,
+  query, where, getDocs,
 } from "firebase/firestore";
 import { UsersIcon } from "../../components/Icons";
 import FormBuilder from "../../components/FormBuilder";
 import { createUserNotification } from "../../services/userNotifications";
+import { logTransaction } from '../../services/logger';
+import { onAuthStateChanged } from "firebase/auth";
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -29,6 +32,10 @@ export default function ServiceLivelihood({ onBack }) {
   const [rejectTarget, setRejectTarget]   = useState(null);
   const [rejectReason, setRejectReason]   = useState("");
   const [saving, setSaving]               = useState(false);
+
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
 
   // ── New program form ─────────────────────────────────────────────
   const BLANK_PROGRAM = {
@@ -65,6 +72,28 @@ export default function ServiceLivelihood({ onBack }) {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+        // Listen for the currently logged-in user
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            // Find their document in the approvedAdmins collection
+            const q = query(
+              collection(db, "approvedAdmins"),
+              where("uid", "==", user.uid),
+            );
+            const snapshot = await getDocs(q);
+    
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              setAdminName(data.fullName || "Admin");
+              setAdminRole(data.role || "Standard Admin");
+            }
+          }
+        });
+    
+        return () => unsubscribe();
+      }, []);
 
   // ── Real-time: livelihoodRegistrations collection ────────────────
   useEffect(() => {
@@ -103,10 +132,24 @@ export default function ServiceLivelihood({ onBack }) {
         attendees:   [],
         updatedAt:   serverTimestamp(),
       });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "ADDED_LIVELIHOOD_PROGRAM",
+        `Added new livelihood program: ${newProgram.title} (ID: ${newProgram.id || "N/A"})`,
+      );
+
       setNewProgram(BLANK_PROGRAM);
       setShowAddModal(false);
     } catch (err) {
       console.error("Error adding program:", err);
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_ADDING_LIVELIHOOD_PROGRAM",
+        `Error adding livelihood program ${newProgram.title} - ${err.message}`,
+       );
     }
     setSaving(false);
   };
@@ -118,6 +161,13 @@ export default function ServiceLivelihood({ onBack }) {
         status:    "approved",
         updatedAt: serverTimestamp(),
       });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "APPROVED_LIVELIHOOD_REGISTRATION",
+        `Approved livelihood registration for ${participants.find(p => p.id === id)?.fullName || "Unknown"} (ID: ${id})`,
+      );
 
       const p = participants.find(part => part.id === id);
       if (p && p.userID) {
@@ -131,6 +181,12 @@ export default function ServiceLivelihood({ onBack }) {
       }
     } catch (err) {
       console.error("Error approving:", err);
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_APPROVING_LIVELIHOOD_REGISTRATION",
+        `Error approving livelihood registration ID ${id} - ${err.message}`,
+       );
     }
   };
 
@@ -152,6 +208,13 @@ export default function ServiceLivelihood({ onBack }) {
         updatedAt:    serverTimestamp(),
       });
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "REJECTED_LIVELIHOOD_REGISTRATION",
+        `Rejected livelihood registration for ${participants.find(p => p.id === rejectTarget)?.fullName || "Unknown"} (ID: ${rejectTarget}) with reason: ${rejectReason.trim()}`,
+      );
+
       const p = participants.find(part => part.id === rejectTarget);
       if (p && p.userID) {
         await createUserNotification(
@@ -168,6 +231,12 @@ export default function ServiceLivelihood({ onBack }) {
       setRejectReason("");
     } catch (err) {
       console.error("Error rejecting:", err);
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_REJECTING_LIVELIHOOD_REGISTRATION",
+        `Error rejecting livelihood registration ID ${rejectTarget} - ${err.message}`,
+       );
     }
     setSaving(false);
   };

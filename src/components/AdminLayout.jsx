@@ -280,6 +280,18 @@ export default function AdminLayout({ children }) {
           )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
+            "/admin/logs",
+          ) && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/logs" ? "active" : ""}
+              to="/admin/logs"
+            >
+              Audit Logs
+            </Link>
+          )}
+
+          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/reports",
           ) && (
             <Link

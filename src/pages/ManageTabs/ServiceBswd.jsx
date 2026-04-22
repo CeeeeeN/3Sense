@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../../firebase/firebase";
+import { auth, db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, doc, updateDoc,
   serverTimestamp, query, orderBy,
+  where, getDocs
 } from "firebase/firestore";
 import { createUserNotification } from "../../services/userNotifications";
+import { logTransaction } from '../../services/logger';
+import { onAuthStateChanged } from "firebase/auth";
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -43,6 +46,10 @@ export default function ServiceBswd({ onBack }) {
   // ── Saving state ─────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
 
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
   // ── Real-time listener ───────────────────────────────────────────
   useEffect(() => {
     const q = query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"));
@@ -57,6 +64,28 @@ export default function ServiceBswd({ onBack }) {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+        // Listen for the currently logged-in user
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            // Find their document in the approvedAdmins collection
+            const q = query(
+              collection(db, "approvedAdmins"),
+              where("uid", "==", user.uid),
+            );
+            const snapshot = await getDocs(q);
+    
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              setAdminName(data.fullName || "Admin");
+              setAdminRole(data.role || "Standard Admin");
+            }
+          }
+        });
+    
+        return () => unsubscribe();
+      }, []);
+
   // ── Update status ────────────────────────────────────────────────
   const updateStatus = async (id, newStatus) => {
     setSaving(true);
@@ -65,6 +94,13 @@ export default function ServiceBswd({ onBack }) {
         status:    newStatus,
         updatedAt: serverTimestamp(),
       });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "UPDATED_BSWD_REPORT_STATUS",
+        `Updated status of ${reports.find(r => r.id === id)?.type || "report"} ID ${id} to ${newStatus}`,
+       );
 
       if (newStatus === "responded" || newStatus === "resolved") {
         const p = reports.find(r => r.id === id);
@@ -86,6 +122,12 @@ export default function ServiceBswd({ onBack }) {
       }
     } catch (err) {
       console.error("Error updating status:", err);
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_UPDATING_BSWD_REPORT_STATUS",
+        `Error updating status of report ID ${id} to ${newStatus} - ${err.message}`,
+       );
     }
     setSaving(false);
   };
