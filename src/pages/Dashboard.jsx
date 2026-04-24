@@ -112,7 +112,7 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
               </span>
             </div>
             <h2 className="db-popup-title">All Announcements</h2>
-            <p className="db-popup-desc" style={{ marginBottom: 0 }}>Showing combined smart alerts and general announcements.</p>
+            <p className="db-popup-desc" style={{ marginBottom: 0 }}>Showing combined alerts and general announcements.</p>
           </div>
           <div className="db-popup-ann-list">
             {announcements.map((ann) => (
@@ -305,26 +305,26 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       const acType = (ann.announcementCategory || "").toLowerCase();
 
       switch (acType) {
-        case "health":     dc = "green";  cc = "db-cat-health";  icon = <HealthIcon />;        break;
-        case "event":      dc = "blue";   cc = "db-cat-event";   icon = <AssistanceIcon />;    break;
-        case "documents":  dc = "amber";  cc = "db-cat-service"; icon = <DocumentIcon />;      break;
-        case "programs":   dc = "purple"; cc = "db-cat-service"; icon = <ScholarshipIcon />;   break;
-        case "facilities": dc = "amber";  cc = "db-cat-service"; icon = <VerifiedVisitIcon />; break;
+        case "health": dc = "green"; cc = "db-cat-health"; icon = <HealthIcon />; break;
+        case "event": dc = "blue"; cc = "db-cat-event"; icon = <AssistanceIcon />; break;
+        case "documents": dc = "amber"; cc = "db-cat-service"; icon = <DocumentIcon />; break;
+        case "programs": dc = "purple"; cc = "db-cat-service"; icon = <ScholarshipIcon />; break;
+        case "facilities": dc = "amber"; cc = "db-cat-service"; icon = <VerifiedVisitIcon />; break;
         default: break;
       }
 
       const annCatClean = (ann.category || "").trim().toLowerCase();
       const annAudienceClean = (ann.targetAudience || "").trim().toLowerCase();
 
-      // "All Residents" → general announcements only, NOT smart alerts
+      // "All Residents" → general announcements only, NOT alerts
       const targetsEveryone = annCatClean === "all residents" || annAudienceClean === "all residents";
 
       // Match: user's category string should be contained in the announcement's target audience, or vice-versa
       const isAlert = !targetsEveryone && userCategories.some(uc => {
         const u = uc.trim().toLowerCase();
         if (!u) return false;
-        return annCatClean.includes(u) || u.includes(annCatClean) || 
-               annAudienceClean.includes(u) || u.includes(annAudienceClean);
+        return annCatClean.includes(u) || u.includes(annCatClean) ||
+          annAudienceClean.includes(u) || u.includes(annAudienceClean);
       });
 
       return { ...ann, dotColor: dc, catClass: cc, icon, isSmartAlert: isAlert };
@@ -339,9 +339,9 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
   // Pagination derived values
   const alertTotalPages = Math.max(1, Math.ceil(smartAlertsList.length / ITEMS_PER_PAGE));
-  const annTotalPages   = Math.max(1, Math.ceil(generalAnnsList.length  / ITEMS_PER_PAGE));
+  const annTotalPages = Math.max(1, Math.ceil(generalAnnsList.length / ITEMS_PER_PAGE));
   const pagedAlerts = smartAlertsList.slice((alertPage - 1) * ITEMS_PER_PAGE, alertPage * ITEMS_PER_PAGE);
-  const pagedAnns   = generalAnnsList.slice((annPage   - 1) * ITEMS_PER_PAGE, annPage   * ITEMS_PER_PAGE);
+  const pagedAnns = generalAnnsList.slice((annPage - 1) * ITEMS_PER_PAGE, annPage * ITEMS_PER_PAGE);
 
   // Reset pages when data refreshes
   // (safe because these are render-time derivations, not effects)
@@ -389,11 +389,11 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
             </button>
           }
         >
-          {/* Smart Alerts */}
+          {/* Alerts */}
           <div style={{ padding: "0 1.5rem" }}>
-            <SubLabel icon={<BoltIcon />} label="Smart Alerts for You" />
+            <SubLabel icon={<BoltIcon />} label="Based on Your Profile Category" />
             {smartAlertsList.length === 0 ? (
-              <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new smart alerts based on your profile.</p>
+              <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No alerts based on your profile category at this time.</p>
             ) : (
               <>
                 <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>

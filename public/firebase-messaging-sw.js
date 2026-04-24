@@ -24,9 +24,23 @@ messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
   const notificationTitle = payload.notification?.title || payload.data?.title || 'System Notification';
+  const notificationBody  = payload.notification?.body  || payload.data?.message || '';
+
+  // Use a stable tag derived from the content to prevent OS-level duplication.
+  // If the same message arrives twice, the browser replaces the existing notification
+  // instead of showing a second one.
+  const tagSource = `${notificationTitle}__${notificationBody}`;
+  let hash = 0;
+  for (let i = 0; i < tagSource.length; i++) {
+    hash = (Math.imul(31, hash) + tagSource.charCodeAt(i)) | 0;
+  }
+  const dedupeTag = `brgy-notif-${Math.abs(hash)}`;
+
   const notificationOptions = {
-    body: payload.notification?.body || payload.data?.message || '',
-    icon: '/barangay-logo.jpg'
+    body: notificationBody,
+    icon: '/barangay-logo.jpg',
+    tag: dedupeTag,          // OS deduplication key
+    renotify: false,         // do NOT re-vibrate/re-sound if tag already exists
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

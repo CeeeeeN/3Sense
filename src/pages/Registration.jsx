@@ -44,6 +44,8 @@ export default function Registration({ onBack }) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState("");
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   
   // --- ADDED: Error Message State ---
   const [errorMsg, setErrorMsg] = useState("");
@@ -132,6 +134,13 @@ export default function Registration({ onBack }) {
     if (step === 5) {
       if (!form.totalMembers) missing.push("Number of Household Members");
       if (!form.householdClassification) missing.push("Household Classification");
+    }
+
+    if (step === 6) {
+      if (!privacyAgreed) {
+        setErrorMsg("You must agree to the Privacy Policy before submitting.");
+        return false;
+      }
     }
 
     if (missing.length > 0) {
@@ -551,9 +560,52 @@ export default function Registration({ onBack }) {
                     <ReviewField label="Classification" value={rv(form.householdClassification)} />
                   </ReviewSection>
 
-                  <div className="reg-privacy-note">
-                    <span>🔒</span>
-                    <span>By submitting, you confirm that all provided information is accurate. Your registration will be reviewed by the Barangay within <strong>3–5 business days</strong>.</span>
+                  <div className="reg-review-section" style={{
+                    background: "#f8fafc",
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: "12px",
+                    padding: "1.5rem",
+                    marginTop: "1.5rem",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "0.75rem" }}>
+                      <span style={{ fontSize: "1.3rem" }}>🔐</span>
+                      <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e3a5f" }}>Privacy Policy &amp; Consent</h4>
+                    </div>
+                    <p style={{ fontSize: "0.875rem", color: "#4b5563", margin: "0 0 0.75rem" }}>
+                      Your personal information will be collected and processed in accordance with the{" "}
+                      <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong>. The data you provide will be
+                      used strictly for system-related purposes such as account management and access to services.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivacyModal(true)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#317D89",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontSize: "0.875rem",
+                        padding: 0,
+                        textDecoration: "underline",
+                        marginBottom: "1rem",
+                        display: "block",
+                      }}
+                    >
+                      Read Full Privacy Policy →
+                    </button>
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={privacyAgreed}
+                        onChange={(e) => { setPrivacyAgreed(e.target.checked); setErrorMsg(""); }}
+                        style={{ marginTop: "3px", accentColor: "#317D89", width: "16px", height: "16px", flexShrink: 0 }}
+                      />
+                      <span style={{ fontSize: "0.875rem", color: "#374151", lineHeight: 1.5 }}>
+                        I have read and agree to the <strong>Privacy Policy</strong> and the{" "}
+                        <strong>Data Privacy Act of 2012 (RA 10173)</strong>.
+                      </span>
+                    </label>
                   </div>
                 </div>
               )}
@@ -587,13 +639,127 @@ export default function Registration({ onBack }) {
                 {step < total ? (
                   <button className="reg-btn-primary" onClick={goNext}>Continue →</button>
                 ) : (
-                  <button className="reg-btn-success" onClick={goNext}>✓ Confirm & Submit</button>
+                  <button
+                    className="reg-btn-success"
+                    onClick={goNext}
+                    disabled={!privacyAgreed}
+                    style={{ opacity: privacyAgreed ? 1 : 0.5, cursor: privacyAgreed ? "pointer" : "not-allowed" }}
+                  >
+                    ✓ Confirm &amp; Submit
+                  </button>
                 )}
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* ── Privacy Policy Modal ── */}
+      {showPrivacyModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowPrivacyModal(false)}
+        >
+          <div style={{
+            background: "#fff", borderRadius: "16px",
+            maxWidth: "640px", width: "100%",
+            maxHeight: "85vh", display: "flex", flexDirection: "column",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: "1.25rem 1.5rem", borderBottom: "1px solid #e5e7eb",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "1.3rem" }}>🔐</span>
+                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1e3a5f" }}>
+                  Privacy Policy
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: "1.4rem", color: "#6b7280", lineHeight: 1,
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Body — scrollable */}
+            <div style={{ overflowY: "auto", padding: "1.5rem", flex: 1 }}>
+              <p style={{ marginBottom: "1rem", fontSize: "0.875rem", color: "#374151" }}>
+                This system complies with the <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong> and
+                its implementing rules and regulations.
+              </p>
+
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Information Collected</h4>
+              <ul style={{ fontSize: "0.875rem", color: "#374151", paddingLeft: "1.25rem", marginBottom: "1rem" }}>
+                <li>Personal details (e.g., name, contact information)</li>
+                <li>Account and profile data</li>
+              </ul>
+
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Purpose of Collection</h4>
+              <ul style={{ fontSize: "0.875rem", color: "#374151", paddingLeft: "1.25rem", marginBottom: "1rem" }}>
+                <li>To manage and verify user accounts</li>
+                <li>To provide access to system services (programs, facilities, documents, announcements)</li>
+                <li>To send relevant notifications and updates based on user category</li>
+              </ul>
+
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Data Usage and Sharing</h4>
+              <p style={{ fontSize: "0.875rem", color: "#374151", marginBottom: "1rem" }}>
+                Personal data will be used solely for legitimate system purposes and will not be disclosed to
+                unauthorized third parties, except when required by law.
+              </p>
+
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Data Protection</h4>
+              <p style={{ fontSize: "0.875rem", color: "#374151", marginBottom: "1rem" }}>
+                Appropriate organizational, physical, and technical security measures are implemented to protect
+                personal data against unauthorized access, alteration, disclosure, or destruction.
+              </p>
+
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Your Rights Under RA 10173</h4>
+              <ul style={{ fontSize: "0.875rem", color: "#374151", paddingLeft: "1.25rem", marginBottom: "1rem" }}>
+                <li>Right to be informed</li>
+                <li>Right to access</li>
+                <li>Right to object</li>
+                <li>Right to correct</li>
+                <li>Right to erasure or blocking</li>
+              </ul>
+
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Consent</h4>
+              <p style={{ fontSize: "0.875rem", color: "#374151" }}>
+                By registering and submitting your information, you expressly consent to the collection, use, and
+                processing of your personal data in accordance with this Privacy Policy and applicable laws.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: "1rem 1.5rem", borderTop: "1px solid #e5e7eb",
+              display: "flex", justifyContent: "flex-end",
+            }}>
+              <button
+                onClick={() => { setPrivacyAgreed(true); setShowPrivacyModal(false); }}
+                style={{
+                  background: "#317D89", color: "#fff", border: "none",
+                  borderRadius: "8px", padding: "0.6rem 1.4rem",
+                  fontWeight: 600, fontSize: "0.9rem", cursor: "pointer",
+                }}
+              >
+                I Agree &amp; Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

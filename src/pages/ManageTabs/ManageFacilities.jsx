@@ -9,6 +9,8 @@ import { logTransaction } from "../../services/logger";
 export default function ManageFacilities() {
   const [facilities, setFacilities] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showGlobalQRModal, setShowGlobalQRModal] = useState(false);
@@ -187,6 +189,48 @@ export default function ManageFacilities() {
 
   const filteredFacs = facilities.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  const totalPages = Math.ceil(filteredFacs.length / ITEMS_PER_PAGE);
+  const paginatedFacs = filteredFacs.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleSearch = (val) => {
+    setSearchTerm(val);
+    setCurrentPage(1);
+  };
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => typeof page === "number" ? setCurrentPage(page) : null}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : "",
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
+
   return (
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
@@ -207,12 +251,12 @@ export default function ManageFacilities() {
       <div className="as-controls">
         <div className="as-search-box">
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          <input type="text" placeholder="Search facilities..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <input type="text" placeholder="Search facilities..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
         </div>
       </div>
 
       <div className="as-card-grid">
-        {filteredFacs.map((fac) => (
+        {paginatedFacs.map((fac) => (
           <div className="as-card" key={fac.id}>
             <div className="as-card-header">
               <h2 className="as-card-title">{fac.name}</h2>
@@ -233,6 +277,28 @@ export default function ManageFacilities() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="af-pagination" style={{ display: "flex", justifyContent: "center", gap: "8px", padding: "16px" }}>
+          <button
+            className="af-page-btn"
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+          >
+            Previous
+          </button>
+          {renderPageNumbers()}
+          <button
+            className="af-page-btn"
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
 
 

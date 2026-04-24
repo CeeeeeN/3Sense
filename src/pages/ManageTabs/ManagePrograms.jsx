@@ -36,6 +36,8 @@ export default function ManagePrograms() {
   const [adminRole, setAdminRole] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
   const [selectedQR, setSelectedQR] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProgramId, setEditingProgramId] = useState(null);
@@ -278,6 +280,48 @@ export default function ManagePrograms() {
     p.title?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
+  const totalPages = Math.ceil(filteredPrograms.length / ITEMS_PER_PAGE);
+  const paginatedPrograms = filteredPrograms.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleSearch = (val) => {
+    setSearchTerm(val);
+    setCurrentPage(1);
+  };
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => typeof page === "number" ? setCurrentPage(page) : null}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : "",
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
+
   return (
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
@@ -312,7 +356,7 @@ export default function ManagePrograms() {
             type="text"
             placeholder="Search programs..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
       </div>
@@ -343,8 +387,9 @@ export default function ManagePrograms() {
             : "No programs yet. Click 'Add New Program' to create one."}
         </div>
       ) : (
+        <>
         <div className="as-card-grid">
-          {filteredPrograms.map((prog) => (
+          {paginatedPrograms.map((prog) => (
             <div className="as-card" key={prog.id}>
               <div className="as-card-header">
                 <h2 className="as-card-title">{prog.title}</h2>
@@ -415,6 +460,29 @@ export default function ManagePrograms() {
             </div>
           ))}
         </div>
+
+          {totalPages > 1 && (
+            <div className="af-pagination" style={{ display: "flex", justifyContent: "center", gap: "8px", padding: "16px" }}>
+              <button
+                className="af-page-btn"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+              >
+                Previous
+              </button>
+              {renderPageNumbers()}
+              <button
+                className="af-page-btn"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Add / Edit Modal ── */}
