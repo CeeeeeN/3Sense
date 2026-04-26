@@ -18,13 +18,16 @@ const STATUS = {
   ongoing:      { label: "Ongoing",          color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
   completed:    { label: "Completed",        color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
   pending:      { label: "Pending",          color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
+  pending_ai:   { label: "Pending AI",       color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
+  analyzed:     { label: "Analyzed",         color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
   approved:     { label: "Approved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
   rejected:     { label: "Rejected",         color: "#e03e3e", bg: "rgba(224,62,62,0.1)"   },
   received:     { label: "Received",         color: "#317D89", bg: "rgba(49,125,137,0.1)"  },
   under_review: { label: "Under Review",     color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
   resolved:     { label: "Resolved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  claimed:      { label: "Claimed",          color: "#c125d6", bg: "rgba(45,177,123,0.1)"  },
   processing:   { label: "Processing",       color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  ready:        { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
 };
 
 // ── Reusable Components ──
@@ -57,11 +60,13 @@ export default function ActivityPage({ onNavigate }) {
   const [programs, setPrograms] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [feedback, setFeedback] = useState([]); // --- ADDED: Feedback State ---
 
   // Limits for "Load More" functionality
   const [progLimit, setProgLimit] = useState(5);
   const [docLimit, setDocLimit] = useState(5);
   const [resLimit, setResLimit] = useState(5);
+  const [feedbackLimit, setFeedbackLimit] = useState(5); // --- ADDED: Feedback Limit ---
 
   const activeUserId = getSaved("userID", null);
 
@@ -119,6 +124,21 @@ export default function ActivityPage({ onNavigate }) {
     });
     return () => unsubReservations();
   }, [activeUserId, resLimit]);
+
+  // D. Fetch Feedback --- ADDED ---
+  useEffect(() => {
+    if (!activeUserId) return;
+    const qFeedback = query(
+      collection(db, "Feedback"),
+      where("userID", "==", activeUserId),
+      orderBy("CreatedAt", "desc"), // Ensure this matches your Firebase field exactly
+      limit(feedbackLimit)
+    );
+    const unsubFeedback = onSnapshot(qFeedback, (snapshot) => {
+      setFeedback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubFeedback();
+  }, [activeUserId, feedbackLimit]);
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
@@ -232,11 +252,47 @@ export default function ActivityPage({ onNavigate }) {
     );
   };
 
+  // ── 6.4 Feedback Tab
+  const FeedbackTab = () => {
+    if (feedback.length === 0) return <EmptyState message="You have not submitted any feedback yet." />;
+    return (
+      <div className="act2-list">
+        {feedback.map((item) => (
+          <div key={item.id} className="act2-card">
+            <div className="act2-card__row">
+              <div className="act2-card__main">
+                <div className="act2-card__title">{item.FacilityName || "General Service"}</div>
+                <div className="act2-card__subtitle" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                  <span style={{ color: '#e8a020' }}>★</span> {item.Rating} / 5 Rating
+                </div>
+                <div className="act2-card__meta" style={{ marginTop: '4px' }}>Date Submitted: {formatDate(item.CreatedAt)}</div>
+                <div className="act2-card__ref">Ref: {item.ReferenceID || item.id}</div>
+              </div>
+              <StatusBadge status={item.Status || "pending"} />
+            </div>
+          </div>
+        ))}
+        {/* LOAD MORE BUTTON */}
+        {feedback.length >= feedbackLimit && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
+            <button 
+              onClick={() => setFeedbackLimit(prev => prev + 5)}
+              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
+            >
+              Load More
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── TABS CONFIG ──
   const TABS = [
     { key: "programs",     label: "Programs & Facilities", icon: <ProgramIcon />,     count: programs.length,     component: <ProgramsFacilitiesTab /> },
     { key: "documents",    label: "Documents",             icon: <DocumentIcon />,    count: documents.length,    component: <DocumentsTab /> },
     { key: "reservations", label: "Reservations",          icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "feedback",     label: "Feedback",              icon: <ActivityIcon />,    count: feedback.length,     component: <FeedbackTab /> }, // --- ADDED ---
   ];
 
   const current = TABS.find((t) => t.key === activeTab);
@@ -278,7 +334,7 @@ export default function ActivityPage({ onNavigate }) {
         <div className="sc-card sc-card--tabbed">
 
           {/* Tab Bar */}
-          <div className="act2-tabbar">
+          <div className="act2-tabbar" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
             <div className="act2-tabbar__inner">
               {TABS.map((tab) => (
                 <button
