@@ -24,6 +24,31 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 
+const PREVIEW_LIMIT = 120;
+
+function DescriptionPreview({ text }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!text) return null;
+  const isLong = text.length > PREVIEW_LIMIT;
+  return (
+    <p className="as-card-desc" style={{ marginBottom: 0 }}>
+      {isLong && !expanded ? text.slice(0, PREVIEW_LIMIT) + "…" : text}
+      {isLong && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            marginLeft: 6, background: 'none', border: 'none', padding: 0,
+            color: '#317D89', fontWeight: 700, fontSize: '0.8rem',
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          {expanded ? 'Show Less' : 'Read More'}
+        </button>
+      )}
+    </p>
+  );
+}
+
 export default function ManageDocuments() {
   const [documents, setDocuments] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -291,9 +316,7 @@ export default function ManageDocuments() {
               <h2 className="as-card-title">{doc.title}</h2>
             </div>
             {doc.description && (
-              <p className="as-card-desc" style={{ marginBottom: "10px" }}>
-                {doc.description}
-              </p>
+              <div style={{ marginBottom: "10px" }}><DescriptionPreview text={doc.description} /></div>
             )}
             <ul className="as-card-details">
               <li>

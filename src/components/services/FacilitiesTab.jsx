@@ -8,8 +8,18 @@ import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, Servi
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
+// Convert "HH:MM" 24-hour time to "h:MM AM/PM" 12-hour display
+const to12h = (t) => {
+  if (!t) return t;
+  const [h, m] = t.split(":");
+  const hh = parseInt(h, 10);
+  const suffix = hh >= 12 ? "PM" : "AM";
+  const h12 = hh % 12 || 12;
+  return `${h12}:${m} ${suffix}`;
+};
+
 // ── 1. Main Facilities Tab Component ──
-export default function FacilitiesTab({ userData, householdID, userName }) {
+export default function FacilitiesTab({ userData, householdID, userName, userID }) {
   const [facilities, setFacilities] = useState([]);
   const [reservationFacility, setReservationFacility] = useState(null);
 
@@ -64,7 +74,7 @@ export default function FacilitiesTab({ userData, householdID, userName }) {
               userData={userData} 
               householdID={householdID} 
               userName={userName} 
-              userID={activeUserId}
+              userID={userID}
             />
           </div>
         </div>
@@ -196,7 +206,21 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     if (!form.date)            e.date      = "Please select a date.";
     if (!form.startTime)       e.startTime = "Start time is required.";
     if (!form.endTime)         e.endTime   = "End time is required.";
-    if (form.startTime && form.endTime && form.startTime >= form.endTime) e.endTime = "End time must be after start time.";
+    if (form.startTime && form.endTime && form.startTime >= form.endTime)
+      e.endTime = "End time must be after start time.";
+
+    // Enforce facility operating hours
+    const open  = facility?.openTime;
+    const close = facility?.closeTime;
+    if (open && form.startTime && form.startTime < open)
+      e.startTime = `Start time cannot be before opening time (${to12h(open)}).`;
+    if (close && form.startTime && form.startTime > close)
+      e.startTime = `Start time cannot be after closing time (${to12h(close)}).`;
+    if (open && form.endTime && form.endTime < open)
+      e.endTime = `End time cannot be before opening time (${to12h(open)}).`;
+    if (close && form.endTime && form.endTime > close)
+      e.endTime = `End time cannot be after closing time (${to12h(close)}).`;
+
     const extra = facility?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
@@ -288,15 +312,40 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           <div className="sv-field-row">
             <div className="sv-field">
               <label className="sv-label">Start Time <span className="sv-required">*</span></label>
-              <input className={`sv-input${errors.startTime ? " sv-input--error" : ""}`} type="time" value={form.startTime} onChange={e => { set("startTime", e.target.value); setErrors(p => ({...p, startTime: ""})); }} />
+              <input
+                className={`sv-input${errors.startTime ? " sv-input--error" : ""}`}
+                type="time"
+                value={form.startTime}
+                min={facility?.openTime || undefined}
+                max={facility?.closeTime || undefined}
+                onChange={e => { set("startTime", e.target.value); setErrors(p => ({...p, startTime: ""})); }}
+              />
               {errors.startTime && <span className="sv-error-msg">{errors.startTime}</span>}
             </div>
             <div className="sv-field">
               <label className="sv-label">End Time <span className="sv-required">*</span></label>
-              <input className={`sv-input${errors.endTime ? " sv-input--error" : ""}`} type="time" value={form.endTime} onChange={e => { set("endTime", e.target.value); setErrors(p => ({...p, endTime: ""})); }} />
+              <input
+                className={`sv-input${errors.endTime ? " sv-input--error" : ""}`}
+                type="time"
+                value={form.endTime}
+                min={facility?.openTime || undefined}
+                max={facility?.closeTime || undefined}
+                onChange={e => { set("endTime", e.target.value); setErrors(p => ({...p, endTime: ""})); }}
+              />
               {errors.endTime && <span className="sv-error-msg">{errors.endTime}</span>}
             </div>
           </div>
+          {(facility?.openTime && facility?.closeTime) && (
+            <div style={{
+              fontSize: '0.78rem', color: '#5e7a99', marginTop: '-0.25rem', marginBottom: '0.5rem',
+              display: 'flex', alignItems: 'center', gap: '5px',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Facility hours: <strong>{to12h(facility.openTime)}</strong> – <strong>{to12h(facility.closeTime)}</strong>
+            </div>
+          )}
           <div className="sv-field">
             <label className="sv-label">Estimated Number of Attendees</label>
             <input className="sv-input" type="number" placeholder="e.g. 50" min="1" max="200" value={form.attendees} onChange={e => set("attendees", e.target.value)} />

@@ -383,8 +383,8 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
       </div>
       {step < 4 && (
-        <div className="dr-wizard-actions">
-          {step > 1 ? <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }}>Previous</button> : <div />}
+        <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+          {step > 1 && <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }}>Previous</button>}
           <button className="sv-btn-primary" onClick={handleNext}>{step === 3 ? "Submit Request" : "Next"}</button>
         </div>
       )}

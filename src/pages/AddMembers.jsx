@@ -49,7 +49,6 @@ const BLANK_FORM = {
   pwdStatus: "", disabilityType: "",
   educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
   sameAddress: false,
-  isHead: false,
 };
 
 const TABS = ["Personal Info", "Address", "Category", "Education"];
@@ -59,6 +58,7 @@ export default function AddMembers({ onBack, onDone, householdID, hhAddress }) {
   const [tab, setTab] = useState(1);
   const [form, setForm] = useState({ ...BLANK_FORM });
   const [showToast, setShowToast] = useState(false);
+  const [memberError, setMemberError] = useState("");
   const toastRef = useRef(null);
 
   useEffect(() => {
@@ -114,59 +114,116 @@ export default function AddMembers({ onBack, onDone, householdID, hhAddress }) {
     }
   };
 
-const addMember = async () => {
-  const fullName = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || `Member ${members.length + 1}`;
-  const initials = (form.firstName?.[0] || "") + (form.lastName?.[0] || "M");
-  const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
+  // Per-tab validation 
+  const validateTab = (tabNum) => {
+    const missing = [];
 
-  try {
-    await addHouseholdMember(householdID, {
-      // identity
-      isHead: form.isHead,
-      // personal info
-      firstName:    form.firstName    || "",
-      middleName:   form.middleName   || "",
-      lastName:     form.lastName     || "",
-      suffix:       form.suffix       || "",
-      birthDate:    form.birthDate    || "",
-      age:          form.age          || "",
-      birthPlace:   form.birthPlace   || "",
-      sex:          form.sex          || "",
-      civilStatus:  form.civilStatus  || "",
-      religion:     form.religion     || "",
-      citizenship:  form.citizenship  || "",
-      contactNumber: form.contactNumber || "",
-      email:        form.email        || "",
-      residingSinceYear: form.residingSinceYear || "",
-      // address — service omits these when sameAddress is true
-      sameAddress:  form.sameAddress,
-      houseNumber:  form.houseNumber  || "",
-      street:       form.street       || "",
-      region:       form.region       || "",
-      province:     form.province     || "",
-      city:         form.city         || "",
-      barangay:     form.barangay     || "",
-      // category — service converts array → string
-      categories:   form.categories   || [],
-      pwdStatus:    form.pwdStatus     || "",
-      disabilityType: form.disabilityType || "",
-      // education & employment
-      educationAttainment: form.educationAttainment || "",
-      educationStatus:     form.educationStatus     || "",
-      occupation:          form.occupation          || "",
-      employmentStatus:    form.employmentStatus    || "",
-    });
-  } catch (err) {
-    alert("Failed to save member: " + err.message);
-    return;
-  }
+    if (tabNum === 1) {
+      if (!form.firstName.trim()) missing.push("First Name");
+      if (!form.lastName.trim()) missing.push("Last Name");
+      if (!form.birthDate) missing.push("Birth Date");
+      if (!form.birthPlace.trim()) missing.push("Birth Place");
+      if (!form.civilStatus) missing.push("Civil Status");
+      if (!form.residingSinceYear) missing.push("Residing Since Year");
 
-  setMembers(m => [...m, { fullName, initials, color, isHead: form.isHead, meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · ") }]);
-  setForm({ ...BLANK_FORM });
-  setTab(1);
-  setShowToast(true);
-  window.scrollTo({ top: 0, behavior: "smooth" });
-};
+      if (!form.contactNumber.trim()) missing.push("Contact Number");
+      else if (form.contactNumber.replace(/\D/g, "").length < 10) missing.push("Valid Contact Number (min 10 digits)");
+
+      if (!form.email.trim()) missing.push("Email Address");
+      else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+    }
+
+    if (tabNum === 2 && !form.sameAddress) {
+      if (!form.houseNumber.trim()) missing.push("House / Unit Number");
+      if (!form.street.trim()) missing.push("Street");
+      if (!form.province.trim()) missing.push("Province");
+    }
+
+    if (tabNum === 4) {
+      if (!form.educationAttainment) missing.push("Highest Educational Attainment");
+      if (!form.educationStatus) missing.push("Education Status");
+      if (!form.employmentStatus) missing.push("Employment Status");
+    }
+
+    if (missing.length > 0) {
+      setMemberError(`Please fill in required fields: ${missing.join(", ")}`);
+      return false;
+    }
+    setMemberError("");
+    return true;
+  };
+
+  // Navigate to the next tab only if current tab passes validation
+  const goNext = (nextTab) => {
+    if (!validateTab(tab)) return;
+    setTab(nextTab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goBack = (prevTab) => {
+    setMemberError("");
+    setTab(prevTab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const addMember = async () => {
+    // Final validation covers all tabs before submitting
+    if (!validateTab(1) || !validateTab(4)) {
+      setTab(1);
+      return;
+    }
+
+    const fullName = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || `Member ${members.length + 1}`;
+    const initials = (form.firstName?.[0] || "") + (form.lastName?.[0] || "M");
+    const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
+
+    try {
+      await addHouseholdMember(householdID, {
+        // personal info
+        firstName: form.firstName || "",
+        middleName: form.middleName || "",
+        lastName: form.lastName || "",
+        suffix: form.suffix || "",
+        birthDate: form.birthDate || "",
+        age: form.age || "",
+        birthPlace: form.birthPlace || "",
+        sex: form.sex || "",
+        civilStatus: form.civilStatus || "",
+        religion: form.religion || "",
+        citizenship: form.citizenship || "",
+        contactNumber: form.contactNumber || "",
+        email: form.email || "",
+        residingSinceYear: form.residingSinceYear || "",
+        // address — service omits these when sameAddress is true
+        sameAddress: form.sameAddress,
+        houseNumber: form.houseNumber || "",
+        street: form.street || "",
+        region: form.region || "",
+        province: form.province || "",
+        city: form.city || "",
+        barangay: form.barangay || "",
+        // category — service converts array → string
+        categories: form.categories || [],
+        pwdStatus: form.pwdStatus || "",
+        disabilityType: form.disabilityType || "",
+        // education & employment
+        educationAttainment: form.educationAttainment || "",
+        educationStatus: form.educationStatus || "",
+        occupation: form.occupation || "",
+        employmentStatus: form.employmentStatus || "",
+      });
+    } catch (err) {
+      alert("Failed to save member: " + err.message);
+      return;
+    }
+
+    setMembers(m => [...m, { fullName, initials, color, meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · ") }]);
+    setForm({ ...BLANK_FORM });
+    setTab(1);
+    setMemberError("");
+    setShowToast(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const removeMember = (i) => setMembers(m => m.filter((_, idx) => idx !== i));
 
@@ -188,14 +245,14 @@ const addMember = async () => {
           </div>
         </div>
         <div className="am-hh-badge">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
           <span>{householdID || "HH-XXXX-XXXXX"}</span>
         </div>
       </nav>
 
       {/* TOAST */}
       <div className={`am-toast ${showToast ? "show" : ""}`}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d7a55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d7a55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
         Member added successfully.
       </div>
 
@@ -245,16 +302,6 @@ const addMember = async () => {
                 <span className="am-check-text">
                   <strong>📍 Same address as Household Head</strong>
                   <span>{addrPreview}</span>
-                </span>
-              </span>
-            </label>
-            <label className="am-special-check">
-              <input type="checkbox" checked={form.isHead} onChange={set("isHead")} />
-              <span className="am-special-check-label">
-                <span className="am-check-icon-box">{form.isHead && "✓"}</span>
-                <span className="am-check-text">
-                  <strong>⭐ Set as Household Head</strong>
-                  <span>This member will be designated as the primary household head</span>
                 </span>
               </span>
             </label>
@@ -330,10 +377,10 @@ const addMember = async () => {
                   </Field>
                 </div>
                 <div className="am-form-grid cols-3">
-                  <Field label="Contact Number">
+                  <Field label="Contact Number" required>
                     <InputField icon={IconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} />
                   </Field>
-                  <Field label="Email Address">
+                  <Field label="Email Address" required hint="Used for account notifications.">
                     <InputField icon={IconMail} type="email" placeholder="email@example.com" value={form.email} onChange={set("email")} />
                   </Field>
                   <Field label="Residing Since (Year)" required>
@@ -341,9 +388,23 @@ const addMember = async () => {
                   </Field>
                 </div>
               </div>
+              {memberError && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#fef2f2',
+                  borderLeft: '4px solid #ef4444',
+                  color: '#b91c1c',
+                  fontSize: '0.875rem',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  marginTop: '0.75rem',
+                }}>
+                  ⚠️ {memberError}
+                </div>
+              )}
               <div className="am-form-actions">
                 <div />
-                <button className="am-btn am-btn-primary" onClick={() => setTab(2)}>Next: Address <IconArrow /></button>
+                <button className="am-btn am-btn-primary" onClick={() => goNext(2)}>Next: Address <IconArrow /></button>
               </div>
             </div>
           )}
@@ -377,9 +438,23 @@ const addMember = async () => {
                   </Field>
                 </div>
               </div>
+              {memberError && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#fef2f2',
+                  borderLeft: '4px solid #ef4444',
+                  color: '#b91c1c',
+                  fontSize: '0.875rem',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  marginTop: '0.75rem',
+                }}>
+                  ⚠️ {memberError}
+                </div>
+              )}
               <div className="am-form-actions">
-                <button className="am-btn am-btn-ghost" onClick={() => setTab(1)}>← Back</button>
-                <button className="am-btn am-btn-primary" onClick={() => setTab(3)}>Next: Category <IconArrow /></button>
+                <button className="am-btn am-btn-ghost" onClick={() => goBack(1)}>← Back</button>
+                <button className="am-btn am-btn-primary" onClick={() => goNext(3)}>Next: Category <IconArrow /></button>
               </div>
             </div>
           )}
@@ -421,8 +496,8 @@ const addMember = async () => {
                 )}
               </div>
               <div className="am-form-actions">
-                <button className="am-btn am-btn-ghost" onClick={() => setTab(2)}>← Back</button>
-                <button className="am-btn am-btn-primary" onClick={() => setTab(4)}>Next: Education <IconArrow /></button>
+                <button className="am-btn am-btn-ghost" onClick={() => goBack(2)}>← Back</button>
+                <button className="am-btn am-btn-primary" onClick={() => goNext(4)}>Next: Education <IconArrow /></button>
               </div>
             </div>
           )}
@@ -461,8 +536,22 @@ const addMember = async () => {
                   </Field>
                 </div>
               </div>
+              {memberError && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#fef2f2',
+                  borderLeft: '4px solid #ef4444',
+                  color: '#b91c1c',
+                  fontSize: '0.875rem',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  marginTop: '0.75rem',
+                }}>
+                  ⚠️ {memberError}
+                </div>
+              )}
               <div className="am-form-actions">
-                <button className="am-btn am-btn-ghost" onClick={() => setTab(3)}>← Back</button>
+                <button className="am-btn am-btn-ghost" onClick={() => goBack(3)}>← Back</button>
                 <button className="am-btn am-btn-primary" onClick={addMember}>
                   <IconCheck /> Add Member
                 </button>

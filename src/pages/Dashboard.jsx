@@ -319,12 +319,12 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       // "All Residents" → general announcements only, NOT alerts
       const targetsEveryone = annCatClean === "all residents" || annAudienceClean === "all residents";
 
-      // Match: user's category string should be contained in the announcement's target audience, or vice-versa
+      // Exact match: announcement category must equal one of the user's profile categories
       const isAlert = !targetsEveryone && userCategories.some(uc => {
         const u = uc.trim().toLowerCase();
         if (!u) return false;
-        return annCatClean.includes(u) || u.includes(annCatClean) ||
-          annAudienceClean.includes(u) || u.includes(annAudienceClean);
+        // Exact match only — the announcement's category field must equal the user's category
+        return annCatClean === u || annAudienceClean === u;
       });
 
       return { ...ann, dotColor: dc, catClass: cc, icon, isSmartAlert: isAlert };

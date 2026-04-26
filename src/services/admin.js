@@ -34,9 +34,17 @@ export const approveRegistration = async (docID) => {
   const pendingRef = doc(db, "pending_registrations", docID);
   const snapshot = await getDoc(pendingRef);
 
-  if (!snapshot.exists()) throw new Error("Registration not found");
+  // Idempotency guard: bail out if the record was already processed
+  if (!snapshot.exists()) {
+    throw new Error("Registration not found or already processed.");
+  }
 
   const data = snapshot.data();
+
+  // Extra guard: if the record was somehow already marked approved, stop here
+  if (data.status === "approved") {
+    throw new Error("This registration has already been approved.");
+  }
   const householdID = await generateHouseholdID();
   const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
 
