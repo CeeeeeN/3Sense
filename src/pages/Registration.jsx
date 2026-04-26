@@ -46,6 +46,7 @@ export default function Registration({ onBack }) {
   const [refNumber, setRefNumber] = useState("");
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // --- ADDED: Error Message State ---
   const [errorMsg, setErrorMsg] = useState("");
@@ -163,6 +164,8 @@ export default function Registration({ onBack }) {
       window.scrollTo({ top: 0, behavior: "smooth" }); 
     }
     else {
+      if (isSubmitting) return; // Guard against double-click
+      setIsSubmitting(true);
       try {
         await submitRegistration(form);
         const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
@@ -172,6 +175,7 @@ export default function Registration({ onBack }) {
       } catch(error) {
         console.error("Submission error:", error);
         alert("Failed to submit registration.");
+        setIsSubmitting(false); // Re-enable on error so user can retry
       }
     }
   };
@@ -642,10 +646,10 @@ export default function Registration({ onBack }) {
                   <button
                     className="reg-btn-success"
                     onClick={goNext}
-                    disabled={!privacyAgreed}
-                    style={{ opacity: privacyAgreed ? 1 : 0.5, cursor: privacyAgreed ? "pointer" : "not-allowed" }}
+                    disabled={!privacyAgreed || isSubmitting}
+                    style={{ opacity: (privacyAgreed && !isSubmitting) ? 1 : 0.5, cursor: (privacyAgreed && !isSubmitting) ? "pointer" : "not-allowed" }}
                   >
-                    ✓ Confirm &amp; Submit
+                    {isSubmitting ? "⏳ Submitting…" : "✓ Confirm & Submit"}
                   </button>
                 )}
               </div>

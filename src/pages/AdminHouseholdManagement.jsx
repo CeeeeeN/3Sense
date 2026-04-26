@@ -55,6 +55,7 @@ export default function HouseholdManagement() {
   const [showHhViewModal, setShowHhViewModal] = useState(false);
   const [showHhApproveModal, setShowHhApproveModal] = useState(false);
   const [showHhRejectModal, setShowHhRejectModal] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   // For logging purposes
   const [adminName, setAdminName] = useState("");
@@ -241,6 +242,8 @@ export default function HouseholdManagement() {
   // ================= HH REQUEST ACTIONS =================
   const handleHhApprove = async () => {
     if (!selectedHhRequest) return;
+    if (isApproving) return; // Prevent duplicate clicks
+    setIsApproving(true);
     try {
       await approveRegistration(selectedHhRequest.id);
       setSelectedHhRequest(null);
@@ -261,6 +264,8 @@ export default function HouseholdManagement() {
         `Failed to approve household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId}). Error: ${error.message}`
       );
       alert("Error approving registration: " + error.message);
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -838,8 +843,13 @@ export default function HouseholdManagement() {
               </p>
 
               <div className="modal-actions">
-                <button className="approve-btn" onClick={handleHhApprove}>
-                  Confirm Approval
+                <button
+                  className="approve-btn"
+                  onClick={handleHhApprove}
+                  disabled={isApproving}
+                  style={{ opacity: isApproving ? 0.6 : 1, cursor: isApproving ? "not-allowed" : "pointer" }}
+                >
+                  {isApproving ? "⏳ Approving…" : "Confirm Approval"}
                 </button>
                 <button
                   className="reject-btn"
@@ -847,6 +857,7 @@ export default function HouseholdManagement() {
                     setShowHhApproveModal(false);
                     setSelectedHhRequest(null);
                   }}
+                  disabled={isApproving}
                 >
                   Cancel
                 </button>

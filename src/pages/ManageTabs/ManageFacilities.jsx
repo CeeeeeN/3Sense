@@ -6,6 +6,31 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 
+const PREVIEW_LIMIT = 120;
+
+function DescriptionPreview({ text }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!text) return null;
+  const isLong = text.length > PREVIEW_LIMIT;
+  return (
+    <p className="as-card-desc" style={{ marginBottom: 0 }}>
+      {isLong && !expanded ? text.slice(0, PREVIEW_LIMIT) + "…" : text}
+      {isLong && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            marginLeft: 6, background: 'none', border: 'none', padding: 0,
+            color: '#317D89', fontWeight: 700, fontSize: '0.8rem',
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          {expanded ? 'Show Less' : 'Read More'}
+        </button>
+      )}
+    </p>
+  );
+}
+
 export default function ManageFacilities() {
   const [facilities, setFacilities] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -264,7 +289,7 @@ export default function ManageFacilities() {
                 {fac.available ? "Enabled" : "Disabled"}
               </span>
             </div>
-            <p className="as-card-desc" style={{ marginBottom: '12px' }}>{fac.fullDescription}</p>
+            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.fullDescription} /></div>
             <ul className="as-card-details">
               <li><strong>Capacity:</strong> {fac.capacity}</li>
               <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>

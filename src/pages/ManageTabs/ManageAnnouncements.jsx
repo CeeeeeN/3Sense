@@ -11,6 +11,31 @@ import {
   deleteAnnouncement
 } from "../../services/announcements";
 
+const PREVIEW_LIMIT = 120;
+
+function DescriptionPreview({ text }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!text) return null;
+  const isLong = text.length > PREVIEW_LIMIT;
+  return (
+    <p className="as-card-desc" style={{ marginBottom: 0 }}>
+      {isLong && !expanded ? text.slice(0, PREVIEW_LIMIT) + "…" : text}
+      {isLong && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            marginLeft: 6, background: 'none', border: 'none', padding: 0,
+            color: '#317D89', fontWeight: 700, fontSize: '0.8rem',
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          {expanded ? 'Show Less' : 'Read More'}
+        </button>
+      )}
+    </p>
+  );
+}
+
 export default function ManageAnnouncements() {
   const [announcements, setAnnouncements] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -235,7 +260,7 @@ export default function ManageAnnouncements() {
               <h2 className="as-card-title">{ann.title}</h2>
               <span className="as-badge open" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>{ann.announcementCategory}</span>
             </div>
-            <p className="as-card-desc">{ann.description}</p>
+            <DescriptionPreview text={ann.description} />
             <ul className="as-card-details">
               <li><Manage_IconLocation /> {ann.location || "TBA"}</li>
               {ann.time && <li><strong>Time:</strong> {new Date(ann.time).toLocaleString()}</li>}

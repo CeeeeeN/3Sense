@@ -260,19 +260,56 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           </button>
         </div>
 
-        {/* 1. QR */}
         <Card icon={IconQR} title="Personal QR Code">
           <div className="pf-qr-wrap">
-            <div className="pf-qr-box" style={{ padding: 0, background: "#fff", borderRadius: 8, overflow: "hidden" }}>
-              {qrUrl
-                ? <img src={qrUrl} alt="Personal QR Code" style={{ width: 160, height: 160, display: "block" }} />
-                : <div style={{ width: 160, height: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.75rem" }}>Generating...</div>
-              }
+            {/* QR image panel */}
+            <div style={{
+              background: "linear-gradient(145deg, #f0faf6, #e8f5f0)",
+              border: "2px solid rgba(13,122,85,0.25)",
+              borderRadius: "18px",
+              padding: "20px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "12px",
+              boxShadow: "0 4px 20px rgba(13,122,85,0.12)",
+              flexShrink: 0,
+            }}>
+              <div style={{
+                background: "#fff",
+                borderRadius: "12px",
+                padding: "10px",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                {qrUrl
+                  ? <img src={qrUrl} alt="Personal QR Code" style={{ width: 180, height: 180, display: "block", borderRadius: "6px" }} />
+                  : <div style={{ width: 180, height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.75rem" }}>Generating...</div>
+                }
+              </div>
+              <div style={{
+                fontSize: "0.65rem",
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 700,
+                color: "#0d7a55",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                textAlign: "center",
+              }}>
+                Scan to Verify Identity
+              </div>
             </div>
+
+            {/* Info column */}
             <div className="pf-qr-info">
               <div className="pf-qr-name">{fullName || "Your Full Name"}</div>
               <div className="pf-qr-id">{householdID || "HH-XXXX-XXXXX"} · {data.role === "head" ? "Household Head" : "Member"}</div>
               <div className="pf-qr-verified"><span className="dot" /> Verified Resident</div>
+
+              <div style={{ borderTop: "1.5px solid var(--bg)", margin: "1rem 0" }} />
+
               <div className="pf-qr-meta">
                 <div><div className="pf-qr-ml">Barangay</div><div className="pf-qr-mv">{data.barangay || "—"}</div></div>
                 <div><div className="pf-qr-ml">City</div><div className="pf-qr-mv">{data.city || "—"}</div></div>
@@ -281,6 +318,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                   <div className="pf-qr-mv" style={{ color: sInfo.color }}>{sInfo.label}</div>
                 </div>
               </div>
+
               <button className="pf-btn-dl" onClick={downloadQR} disabled={!qrUrl}><IconDl /> Download QR Code</button>
             </div>
           </div>

@@ -26,6 +26,31 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 
+const PREVIEW_LIMIT = 120;
+
+function DescriptionPreview({ text }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!text) return null;
+  const isLong = text.length > PREVIEW_LIMIT;
+  return (
+    <p className="as-card-desc" style={{ marginBottom: 0 }}>
+      {isLong && !expanded ? text.slice(0, PREVIEW_LIMIT) + "…" : text}
+      {isLong && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            marginLeft: 6, background: 'none', border: 'none', padding: 0,
+            color: '#317D89', fontWeight: 700, fontSize: '0.8rem',
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}
+        >
+          {expanded ? 'Show Less' : 'Read More'}
+        </button>
+      )}
+    </p>
+  );
+}
+
 export default function ManagePrograms() {
   // 🆕 Programs now come from Firestore
   const [programs, setPrograms] = useState([]);
@@ -399,7 +424,7 @@ export default function ManagePrograms() {
                   {prog.status}
                 </span>
               </div>
-              <p className="as-card-desc">{prog.description}</p>
+              <DescriptionPreview text={prog.description} />
               <ul className="as-card-details">
                 <li>
                   <Manage_IconLocation /> {prog.location}
