@@ -491,7 +491,7 @@ export default function AdminRequests() {
                   <th>Scheduled Date</th>
                   <th>Date Submitted</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -522,8 +522,8 @@ export default function AdminRequests() {
                         {String(req.status || "Pending").charAt(0).toUpperCase() + String(req.status || "Pending").slice(1).toLowerCase()}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div className="req-actions" style={{ justifyContent: 'center' }}>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="req-actions" style={{ justifyContent: 'flex-end' }}>
                         {String(req.status || "").toLowerCase() === 'pending' && (
                           <>
                             <button className="btn-approve" title="Approve" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>

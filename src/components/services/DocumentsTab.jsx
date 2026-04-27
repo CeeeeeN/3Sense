@@ -74,6 +74,7 @@ function Step1({ docTypes, selected, onSelect }) {
 function Step2({ docType, form, setForm, errors }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
+  const purposeOptions = docType?.purposeOptions || [];
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -135,7 +136,8 @@ function Step2({ docType, form, setForm, errors }) {
         <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
         {errors.address && <span className="sv-error-msg">{errors.address}</span>}
       </div>
-      <div className="dr-field-row">
+      {/* ── Contact | Email | Purpose — all on the same row ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
         <div className="dr-field">
           <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.contact ? " sv-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
@@ -145,12 +147,38 @@ function Step2({ docType, form, setForm, errors }) {
           <label className="sv-label">Email Address</label>
           <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
         </div>
+        <div className="dr-field">
+          <label className="sv-label">Purpose of Request <span className="sv-required">*</span></label>
+          <select
+            className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
+            value={form.purposeOption}
+            onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
+          >
+            <option value="">— Select purpose —</option>
+            {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            <option value="Other">Other</option>
+          </select>
+          {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
+        </div>
       </div>
-      <div className="dr-field">
-        <label className="sv-label">Purpose <span className="sv-required">*</span></label>
-        <textarea className={`sv-textarea${errors.purpose ? " sv-input--error" : ""}`} rows={3} value={form.purpose} onChange={e => set("purpose", e.target.value)} placeholder="State the purpose of this document request..." />
-        {errors.purpose && <span className="sv-error-msg">{errors.purpose}</span>}
-      </div>
+
+      {/* ── "Other" free-text — aligned under the Purpose column (3rd slot) ── */}
+      {form.purposeOption === "Other" && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+          <div />{/* col 1 spacer */}
+          <div />{/* col 2 spacer */}
+          <div className="dr-field">
+            <label className="sv-label">Please specify <span className="sv-required">*</span></label>
+            <input
+              className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
+              value={form.purposeOther}
+              onChange={e => set("purposeOther", e.target.value)}
+              placeholder="Describe your purpose..."
+            />
+            {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
+          </div>
+        </div>
+      )}
 
       <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>File Upload</div>
       <div className="dr-field">
@@ -207,6 +235,9 @@ function Step2({ docType, form, setForm, errors }) {
 // ── Step 3: Review ──
 function Step3({ docType, form }) {
   const extraFields = docType?.customFields || [];
+  const effectivePurpose = form.purposeOption === "Other"
+    ? (form.purposeOther || "Other")
+    : form.purposeOption;
   const rows = [
     { label: "Document Type", value: docType?.title || docType?.name, full: true },
     { label: "Full Name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
@@ -216,7 +247,7 @@ function Step3({ docType, form }) {
     { label: "Address", value: form.address, full: true },
     { label: "Contact Number", value: form.contact },
     { label: "Email", value: form.email || "—" },
-    { label: "Purpose", value: form.purpose, full: true },
+    { label: "Purpose", value: effectivePurpose || "—", full: true },
     { label: "Valid ID Uploaded", value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
     ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
@@ -281,7 +312,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
     contact: "", email: "",
-    residingSince: "", purpose: "", validId: "", validIdFile: null,
+    residingSince: "", purposeOption: "", purposeOther: "", validId: "", validIdFile: null,
   });
 
   useEffect(() => {
@@ -325,7 +356,8 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     if (!form.address.trim()) e.address = "Required.";
     if (!String(form.contact || "").trim()) e.contact = "Required.";
     if (!form.residingSince) e.residingSince = "Required.";
-    if (!form.purpose.trim()) e.purpose = "Required.";
+    if (!form.purposeOption) e.purposeOption = "Required.";
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
     if (!form.validId) e.validId = "Please upload a valid ID.";
     const extra = docType?.customFields || [];
     extra.forEach(f => {
@@ -347,7 +379,10 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
-        const generatedRef = await submitDocumentRequest(householdID, activeUserId || "", userName || "Unknown", docType, form, customData);
+        // Resolve effective purpose for submission
+        const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
+        const submissionForm = { ...form, purpose: effectivePurpose };
+        const generatedRef = await submitDocumentRequest(householdID, activeUserId || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
 
         // 🆕 Notify all admins about new document request
@@ -369,7 +404,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
 
   const handleReset = () => {
     setStep(1); setDocType(null); setErrors({});
-    setForm({ firstName: "", middleName: "", lastName: "", dob: "", civilStatus: "Single", address: "", contact: "", email: "", ctc: "", residingSince: "", purpose: "", validId: "", validIdFile: null });
+    setForm({ firstName: "", middleName: "", lastName: "", dob: "", civilStatus: "Single", address: "", contact: "", email: "", ctc: "", residingSince: "", purposeOption: "", purposeOther: "", validId: "", validIdFile: null });
   };
 
   return (

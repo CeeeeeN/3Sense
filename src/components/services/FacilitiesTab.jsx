@@ -18,6 +18,27 @@ const to12h = (t) => {
   return `${h12}:${m} ${suffix}`;
 };
 
+// ── Helper: does a set of approved reservations cover the full operating hours? ──
+// We use a simple interval-union approach: merge all approved intervals on a date
+// and check if they collectively span [openTime, closeTime].
+function isFullyCovered(approvedOnDate, openTime, closeTime) {
+  if (!openTime || !closeTime || !approvedOnDate.length) return false;
+
+  // Sort intervals by start time
+  const intervals = approvedOnDate
+    .map(r => ({ s: r.startTime, e: r.endTime }))
+    .filter(r => r.s && r.e)
+    .sort((a, b) => a.s.localeCompare(b.s));
+
+  let covered = openTime;
+  for (const iv of intervals) {
+    if (iv.s > covered) break; // gap found
+    if (iv.e > covered) covered = iv.e;
+    if (covered >= closeTime) return true;
+  }
+  return false;
+}
+
 // ── 1. Main Facilities Tab Component ──
 export default function FacilitiesTab({ userData, householdID, userName, userID }) {
   const [facilities, setFacilities] = useState([]);
@@ -40,11 +61,11 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
               <div>
                 <div className="sv-facility-card__title">{f.name || f.title}</div>
                 <div className="sv-facility-card__meta">
-                  <span>{f.capacity}</span>
+                  <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
                   <span className="sv-facility-card__dot" />
                   <span>{f.openTime && f.closeTime ? (() => {
                     const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h,10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
-                    return fmt(f.openTime) + ' - ' + fmt(f.closeTime);
+                    return fmt(f.openTime) + ' – ' + fmt(f.closeTime);
                   })() : f.hours}</span>
                 </div>
                 <div className="sv-facility-card__desc">{f.fullDescription || f.desc}</div>
@@ -83,8 +104,9 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
   );
 }
 
-// ── Calendar ──
-function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates = [], blockedDates = [] }) {
+// ── 2. Calendar ──
+// fullyBookedDates: dates where approved reservations cover the full operating hours (shown Red)
+function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDates = [] }) {
   const today = new Date();
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -92,16 +114,27 @@ function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates
   const firstDay    = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const isPastMonth = (year, month) => {
+    const now = new Date();
+    return year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth());
+  };
+  const prevMonth = () => {
+    const newMonth = viewMonth === 0 ? 11 : viewMonth - 1;
+    const newYear  = viewMonth === 0 ? viewYear - 1 : viewYear;
+    if (!isPastMonth(newYear, newMonth)) { setViewMonth(newMonth); setViewYear(newYear); }
+  };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
 
   const getStatus = (d) => {
     const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    if (reservedDates.includes(str)) return "Reserved";
-    if (pendingDates.includes(str))  return "Pending";
+    // Past dates are unselectable
     const date = new Date(viewYear, viewMonth, d);
     if (date < new Date(today.getFullYear(), today.getMonth(), today.getDate())) return "past";
+    // Admin-blocked dates
     if (blockedDates.includes(str)) return "past";
+    // Fully booked by approved reservations → show red
+    if (fullyBookedDates.includes(str)) return "Reserved";
+    // Everything else is available (green)
     return "available";
   };
 
@@ -124,22 +157,22 @@ function Calendar({ selectedDate, onSelectDate, reservedDates = [], pendingDates
           const d = i + 1;
           const status = getStatus(d);
           const sel = isSelected(d);
+          const isBlocked = status === "past" || status === "Reserved";
           return (
             <button key={d} className={`sv-cal-cell sv-cal-cell--${status}${sel ? " sv-cal-cell--selected" : ""}`}
               onClick={() => {
-                if (status === "past") return;
+                if (isBlocked) return;
                 const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
                 onSelectDate(str, status);
               }}
-              disabled={status === "past"}
+              disabled={isBlocked}
             >{d}</button>
           );
         })}
       </div>
       <div className="sv-cal-legend">
         <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--pending" />Pending</span>
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Reserved</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Fully Reserved</span>
       </div>
     </div>
   );
@@ -152,26 +185,50 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
     : "Reserve a facility for your event. Approval is required before confirmation.";
 
-  const [reservations, setReservations] = useState([]);
-  const [pendingDates, setPendingDates] = useState([]);
+  // approvedReservations: only "approved" status — used for overlap check & fully-booked detection
+  const [approvedReservations, setApprovedReservations] = useState([]);
+  // allActiveReservations: all non-rejected — used for overlap check on submit
+  const [allActiveReservations, setAllActiveReservations] = useState([]);
+  // fullyBookedDates: dates where approved reservations cover the full operating hours
+  const [fullyBookedDates, setFullyBookedDates] = useState([]);
 
   useEffect(() => {
     if (!facility) return;
     const unsub = onSnapshot(collection(db, "facility_reservations"), (snapshot) => {
-      const allRes = [];
-      const datesWithRes = new Set();
+      const approved = [];
+      const allActive = [];
+
       snapshot.docs.forEach(doc => {
         const data = doc.data();
         if (String(data.facilityId) === String(facility.id) && data.date) {
           const stat = (data.status || "").toLowerCase();
-          if (stat !== "rejected") {
-            allRes.push({ id: doc.id, date: data.date, startTime: data.startTime, endTime: data.endTime, status: stat });
-            datesWithRes.add(data.date);
-          }
+          if (stat === "rejected") return;
+
+          const entry = { id: doc.id, date: data.date, startTime: data.startTime, endTime: data.endTime, status: stat };
+          allActive.push(entry);
+          if (stat === "approved") approved.push(entry);
         }
       });
-      setReservations(allRes);
-      setPendingDates(Array.from(datesWithRes));
+
+      setAllActiveReservations(allActive);
+      setApprovedReservations(approved);
+
+      // Compute fully-booked dates (approved covers full operating hours)
+      const openTime  = facility?.openTime;
+      const closeTime = facility?.closeTime;
+      if (openTime && closeTime) {
+        const dateMap = {};
+        approved.forEach(r => {
+          if (!dateMap[r.date]) dateMap[r.date] = [];
+          dateMap[r.date].push(r);
+        });
+        const booked = Object.keys(dateMap).filter(date =>
+          isFullyCovered(dateMap[date], openTime, closeTime)
+        );
+        setFullyBookedDates(booked);
+      } else {
+        setFullyBookedDates([]);
+      }
     });
     return () => unsub();
   }, [facility]);
@@ -199,27 +256,45 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     }
   }, [userData]);
 
+  // Check if the selected date+time overlaps with any approved reservation
+  const hasApprovedOverlapOnDate = (date, startTime, endTime) => {
+    if (!date || !startTime || !endTime) return false;
+    return approvedReservations.some(r =>
+      r.date === date && startTime < r.endTime && r.startTime < endTime
+    );
+  };
+
   const validate = () => {
     const e = {};
-    if (!form.email?.trim())   e.email     = "Email is required.";
-    if (!form.purpose.trim())  e.purpose   = "Purpose of use is required.";
-    if (!form.date)            e.date      = "Please select a date.";
-    if (!form.startTime)       e.startTime = "Start time is required.";
-    if (!form.endTime)         e.endTime   = "End time is required.";
+    if (!form.email?.trim())    e.email     = "Email is required.";
+    if (!form.purpose.trim())   e.purpose   = "Purpose of use is required.";
+    if (!form.date)             e.date      = "Please select a date.";
+    if (!form.startTime)        e.startTime = "Start time is required.";
+    if (!form.endTime)          e.endTime   = "End time is required.";
+    // Attendees is required
+    if (!form.attendees || String(form.attendees).trim() === "")
+      e.attendees = "Estimated number of attendees is required.";
+
     if (form.startTime && form.endTime && form.startTime >= form.endTime)
       e.endTime = "End time must be after start time.";
 
     // Enforce facility operating hours
     const open  = facility?.openTime;
     const close = facility?.closeTime;
-    if (open && form.startTime && form.startTime < open)
+    if (open  && form.startTime && form.startTime < open)
       e.startTime = `Start time cannot be before opening time (${to12h(open)}).`;
     if (close && form.startTime && form.startTime > close)
       e.startTime = `Start time cannot be after closing time (${to12h(close)}).`;
-    if (open && form.endTime && form.endTime < open)
+    if (open  && form.endTime && form.endTime < open)
       e.endTime = `End time cannot be before opening time (${to12h(open)}).`;
     if (close && form.endTime && form.endTime > close)
       e.endTime = `End time cannot be after closing time (${to12h(close)}).`;
+
+    // Validate attendees against facility capacity
+    const capacityNum  = facility?.capacity ? parseInt(String(facility.capacity).replace(/\D/g, ""), 10) : null;
+    const attendeesNum = form.attendees ? parseInt(form.attendees, 10) : null;
+    if (capacityNum && attendeesNum && attendeesNum > capacityNum)
+      e.attendees = `Number of attendees exceeds facility capacity (max: ${capacityNum}).`;
 
     const extra = facility?.customFields || [];
     extra.forEach(f => {
@@ -234,7 +309,8 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
 
-    const hasOverlap = reservations.some(r => {
+    // Check overlap against all active (non-rejected) reservations on submit
+    const hasOverlap = allActiveReservations.some(r => {
       if (r.date !== form.date) return false;
       return form.startTime < r.endTime && r.startTime < form.endTime;
     });
@@ -271,6 +347,11 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>Close</button>
     </div>
   );
+
+  // Does the selected date have any approved reservation that overlaps with chosen times?
+  const showApprovedOverlapWarning =
+    form.date && form.startTime && form.endTime &&
+    hasApprovedOverlapOnDate(form.date, form.startTime, form.endTime);
 
   return (
     <div className="sv-form-wrap">
@@ -347,8 +428,21 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             </div>
           )}
           <div className="sv-field">
-            <label className="sv-label">Estimated Number of Attendees</label>
-            <input className="sv-input" type="number" placeholder="e.g. 50" min="1" max="200" value={form.attendees} onChange={e => set("attendees", e.target.value)} />
+            <label className="sv-label">
+              Estimated Number of Attendees <span className="sv-required">*</span>
+              {facility?.capacity && (
+                <span style={{ fontWeight: 400, fontSize: '0.8rem', color: '#64748b', marginLeft: '6px' }}>
+                  (Max: {facility.capacity})
+                </span>
+              )}
+            </label>
+            <input
+              className={`sv-input${errors.attendees ? " sv-input--error" : ""}`}
+              type="number" placeholder="e.g. 50" min="1"
+              value={form.attendees}
+              onChange={e => { set("attendees", e.target.value); setErrors(p => ({...p, attendees: ""})); }}
+            />
+            {errors.attendees && <span className="sv-error-msg">{errors.attendees}</span>}
           </div>
           <div className="sv-field">
             <label className="sv-label">Additional Notes <span className="sv-optional">(Optional)</span></label>
@@ -388,14 +482,18 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
           <Calendar
             selectedDate={form.date}
-            reservedDates={[]}
-            pendingDates={pendingDates}
+            fullyBookedDates={fullyBookedDates}
             blockedDates={facility?.blockedDates || []}
             onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({...p, date: ""})); }}
           />
           {errors.date && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{errors.date}</span>}
           {errors.timeOverlap && <div className="sv-error-msg" style={{marginTop:"0.5rem",padding:"0.75rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"0.375rem",color:"#b91c1c"}}>{errors.timeOverlap}</div>}
-          {pendingDates.includes(form.date) && !errors.timeOverlap && <div className="sv-cal-warning sv-cal-warning--pending"><ServiceInfoIcon /> This date has existing reservations. Make sure your time slot doesn't overlap.</div>}
+          {/* Show warning ONLY when there is a real approved-reservation overlap on the chosen date+time */}
+          {showApprovedOverlapWarning && !errors.timeOverlap && (
+            <div className="sv-cal-warning sv-cal-warning--pending">
+              <ServiceInfoIcon /> This time slot overlaps with an existing approved reservation. Please choose a different time.
+            </div>
+          )}
         </div>
       </div>
       <div className="sv-form-actions">

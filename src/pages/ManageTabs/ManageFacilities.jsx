@@ -291,7 +291,7 @@ export default function ManageFacilities() {
             </div>
             <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.fullDescription} /></div>
             <ul className="as-card-details">
-              <li><strong>Capacity:</strong> {fac.capacity}</li>
+              <li><strong>Capacity:</strong> {fac.capacity ? `Up to ${fac.capacity} persons` : "—"}</li>
               <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>
             </ul>
             <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
@@ -348,7 +348,7 @@ export default function ManageFacilities() {
 
                   <div className="as-form-group">
                     <label className="as-form-label">Capacity</label>
-                    <input type="text" className="as-form-input" required placeholder="e.g. Up to 200 persons"
+                    <input type="number" className="as-form-input" required placeholder="e.g. 200" min="1"
                       value={newFacility.capacity} onChange={(e) => setNewFacility({...newFacility, capacity: e.target.value})} 
                     />
                   </div>
