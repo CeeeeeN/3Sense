@@ -253,7 +253,11 @@ export default function AdminRequests() {
 
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'Approved' });
+      await updateDoc(requestRef, { 
+        status: 'Approved',
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()});
 
       logTransaction(
         adminName,
@@ -289,7 +293,12 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'Ready for Pickup' });
+      await updateDoc(requestRef, { 
+        status: 'Ready for Pickup',
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
+      });
 
       logTransaction(
         adminName,
@@ -323,7 +332,12 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'Claimed' });
+      await updateDoc(requestRef, { 
+        status: 'Claimed',
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
+      });
 
       logTransaction(
         adminName,
@@ -362,7 +376,10 @@ export default function AdminRequests() {
       const requestRef = doc(db, selectedRequest.collectionName, selectedRequest.docId);
       await updateDoc(requestRef, {
         status: 'Rejected',
-        rejectionReason: rejectReason
+        rejectionReason: rejectReason,
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
       });
 
       logTransaction(
@@ -474,7 +491,7 @@ export default function AdminRequests() {
                   <th>Scheduled Date</th>
                   <th>Date Submitted</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -505,8 +522,8 @@ export default function AdminRequests() {
                         {String(req.status || "Pending").charAt(0).toUpperCase() + String(req.status || "Pending").slice(1).toLowerCase()}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div className="req-actions" style={{ justifyContent: 'center' }}>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="req-actions" style={{ justifyContent: 'flex-end' }}>
                         {String(req.status || "").toLowerCase() === 'pending' && (
                           <>
                             <button className="btn-approve" title="Approve" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>

@@ -1,336 +1,271 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from 'react';
+import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
-import "../AdminStyle.css";
-import { db } from "../firebase/firebase"; 
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { Search, AlertTriangle, Clock, BarChart2, List } from 'lucide-react';
+import { auth, db } from '../firebase/firebase';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { logTransaction } from '../services/logger';
 
-import { getSmartSuggestions } from "../services/suggestionEngine"; 
-
-// --- STAR RATING HELPER ---
-const StarRating = ({ rating }) => {
-  return (
-    <div style={{ display: 'flex', gap: '2px' }}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <svg
-          key={star}
-          width="16" height="16"
-          fill={star <= rating ? "#374151" : "#D1D5DB"}
-          viewBox="0 0 20 20"
-        >
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
-      ))}
-    </div>
-  );
-};
+// Import our newly separated components
+import SummaryDashboard from '../components/Feedback/SummaryDashboard';
+import FeedbackTable from '../components/Feedback/FeedbackTable';
+import ReviewModal from '../components/Feedback/ReviewModal';
 
 export default function AdminFeedback() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('summary'); 
+
+  // For logging purposes
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+  
+  // States for 'All' tab filtering
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  
+  // Analytics States
+  const [wordCloud, setWordCloud] = useState([]);
+  const [stats, setStats] = useState({ total: 0, avgRating: 0, negative: 0, pending: 0 });
+  const [heatmapData, setHeatmapData] = useState({});
+
+  // Modal State
   const [selectedFeedback, setSelectedFeedback] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterService, setFilterService] = useState("All");
-  const [filterTag, setFilterTag] = useState("All");
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // Change this to show more/less items per page
-
-  // Helper to assign CSS classes
-  const getBadgeClass = (text) => {
-    if (!text) return "af-badge";
-    const lowerText = text.toLowerCase().replace(" ", "-");
-    return `af-badge ${lowerText}`;
-  };
-
-  // Fetch Real-Time Data
   useEffect(() => {
-    const q = query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const liveData = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        let formattedDate = "Unknown Date";
-        if (data.CreatedAt) {
-          formattedDate = data.CreatedAt.toDate().toLocaleDateString('en-US', {
-            month: 'long', day: 'numeric', year: 'numeric'
-          });
-        }
+        // Listen for the currently logged-in user
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            // Find their document in the approvedAdmins collection
+            const q = query(
+              collection(db, "approvedAdmins"), 
+              where("uid", "==", user.uid)
+            );
+            const snapshot = await getDocs(q);
+    
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              setAdminName(data.fullName || "Admin");
+              setAdminRole(data.role || "Standard Admin");
+            }
+          }
+        });
+    
+        return () => unsubscribe();
+      }, []);
 
-        return {
-          id: doc.id,
-          date: formattedDate,
-          service: data.FacilityName || "Barangay Service",
-          name: data.UserName || "Resident",
-          rating: data.Rating || 0,
-          tag: data.Sentiment || "Pending",
-          status: data.Status === 'analyzed' ? 'Received' : 
-                  data.Status === 'pending' ? 'Under Review' : 'Resolved',
-          text: data.Comment || "",
-          confidence: data.Confidence ? `${Math.round(data.Confidence * 100)}%` : "N/A",
-          detectedIssue: data.DetectedIssue || "None",
-          issueConfidence: data.IssueConfidence ? `${Math.round(data.IssueConfidence * 100)}%` : "N/A",
-        };
-      });
-      setFeedbacks(liveData);
+  // --- FETCH FIREBASE DATA ---
+  useEffect(() => {
+    const q = query(collection(db, 'Feedback'), orderBy('CreatedAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fbData = snapshot.docs.map(doc => ({
+        docId: doc.id,
+        ...doc.data(),
+        CreatedAt: doc.data().CreatedAt?.toDate 
+          ? doc.data().CreatedAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) 
+          : "Unknown"
+      }));
+      
+      setFeedbacks(fbData);
+      generateAnalytics(fbData);
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
-  const uniqueServices = ["All", ...new Set(feedbacks.map(item => item.service))];
+  // --- ANALYTICS ENGINE ---
+  const generateAnalytics = (data) => {
+    if (data.length === 0) return;
 
-  const filteredFeedbacks = useMemo(() => {
-    return feedbacks.filter((item) => {
-      const matchesSearch = 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.text.toLowerCase().includes(searchTerm.toLowerCase());
+    let totalRating = 0;
+    let negativeCount = 0;
+    let pendingCount = 0;
 
-      const matchesService = filterService === "All" || item.service === filterService;
-      const matchesTag = filterTag === "All" || item.tag === filterTag;
-      const matchesStatus = filterStatus === "All" || item.status === filterStatus;
-
-      return matchesSearch && matchesService && matchesTag && matchesStatus;
+    data.forEach(fb => {
+      totalRating += Number(fb.Rating || 0);
+      if (String(fb.Sentiment).toLowerCase() === 'negative') negativeCount++;
+      if (['pending', 'analyzed', 'under review'].includes(String(fb.Status).toLowerCase())) pendingCount++;
     });
-  }, [feedbacks, searchTerm, filterService, filterTag, filterStatus]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterService, filterTag, filterStatus]);
+    setStats({
+      total: data.length,
+      avgRating: (totalRating / data.length).toFixed(1),
+      negative: negativeCount,
+      pending: pendingCount
+    });
 
-  const totalPages = Math.ceil(filteredFeedbacks.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  // This is the slice of data actually shown on the table
-  const currentFeedbacks = filteredFeedbacks.slice(startIndex, startIndex + itemsPerPage); 
-
-  const renderPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 5;
-    
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      if (currentPage <= 3) {
-        pages.push(1, 2, 3, 4, '...', totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-      } else {
-        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+    const stopWords = ['ang', 'mga', 'sa', 'ng', 'na', 'po', 'at', 'ay', 'ito', 'yung', 'the', 'to', 'and', 'a', 'is', 'in', 'of', 'for', 'it', 'was', 'that', 'with'];
+    const wordCounts = {};
+    data.forEach(fb => {
+      if (fb.Comment) {
+        const words = fb.Comment.toLowerCase().replace(/[^\w\s\u0900-\u097F]/gi, '').split(/\s+/);
+        words.forEach(word => {
+          if (word.length > 2 && !stopWords.includes(word)) wordCounts[word] = (wordCounts[word] || 0) + 1;
+        });
       }
-    }
+    });
+    setWordCloud(Object.entries(wordCounts).map(([text, count]) => ({ text, count })).sort((a, b) => b.count - a.count).slice(0, 30));
 
-    return pages.map((page, index) => (
-      <button
-        key={index}
-        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
-        onClick={() => typeof page === 'number' ? setCurrentPage(page) : null}
-        disabled={typeof page !== 'number'}
-        style={{ 
-          cursor: typeof page === 'number' ? 'pointer' : 'default', 
-          border: typeof page !== 'number' ? 'none' : '',
-          background: typeof page !== 'number' ? 'transparent' : ''
-        }}
-      >
-        {page}
-      </button>
-    ));
+    const hData = {};
+    data.forEach(fb => {
+      const facility = fb.FacilityName || "General";
+      const sentiment = fb.Sentiment || "Neutral";
+      if (!hData[facility]) hData[facility] = { Positive: 0, Neutral: 0, Negative: 0, Total: 0 };
+      if (hData[facility][sentiment] !== undefined) {
+        hData[facility][sentiment]++;
+        hData[facility].Total++;
+      }
+    });
+    setHeatmapData(hData);
   };
 
-  const activeSuggestions = selectedFeedback && selectedFeedback.tag === "Negative" 
-    ? getSmartSuggestions(selectedFeedback.detectedIssue) 
-    : null;
+  // --- FILTERING LOGIC ---
+  
+  // Rule: Only show Negative feedback that is NOT resolved
+  const actionRequiredFeedbacks = feedbacks.filter(fb => 
+    String(fb.Sentiment).toLowerCase() === 'negative' && 
+    String(fb.Status).toLowerCase() !== 'resolved'
+  );
+
+  const allFilteredFeedbacks = feedbacks.filter(fb => {
+    const searchStr = String(searchTerm).toLowerCase();
+    const matchesSearch = 
+      String(fb.FacilityName || "").toLowerCase().includes(searchStr) ||
+      String(fb.Comment || "").toLowerCase().includes(searchStr) ||
+      String(fb.ReferenceID || "").toLowerCase().includes(searchStr) ||
+      String(fb.UserName || "").toLowerCase().includes(searchStr);
+      
+    const matchesStatus = filterStatus === 'All' || String(fb.Status).toLowerCase() === filterStatus.toLowerCase();
+    return matchesSearch && matchesStatus;
+  });
+
+  // --- HANDLERS ---
+  const handleReviewClick = (fb) => {
+    setSelectedFeedback(fb);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveModal = async (docId, adminNote, newStatus) => {
+    try {
+      const fbRef = doc(db, "Feedback", docId);
+      await updateDoc(fbRef, { 
+        AdminNotes: adminNote, 
+        Status: newStatus,
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
+      });
+      alert("Feedback updated successfully!");
+      setIsModalOpen(false);
+      logTransaction(
+        adminName,
+        adminRole,
+        "Update Feedback",
+        `Updated feedback (Ref: ${selectedFeedback.ReferenceID || docId}) - New Status: ${newStatus} - Admin Note: ${adminNote.substring(0, 50)}...`
+      )
+    } catch (error) {
+      console.error("Error updating feedback:", error);
+      alert("Failed to update feedback.");
+      logTransaction(
+        adminName,
+        adminRole,
+        "Failed Feedback Update",
+        `Attempted to update feedback (Ref: ${selectedFeedback.ReferenceID || docId}) - Error: ${error.message}`
+      )
+    }
+  };
 
   return (
     <AdminLayout>
-      <div className="af-container">
-        <div className="af-header-section">
-          <h1 className="af-title">Feedbacks</h1>
-          <p className="af-subtitle">Review the Residents' Feedbacks</p>
+      <div className="requests-container">
+        
+        {/* Page Header */}
+        <div className="requests-header">
+          <h1 className="requests-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <BarChart2 size={28} color="#317D89" /> Feedback & Sentiment Analytics
+          </h1>
+          <p className="requests-subtitle">Analyze AI insights, resolve negative complaints, and view historical feedback data.</p>
         </div>
 
-        {/* --- CONTROLS: SEARCH & FILTERS --- */}
-        <div className="af-controls">
-          <div className="af-search-box">
-            <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-            <input 
-              type="text" 
-              placeholder="Search names or comments..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
+          <button 
+            onClick={() => setActiveTab('summary')}
+            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'summary' ? '3px solid #317D89' : '3px solid transparent', color: activeTab === 'summary' ? '#317D89' : '#64748b', fontWeight: activeTab === 'summary' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <BarChart2 size={18} /> Dashboard Summary
+          </button>
+          <button 
+            onClick={() => setActiveTab('action')}
+            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'action' ? '3px solid #e11d48' : '3px solid transparent', color: activeTab === 'action' ? '#e11d48' : '#64748b', fontWeight: activeTab === 'action' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <AlertTriangle size={18} /> Action Required 
+            {actionRequiredFeedbacks.length > 0 && <span style={{ background: '#e11d48', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{actionRequiredFeedbacks.length}</span>}
+          </button>
+          <button 
+            onClick={() => setActiveTab('all')}
+            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'all' ? '3px solid #317D89' : '3px solid transparent', color: activeTab === 'all' ? '#317D89' : '#64748b', fontWeight: activeTab === 'all' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <List size={18} /> All Feedback
+          </button>
+        </div>
 
-          <div className="af-filters">
-            <span className="af-filter-label">Filters:</span>
+        {/* Tab Content Routing */}
+        {loading ? (
+          <div className="empty-state"><Clock className="animate-spin mb-2" size={32} /><h3>Loading...</h3></div>
+        ) : (
+          <>
+            {activeTab === 'summary' && (
+              <SummaryDashboard stats={stats} heatmapData={heatmapData} wordCloud={wordCloud} />
+            )}
             
-            <select 
-              className="af-select"
-              value={filterService}
-              onChange={(e) => setFilterService(e.target.value)}
-            >
-              {uniqueServices.map(service => (
-                <option key={service} value={service}>{service === "All" ? "All Services" : service}</option>
-              ))}
-            </select>
-
-            <select 
-              className="af-select"
-              value={filterTag}
-              onChange={(e) => setFilterTag(e.target.value)}
-            >
-              <option value="All">All Tags</option>
-              <option value="Positive">Positive</option>
-              <option value="Neutral">Neutral</option>
-              <option value="Negative">Negative</option>
-              <option value="Pending">Pending AI</option>
-            </select>
-
-            <select 
-              className="af-select"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="All">All Statuses</option>
-              <option value="Received">Received</option>
-              <option value="Under Review">Under Review</option>
-              <option value="Resolved">Resolved</option>
-            </select>
-          </div>
-        </div>
-
-        {/* --- TABLE --- */}
-        <div className="af-table-wrapper">
-          <table className="af-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Service</th>
-                <th>Name</th>
-                <th>Rating</th>
-                <th>Tag</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="7" style={{ textAlign: 'center' }}>Loading feedbacks...</td></tr>
-              ) : currentFeedbacks.length === 0 ? (
-                <tr><td colSpan="7" style={{ textAlign: 'center' }}>No feedbacks found matching your filters.</td></tr>
-              ) : (
-                /* --- UPDATED: Map over currentFeedbacks instead of filteredFeedbacks --- */
-                currentFeedbacks.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.date}</td>
-                    <td>{item.service}</td>
-                    <td>{item.name}</td>
-                    <td><StarRating rating={item.rating} /></td>
-                    <td><span className={getBadgeClass(item.tag)}>{item.tag}</span></td>
-                    <td><span className={getBadgeClass(item.status)}>{item.status}</span></td>
-                    <td>
-                      <button className="af-view-btn" onClick={() => setSelectedFeedback(item)}>View</button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          
-          {totalPages > 1 && (
-            <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
-              <button 
-                className="af-page-btn" 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-              >
-                Previous
-              </button>
-              
-              {renderPageNumbers()}
-              
-              <button 
-                className="af-page-btn" 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* --- POPUP MODAL --- */}
-      {selectedFeedback && (
-        <div className="af-modal-overlay">
-          <div className="af-modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="af-modal-header">
-              <h2>Feedback Response</h2>
-              <button className="af-modal-close" onClick={() => setSelectedFeedback(null)}>&times;</button>
-            </div>
-            <div className="af-modal-body">
-              <h3>Feedback - {selectedFeedback.name}</h3>
-              <p style={{ fontStyle: 'italic', color: '#4b5563', backgroundColor: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
-                "{selectedFeedback.text}"
-              </p>
-              
-              <h3>AI Sentiment Classification</h3>
-              <ul className="af-sentiment-list">
-                <li>
-                  <strong>Overall Sentiment: </strong>
-                  <span className={getBadgeClass(selectedFeedback.tag)}>{selectedFeedback.tag}</span>
-                </li>
-                <li><strong>AI Confidence:</strong> {selectedFeedback.confidence}</li>
-                {selectedFeedback.tag === "Negative" && selectedFeedback.detectedIssue !== "None" && (
-                  <li style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #e5e7eb' }}>
-                    <strong>Detected Issue: </strong>
-                    <span style={{ fontWeight: 'bold', color: '#b91c1c' }}>{selectedFeedback.detectedIssue}</span>
-                    <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '8px' }}>(Confidence: {selectedFeedback.issueConfidence})</span>
-                  </li>
-                )}
-              </ul>
-
-              {activeSuggestions && (
-                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
-                  <h3 style={{ color: '#166534', marginTop: 0, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                    AI Smart Suggestions
-                  </h3>
-
-                  <div style={{ marginBottom: '16px' }}>
-                    <strong style={{ fontSize: '14px', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Immediate Actions (24-48 Hours):
-                    </strong>
-                    <ul style={{ margin: '6px 0 0 0', paddingLeft: '24px', fontSize: '14px', color: '#374151' }}>
-                      {activeSuggestions.actions.map((act, i) => (
-                        <li key={i} style={{ marginBottom: '4px' }}>{act}</li>
-                      ))}
-                    </ul>
+            {activeTab === 'action' && (
+              <FeedbackTable 
+                dataList={actionRequiredFeedbacks} 
+                emptyMessage="Hooray! No negative feedback requires admin action right now." 
+                onReview={handleReviewClick} 
+              />
+            )}
+            
+            {activeTab === 'all' && (
+              <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+                <div className="requests-controls">
+                  <div className="search-wrapper">
+                    <Search className="search-icon" size={20} />
+                    <input type="text" placeholder="Search Facility, Name, or Ref #..." className="search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                   </div>
-
-                  <div>
-                    <strong style={{ fontSize: '14px', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Long-Term Strategies:
-                    </strong>
-                    <ul style={{ margin: '6px 0 0 0', paddingLeft: '24px', fontSize: '14px', color: '#374151' }}>
-                      {activeSuggestions.strategy.map((strat, i) => (
-                        <li key={i} style={{ marginBottom: '4px' }}>{strat}</li>
-                      ))}
-                    </ul>
+                  <div className="filter-group">
+                    <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                      <option value="All">All Statuses</option>
+                      <option value="analyzed">Analyzed</option>
+                      <option value="under review">Under Review</option>
+                      <option value="responded">Responded</option>
+                      <option value="resolved">Resolved</option>
+                    </select>
                   </div>
                 </div>
-              )}
+                <FeedbackTable 
+                  dataList={allFilteredFeedbacks} 
+                  emptyMessage="No feedback matches your search criteria." 
+                  onReview={handleReviewClick} 
+                />
+              </div>
+            )}
+          </>
+        )}
 
-            </div>
-          </div>
-        </div>
-      )}
+        {/* Modal Overlay Component */}
+        <ReviewModal 
+          isOpen={isModalOpen} 
+          feedback={selectedFeedback} 
+          onClose={() => setIsModalOpen(false)} 
+          onSave={handleSaveModal} 
+        />
+      </div>
     </AdminLayout>
   );
 }
