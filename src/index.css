@@ -7284,7 +7284,8 @@ h1,h2,h3,h4,.poppins {
   background: rgba(45, 177, 123, 0.22);
 }
 
-.sv-cal-cell--reserved {
+.sv-cal-cell--reserved,
+.sv-cal-cell--Reserved {
   background: rgba(224, 62, 62, 0.1);
   color: #c0392b;
   cursor: not-allowed;

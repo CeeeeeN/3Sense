@@ -68,8 +68,12 @@ export default function ManageDocuments() {
     fee: "",
     description: "",
     reminder: "",
+    purposeOptions: [],
     customFields: [],
   });
+  const [purposeInput, setPurposeInput] = useState("");
+  const [editingPurposeIdx, setEditingPurposeIdx] = useState(null);
+  const [purposeFormError, setPurposeFormError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
@@ -108,8 +112,12 @@ export default function ManageDocuments() {
       fee: docType.fee || "",
       description: docType.description || "",
       reminder: docType.reminder || "",
+      purposeOptions: docType.purposeOptions || [],
       customFields: docType.customFields || [],
     });
+    setPurposeInput("");
+    setEditingPurposeIdx(null);
+    setPurposeFormError("");
     setEditingDocId(docType.id);
     setShowAddModal(true);
   };
@@ -138,6 +146,11 @@ export default function ManageDocuments() {
 
   const handleAddDocument = async (e) => {
     e.preventDefault();
+    if (!newDocument.purposeOptions || newDocument.purposeOptions.length === 0) {
+      setPurposeFormError("At least one Purpose option is required before saving.");
+      return;
+    }
+    setPurposeFormError("");
     try {
       if (editingDocId) {
         await updateDoc(doc(db, "documents", editingDocId), { ...newDocument });
@@ -167,8 +180,12 @@ export default function ManageDocuments() {
         fee: "",
         description: "",
         reminder: "",
+        purposeOptions: [],
         customFields: [],
       });
+      setPurposeInput("");
+      setEditingPurposeIdx(null);
+      setPurposeFormError("");
       setEditingDocId(null);
       setShowAddModal(false);
     } catch (error) {
@@ -190,8 +207,12 @@ export default function ManageDocuments() {
       fee: "",
       description: "",
       reminder: "",
+      purposeOptions: [],
       customFields: [],
     });
+    setPurposeInput("");
+    setEditingPurposeIdx(null);
+    setPurposeFormError("");
     setShowAddModal(true);
   };
 
@@ -567,6 +588,106 @@ export default function ManageDocuments() {
                       </span>
                     ))}
                   </div>
+                </div>
+
+                {/* ── Purpose Options Manager ── */}
+                <div className="as-form-section" style={{ marginTop: '20px' }}>
+                  <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Purpose of Request Options <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>
+                    These options appear in the "Purpose of Request" dropdown on the resident form. An "Other" option is always included automatically.
+                  </p>
+                  {purposeFormError && (
+                    <p style={{ fontSize: '0.8rem', color: '#e03e3e', fontWeight: 600, marginBottom: '8px' }}>{purposeFormError}</p>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      className="as-form-input"
+                      placeholder="e.g. Employment, Scholarship, Loan..."
+                      value={purposeInput}
+                      onChange={e => setPurposeInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = purposeInput.trim();
+                          if (!val) return;
+                          if (editingPurposeIdx !== null) {
+                            const updated = [...newDocument.purposeOptions];
+                            updated[editingPurposeIdx] = val;
+                            setNewDocument({ ...newDocument, purposeOptions: updated });
+                            setEditingPurposeIdx(null);
+                          } else {
+                            setNewDocument({ ...newDocument, purposeOptions: [...(newDocument.purposeOptions || []), val] });
+                          }
+                          setPurposeInput('');
+                          setPurposeFormError('');
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="as-btn-aqua"
+                      style={{ padding: '8px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+                      onClick={() => {
+                        const val = purposeInput.trim();
+                        if (!val) return;
+                        if (editingPurposeIdx !== null) {
+                          const updated = [...newDocument.purposeOptions];
+                          updated[editingPurposeIdx] = val;
+                          setNewDocument({ ...newDocument, purposeOptions: updated });
+                          setEditingPurposeIdx(null);
+                        } else {
+                          setNewDocument({ ...newDocument, purposeOptions: [...(newDocument.purposeOptions || []), val] });
+                        }
+                        setPurposeInput('');
+                        setPurposeFormError('');
+                      }}
+                    >
+                      {editingPurposeIdx !== null ? 'Update' : '+ Add'}
+                    </button>
+                    {editingPurposeIdx !== null && (
+                      <button
+                        type="button"
+                        className="as-btn-ghost"
+                        style={{ padding: '8px 12px', fontSize: '0.82rem' }}
+                        onClick={() => { setEditingPurposeIdx(null); setPurposeInput(''); }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                  {(newDocument.purposeOptions || []).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(newDocument.purposeOptions || []).map((opt, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #e2eaf3', borderRadius: '8px', padding: '6px 10px' }}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', color: '#0f1f35' }}>{opt}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingPurposeIdx(idx); setPurposeInput(opt); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#317D89', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
+                          >Edit</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (newDocument.purposeOptions || []).filter((_, i) => i !== idx);
+                              setNewDocument({ ...newDocument, purposeOptions: updated });
+                              if (editingPurposeIdx === idx) { setEditingPurposeIdx(null); setPurposeInput(''); }
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e03e3e', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
+                          >Remove</button>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0faf5', border: '1px dashed #a7d7c1', borderRadius: '8px', padding: '6px 10px' }}>
+                        <span style={{ flex: 1, fontSize: '0.83rem', color: '#2DB17B', fontStyle: 'italic' }}>Other (always included – shows a free-text field)</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>No options added yet. Add at least one above.</p>
+                  )}
                 </div>
 
                 <FormBuilder
