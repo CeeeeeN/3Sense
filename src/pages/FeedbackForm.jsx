@@ -152,7 +152,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         userID:      userID      || "",
         HasPhoto:    !!photo,
         // Set placeholders for AI data
-        Sentiment: null, Confidence: null, HybridScore: null, TextScore: null, DetectedIssue: "None", IssueConfidence: null
+        Severity: null, Sentiment: null, Confidence: null, HybridScore: null, TextScore: null, DetectedIssue: "None", IssueConfidence: null
       });
 
       // 2. SHOW SUCCESS SCREEN TO USER INSTANTLY!
@@ -192,10 +192,13 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           Sentiment:       aiData.sentiment || null,
           Confidence:      aiData.confidence || null,
           HybridScore:     aiData.hybridScore || null,
+          Severity:        aiData.severity || (aiData.sentiment === 'Negative' ? 'High' : 'Normal'),
           TextScore:       aiData.textScore || null,
           DetectedIssue:   aiData.detectedIssue || "None",
           IssueConfidence: aiData.issueConfidence || null,
-          Status:          aiData.sentiment ? 'analyzed' : 'pending'
+          Status:          aiData.sentiment ? 'analyzed' : 'pending',
+          AINotes:      aiData.suggestions ? `AI Suggestions:\n- Actions: ${aiData.suggestions.actions.join("; ")}\n- Strategy: ${aiData.suggestions.strategy.join("; ")}` : "No suggestions available.",
+          AdminNotes: ""
         });
       } else {
         await updateDoc(doc(db, "Feedback", documentId), { Status: 'analysis_failed' });
