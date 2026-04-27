@@ -19,6 +19,7 @@ const STATUS = {
   completed:    { label: "Completed",        color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
   pending:      { label: "Pending",          color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
   pending_ai:   { label: "Pending AI",       color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
+  responded:   { label: "Responded",        color: "#d86a11", bg: "rgba(45,177,123,0.1)"  },
   analyzed:     { label: "Analyzed",         color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
   approved:     { label: "Approved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
   rejected:     { label: "Rejected",         color: "#e03e3e", bg: "rgba(224,62,62,0.1)"   },
@@ -192,6 +193,12 @@ export default function ActivityPage({ onNavigate }) {
                 <div className="act2-card__title">{item.documentType || item.name}</div>
                 <div className="act2-card__meta">Date Requested: {formatDate(item.submittedAt || item.createdAt)}</div>
                 <div className="act2-card__ref">Ref: {item.refNum || item.refId || item.id}</div>
+                {item.processedBy && (
+                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheckIcon /> 
+                    <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
+                  </div>
+                )}
               </div>
               <StatusBadge status={item.status} />
             </div>
@@ -224,6 +231,12 @@ export default function ActivityPage({ onNavigate }) {
                 <div className="act2-card__title">{item.purpose || item.eventName}</div>
                 <div className="act2-card__subtitle">{item.facilityName || item.facility}</div>
                 <div className="act2-card__meta">{formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || "TBA"}</div>
+                {item.processedBy && (
+                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheckIcon /> 
+                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
+                  </div>
+                )}
               </div>
               <StatusBadge status={item.status} />
             </div>
@@ -267,6 +280,12 @@ export default function ActivityPage({ onNavigate }) {
                 </div>
                 <div className="act2-card__meta" style={{ marginTop: '4px' }}>Date Submitted: {formatDate(item.CreatedAt)}</div>
                 <div className="act2-card__ref">Ref: {item.ReferenceID || item.id}</div>
+                {item.processedBy && (
+                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheckIcon /> 
+                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
+                  </div>
+                )}
               </div>
               <StatusBadge status={item.Status || "pending"} />
             </div>

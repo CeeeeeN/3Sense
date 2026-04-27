@@ -253,7 +253,11 @@ export default function AdminRequests() {
 
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'Approved' });
+      await updateDoc(requestRef, { 
+        status: 'Approved',
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()});
 
       logTransaction(
         adminName,
@@ -289,7 +293,12 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'Ready for Pickup' });
+      await updateDoc(requestRef, { 
+        status: 'Ready for Pickup',
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
+      });
 
       logTransaction(
         adminName,
@@ -323,7 +332,12 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { status: 'Claimed' });
+      await updateDoc(requestRef, { 
+        status: 'Claimed',
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
+      });
 
       logTransaction(
         adminName,
@@ -362,7 +376,10 @@ export default function AdminRequests() {
       const requestRef = doc(db, selectedRequest.collectionName, selectedRequest.docId);
       await updateDoc(requestRef, {
         status: 'Rejected',
-        rejectionReason: rejectReason
+        rejectionReason: rejectReason,
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
       });
 
       logTransaction(

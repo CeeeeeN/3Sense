@@ -152,7 +152,13 @@ export default function AdminFeedback() {
   const handleSaveModal = async (docId, adminNote, newStatus) => {
     try {
       const fbRef = doc(db, "Feedback", docId);
-      await updateDoc(fbRef, { AdminNotes: adminNote, Status: newStatus });
+      await updateDoc(fbRef, { 
+        AdminNotes: adminNote, 
+        Status: newStatus,
+        processedBy: adminName,
+        processedRole: adminRole,
+        processedAt: new Date()
+      });
       alert("Feedback updated successfully!");
       setIsModalOpen(false);
       logTransaction(
