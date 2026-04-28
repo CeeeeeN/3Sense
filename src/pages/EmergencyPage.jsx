@@ -3,18 +3,19 @@ import { PhoneIcon, AlertTriangleIcon, MapPinIcon, ShieldAlertIcon, ListIcon, Ch
 // DATA
 
 const HOTLINES = [
-  { id: "brgy",     name: "Barangay Office",       number: "02-8123-4567", sub: "Available 24/7 for barangay emergencies",        variant: "red",    primary: true },
-  { id: "health",   name: "Health Center",         number: "02-8234-5678", sub: "Medical assistance & first aid",                variant: "green"        },
-  { id: "fire",     name: "Fire Station",          number: "911",          sub: "Bureau of Fire Protection — Malanday",          variant: "amber"        },
-  { id: "police",   name: "Police Hotline",        number: "117",          sub: "PNP — 24/7 emergency response",                variant: "blue"         },
-  { id: "ndrrmc",   name: "NDRRMC",                number: "0-2911-5061",  sub: "National Disaster Risk Reduction & Management", variant: "purple"       },
-  { id: "redcross", name: "Philippine Red Cross",  number: "143",          sub: "Ambulance, blood, disaster response",          variant: "red"          },
+  { id: "brgy",     name: "Barangay Office Landline",         number: "02-8926-7327",  sub: "Available 24/7 for barangay emergencies", variant: "red", primary: true },
+  { id: "brgy",     name: "Barangay Office Hotline",          number: "0927-373-6727", sub: "Available 24/7 for barangay emergencies"},
+  { id: "brgy",     name: "Barangay Tanod",                   number: "02-8962-7325",  sub: "Available 24/7 for barangay emergencies"},
+  { id: "health",   name: "Valenzuela Medical Center",        number: "02-8294-6711",  sub: "Medical assistance & first aid"},
+  { id: "fire",     name: "Valenzuela Fire Station",          number: "02-8292-3519",  sub: "Bureau of Fire Protection"},
+  { id: "police",   name: "Valenzuela Police Station",        number: "02-8352-4000",  sub: "PNP"},
+  { id: "ndrrmc",   name: "Valenzuela DRRMO",                 number: "02-8352-5000",  sub: "National Disaster Risk Reduction & Management"},
 ];
 
 const EVACUATION_CENTERS = [
-  { id: "ev1", name: "Barangay Hall Multi-Purpose Area",  address: "Malanday, Valenzuela City",            capacity: "200 people",   status: "operational", floor: "Ground Floor",  contact: "02-8123-4567" },
-  { id: "ev2", name: "Gen. T. De Leon Elementary School", address: "Gen. T. De Leon St., Valenzuela City", capacity: "500 people",   status: "operational", floor: "Main Building", contact: "02-8765-4321" },
-  { id: "ev3", name: "Valenzuela City Astrodome",         address: "Karuhatan, Valenzuela City",           capacity: "2,000 people", status: "standby",     floor: "Indoor Arena",  contact: "02-8293-1234" },
+  { id: "ev1", name: "Barangay Hall Multi-Purpose Area",  address: "Malanday, Valenzuela City",            capacity: "200 people",   status: "operational", floor: "Ground Floor"},
+  { id: "ev2", name: "Gen. T. De Leon Elementary School", address: "Gen. T. De Leon St., Valenzuela City", capacity: "500 people",   status: "operational", floor: "Main Building"},
+  { id: "ev3", name: "Valenzuela City Astrodome",         address: "Karuhatan, Valenzuela City",           capacity: "2,000 people", status: "standby",     floor: "Indoor Arena"},
 ];
 
 const SAFETY_REMINDERS = [
@@ -110,9 +111,6 @@ function EvacuationCard({ center }) {
           <span className="em-evac-status__dot" />
           {isOperational ? "Operational" : "Standby"}
         </span>
-        <a href={`tel:${center.contact}`} className="em-evac-card__call">
-          <PhoneIcon size={11} /> Call
-        </a>
       </div>
     </div>
   );
@@ -167,7 +165,7 @@ export default function EmergencyPage({ onNavigate, userName = "Juan Dela Cruz" 
       {/* ── Urgent Notice Bar ── */}
       <div className="em-notice">
         <InfoIcon size={14} />
-        <span>For life-threatening emergencies, call <strong>911</strong> or <strong>117</strong> immediately. Do not delay.</span>
+        <span>For life-threatening emergencies, call immediately. Do not delay.</span>
       </div>
 
       {/* ── Content ── */}
