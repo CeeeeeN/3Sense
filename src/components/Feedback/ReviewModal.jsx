@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, BarChart2, CheckCircle, Image as ImageIcon } from 'lucide-react';
+import { X, BarChart2, CheckCircle, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import SeverityBadge from './SeverityBadge';
+import { db } from '../../firebase/firebase'; // Ensure this path is correct
+import { doc, updateDoc } from 'firebase/firestore';
 
 export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
   const [adminNote, setAdminNote] = useState('');
   const [newStatus, setNewStatus] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // NEW STATE
 
-  // Reset modal state when opened with new feedback
   useEffect(() => {
     if (feedback) {
       setAdminNote(feedback.AdminNotes || '');
@@ -14,7 +16,52 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
     }
   }, [feedback]);
 
+  const handleRetryAI = async () => {
+    setIsAnalyzing(true);
+    try {
+      // Call your secure Vercel API, exactly like FeedbackForm.jsx does!
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: feedback.Comment,
+          rating: Number(feedback.Rating) || 5
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("API failed or AI is still waking up");
+      }
+
+      // Parse the JSON directly from your Vercel API
+      const aiData = await response.json();
+
+      // Update Firestore using the exact camelCase keys your Vercel API returns
+      const fbRef = doc(db, "Feedback", feedback.docId);
+      await updateDoc(fbRef, {
+        Sentiment: aiData.sentiment,
+        HybridScore: aiData.hybridScore,
+        TextScore: aiData.textScore,
+        Confidence: aiData.confidence,
+        DetectedIssue: aiData.detectedIssue,
+        Severity: aiData.severity || (aiData.sentiment === "Negative" ? "High" : "Normal"),
+        Status: "analyzed"
+      });
+
+      alert("AI Analysis complete! The dashboard will now update.");
+      onClose(); // Close the modal to let the table refresh
+
+    } catch (error) {
+      console.error("Manual AI Trigger Failed:", error);
+      alert("The AI server is still waking up. Please wait 30 seconds and try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   if (!isOpen || !feedback) return null;
+
+  const needsAI = feedback.Status?.toLowerCase() === 'pending_ai' || !feedback.Sentiment;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -25,20 +72,40 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
         </div>
 
         <div className="modal-body">
-          {/* AI Insights Card */}
-          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <BarChart2 size={16} color="#317D89"/> AI Analysis Results
-              </h4>
-              <SeverityBadge severity={feedback.Severity} />
+          
+          {/* --- UPDATED: AI INSIGHTS CARD --- */}
+          {needsAI ? (
+            <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '8px', border: '1px solid #fef3c7', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h4 style={{ margin: 0, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BarChart2 size={16} color="#92400e"/> AI Analysis Pending
+                </h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#b45309' }}>This feedback was submitted while the AI was asleep.</p>
+              </div>
+              <button 
+                onClick={handleRetryAI} 
+                disabled={isAnalyzing}
+                style={{ background: '#d97706', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: isAnalyzing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
+              >
+                {isAnalyzing ? <><RefreshCw size={16} className="animate-spin" /> Waking AI...</> : "Run AI Now"}
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem' }}>
-              <div><strong style={{ color: '#64748b' }}>Detected Sentiment:</strong> {feedback.Sentiment}</div>
-              <div><strong style={{ color: '#64748b' }}>AI Confidence:</strong> {feedback.Confidence ? `${(feedback.Confidence * 100).toFixed(1)}%` : 'N/A'}</div>
-              <div style={{ gridColumn: 'span 2' }}><strong style={{ color: '#64748b' }}>Detected Issue Category:</strong> {feedback.DetectedIssue || 'None'}</div>
+          ) : (
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BarChart2 size={16} color="#317D89"/> AI Analysis Results
+                </h4>
+                <SeverityBadge severity={feedback.Severity} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem' }}>
+                <div><strong style={{ color: '#64748b' }}>Detected Sentiment:</strong> {feedback.Sentiment}</div>
+                <div><strong style={{ color: '#64748b' }}>AI Confidence:</strong> {feedback.Confidence ? `${(feedback.Confidence * 100).toFixed(1)}%` : 'N/A'}</div>
+                <div style={{ gridColumn: 'span 2' }}><strong style={{ color: '#64748b' }}>Detected Issue Category:</strong> {feedback.DetectedIssue || 'None'}</div>
+              </div>
             </div>
-          </div>
+          )}
+          {/* ---------------------------------- */}
 
           {/* Resident Details */}
           <div style={{ marginBottom: '20px' }}>
@@ -47,7 +114,6 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
               "{feedback.Comment}"
             </div>
 
-            {/* --- ADDED: PHOTO EVIDENCE DISPLAY --- */}
             {feedback.ImageUrl && (
               <div style={{ marginTop: '16px' }}>
                 <label style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -55,17 +121,11 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
                 </label>
                 <div style={{ marginTop: '6px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'center', padding: '8px' }}>
                   <a href={feedback.ImageUrl} target="_blank" rel="noopener noreferrer" title="Click to view full size">
-                    <img 
-                      src={feedback.ImageUrl} 
-                      alt="Feedback Evidence" 
-                      style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px', cursor: 'pointer' }} 
-                    />
+                    <img src={feedback.ImageUrl} alt="Feedback Evidence" style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px', cursor: 'pointer' }} />
                   </a>
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>Click image to view full size</div>
               </div>
             )}
-            {/* -------------------------------------- */}
 
             <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '12px' }}>Submitted by: {feedback.UserName || 'Resident'} (Ref: {feedback.ReferenceID})</div>
           </div>
@@ -76,6 +136,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
           <div className="detail-item" style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 600, marginBottom: '6px' }}>Update Status</label>
             <select className="filter-select" style={{ width: '100%', padding: '10px' }} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+              <option value="pending_ai" disabled>Pending AI Processing</option>
               <option value="analyzed">Analyzed (Requires Action)</option>
               <option value="under review">Under Review (Investigating)</option>
               <option value="responded">Responded to Resident</option>
@@ -97,7 +158,12 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
         <div className="modal-footer">
           <button className="btn-view" onClick={onClose}>Cancel</button>
-          <button className="btn-approve" onClick={() => onSave(feedback.docId, adminNote, newStatus)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button 
+            className="btn-approve" 
+            onClick={() => onSave(feedback.docId, adminNote, newStatus)} 
+            disabled={needsAI}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: needsAI ? 0.5 : 1, cursor: needsAI ? 'not-allowed' : 'pointer' }}
+          >
             <CheckCircle size={16} /> Save Changes
           </button>
         </div>

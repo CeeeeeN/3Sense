@@ -32,7 +32,8 @@ export default async function handler(req, res) {
       textScore: aiData.text_contribution_score,
       confidence: aiData.ai_confidence,
       detectedIssue: aiData.detected_issue,
-      issueConfidence: aiData.issue_confidence
+      issueConfidence: aiData.issue_confidence,
+      severity: aiData.severity
     });
 
   } catch (error) {
