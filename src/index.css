@@ -5249,10 +5249,6 @@ h1,h2,h3,h4,.poppins {
   cursor: default;
 }
 
-.summary-widget:hover {
-  transform: translateY(-3px);
-}
-
 /* ── Color variants ── */
 .summary-widget--teal {
   background: #31547c;
@@ -7284,7 +7280,8 @@ h1,h2,h3,h4,.poppins {
   background: rgba(45, 177, 123, 0.22);
 }
 
-.sv-cal-cell--reserved {
+.sv-cal-cell--reserved,
+.sv-cal-cell--Reserved {
   background: rgba(224, 62, 62, 0.1);
   color: #c0392b;
   cursor: not-allowed;
@@ -14334,8 +14331,8 @@ h1,h2,h3,h4,.poppins {
 
 .pf-qr-wrap {
   display: flex;
-  align-items: center;
-  gap: 2rem;
+  align-items: flex-start;
+  gap: 2.5rem;
   flex-wrap: wrap;
 }
 
@@ -15804,8 +15801,6 @@ h1,h2,h3,h4,.poppins {
 
 /* Dashboard */
 .alert-card:hover        { transform: translateY(-4px); }
-.summary-widget:hover,
-.db-widget:hover         { transform: translateY(-4px); }
 .ann-row:hover,
 .db-ann-row:hover        { transform: translateX(3px); }
 
