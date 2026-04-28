@@ -196,7 +196,7 @@ export default function ActivityPage({ onNavigate }) {
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon /> 
-                    <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
+                    <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> - Reason: <strong>{item.rejectionReason}</strong></span>
                   </div>
                 )}
               </div>
@@ -234,7 +234,7 @@ export default function ActivityPage({ onNavigate }) {
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon /> 
-                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
+                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> - Reason: <strong>{item.rejectionReason}</strong> </span>
                   </div>
                 )}
               </div>

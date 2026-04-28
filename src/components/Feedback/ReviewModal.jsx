@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, BarChart2, CheckCircle } from 'lucide-react';
+import { X, BarChart2, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import SeverityBadge from './SeverityBadge';
 
 export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
@@ -18,7 +18,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="modal-header">
           <h2>Feedback Review Panel</h2>
           <button className="btn-close-icon" onClick={onClose}><X size={22} /></button>
@@ -46,7 +46,28 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
             <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.95rem', color: '#1e293b', fontStyle: 'italic', marginTop: '4px' }}>
               "{feedback.Comment}"
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '6px' }}>Submitted by: {feedback.UserName || 'Resident'} (Ref: {feedback.ReferenceID})</div>
+
+            {/* --- ADDED: PHOTO EVIDENCE DISPLAY --- */}
+            {feedback.ImageUrl && (
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ImageIcon size={14} /> Attached Photo Evidence
+                </label>
+                <div style={{ marginTop: '6px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'center', padding: '8px' }}>
+                  <a href={feedback.ImageUrl} target="_blank" rel="noopener noreferrer" title="Click to view full size">
+                    <img 
+                      src={feedback.ImageUrl} 
+                      alt="Feedback Evidence" 
+                      style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px', cursor: 'pointer' }} 
+                    />
+                  </a>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>Click image to view full size</div>
+              </div>
+            )}
+            {/* -------------------------------------- */}
+
+            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '12px' }}>Submitted by: {feedback.UserName || 'Resident'} (Ref: {feedback.ReferenceID})</div>
           </div>
 
           {/* Staff Action Section */}

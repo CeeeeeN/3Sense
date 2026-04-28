@@ -5249,10 +5249,6 @@ h1,h2,h3,h4,.poppins {
   cursor: default;
 }
 
-.summary-widget:hover {
-  transform: translateY(-3px);
-}
-
 /* ── Color variants ── */
 .summary-widget--teal {
   background: #31547c;
@@ -15805,8 +15801,6 @@ h1,h2,h3,h4,.poppins {
 
 /* Dashboard */
 .alert-card:hover        { transform: translateY(-4px); }
-.summary-widget:hover,
-.db-widget:hover         { transform: translateY(-4px); }
 .ann-row:hover,
 .db-ann-row:hover        { transform: translateX(3px); }
 

@@ -2,16 +2,145 @@ import { useState, useEffect } from "react";
 import { auth, db } from '../firebase/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { createNotification } from '../services/notifications'; 
-import { StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon, MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon } from '../components/Icons';
+import { createNotification } from '../services/notifications';
+import {
+  StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon,
+  MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon
+} from '../components/Icons';
 
 const STAR_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
 const generateRefId = () => {
   const num = Math.floor(Math.random() * 900) + 100;
-  return `MAL-2026-${num}`; 
+  return `MAL-2026-${num}`;
 };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const getTodayStr = () => new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+/**
+ * Validate the QR URL parameters.
+ * Returns: { valid: true } | { valid: false, reason: "expired" | "ended" | "not_started" | "unknown" }
+ *
+ * Rules:
+ *  1. `dt` must equal today's date (daily rotation)
+ *  2. If type === "program", today must be >= startDate AND <= endDate
+ */
+const validateQRParams = (params) => {
+  const dt        = params.get("dt");
+  const type      = params.get("type");      // "program" | "service" | null (legacy)
+  const startDate = params.get("startDate");
+  const endDate   = params.get("endDate");
+  const today     = getTodayStr();
+
+  // ── If no dt param at all, this is a legacy QR (pre-feature) — allow it ──
+  if (!dt) return { valid: true };
+
+  // 1. Daily token check
+  if (dt !== today) {
+    return { valid: false, reason: "expired", dt, today };
+  }
+
+  // 2. Program date range check
+  if (type === "program" && startDate && endDate) {
+    if (today < startDate) return { valid: false, reason: "not_started", startDate, endDate };
+    if (today > endDate)   return { valid: false, reason: "ended",       startDate, endDate };
+  }
+
+  return { valid: true };
+};
+
+// ── QR Invalid Screen ─────────────────────────────────────────────────────────
+function QRInvalidScreen({ reason, startDate, endDate, onGoHome }) {
+  const config = {
+    expired: {
+      icon:    "🔒",
+      title:   "QR Code Expired",
+      message: "This QR code was valid only for a specific date. Please ask the barangay staff to generate a new QR code for today.",
+      color:   "#dc2626",
+      bg:      "#fee2e2",
+      border:  "#fca5a5",
+    },
+    ended: {
+      icon:    "📅",
+      title:   "Program Has Ended",
+      message: `This program ran from ${startDate} to ${endDate} and is no longer active. This QR code can no longer be used.`,
+      color:   "#7c3aed",
+      bg:      "#ede9fe",
+      border:  "#c4b5fd",
+    },
+    not_started: {
+      icon:    "⏳",
+      title:   "Program Not Yet Started",
+      message: `This program starts on ${startDate}. Please come back on or after that date to use this QR code.`,
+      color:   "#b45309",
+      bg:      "#fef3c7",
+      border:  "#fde68a",
+    },
+    unknown: {
+      icon:    "⚠️",
+      title:   "Invalid QR Code",
+      message: "This QR code is not recognized or may have been tampered with. Please request a valid QR code from barangay staff.",
+      color:   "#6b7280",
+      bg:      "#f3f4f6",
+      border:  "#e5e7eb",
+    },
+  };
+
+  const c = config[reason] || config.unknown;
+
+  return (
+    <main className="fb-page">
+      <div className="fb-topbar">
+        <div className="fb-topbar__title">QR Verification</div>
+      </div>
+      <div className="fb-card" style={{ textAlign: "center", padding: "40px 24px" }}>
+        {/* Icon */}
+        <div style={{ fontSize: "3rem", marginBottom: "16px" }}>{c.icon}</div>
+
+        {/* Status badge */}
+        <div style={{ display: "inline-block", background: c.bg, border: `1px solid ${c.border}`, color: c.color, borderRadius: "9999px", padding: "4px 14px", fontSize: "0.78rem", fontWeight: 700, marginBottom: "16px", letterSpacing: "0.04em" }}>
+          {reason === "expired"     && "EXPIRED"}
+          {reason === "ended"       && "PROGRAM ENDED"}
+          {reason === "not_started" && "NOT YET ACTIVE"}
+          {reason === "unknown"     && "INVALID"}
+        </div>
+
+        <h2 style={{ fontSize: "1.3rem", fontWeight: 700, color: "#111827", marginBottom: "12px" }}>{c.title}</h2>
+        <p style={{ color: "#6b7280", fontSize: "0.92rem", lineHeight: 1.6, marginBottom: "28px" }}>{c.message}</p>
+
+        {/* Date info for program reasons */}
+        {(reason === "ended" || reason === "not_started") && startDate && endDate && (
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "12px 16px", marginBottom: "24px", fontSize: "0.85rem", color: "#374151" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "16px" }}>
+              <div><div style={{ color: "#9ca3af", fontSize: "0.75rem", marginBottom: 2 }}>START DATE</div><strong>{startDate}</strong></div>
+              <div><div style={{ color: "#9ca3af", fontSize: "0.75rem", marginBottom: 2 }}>END DATE</div><strong>{endDate}</strong></div>
+              <div><div style={{ color: "#9ca3af", fontSize: "0.75rem", marginBottom: 2 }}>TODAY</div><strong>{getTodayStr()}</strong></div>
+            </div>
+          </div>
+        )}
+
+        {/* Today vs QR date for expired */}
+        {reason === "expired" && (
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "12px 16px", marginBottom: "24px", fontSize: "0.85rem", color: "#374151" }}>
+            <div style={{ color: "#9ca3af", fontSize: "0.75rem", marginBottom: 4 }}>TODAY'S DATE</div>
+            <strong style={{ fontSize: "1rem" }}>{getTodayStr()}</strong>
+            <div style={{ marginTop: 8, color: "#9ca3af", fontSize: "0.78rem" }}>Ask staff to generate today's QR code.</div>
+          </div>
+        )}
+
+        <button
+          onClick={onGoHome}
+          style={{ width: "100%", padding: "14px", background: "#317D89", color: "#fff", border: "none", borderRadius: "10px", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer" }}
+        >
+          <HomeIcon style={{ marginRight: 6, verticalAlign: "middle" }} /> Back to Home
+        </button>
+      </div>
+    </main>
+  );
+}
+
+// ── Success Confirmation ──────────────────────────────────────────────────────
 function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
   return (
     <div className="fb-confirm-wrap">
@@ -51,63 +180,105 @@ function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
       </div>
       <div className="fb-confirm-actions">
         <button className="fb-confirm-btn-primary" onClick={onGoActivity}><ActivityIcon /> View Progress in Activity</button>
-        <button className="fb-confirm-btn-ghost" onClick={onGoHome}><HomeIcon /> Back to Home</button>
+        <button className="fb-confirm-btn-ghost"   onClick={onGoHome}><HomeIcon /> Back to Home</button>
       </div>
       <p className="fb-confirm-footnote">This submission has been recorded for reference purposes.</p>
     </div>
   );
 }
 
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function FeedbackForm({ onNavigate, service, userName = "Resident", householdID, userID }) {
-  const [rating, setRating]           = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [comment, setComment]         = useState("");
-  const [photo, setPhoto]             = useState(null);
-  const [photoName, setPhotoName]     = useState("");
-  const [submitting, setSubmitting]   = useState(false);
-  const [submitted, setSubmitted]     = useState(false);
-  const [refId, setRefId]             = useState("");
-  const [errors, setErrors]           = useState({});
+  const [rating,       setRating]       = useState(0);
+  const [hoverRating,  setHoverRating]  = useState(0);
+  const [comment,      setComment]      = useState("");
+  const [photo,        setPhoto]        = useState(null);
+  const [photoName,    setPhotoName]    = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
+  const [submitted,    setSubmitted]    = useState(false);
+  const [refId,        setRefId]        = useState("");
+  const [errors,       setErrors]       = useState({});
 
-  const [serviceId, setServiceId]     = useState("general");
-  const [serviceName, setServiceName] = useState("General Barangay Service");
-  const [category, setCategory]       = useState("General");
-  const [authChecked, setAuthChecked] = useState(false);
+  const [serviceId,    setServiceId]    = useState("general");
+  const [serviceName,  setServiceName]  = useState("General Barangay Service");
+  const [category,     setCategory]     = useState("General");
+  const [authChecked,  setAuthChecked]  = useState(false);
 
+  // ── QR validation state ───────────────────────────────────────────────────────
+  // null = not yet checked, { valid, reason, startDate, endDate } after check
+  const [qrValidation, setQrValidation] = useState(null);
+
+  // ── Auth check ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) { if (onNavigate) onNavigate("logout"); }
-      else { setAuthChecked(true); }
+      else        { setAuthChecked(true); }
     });
     return () => unsubscribe();
   }, [onNavigate]);
 
+  // ── Parse URL params + run QR validation ─────────────────────────────────────
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+
     if (service && service.name) {
+      // Service passed via props (not from QR scan) — skip QR validation
       setServiceId(service.id);
       setServiceName(service.name || service.fullName || "General Barangay Service");
       setCategory(service.category || "General");
+      setQrValidation({ valid: true });
     } else {
-      const urlParams = new URLSearchParams(window.location.search);
-      const scannedId   = urlParams.get('serviceId');
-      const scannedName = urlParams.get('serviceName');
-      const scannedCat  = urlParams.get('category');
+      const scannedId   = urlParams.get("serviceId");
+      const scannedName = urlParams.get("serviceName");
+      const scannedCat  = urlParams.get("category");
+
       if (scannedId) {
         setServiceId(scannedId);
         setServiceName(scannedName || "General Barangay Service");
         setCategory(scannedCat || "General");
       }
+
+      // ── Run validation ──
+      const result = validateQRParams(urlParams);
+      setQrValidation(result);
     }
   }, [service]);
 
+  // ── Loading screens ───────────────────────────────────────────────────────────
   if (!authChecked) {
-    return <main className="fb-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading authentication...</main>;
+    return (
+      <main className="fb-page" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+        Loading authentication...
+      </main>
+    );
   }
 
+  if (qrValidation === null) {
+    return (
+      <main className="fb-page" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+        Verifying QR code...
+      </main>
+    );
+  }
+
+  // ── QR Invalid → show error screen ───────────────────────────────────────────
+  if (!qrValidation.valid) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return (
+      <QRInvalidScreen
+        reason={qrValidation.reason || "unknown"}
+        startDate={qrValidation.startDate || urlParams.get("startDate")}
+        endDate={qrValidation.endDate   || urlParams.get("endDate")}
+        onGoHome={() => onNavigate && onNavigate("home")}
+      />
+    );
+  }
+
+  // ── Normal form below (QR is valid) ──────────────────────────────────────────
   const defaultService = {
     description: "Your feedback helps us improve public services.",
-    color: "#317D89",
-    bg: "rgba(49,125,137,0.08)",
+    color:  "#317D89",
+    bg:     "rgba(49,125,137,0.08)",
     border: "rgba(49,125,137,0.2)",
   };
   const currentService = { ...defaultService, ...(service || {}) };
@@ -124,7 +295,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
 
   const validate = () => {
     const e = {};
-    if (!rating) e.rating = "Please select a star rating.";
+    if (!rating)         e.rating  = "Please select a star rating.";
     if (!comment.trim()) e.comment = "Please describe your experience.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -135,81 +306,95 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     setSubmitting(true);
 
     try {
-      const ref = generateRefId();
+      let uploadedImageUrl = null;
 
-      // 1. SAVE TO FIREBASE
+      if (photo) {
+        const formData = new FormData();
+        formData.append("file", photo);
+        formData.append("upload_preset", "3Sense+_Feedback");
+
+        const cloudinaryResponse = await fetch(
+          "https://api.cloudinary.com/v1_1/dfnqeiksu/image/upload",
+          { method: "POST", body: formData }
+        );
+        if (!cloudinaryResponse.ok) throw new Error("Failed to upload image to Cloudinary");
+        const cloudinaryData = await cloudinaryResponse.json();
+        uploadedImageUrl = cloudinaryData.secure_url;
+      }
+
+      const ref    = generateRefId();
       const docRef = await addDoc(collection(db, "Feedback"), {
-        ReferenceID: ref,
-        FacilityID:  serviceId,
-        FacilityName: serviceName,
-        Category:    category,
-        Rating:      rating,
-        Comment:     comment,
-        Status:      'pending_ai', // Initial status while AI thinks
-        CreatedAt:   serverTimestamp(),
-        UserName:    userName,
-        householdID: householdID || "",
-        userID:      userID      || "",
-        HasPhoto:    !!photo,
-        // Set placeholders for AI data
-        Severity: null, Sentiment: null, Confidence: null, HybridScore: null, TextScore: null, DetectedIssue: "None", IssueConfidence: null
+        ReferenceID:     ref,
+        FacilityID:      serviceId,
+        FacilityName:    serviceName,
+        Category:        category,
+        Rating:          rating,
+        Comment:         comment,
+        Status:          "pending_ai",
+        CreatedAt:       serverTimestamp(),
+        UserName:        userName,
+        householdID:     householdID || "",
+        userID:          userID      || "",
+        ImageUrl:        uploadedImageUrl,
+        Severity:        null, Sentiment: null, Confidence: null,
+        HybridScore:     null, TextScore:  null,
+        DetectedIssue:   "None", IssueConfidence: null,
       });
 
-      // 2. SHOW SUCCESS SCREEN TO USER INSTANTLY!
       setRefId(ref);
       setSubmitted(true);
       setSubmitting(false);
 
-      // 3. RUN AI IN THE BACKGROUND
+      // Background AI analysis
       analyzeAndSyncFeedback(docRef.id, comment, rating);
 
-      // 4. Send Notification
+      // Notify admins
       await createNotification(
         "feedback",
         `New ${STAR_LABELS[rating]} (${rating}★) feedback on "${serviceName}" submitted by ${userName}.`,
         userName,
         ref
       );
-
     } catch (error) {
       console.error("Full Error Details:", error);
       alert(`System Error: ${error.message}`);
-      setSubmitting(false); // Only reset if there was a hard crash
-    } 
+      setSubmitting(false);
+    }
   };
 
   const analyzeAndSyncFeedback = async (documentId, text, rtg) => {
     try {
-      const aiResponse = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, rating: rtg })
+      const aiResponse = await fetch("/api/analyze", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ text, rating: rtg }),
       });
-
       if (aiResponse.ok) {
         const aiData = await aiResponse.json();
         await updateDoc(doc(db, "Feedback", documentId), {
-          Sentiment:       aiData.sentiment || null,
-          Confidence:      aiData.confidence || null,
-          HybridScore:     aiData.hybridScore || null,
-          Severity:        aiData.severity || (aiData.sentiment === 'Negative' ? 'High' : 'Normal'),
-          TextScore:       aiData.textScore || null,
-          DetectedIssue:   aiData.detectedIssue || "None",
+          Sentiment:       aiData.sentiment      || null,
+          Confidence:      aiData.confidence     || null,
+          HybridScore:     aiData.hybridScore    || null,
+          Severity:        aiData.severity       || (aiData.sentiment === "Negative" ? "High" : "Normal"),
+          TextScore:       aiData.textScore      || null,
+          DetectedIssue:   aiData.detectedIssue  || "None",
           IssueConfidence: aiData.issueConfidence || null,
-          Status:          aiData.sentiment ? 'analyzed' : 'pending',
-          AINotes:      aiData.suggestions ? `AI Suggestions:\n- Actions: ${aiData.suggestions.actions.join("; ")}\n- Strategy: ${aiData.suggestions.strategy.join("; ")}` : "No suggestions available.",
-          AdminNotes: ""
+          Status:          aiData.sentiment ? "analyzed" : "pending",
+          AINotes:         aiData.suggestions
+            ? `AI Suggestions:\n- Actions: ${aiData.suggestions.actions.join("; ")}\n- Strategy: ${aiData.suggestions.strategy.join("; ")}`
+            : "No suggestions available.",
+          AdminNotes: "",
         });
       } else {
-        await updateDoc(doc(db, "Feedback", documentId), { Status: 'analysis_failed' });
+        await updateDoc(doc(db, "Feedback", documentId), { Status: "analysis_failed" });
       }
     } catch (err) {
       console.error("Background AI Analysis Failed:", err);
-      await updateDoc(doc(db, "Feedback", documentId), { Status: 'analysis_failed' });
+      await updateDoc(doc(db, "Feedback", documentId), { Status: "analysis_failed" });
     }
   };
 
-
+  // ── Success screen ────────────────────────────────────────────────────────────
   if (submitted) {
     return (
       <main className="fb-page">
@@ -226,6 +411,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     );
   }
 
+  // ── Feedback form ─────────────────────────────────────────────────────────────
   return (
     <main className="fb-page">
       <div className="fb-topbar">
@@ -245,6 +431,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
             <div className="fb-service-info__desc">{currentService.description}</div>
           </div>
         </div>
+
         <div className="fb-field">
           <label className="fb-label">Rate your experience <span className="fb-required">*</span></label>
           <p className="fb-hint">Please rate your overall experience with the service provided</p>
@@ -274,17 +461,19 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           </div>
           {errors.rating && <span className="fb-error-msg">{errors.rating}</span>}
         </div>
+
         <div className="fb-field">
           <label className="fb-label">Comments or Suggestions <span className="fb-required">*</span></label>
           <p className="fb-hint">Share your experience to help us improve our services</p>
           <textarea
             className={`fb-textarea${errors.comment ? " fb-textarea--error" : ""}`}
-            rows={5} placeholder="Write your detailed feedback..." value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            rows={5} placeholder="Write your detailed feedback..."
+            value={comment} onChange={(e) => setComment(e.target.value)}
           />
           <p className="fb-char-hint">Please provide specific details to help us understand your concern.</p>
           {errors.comment && <span className="fb-error-msg">{errors.comment}</span>}
         </div>
+
         <div className="fb-field">
           <label className="fb-label">Image (Optional)</label>
           <p className="fb-hint">Attach photo documentation if applicable</p>
@@ -304,6 +493,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
             )}
           </label>
         </div>
+
         <div className="fb-ai-notice">
           <div className="fb-ai-notice__icon"><BoltIcon /></div>
           <div>
@@ -311,12 +501,14 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
             <div className="fb-ai-notice__desc">Your feedback will be automatically analyzed by our intelligent system to detect priority concerns and route them to the appropriate department for faster resolution.</div>
           </div>
         </div>
+
         <div className="fb-privacy-notice">
           <ShieldIcon />
           <span>
             <strong>Data Privacy Statement:</strong> Your personal information and feedback are protected under the Data Privacy Act of 2012 (RA 10173). All submissions are confidential and will only be used for service improvement purposes.
           </span>
         </div>
+
         <button
           className="fb-submit-btn"
           onClick={handleSubmit}

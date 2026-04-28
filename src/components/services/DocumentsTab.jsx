@@ -136,7 +136,7 @@ function Step2({ docType, form, setForm, errors }) {
         <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
         {errors.address && <span className="sv-error-msg">{errors.address}</span>}
       </div>
-      {/* ── Contact | Email | Purpose — all on the same row ── */}
+      
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
         <div className="dr-field">
           <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
@@ -162,11 +162,10 @@ function Step2({ docType, form, setForm, errors }) {
         </div>
       </div>
 
-      {/* ── "Other" free-text — aligned under the Purpose column (3rd slot) ── */}
       {form.purposeOption === "Other" && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-          <div />{/* col 1 spacer */}
-          <div />{/* col 2 spacer */}
+          <div />
+          <div />
           <div className="dr-field">
             <label className="sv-label">Please specify <span className="sv-required">*</span></label>
             <input
@@ -298,8 +297,6 @@ function Step4({ refNum, onReset }) {
   );
 }
 
-
-
 // ── Documents Tab ──
 export default function DocumentsTab({ userData, householdID, userName }) {
   const activeUserId   = getSaved("userID", null);
@@ -308,6 +305,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   const [docType, setDocType] = useState(null);
   const [errors, setErrors] = useState({});
   const [refNum, setRefNum] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
@@ -373,19 +371,46 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setErrors({});
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    
     if (step === 3) {
+      setIsSubmitting(true);
       try {
+        let uploadedIdUrl = null;
+
+        // --- NEW: CLOUDINARY UPLOAD LOGIC ---
+        if (form.validIdFile) {
+          const formData = new FormData();
+          formData.append("file", form.validIdFile);
+          
+          // ⚠️ UPDATE THESE STRINGS WITH YOUR CREDENTIALS
+          formData.append("upload_preset", "3Sense+_ID");
+          const cloudName = "dfnqeiksu";
+
+          const cloudinaryResponse = await fetch(
+            `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+            { method: "POST", body: formData }
+          );
+
+          if (!cloudinaryResponse.ok) throw new Error("Failed to upload ID to Cloudinary");
+          
+          const cloudinaryData = await cloudinaryResponse.json();
+          uploadedIdUrl = cloudinaryData.secure_url;
+        }
+        // ------------------------------------
+
         const customData = {};
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
+        
         // Resolve effective purpose for submission
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-        const submissionForm = { ...form, purpose: effectivePurpose };
+        
+        const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
+        
         const generatedRef = await submitDocumentRequest(householdID, activeUserId || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
 
-        // 🆕 Notify all admins about new document request
         const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") || userName || "Unknown";
         await createNotification(
           "document_requests",
@@ -393,12 +418,17 @@ export default function DocumentsTab({ userData, householdID, userName }) {
           form.email || fullName,
           generatedRef
         );
+        
+        setStep(4);
       } catch (error) {
         console.error("Failed to submit document request:", error);
         setErrors({ submit: "Failed to submit. Please try again." });
-        return;
+      } finally {
+        setIsSubmitting(false);
       }
+      return;
     }
+    
     setStep(s => s + 1);
   };
 
@@ -416,11 +446,14 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
         {step === 3 && <Step3 docType={docType} form={form} />}
         {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
+        {errors.submit && <p className="sv-error-msg" style={{ padding: "1rem 1.5rem", textAlign: "center" }}>{errors.submit}</p>}
       </div>
       {step < 4 && (
         <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-          {step > 1 && <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }}>Previous</button>}
-          <button className="sv-btn-primary" onClick={handleNext}>{step === 3 ? "Submit Request" : "Next"}</button>
+          {step > 1 && <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }} disabled={isSubmitting}>Previous</button>}
+          <button className="sv-btn-primary" onClick={handleNext} disabled={isSubmitting}>
+            {isSubmitting ? "Uploading ID..." : (step === 3 ? "Submit Request" : "Next")}
+          </button>
         </div>
       )}
     </div>

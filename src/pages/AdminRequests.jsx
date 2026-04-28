@@ -709,6 +709,21 @@ export default function AdminRequests() {
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Purpose</label>
                           <p className="detail-value">{selectedRequest.purpose || 'N/A'}</p>
                         </div>
+                        {selectedRequest.allData?.validIdUrl && (
+                          <div style={{ marginTop: '16px' }}>
+                            <label style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>Attached Valid ID Verification</label>
+                            <div style={{ marginTop: '8px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc', display: 'flex', justifyContent: 'center' }}>
+                              <a href={selectedRequest.allData.validIdUrl} target="_blank" rel="noopener noreferrer">
+                                <img 
+                                  src={selectedRequest.allData.validIdUrl} 
+                                  alt="Resident Valid ID" 
+                                  style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px' }} 
+                                />
+                              </a>
+                            </div>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>Click to view full size</div>
+                        </div>
+                      )}
                       </>
                     )}
                   </div>
