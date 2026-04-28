@@ -284,14 +284,31 @@ export default function ServicePeaceOrder({ onBack }) {
                       {selectedReport.description || "No description provided."}
                     </div>
                   </div>
-                  {selectedReport.photoFileName && (
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Attached Photo</p>
-                      <span style={{ fontSize: "0.8rem", color: "#317D89", background: "#e0f2fe", padding: "3px 10px", borderRadius: "12px" }}>
-                        📸 {selectedReport.photoFileName}
-                      </span>
+
+                  {/* ── UPDATED: PHOTO EVIDENCE DISPLAY ── */}
+                  {(selectedReport.photoURL || selectedReport.photoFileName || selectedReport.photo) && (
+                    <div style={{ gridColumn: "1 / -1", marginTop: "8px" }}>
+                      <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 8px 0" }}>Attached Photo Evidence</p>
+                      {selectedReport.photoURL ? (
+                        <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px", background: "#f9fafb", display: "inline-block", maxWidth: "100%" }}>
+                          <a href={selectedReport.photoURL} target="_blank" rel="noopener noreferrer" title="Click to view full size">
+                            <img 
+                              src={selectedReport.photoURL} 
+                              alt="Incident Evidence" 
+                              style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }} 
+                            />
+                          </a>
+                          <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>Click image to view full size</div>
+                        </div>
+                      ) : (
+                        // Fallback for older reports before we added Cloudinary URLs
+                        <span style={{ fontSize: "0.8rem", color: "#317D89", background: "#e0f2fe", padding: "6px 12px", borderRadius: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          📸 {selectedReport.photoFileName || selectedReport.photo}
+                        </span>
+                      )}
                     </div>
                   )}
+                  {/* ───────────────────────────────────── */}
                 </div>
 
                 {/* Reporter info */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase/firebase";
 import { submitIncidentReport } from "../../../services/services";
-import { createNotification } from "../../../services/notifications"; // 🆕
+import { createNotification } from "../../../services/notifications"; 
 import { SirenIcon, SendIcon } from "../../Icons";
 
 const INCIDENT_TYPES = [
@@ -31,10 +31,12 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const [trackError, setTrackError]   = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [callExpanded, setCallExpanded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🆕 Loading state for uploads
 
   const [form, setForm] = useState({
     reporterName: "", isAnonymous: false, contact: "", reporterAddress: "",
-    incidentType: "", location: "", date: "", time: "", description: "", urgency: "", photo: "",
+    incidentType: "", location: "", date: "", time: "", description: "", urgency: "", 
+    photo: "", photoFile: null, // 🆕 Added photoFile to hold the actual image object
   });
 
   useEffect(() => {
@@ -62,14 +64,40 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
+    
+    setIsSubmitting(true); // Start loading spinner
+    
     try {
-      const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", form);
+      let uploadedImageUrl = null;
+
+      if (form.photoFile) {
+        const formData = new FormData();
+        formData.append("file", form.photoFile);
+        
+        formData.append("upload_preset", "3Sense+_PeaceAndOrder");
+        const cloudName = "dfnqeiksu";
+
+        const cloudinaryResponse = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+          { method: "POST", body: formData }
+        );
+
+        if (!cloudinaryResponse.ok) throw new Error("Failed to upload photo to Cloudinary");
+
+        const cloudinaryData = await cloudinaryResponse.json();
+        uploadedImageUrl = cloudinaryData.secure_url;
+      }
+      // ------------------------------------
+
+      // Attach the secure URL to the form data before sending to Firestore
+      const submissionData = { ...form, photoURL: uploadedImageUrl };
+
+      const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", submissionData);
       const finalRef = generatedRef || Array.from({length:8}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join("");
 
-      // 🆕 Notify admins about new incident report
       const reporterLabel = form.isAnonymous ? "Anonymous" : (form.reporterName || "Unknown");
       await createNotification(
-        "feedback", // closest available type; shows as "Feedback" in bell
+        "feedback", 
         `New incident report (${form.incidentType}) filed by ${reporterLabel} at ${form.location}.`,
         reporterLabel,
         finalRef
@@ -80,6 +108,8 @@ export default function PeaceOrderTab({ userData, householdID }) {
     } catch (error) {
       console.error("Failed to submit incident report:", error);
       setErrors({ submit: "Failed to submit. Please try again." });
+    } finally {
+      setIsSubmitting(false); // Stop loading spinner
     }
   };
 
@@ -257,7 +287,13 @@ export default function PeaceOrderTab({ userData, householdID }) {
           <div className="dr-field">
             <label className="sv-label">Upload Photo <span className="sv-optional">(Optional)</span></label>
             <label className="dr-upload-box">
-              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files[0] && set("photo", e.target.files[0].name)} />
+              {/* 🆕 CAPTURE BOTH THE FILE NAME AND THE ACTUAL FILE OBJECT HERE */}
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                if (e.target.files[0]) {
+                  set("photo", e.target.files[0].name);
+                  set("photoFile", e.target.files[0]);
+                }
+              }} />
               {form.photo
                 ? <div className="dr-upload-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{form.photo}</div>
                 : <div className="dr-upload-placeholder"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>Upload photo evidence</span><span className="dr-upload-hint">JPG or PNG · Max 5MB</span></div>
@@ -266,8 +302,11 @@ export default function PeaceOrderTab({ userData, householdID }) {
           </div>
         </div>
         <div className="po-form-actions">
-          <button className="sv-btn-ghost" onClick={() => { setView("home"); setErrors({}); }}>Cancel</button>
-          <button className="sv-btn-primary" onClick={handleSubmit}><SendIcon /> Submit Report</button>
+          <button className="sv-btn-ghost" onClick={() => { setView("home"); setErrors({}); }} disabled={isSubmitting}>Cancel</button>
+          {/* 🆕 DISABLE BUTTON AND SHOW LOADING TEXT WHILE UPLOADING */}
+          <button className="sv-btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+            <SendIcon /> {isSubmitting ? "Submitting Report..." : "Submit Report"}
+          </button>
         </div>
       </div>
     </div>
@@ -290,7 +329,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
         </div>
         <div className="po-submitted-btns">
           <button className="sv-btn-outline" onClick={() => { setTrackInput(refNum); setView("track"); }}>Track This Report</button>
-          <button className="sv-btn-ghost" onClick={() => { setView("home"); setForm({ reporterName:"", isAnonymous:false, contact:"", reporterAddress:"", incidentType:"", location:"", date:"", time:"", description:"", urgency:"", photo:"" }); }}>Done</button>
+          <button className="sv-btn-ghost" onClick={() => { setView("home"); setForm({ reporterName:"", isAnonymous:false, contact:"", reporterAddress:"", incidentType:"", location:"", date:"", time:"", description:"", urgency:"", photo:"", photoFile: null }); }}>Done</button>
         </div>
       </div>
     </div>
