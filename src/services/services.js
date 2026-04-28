@@ -37,6 +37,7 @@ export async function submitDocumentRequest(householdID, activeUserId, userName,
     status: "Pending",
     customFields: customData,
     submittedAt: serverTimestamp(),
+    validIdUrl: form.validIdUrl || ""
   });
   return refNum;
 }
