@@ -26,13 +26,7 @@ import AdminReports from "./pages/AdminReports";
 import AdminProfile from "./pages/AdminProfile";
 import UserApp from "./pages/UserApp";
 
-// ================================================================
-// 🔒 PROTECTED ROUTE (NOW WITH RBAC!)
-// Blocks access if:
-// - Not logged in
-// - Logged in but NOT in approvedAdmins collection
-// - Approved, but ROLE doesn't allow access to this specific page
-// ================================================================
+
 function ProtectedRoute({
   user,
   isApprovedAdmin,

@@ -135,6 +135,32 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     setSubmitting(true);
 
     try {
+      let uploadedImageUrl = null;
+
+      // --- CLOUDINARY UPLOAD LOGIC ---
+      if (photo) {
+        const formData = new FormData();
+        formData.append("file", photo);
+        formData.append("upload_preset", "3Sense+_Feedback"); 
+        const cloudName = "your_cloud_name_here";
+
+        const cloudinaryResponse = await fetch(
+          `https://api.cloudinary.com/v1_1/dfnqeiksu/image/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        if (!cloudinaryResponse.ok) {
+          throw new Error("Failed to upload image to Cloudinary");
+        }
+
+        const cloudinaryData = await cloudinaryResponse.json();
+        uploadedImageUrl = cloudinaryData.secure_url;
+      }
+      // -------------------------------
+
       const ref = generateRefId();
 
       // 1. SAVE TO FIREBASE
@@ -145,17 +171,16 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         Category:    category,
         Rating:      rating,
         Comment:     comment,
-        Status:      'pending_ai', // Initial status while AI thinks
+        Status:      'pending_ai',
         CreatedAt:   serverTimestamp(),
         UserName:    userName,
         householdID: householdID || "",
         userID:      userID      || "",
-        HasPhoto:    !!photo,
-        // Set placeholders for AI data
+        ImageUrl:    uploadedImageUrl,
         Severity: null, Sentiment: null, Confidence: null, HybridScore: null, TextScore: null, DetectedIssue: "None", IssueConfidence: null
       });
 
-      // 2. SHOW SUCCESS SCREEN TO USER INSTANTLY!
+      // 2. SHOW SUCCESS SCREEN TO USER INSTANTLY
       setRefId(ref);
       setSubmitted(true);
       setSubmitting(false);
@@ -174,7 +199,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     } catch (error) {
       console.error("Full Error Details:", error);
       alert(`System Error: ${error.message}`);
-      setSubmitting(false); // Only reset if there was a hard crash
+      setSubmitting(false); 
     } 
   };
 
@@ -197,7 +222,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           DetectedIssue:   aiData.detectedIssue || "None",
           IssueConfidence: aiData.issueConfidence || null,
           Status:          aiData.sentiment ? 'analyzed' : 'pending',
-          AINotes:      aiData.suggestions ? `AI Suggestions:\n- Actions: ${aiData.suggestions.actions.join("; ")}\n- Strategy: ${aiData.suggestions.strategy.join("; ")}` : "No suggestions available.",
+          AINotes:         aiData.suggestions ? `AI Suggestions:\n- Actions: ${aiData.suggestions.actions.join("; ")}\n- Strategy: ${aiData.suggestions.strategy.join("; ")}` : "No suggestions available.",
           AdminNotes: ""
         });
       } else {
