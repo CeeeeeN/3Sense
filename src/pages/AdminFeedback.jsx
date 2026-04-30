@@ -15,16 +15,16 @@ import ReviewModal from '../components/Feedback/ReviewModal';
 export default function AdminFeedback() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('summary'); 
+  const [activeTab, setActiveTab] = useState('summary');
 
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
-  
+
   // States for 'All' tab filtering
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
-  
+
   // Analytics States
   const [wordCloud, setWordCloud] = useState([]);
   const [stats, setStats] = useState({ total: 0, avgRating: 0, negative: 0, pending: 0 });
@@ -35,40 +35,55 @@ export default function AdminFeedback() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-        // Listen for the currently logged-in user
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            // Find their document in the approvedAdmins collection
-            const q = query(
-              collection(db, "approvedAdmins"), 
-              where("uid", "==", user.uid)
-            );
-            const snapshot = await getDocs(q);
-    
-            if (!snapshot.empty) {
-              const data = snapshot.docs[0].data();
-              setAdminName(data.fullName || "Admin");
-              setAdminRole(data.role || "Standard Admin");
-            }
-          }
-        });
-    
-        return () => unsubscribe();
-      }, []);
+    // Listen for the currently logged-in user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Find their document in the approvedAdmins collection
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid)
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // --- FETCH FIREBASE DATA ---
   useEffect(() => {
     const q = query(collection(db, 'feedback'), orderBy('CreatedAt', 'desc'));
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fbData = snapshot.docs.map(doc => ({
-        docId: doc.id,
-        ...doc.data(),
-        CreatedAt: doc.data().CreatedAt?.toDate 
-          ? doc.data().CreatedAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) 
-          : "Unknown"
-      }));
-      
+      const fbData = snapshot.docs.map(doc => {
+        const data = doc.data();
+
+        // Handle both createdAt and CreatedAt variations
+        let formattedDate = "Unknown";
+        if (data.createdAt?.toDate) {
+          formattedDate = data.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else if (data.CreatedAt?.toDate) {
+          formattedDate = data.CreatedAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else if (typeof data.createdAt === 'string') {
+          formattedDate = data.createdAt;
+        } else if (typeof data.CreatedAt === 'string') {
+          formattedDate = data.CreatedAt;
+        }
+
+        return {
+          docId: doc.id,
+          ...data,
+          createdAt: formattedDate,
+          CreatedAt: formattedDate
+        };
+      });
+
       setFeedbacks(fbData);
       generateAnalytics(fbData);
       setLoading(false);
@@ -124,21 +139,21 @@ export default function AdminFeedback() {
   };
 
   // --- FILTERING LOGIC ---
-  
+
   // Rule: Only show Negative feedback that is NOT resolved
-  const actionRequiredFeedbacks = feedbacks.filter(fb => 
-    String(fb.sentiment).toLowerCase() === 'negative' && 
+  const actionRequiredFeedbacks = feedbacks.filter(fb =>
+    String(fb.sentiment).toLowerCase() === 'negative' &&
     String(fb.status).toLowerCase() !== 'resolved'
   );
 
   const allFilteredFeedbacks = feedbacks.filter(fb => {
     const searchStr = String(searchTerm).toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
       String(fb.comment || "").toLowerCase().includes(searchStr) ||
       String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
       String(fb.userName || "").toLowerCase().includes(searchStr);
-      
+
     const matchesStatus = filterStatus === 'All' || String(fb.status).toLowerCase() === filterStatus.toLowerCase();
     return matchesSearch && matchesStatus;
   });
@@ -152,8 +167,8 @@ export default function AdminFeedback() {
   const handleSaveModal = async (docId, adminNote, newStatus) => {
     try {
       const fbRef = doc(db, "feedback", docId);
-      await updateDoc(fbRef, { 
-        adminNotes: adminNote, 
+      await updateDoc(fbRef, {
+        adminNotes: adminNote,
         status: newStatus,
         processedBy: adminName,
         processedRole: adminRole,
@@ -182,7 +197,7 @@ export default function AdminFeedback() {
   return (
     <AdminLayout>
       <div className="requests-container">
-        
+
         {/* Page Header */}
         <div className="requests-header">
           <h1 className="requests-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -193,20 +208,20 @@ export default function AdminFeedback() {
 
         {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
-          <button 
+          <button
             onClick={() => setActiveTab('summary')}
             style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'summary' ? '3px solid #317D89' : '3px solid transparent', color: activeTab === 'summary' ? '#317D89' : '#64748b', fontWeight: activeTab === 'summary' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <BarChart2 size={18} /> Dashboard Summary
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('action')}
             style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'action' ? '3px solid #e11d48' : '3px solid transparent', color: activeTab === 'action' ? '#e11d48' : '#64748b', fontWeight: activeTab === 'action' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
           >
-            <AlertTriangle size={18} /> Action Required 
+            <AlertTriangle size={18} /> Action Required
             {actionRequiredFeedbacks.length > 0 && <span style={{ background: '#e11d48', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{actionRequiredFeedbacks.length}</span>}
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('all')}
             style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'all' ? '3px solid #317D89' : '3px solid transparent', color: activeTab === 'all' ? '#317D89' : '#64748b', fontWeight: activeTab === 'all' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
           >
@@ -222,15 +237,15 @@ export default function AdminFeedback() {
             {activeTab === 'summary' && (
               <SummaryDashboard stats={stats} heatmapData={heatmapData} wordCloud={wordCloud} />
             )}
-            
+
             {activeTab === 'action' && (
-              <FeedbackTable 
-                dataList={actionRequiredFeedbacks} 
-                emptyMessage="Hooray! No negative feedback requires admin action right now." 
-                onReview={handleReviewClick} 
+              <FeedbackTable
+                dataList={actionRequiredFeedbacks}
+                emptyMessage="Hooray! No negative feedback requires admin action right now."
+                onReview={handleReviewClick}
               />
             )}
-            
+
             {activeTab === 'all' && (
               <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
                 <div className="requests-controls">
@@ -248,10 +263,10 @@ export default function AdminFeedback() {
                     </select>
                   </div>
                 </div>
-                <FeedbackTable 
-                  dataList={allFilteredFeedbacks} 
-                  emptyMessage="No feedback matches your search criteria." 
-                  onReview={handleReviewClick} 
+                <FeedbackTable
+                  dataList={allFilteredFeedbacks}
+                  emptyMessage="No feedback matches your search criteria."
+                  onReview={handleReviewClick}
                 />
               </div>
             )}
@@ -259,11 +274,11 @@ export default function AdminFeedback() {
         )}
 
         {/* Modal Overlay Component */}
-        <ReviewModal 
-          isOpen={isModalOpen} 
-          feedback={selectedFeedback} 
-          onClose={() => setIsModalOpen(false)} 
-          onSave={handleSaveModal} 
+        <ReviewModal
+          isOpen={isModalOpen}
+          feedback={selectedFeedback}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSaveModal}
         />
       </div>
     </AdminLayout>
