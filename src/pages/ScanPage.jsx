@@ -124,6 +124,7 @@ export default function ScanPage({
   onNavigate,
   userName = "",
   householdID = "",
+  residentID = "",
   userID = "",
 }) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 769);
@@ -216,7 +217,7 @@ export default function ScanPage({
     scanning.current = false;
     try {
       setCamState("requesting"); // visually pause/indicate loading optionally
-      const result = await processQRScan({ qrUrl: data, userID, householdID });
+      const result = await processQRScan({ qrUrl: data, residentID, householdID, userID });
 
       if (result.isValid) {
         setFlash(true);

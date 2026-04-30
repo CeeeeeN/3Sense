@@ -59,7 +59,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
             <div className="sv-facility-card__left">
               <div className="sv-facility-card__icon-wrap"><BuildingIcon /></div>
               <div>
-                <div className="sv-facility-card__title">{f.name || f.title}</div>
+                <div className="sv-facility-card__title">{f.facilityName || f.name || f.title}</div>
                 <div className="sv-facility-card__meta">
                   <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
                   <span className="sv-facility-card__dot" />
@@ -68,7 +68,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
                     return fmt(f.openTime) + ' – ' + fmt(f.closeTime);
                   })() : f.hours}</span>
                 </div>
-                <div className="sv-facility-card__desc">{f.fullDescription || f.desc}</div>
+                <div className="sv-facility-card__desc">{f.description || f.fullDescription || f.desc}</div>
               </div>
             </div>
             <div className="sv-facility-card__right">
@@ -325,7 +325,14 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
-      const generatedRef = await submitFacilityReservation(householdID, userID || "", userName || "Unknown", facility, form, customData);
+      const generatedRef = await submitFacilityReservation(
+        householdID,
+        userData?.residentID || userID || "",  // residentID = Firestore doc ID
+        userName || "Unknown",
+        facility,
+        form,
+        customData
+      );
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {

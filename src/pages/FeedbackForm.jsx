@@ -323,22 +323,22 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       }
 
       const ref    = generateRefId();
-      const docRef = await addDoc(collection(db, "Feedback"), {
-        ReferenceID:     ref,
-        FacilityID:      serviceId,
-        FacilityName:    serviceName,
-        Category:        category,
-        Rating:          rating,
-        Comment:         comment,
-        Status:          "pending_ai",
-        CreatedAt:       serverTimestamp(),
-        UserName:        userName,
+      const docRef = await addDoc(collection(db, "feedback"), {
+        referenceID:     ref,
+        facilityID:      serviceId,
+        facilityName:    serviceName,
+        category,
+        rating,
+        comment,
+        status:          "pending_ai",
+        createdAt:       serverTimestamp(),
+        userName,
         householdID:     householdID || "",
-        userID:          userID      || "",
-        ImageUrl:        uploadedImageUrl,
-        Severity:        null, Sentiment: null, Confidence: null,
-        HybridScore:     null, TextScore:  null,
-        DetectedIssue:   "None", IssueConfidence: null,
+        residentID:      userID || "",
+        imageUrl:        uploadedImageUrl,
+        severity:        null, sentiment: null, confidence: null,
+        hybridScore:     null, textScore: null,
+        detectedIssue:   "None", issueConfidence: null,
       });
 
       setRefId(ref);
@@ -371,26 +371,26 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       });
       if (aiResponse.ok) {
         const aiData = await aiResponse.json();
-        await updateDoc(doc(db, "Feedback", documentId), {
-          Sentiment:       aiData.sentiment      || null,
-          Confidence:      aiData.confidence     || null,
-          HybridScore:     aiData.hybridScore    || null,
-          Severity:        aiData.severity       || (aiData.sentiment === "Negative" ? "High" : "Normal"),
-          TextScore:       aiData.textScore      || null,
-          DetectedIssue:   aiData.detectedIssue  || "None",
-          IssueConfidence: aiData.issueConfidence || null,
-          Status:          aiData.sentiment ? "analyzed" : "pending",
-          AINotes:         aiData.suggestions
+        await updateDoc(doc(db, "feedback", documentId), {
+          sentiment:       aiData.sentiment      || null,
+          confidence:      aiData.confidence     || null,
+          hybridScore:     aiData.hybridScore    || null,
+          severity:        aiData.severity       || (aiData.sentiment === "Negative" ? "High" : "Normal"),
+          textScore:       aiData.textScore      || null,
+          detectedIssue:   aiData.detectedIssue  || "None",
+          issueConfidence: aiData.issueConfidence || null,
+          status:          aiData.sentiment ? "analyzed" : "pending",
+          aiNotes:         aiData.suggestions
             ? `AI Suggestions:\n- Actions: ${aiData.suggestions.actions.join("; ")}\n- Strategy: ${aiData.suggestions.strategy.join("; ")}`
             : "No suggestions available.",
-          AdminNotes: "",
+          adminNotes: "",
         });
       } else {
-        await updateDoc(doc(db, "Feedback", documentId), { Status: "analysis_failed" });
+        await updateDoc(doc(db, "feedback", documentId), { status: "analysis_failed" });
       }
     } catch (err) {
       console.error("Background AI Analysis Failed:", err);
-      await updateDoc(doc(db, "Feedback", documentId), { Status: "analysis_failed" });
+      await updateDoc(doc(db, "feedback", documentId), { status: "analysis_failed" });
     }
   };
 

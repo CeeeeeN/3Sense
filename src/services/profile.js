@@ -68,46 +68,50 @@ export const getMemberProfile = async (householdID, residentID) => {
         });
 
     return {
+        // Identity
+        residentID:  residentID,        // Firestore doc ID
+        householdID: householdID,        // parent household
+        userID:      d.userID || "",     // Firebase Auth UID
         role: d.role || "member",
-        firstName: d.firstName || "",
-        middleName: d.middleName || "",
-        lastName: d.lastName || "",
-        suffix: d.suffix || "",
 
-        birthDate: d.birthDate || "",
-        age: d.age ?? null,
-        birthPlace: d.birthPlace || "",
-        sex: d.sex || "",
-        civilStatus: d.civilStatus || "",
-        religion: d.religion || "",
-        citizenship: d.citizenship || "",
-        contactNumber: d.contactNumber ?? null,
-        email: d.email || "",
+        firstName:   d.firstName || "",
+        middleName:  d.middleName || "",
+        lastName:    d.lastName || "",
+        suffix:      d.suffix || "",
+
+        birthDate:        d.birthDate || "",
+        age:              d.age ?? null,
+        birthPlace:       d.birthPlace || "",
+        sex:              d.sex || "",
+        civilStatus:      d.civilStatus || "",
+        religion:         d.religion || "",
+        citizenship:      d.citizenship || "",
+        contactNumber:    d.contactNumber ?? null,
+        email:            d.email || "",
         residingSinceYear: d.residingSinceYear ? Number(d.residingSinceYear) : null,
 
         ...address,
         sameAddress,
 
-        categories: normalizedCategories,
-        pwdStatus: d.pwdStatus || "",
+        categories:    normalizedCategories,
+        pwdStatus:     d.pwdStatus || "",
         disabilityType: d.disabilityType || "",
 
-        totalMembers: d.totalMembers ?? d.householdMembers ?? h.totalMembers ?? "",
-        householdClassification: d.householdClassification || h.householdClassification || "",
+        totalMembers:             d.totalMembers ?? d.householdMembers ?? h.totalMembers ?? "",
+        householdClassification:  d.householdClassification || h.householdClassification || "",
 
         educationAttainment: d.educationAttainment || "",
-        educationStatus: d.educationStatus || "",
-        occupation: d.occupation || "",
-        employmentStatus: d.employmentStatus || "",
+        educationStatus:     d.educationStatus || "",
+        occupation:          d.occupation || "",
+        employmentStatus:    d.employmentStatus || "",
 
         // Admin-managed record status
-        adminStatus: d.adminStatus || "Clear Case",
-        adminRemarks: d.adminRemarks || "",
-        adminIncident: d.adminIncident || "",
-        adminLastUpdatedBy: d.adminLastUpdatedBy || "",
+        adminStatus:         d.adminStatus || "Clear Case",
+        adminRemarks:        d.adminRemarks || "",
+        adminIncident:       d.adminIncident || "",
+        adminLastUpdatedBy:  d.adminLastUpdatedBy || "",
         adminLastUpdatedByPosition: d.adminLastUpdatedByPosition || "",
-        // Firestore Timestamp → JS Date for display
-        adminLastUpdatedAt: d.adminLastUpdatedAt ? d.adminLastUpdatedAt.toDate().toLocaleDateString("en-PH", {
+        adminLastUpdatedAt:  d.adminLastUpdatedAt ? d.adminLastUpdatedAt.toDate().toLocaleDateString("en-PH", {
             year: "numeric", month: "short", day: "numeric"
         }) : null,
 

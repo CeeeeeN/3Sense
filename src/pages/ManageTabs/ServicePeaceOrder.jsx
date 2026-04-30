@@ -115,9 +115,10 @@ export default function ServicePeaceOrder({ onBack }) {
           `Updated report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} and assigned tanod ${assignedTanod}`,
         );
 
-      if ((newStatus === "responded" || newStatus === "resolved") && selectedReport.userID) {
+      const notifyID = selectedReport.residentID || selectedReport.userID;
+      if ((newStatus === "responded" || newStatus === "resolved") && notifyID) {
         await createUserNotification(
-          selectedReport.userID,
+          notifyID,
           "Incident Report Update",
           `Your incident report (${selectedReport.refNum || 'N/A'}) has been marked as ${newStatus}.`,
           "general",

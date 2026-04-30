@@ -50,7 +50,7 @@ function Step1({ docTypes, selected, onSelect }) {
           >
             <div className="dr-doc-row__icon">{d.icon || <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}</div>
             <div className="dr-doc-row__body">
-              <div className="dr-doc-row__name">{d.title || d.name}</div>
+              <div className="dr-doc-row__name">{d.documentName || d.title || d.name}</div>
               <div className="dr-doc-row__desc">{d.description || d.desc}</div>
             </div>
             <div className="dr-doc-row__meta">
@@ -90,7 +90,7 @@ function Step2({ docType, form, setForm, errors }) {
         <div className="dr-doc-selected-banner">
           <span className="dr-doc-selected-icon">{docType.icon}</span>
           <div>
-            <div className="dr-doc-selected-name">{docType.title || docType.name}</div>
+            <div className="dr-doc-selected-name">{docType.documentName || docType.title || docType.name}</div>
             {(docType.reminder || docType.note) && <div className="dr-doc-selected-note">{docType.reminder || docType.note}</div>}
           </div>
         </div>
@@ -238,7 +238,7 @@ function Step3({ docType, form }) {
     ? (form.purposeOther || "Other")
     : form.purposeOption;
   const rows = [
-    { label: "Document Type", value: docType?.title || docType?.name, full: true },
+    { label: "Document Type", value: docType?.documentName || docType?.title || docType?.name, full: true },
     { label: "Full Name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
     { label: "Date of Birth", value: form.dob },
     { label: "Civil Status", value: form.civilStatus },
@@ -299,7 +299,8 @@ function Step4({ refNum, onReset }) {
 
 // ── Documents Tab ──
 export default function DocumentsTab({ userData, householdID, userName }) {
-  const activeUserId   = getSaved("userID", null);
+  // residentID = Firestore doc ID of the resident (from userData, set by ServicesPage)
+  const residentID = userData?.residentID || getSaved("memberID", null);
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -408,13 +409,13 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         
         const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
         
-        const generatedRef = await submitDocumentRequest(householdID, activeUserId || "", userName || "Unknown", docType, submissionForm, customData);
+        const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
 
         const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") || userName || "Unknown";
         await createNotification(
           "document_requests",
-          `New document request (${docType.title || docType.name}) submitted by ${fullName}.`,
+          `New document request (${docType.documentName || docType.title || docType.name}) submitted by ${fullName}.`,
           form.email || fullName,
           generatedRef
         );

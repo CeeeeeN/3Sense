@@ -90,7 +90,7 @@ export default function AdminRequests() {
         return {
           docId: doc.id,
           collectionName: 'document_requests',
-          id: data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
+          id: data.requestID || data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
           residentName: data.fullName || data.residentName || formatName(data.firstName, data.middleName, data.lastName),
           contact: data.email || 'No email provided',
           category: 'Document',
@@ -112,8 +112,8 @@ export default function AdminRequests() {
           return {
             docId: doc.id,
             collectionName: 'facility_reservations',
-            id: data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
-            residentName: data.requesterName || 'Unknown Resident',
+            id: data.reservationID || data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
+            residentName: data.requesterName || data.fullName || 'Unknown Resident',
             contact: data.email || 'No email provided',
             category: 'Facility',
             type: data.facilityName || data.facility || 'Unknown Facility',
@@ -267,7 +267,7 @@ export default function AdminRequests() {
       );
 
       // Notify the resident
-      const memberID = target.allData?.userID || "";
+      const memberID = target.allData?.residentID || target.allData?.userID || "";
       const refNum = target.id || "";
       if (memberID) {
         const label = target.category === 'Document' ? target.type : target.type;
@@ -307,7 +307,7 @@ export default function AdminRequests() {
         `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`
       );
 
-      const memberID = target.allData?.userID || "";
+      const memberID = target.allData?.residentID || target.allData?.userID || "";
       const refNum = target.id || "";
       if (memberID) {
         await createUserNotification(
@@ -346,7 +346,7 @@ export default function AdminRequests() {
         `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`
       );
 
-      const memberID = target.allData?.userID || "";
+      const memberID = target.allData?.residentID || target.allData?.userID || "";
       const refNum = target.id || "";
       if (memberID) {
         await createUserNotification(
@@ -389,7 +389,7 @@ export default function AdminRequests() {
         `Rejected ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
       );
 
-      const memberID = selectedRequest.allData?.userID || "";
+      const memberID = selectedRequest.allData?.residentID || selectedRequest.allData?.userID || "";
       const refNum = selectedRequest.id || "";
       if (memberID) {
         const label = selectedRequest.type || 'Request';

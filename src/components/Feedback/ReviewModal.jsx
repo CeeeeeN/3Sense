@@ -11,8 +11,8 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
   useEffect(() => {
     if (feedback) {
-      setAdminNote(feedback.AdminNotes || '');
-      setNewStatus(feedback.Status || 'analyzed');
+      setAdminNote(feedback.adminNotes || '');
+      setNewStatus(feedback.status || 'analyzed');
     }
   }, [feedback]);
 
@@ -37,15 +37,15 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
       const aiData = await response.json();
 
       // Update Firestore using the exact camelCase keys your Vercel API returns
-      const fbRef = doc(db, "Feedback", feedback.docId);
+      const fbRef = doc(db, "feedback", feedback.docId);
       await updateDoc(fbRef, {
-        Sentiment: aiData.sentiment,
-        HybridScore: aiData.hybridScore,
-        TextScore: aiData.textScore,
-        Confidence: aiData.confidence,
-        DetectedIssue: aiData.detectedIssue,
-        Severity: aiData.severity || (aiData.sentiment === "Negative" ? "High" : "Normal"),
-        Status: "analyzed"
+        sentiment:       aiData.sentiment,
+        hybridScore:     aiData.hybridScore,
+        textScore:       aiData.textScore,
+        confidence:      aiData.confidence,
+        detectedIssue:   aiData.detectedIssue,
+        severity:        aiData.severity || (aiData.sentiment === "Negative" ? "High" : "Normal"),
+        status:          "analyzed"
       });
 
       alert("AI Analysis complete! The dashboard will now update.");
@@ -61,7 +61,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
   if (!isOpen || !feedback) return null;
 
-  const needsAI = feedback.Status?.toLowerCase() === 'pending_ai' || !feedback.Sentiment;
+  const needsAI = feedback.status?.toLowerCase() === 'pending_ai' || !feedback.sentiment;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -96,12 +96,12 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
                 <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <BarChart2 size={16} color="#317D89"/> AI Analysis Results
                 </h4>
-                <SeverityBadge severity={feedback.Severity} />
+                <SeverityBadge severity={feedback.severity} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem' }}>
-                <div><strong style={{ color: '#64748b' }}>Detected Sentiment:</strong> {feedback.Sentiment}</div>
-                <div><strong style={{ color: '#64748b' }}>AI Confidence:</strong> {feedback.Confidence ? `${(feedback.Confidence * 100).toFixed(1)}%` : 'N/A'}</div>
-                <div style={{ gridColumn: 'span 2' }}><strong style={{ color: '#64748b' }}>Detected Issue Category:</strong> {feedback.DetectedIssue || 'None'}</div>
+                <div><strong style={{ color: '#64748b' }}>Detected Sentiment:</strong> {feedback.sentiment}</div>
+                <div><strong style={{ color: '#64748b' }}>AI Confidence:</strong> {feedback.confidence ? `${(feedback.confidence * 100).toFixed(1)}%` : 'N/A'}</div>
+                <div style={{ gridColumn: 'span 2' }}><strong style={{ color: '#64748b' }}>Detected Issue Category:</strong> {feedback.detectedIssue || 'None'}</div>
               </div>
             </div>
           )}
@@ -109,25 +109,25 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
           {/* Resident Details */}
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Resident Comment ({feedback.Rating}★)</label>
+            <label style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Resident Comment ({feedback.rating}★)</label>
             <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.95rem', color: '#1e293b', fontStyle: 'italic', marginTop: '4px' }}>
-              "{feedback.Comment}"
+              "{feedback.comment}"
             </div>
 
-            {feedback.ImageUrl && (
+            {feedback.imageUrl && (
               <div style={{ marginTop: '16px' }}>
                 <label style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <ImageIcon size={14} /> Attached Photo Evidence
                 </label>
                 <div style={{ marginTop: '6px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'center', padding: '8px' }}>
-                  <a href={feedback.ImageUrl} target="_blank" rel="noopener noreferrer" title="Click to view full size">
-                    <img src={feedback.ImageUrl} alt="Feedback Evidence" style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px', cursor: 'pointer' }} />
+                  <a href={feedback.imageUrl} target="_blank" rel="noopener noreferrer" title="Click to view full size">
+                    <img src={feedback.imageUrl} alt="Feedback Evidence" style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px', cursor: 'pointer' }} />
                   </a>
                 </div>
               </div>
             )}
 
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '12px' }}>Submitted by: {feedback.UserName || 'Resident'} (Ref: {feedback.ReferenceID})</div>
+            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '12px' }}>Submitted by: {feedback.userName || 'Resident'} (Ref: {feedback.referenceID})</div>
           </div>
 
           {/* Staff Action Section */}

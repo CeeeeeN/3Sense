@@ -43,39 +43,41 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
     const headRef = doc(db, "households", householdID, "residents", "head");
 
     await setDoc(headRef, {
-        role: "head",
-        firstName: head.firstName || "",
-        middleName: head.middleName || "",
-        lastName: head.lastName || "",
-        suffix: head.suffix || "",
+        residentID:  "head",       // canonical self-reference
+        householdID,               // parent household
+        role:        "head",
+        userID:      userCredential.user.uid,  // Firebase Auth UID
 
-        birthDate: head.birthDate || "",
-        age: head.age ?? null,
-        birthPlace: head.birthPlace || "",
-        sex: head.sex || "",
+        firstName:   head.firstName || "",
+        middleName:  head.middleName || "",
+        lastName:    head.lastName || "",
+        suffix:      head.suffix || "",
+
+        birthDate:   head.birthDate || "",
+        age:         head.age ?? null,
+        birthPlace:  head.birthPlace || "",
+        sex:         head.sex || "",
         civilStatus: head.civilStatus || "",
-        religion: head.religion || "",
+        religion:    head.religion || "",
         citizenship: head.citizenship || "",
         contactNumber: head.contactNumber ?? null,
-        email: head.email || "",
+        email:       head.email || "",
         residingSinceYear: head.residingSinceYear ? Number(head.residingSinceYear) : null,
 
         categories: Array.isArray(head.categories)
             ? head.categories
             : (head.category ? String(head.category).split(",").map(s => s.trim()).filter(Boolean) : []),
-        pwdStatus: head.pwdStatus || "",
+        pwdStatus:    head.pwdStatus || "",
         disabilityType: head.disabilityType || "",
 
         educationAttainment: head.educationAttainment || "",
-        educationStatus: head.educationStatus || "",
-        occupation: head.occupation || "",
-        employmentStatus: head.employmentStatus || "",
+        educationStatus:     head.educationStatus || "",
+        occupation:          head.occupation || "",
+        employmentStatus:    head.employmentStatus || "",
 
-        pin: null,
-
-        userID: userCredential.user.uid,
+        pinHash:   null,
         createdAt: serverTimestamp(),
-        addedAt: serverTimestamp(),
+        addedAt:   serverTimestamp(),
         updatedAt: serverTimestamp(),
     });
 

@@ -109,18 +109,18 @@ export default function ManageFacilities() {
   };
 
   const [newFacility, setNewFacility] = useState({
-    name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: []
+    facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, customFields: []
   });
 
   const handleEdit = (fac) => {
     setNewFacility({ 
-      name: fac.name, 
-      capacity: fac.capacity || "", 
-      openTime: fac.openTime || "08:00",
-      closeTime: fac.closeTime || "17:00",
-      fullDescription: fac.fullDescription || "",
-      available: fac.available !== false,
-      customFields: fac.customFields || []
+      facilityName:  fac.facilityName || fac.name || "",
+      capacity:      fac.capacity || "", 
+      openTime:      fac.openTime || "08:00",
+      closeTime:     fac.closeTime || "17:00",
+      description:   fac.description || fac.fullDescription || "",
+      available:     fac.available !== false,
+      customFields:  fac.customFields || []
     });
     setEditingFacilityId(fac.id);
     setShowAddModal(true);
@@ -153,23 +153,15 @@ export default function ManageFacilities() {
     e.preventDefault();
     try {
       if (editingFacilityId) {
-        await updateDoc(doc(db, "facilities", editingFacilityId), { ...newFacility });
-        logTransaction(
-          adminName,
-          adminRole,
-          "EDITED_FACILITY",
-          `Edited facility with ID: ${editingFacilityId}`,
-        );
+        await updateDoc(doc(db, "facilities", editingFacilityId), { ...newFacility, updatedAt: serverTimestamp() });
+        logTransaction(adminName, adminRole, "EDITED_FACILITY", `Edited facility: ${newFacility.facilityName} (ID: ${editingFacilityId})`);
       } else {
-        await addDoc(collection(db, "facilities"), { ...newFacility, createdAt: serverTimestamp() });
-        logTransaction(
-          adminName,
-          adminRole,
-          "ADDED_FACILITY",
-          `Added new facility: ${newFacility.name} (ID: ${doc.id})`,
-        );
+        const newRef = await addDoc(collection(db, "facilities"), { ...newFacility, createdAt: serverTimestamp() });
+        // Write facilityID back so it's a queryable field
+        await updateDoc(newRef, { facilityID: newRef.id });
+        logTransaction(adminName, adminRole, "ADDED_FACILITY", `Added new facility: ${newFacility.facilityName} (ID: ${newRef.id})`);
       }
-      setNewFacility({ name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: [] });
+      setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, customFields: [] });
       setEditingFacilityId(null);
       setShowAddModal(false);
     } catch(error) {
@@ -179,7 +171,7 @@ export default function ManageFacilities() {
 
   const openAddModal = () => {
     setEditingFacilityId(null);
-    setNewFacility({ name: "", capacity: "", openTime: "08:00", closeTime: "17:00", fullDescription: "", available: true, customFields: [] });
+    setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, customFields: [] });
     setShowAddModal(true);
   };
 
@@ -212,7 +204,7 @@ export default function ManageFacilities() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  const filteredFacs = facilities.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredFacs = facilities.filter(f => (f.facilityName || f.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
 
   const totalPages = Math.ceil(filteredFacs.length / ITEMS_PER_PAGE);
   const paginatedFacs = filteredFacs.slice(
@@ -284,12 +276,12 @@ export default function ManageFacilities() {
         {paginatedFacs.map((fac) => (
           <div className="as-card" key={fac.id}>
             <div className="as-card-header">
-              <h2 className="as-card-title">{fac.name}</h2>
+              <h2 className="as-card-title">{fac.facilityName || fac.name}</h2>
               <span className={`as-badge ${fac.available ? "open" : "ongoing"}`}>
                 {fac.available ? "Enabled" : "Disabled"}
               </span>
             </div>
-            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.fullDescription} /></div>
+            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.description || fac.fullDescription} /></div>
             <ul className="as-card-details">
               <li><strong>Capacity:</strong> {fac.capacity ? `Up to ${fac.capacity} persons` : "—"}</li>
               <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>
@@ -340,9 +332,9 @@ export default function ManageFacilities() {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div className="as-form-group">
-                    <label className="as-form-label">Facility Name</label>
+                  <label className="as-form-label">Facility Name</label>
                     <input type="text" className="as-form-input" required placeholder="e.g. Barangay Hall"
-                      value={newFacility.name} onChange={(e) => setNewFacility({...newFacility, name: e.target.value})} 
+                      value={newFacility.facilityName} onChange={(e) => setNewFacility({...newFacility, facilityName: e.target.value})} 
                     />
                   </div>
 
@@ -371,10 +363,10 @@ export default function ManageFacilities() {
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Full Description</label>
-                  <textarea className="as-form-textarea" required rows="3" placeholder="Hall details, inclusions like tables, chairs, stage, etc."
-                    value={newFacility.fullDescription} onChange={(e) => setNewFacility({...newFacility, fullDescription: e.target.value})} 
-                  />
+                    <label className="as-form-label">Full Description</label>
+                    <textarea className="as-form-textarea" required rows="3" placeholder="Hall details, inclusions like tables, chairs, stage, etc."
+                      value={newFacility.description} onChange={(e) => setNewFacility({...newFacility, description: e.target.value})} 
+                    />
                 </div>
 
                 <div className="as-form-section">

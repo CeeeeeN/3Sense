@@ -13,33 +13,42 @@ const generateRef = () => {
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
 // ══════════════════════════════
-export async function submitDocumentRequest(householdID, activeUserId, userName, docType, form, customData = {}) {
-  const refNum = generateRef();
+/**
+ * @param {string} householdID
+ * @param {string} residentID  - Firestore doc ID of the resident (was userID/activeUserId)
+ * @param {string} userName
+ * @param {object} docType
+ * @param {object} form
+ * @param {object} customData
+ */
+export async function submitDocumentRequest(householdID, residentID, userName, docType, form, customData = {}) {
+  const requestID = generateRef();
   await addDoc(collection(db, "document_requests"), {
-    refNum, householdID, userID: activeUserId || "",
-    requesterName: userName,
-    documentType: docType.name || docType.title,
-    documentId: docType.id,
-    fee: docType.fee || "Free",
-    processingDays: docType.days || docType.processingTime || "",
-    firstName: form.firstName,
-    middleName: form.middleName || "",
-    lastName: form.lastName,
-    fullName: `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
-    dateOfBirth: form.dob,
-    civilStatus: form.civilStatus,
-    address: form.address,
-    contact: form.contact,
-    email: form.email || "",
-    residingSince: form.residingSince,
-    purpose: form.purpose,
+    requestID,
+    householdID,
+    residentID,                                   // Firestore doc ID of the resident
+    documentID:      docType.id,                   // renamed from documentId
+    documentType:    docType.documentName || docType.name || docType.title, // display name
+    fee:             docType.fee || "Free",
+    processingDays:  docType.days || docType.processingTime || "",
+    firstName:       form.firstName,
+    middleName:      form.middleName || "",
+    lastName:        form.lastName,
+    fullName:        `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
+    dateOfBirth:     form.dob,
+    civilStatus:     form.civilStatus,
+    address:         form.address,
+    contact:         form.contact,
+    email:           form.email || "",
+    residingSince:   form.residingSince,
+    purpose:         form.purpose,
     validIdFileName: form.validId || "",
-    status: "Pending",
-    customFields: customData,
-    submittedAt: serverTimestamp(),
-    validIdUrl: form.validIdUrl || ""
+    validIdUrl:      form.validIdUrl || "",
+    status:          "Pending",
+    customFields:    customData,
+    submittedAt:     serverTimestamp(),
   });
-  return refNum;
+  return requestID;
 }
 
 export async function getDocumentRequests(householdID) {
@@ -55,51 +64,69 @@ export async function getDocumentRequests(householdID) {
 // ══════════════════════════════
 // 🏢 FACILITY RESERVATIONS
 // ══════════════════════════════
-export async function submitFacilityReservation(householdID, activeUserId, userName, facility, form, customData = {}) {
-  const refNum = generateRef();
+/**
+ * @param {string} householdID
+ * @param {string} residentID  - Firestore doc ID of the resident
+ * @param {string} userName
+ * @param {object} facility
+ * @param {object} form
+ * @param {object} customData
+ */
+export async function submitFacilityReservation(householdID, residentID, userName, facility, form, customData = {}) {
+  const reservationID = generateRef();
   await addDoc(collection(db, "facility_reservations"), {
-    refNum, householdID, userID: activeUserId || "",
-    requesterName: form.fullName || userName,
-    fullName: form.fullName || userName,
-    email: form.email || "",
+    reservationID,
+    householdID,
+    residentID,                                    // Firestore doc ID of the resident
+    facilityID:    facility?.id || "",             // renamed from facilityId
+    facilityName:  facility?.facilityName || facility?.name || facility?.title || "Barangay Multi-Purpose Hall",
+    fullName:      form.fullName || userName,
+    email:         form.email || "",
     contactNumber: form.contactNumber || "",
-    facilityName: facility?.name || facility?.title || "Barangay Multi-Purpose Hall",
-    facilityId: facility?.id || 1,
-    purpose: form.purpose,
-    date: form.date,
-    startTime: form.startTime,
-    endTime: form.endTime,
-    attendees: form.attendees || "",
-    notes: form.notes || "",
-    status: "Pending",
-    customFields: customData,
-    submittedAt: serverTimestamp(),
+    purpose:       form.purpose,
+    date:          form.date,
+    startTime:     form.startTime,
+    endTime:       form.endTime,
+    attendees:     form.attendees || "",
+    notes:         form.notes || "",
+    status:        "Pending",
+    customFields:  customData,
+    submittedAt:   serverTimestamp(),
   });
-  return refNum;
+  return reservationID;
 }
 
 // ══════════════════════════════
 // 🚔 INCIDENT REPORTS
 // ══════════════════════════════
-export async function submitIncidentReport(householdID, userID, form) {
+/**
+ * @param {string} householdID
+ * @param {string} userID      - Firebase Auth UID
+ * @param {string} residentID  - Firestore doc ID
+ * @param {object} form
+ */
+export async function submitIncidentReport(householdID, userID, residentID, form) {
   const refNum = `PO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "incidentReports"), {
-    refNum, householdID, userID,
-    isAnonymous: form.isAnonymous,
-    reporterName: form.isAnonymous ? "Anonymous" : form.reporterName || "",
-    contact: form.isAnonymous ? "" : form.contact || "",
+    refNum,
+    householdID,
+    userID,       // Firebase Auth UID
+    residentID,   // Firestore doc ID
+    isAnonymous:    form.isAnonymous,
+    reporterName:   form.isAnonymous ? "Anonymous" : form.reporterName || "",
+    contact:        form.isAnonymous ? "" : form.contact || "",
     reporterAddress: form.isAnonymous ? "" : form.reporterAddress || "",
-    incidentType: form.incidentType,
-    location: form.location,
-    date: form.date,
-    time: form.time,
-    description: form.description,
-    urgency: form.urgency,
-    photoFileName: form.photoFile ? form.photoFile.name : "",
-    photoURL: form.photoURL || "",
-    status: "received",
-    updates: [`${form.date} – Report received`],
-    submittedAt: serverTimestamp(),
+    incidentType:   form.incidentType,
+    location:       form.location,
+    date:           form.date,
+    time:           form.time,
+    description:    form.description,
+    urgency:        form.urgency,
+    photoFileName:  form.photoFile ? form.photoFile.name : "",
+    photoURL:       form.photoURL || "",
+    status:         "received",
+    updates:        [`${form.date} – Report received`],
+    submittedAt:    serverTimestamp(),
   });
   return refNum;
 }
@@ -117,27 +144,31 @@ export async function trackIncidentReport(refNum) {
 // ══════════════════════════════
 // 💚 BSWD REPORTS & TIPS
 // ══════════════════════════════
-export async function submitBSWDReport(householdID, userID, form) {
+export async function submitBSWDReport(householdID, userID, residentID, form) {
   await addDoc(collection(db, "bswdReports"), {
-    householdID, userID,
-    type: "homeless_report",
-    reporterName: form.name || "Anonymous",
-    location: form.location,
-    description: form.description,
-    photoFileName: form.photo || "",
-    status: "received",
-    submittedAt: serverTimestamp(),
+    householdID,
+    userID,      // Firebase Auth UID
+    residentID,  // Firestore doc ID
+    type:           "homeless_report",
+    reporterName:   form.name || "Anonymous",
+    location:       form.location,
+    description:    form.description,
+    photoFileName:  form.photo || "",
+    status:         "received",
+    submittedAt:    serverTimestamp(),
   });
 }
 
-export async function submitBSWDTip(householdID, userID, form) {
+export async function submitBSWDTip(householdID, userID, residentID, form) {
   await addDoc(collection(db, "bswdReports"), {
-    householdID, userID,
-    type: "tip",
-    about: form.about,
-    tip: form.tip,
+    householdID,
+    userID,      // Firebase Auth UID
+    residentID,  // Firestore doc ID
+    type:    "tip",
+    about:   form.about,
+    tip:     form.tip,
     contact: form.contact || "",
-    status: "received",
+    status:  "received",
     submittedAt: serverTimestamp(),
   });
 }
@@ -145,25 +176,28 @@ export async function submitBSWDTip(householdID, userID, form) {
 // ══════════════════════════════
 // 💼 LIVELIHOOD REGISTRATIONS
 // ══════════════════════════════
-export async function submitLivelihoodRegistration(householdID, userID, form, program) {
+export async function submitLivelihoodRegistration(householdID, userID, residentID, form, program) {
   const regNum = `LH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "livelihoodRegistrations"), {
-    regNum, householdID, userID,
-    fullName: `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
-    firstName: form.firstName,
-    middleName: form.middleName || "",
-    lastName: form.lastName,
-    address: form.address,
-    contact: form.contact,
-    email: form.email || "",
-    idFileName: form.idFile || "",
-    programId: program.id,
-    programName: program.name,
-    programDate: program.date,
-    programTime: program.time,
+    regNum,
+    householdID,
+    userID,      // Firebase Auth UID
+    residentID,  // Firestore doc ID
+    fullName:        `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
+    firstName:       form.firstName,
+    middleName:      form.middleName || "",
+    lastName:        form.lastName,
+    address:         form.address,
+    contact:         form.contact,
+    email:           form.email || "",
+    idFileName:      form.idFile || "",
+    programId:       program.id,
+    programName:     program.name,
+    programDate:     program.date,
+    programTime:     program.time,
     programLocation: program.location,
-    status: "pending",
-    submittedAt: serverTimestamp(),
+    status:          "pending",
+    submittedAt:     serverTimestamp(),
   });
   return regNum;
 }
@@ -181,40 +215,50 @@ export async function getLivelihoodRegistrations(householdID) {
 // ══════════════════════════════
 // 📋 USER TRANSACTION HISTORY
 // ══════════════════════════════
-export async function fetchUserTransactions(userID) {
-  if (!userID) return [];
+export async function fetchUserTransactions(householdID, residentID, userID, role = "member") {
+  if (!householdID) return [];
 
-  // Fetch document requests
+  const isMyRecord = (item) => {
+    const rId = item.residentID || "";
+    const uId = item.userID || "";
+    if (rId === residentID || uId === residentID) return true;
+    if (role === "head" && (rId === "head" || uId === "head" || rId === userID || uId === userID)) {
+      return true;
+    }
+    return false;
+  };
+
+  // Fetch document requests by householdID
   const docQ = query(
     collection(db, "document_requests"),
-    where("userID", "==", userID)
+    where("householdID", "==", householdID)
   );
   const docSnap = await getDocs(docQ);
   const docs = docSnap.docs.map(d => ({
     id: d.id,
     category: "Document",
     serviceName: d.data().documentType || "Document Request",
-    refNum: d.data().refNum || "",
+    refNum: d.data().requestID || d.data().refNum || "",
     status: d.data().status || "Pending",
     date: d.data().submittedAt,
     ...d.data(),
-  }));
+  })).filter(isMyRecord);
 
-  // Fetch facility reservations
+  // Fetch facility reservations by householdID
   const facQ = query(
     collection(db, "facility_reservations"),
-    where("userID", "==", userID)
+    where("householdID", "==", householdID)
   );
   const facSnap = await getDocs(facQ);
   const facs = facSnap.docs.map(d => ({
     id: d.id,
     category: "Facility",
     serviceName: d.data().facilityName || "Facility Reservation",
-    refNum: d.data().refNum || "",
+    refNum: d.data().reservationID || d.data().refNum || "",
     status: d.data().status || "Pending",
     date: d.data().submittedAt,
     ...d.data(),
-  }));
+  })).filter(isMyRecord);
 
   // Merge and sort by date descending
   const all = [...docs, ...facs];

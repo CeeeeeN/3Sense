@@ -25,7 +25,11 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
   useEffect(() => {
     if (householdID && memberID) {
       getMemberProfile(householdID, memberID)
-        .then(data => setUserData({ ...data, userID: userID }))
+        .then(data => setUserData({
+          ...data,
+          residentID: memberID,   // Firestore doc ID (used for request submissions)
+          // data.userID is the Firebase Auth UID already returned from getMemberProfile
+        }))
         .catch(console.error);
     }
   }, [householdID, memberID, userID]);

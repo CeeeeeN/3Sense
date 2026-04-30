@@ -309,7 +309,7 @@ export default function UserApp() {
           memberID={memberID}
           userID={userID}
         />
-        <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} userID={userID} />
+        <ScanPage onNavigate={handleNav} userName={userName} householdID={householdID} residentID={memberID} userID={userID} />
       </div>
     );
   }
@@ -340,7 +340,7 @@ export default function UserApp() {
           service={feedbackService}
           userName={userName}
           householdID={householdID}
-          userID={userID}
+          userID={memberID}  // FeedbackForm stores this as residentID
         />
       </div>
     );
@@ -359,7 +359,7 @@ export default function UserApp() {
           memberID={memberID}
           userID={userID}
         />
-        <ActivityPage onNavigate={handleNav} userName={userName} />
+        <ActivityPage onNavigate={handleNav} userName={userName} memberID={memberID} householdID={householdID} />
       </div>
     );
   }
