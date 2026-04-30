@@ -4,16 +4,20 @@ import { db } from "../firebase/firebase";
 export const addHouseholdMember = async (householdID, memberData) => {
     if (!householdID) throw new Error("Household ID is required.");
 
+    // Get the household's Firebase Auth UID (shared across all members)
     const hhRef = doc(db, "households", householdID);
     const hhSnap = await getDoc(hhRef);
-    const hhUserID = hhSnap.data()?.userID || "";
+    const hhUserID = hhSnap.data()?.userID || ""; // Firebase Auth UID for the household
 
     const residentsRef = collection(db, "households", householdID, "residents");
     const newMemberRef = doc(residentsRef);
 
     const resident = {
+        residentID: newMemberRef.id,
+        householdID,
         role: memberData.isHead ? "head" : "member",
-        userID: memberData.isHead ? hhUserID : newMemberRef.id,
+        userID: hhUserID,
+
         firstName: memberData.firstName || "",
         middleName: memberData.middleName || "",
         lastName: memberData.lastName || "",
@@ -45,8 +49,9 @@ export const addHouseholdMember = async (householdID, memberData) => {
         occupation: memberData.occupation || "",
         employmentStatus: memberData.employmentStatus || "",
 
-        pin: null,
+        sameAddress: memberData.sameAddress !== undefined ? !!memberData.sameAddress : true,
 
+        pinHash: null,
         createdAt: serverTimestamp(),
         addedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

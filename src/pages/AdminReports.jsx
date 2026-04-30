@@ -47,7 +47,7 @@ export default function Reports() {
       setLoading(true);
       try {
         const q = query(
-          collection(db, "Feedback"),
+          collection(db, "feedback"),
           where("Status", "==", "analyzed")
         );
         const snapshot = await getDocs(q);

@@ -14,12 +14,13 @@ const VALID_STATIC_SERVICES = [
 /**
  * Validates the scanned QR data against Firestore (when applicable) and logs the scan event.
  * @param {string} qrUrl
- * @param {string} userID 
+ * @param {string} residentID 
  * @param {string} householdID 
+ * @param {string} userID 
  */
-export async function processQRScan({ qrUrl, userID, householdID }) {
+export async function processQRScan({ qrUrl, residentID, householdID, userID }) {
   if (!qrUrl) throw new Error("No QR code data provided.");
-  if (!userID || !householdID) throw new Error("Missing user authentication context.");
+  if (!residentID || !householdID || !userID) throw new Error("Missing user authentication context.");
 
   let parsedUrl;
   try {
@@ -86,7 +87,8 @@ export async function processQRScan({ qrUrl, userID, householdID }) {
 
   // Construct Data Payload (snake_case collection / camelCase fields)
   const scanData = {
-    userID,
+    userID,        // Auth UID
+    residentID,    // Member Doc ID
     householdID,
     scanDate: serverTimestamp(),
     category,

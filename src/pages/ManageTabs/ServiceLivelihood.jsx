@@ -5,6 +5,7 @@ import {
   serverTimestamp, query, orderBy,
 } from "firebase/firestore";
 import FormBuilder from "../../components/FormBuilder";
+import { createUserNotification } from "../../services/userNotifications";
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -131,6 +132,16 @@ export default function ServiceLivelihood({ onBack }) {
       await updateDoc(doc(db, "livelihoodRegistrations", p.id), {
         status: "approved", updatedAt: serverTimestamp(),
       });
+      const notifyID = p.residentID || p.userID;
+      if (notifyID) {
+        await createUserNotification(
+          notifyID,
+          "Livelihood Registration Approved",
+          `Your registration for "${prog?.title || p.programName || "the program"}" has been approved!`,
+          "general",
+          p.regNum || p.id
+        );
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -140,9 +151,20 @@ export default function ServiceLivelihood({ onBack }) {
     if (!rejectTarget || !rejectReason.trim()) return;
     setSaving(true);
     try {
+      const p = participants.find(x => x.id === rejectTarget);
       await updateDoc(doc(db, "livelihoodRegistrations", rejectTarget), {
         status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
       });
+      const notifyID = p?.residentID || p?.userID;
+      if (notifyID) {
+        await createUserNotification(
+          notifyID,
+          "Livelihood Registration Rejected",
+          `Your registration for "${p.programName || "the program"}" was rejected. Reason: ${rejectReason.trim()}`,
+          "general",
+          p.regNum || p.id
+        );
+      }
       setShowRejectModal(false); setRejectTarget(null); setRejectReason("");
     } catch (err) { console.error(err); }
     setSaving(false);

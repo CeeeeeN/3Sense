@@ -12,7 +12,7 @@ import { db } from "../firebase/firebase";
 export const generateHouseholdID = async () => {
   const snapshot = await getDocs(collection(db, "households"));
   let maxCount = 0;
-  
+
   snapshot.forEach(doc => {
     const parts = doc.id.split('-');
     // Expected format: HH-YYYY-NNNNN
@@ -50,6 +50,7 @@ export const approveRegistration = async (docID) => {
 
   const householdRef = doc(db, "households", householdID);
   await setDoc(householdRef, {
+    householdID,
     email: data.email || "",
 
     houseNumber: data.houseNumber || "",
@@ -92,7 +93,7 @@ export const approveRegistration = async (docID) => {
   await sendApprovalEmail(householdID, fullName, data.email);
   await deleteDoc(pendingRef);
 
-  return { householdID, email: data.email, name: fullName };
+  return { householdID, registrationID: docID, email: data.email, name: fullName };
 };
 
 const sendApprovalEmail = async (householdID, name, toEmail) => {

@@ -50,12 +50,12 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
 
   // Subscribe to real-time notifications for this user
   useEffect(() => {
-    if (!userID) return;
-    const unsub = subscribeToUserNotifications(userID, (data) => {
+    if (!memberID) return;
+    const unsub = subscribeToUserNotifications(memberID, (data) => {
       setNotifications(data);
     });
     return () => unsub();
-  }, [userID]);
+  }, [memberID]);
 
   useEffect(() => {
     const handler = (e) => {

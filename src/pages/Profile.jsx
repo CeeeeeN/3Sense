@@ -130,8 +130,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
   // Fetch transaction history
   useEffect(() => {
-    if (!userID) { setTxLoading(false); return; }
-    fetchUserTransactions(userID)
+    if (!householdID) { setTxLoading(false); return; }
+    fetchUserTransactions(householdID, memberID, userID, userRole)
       .then(data => {
         setTransactions(data);
         setTxLoading(false);
@@ -140,7 +140,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         console.error("[Profile] Transaction fetch error:", err);
         setTxLoading(false);
       });
-  }, [userID]);
+  }, [householdID, memberID, userID, userRole]);
 
   // Generate QR code whenever fullName or householdID changes
   useEffect(() => {

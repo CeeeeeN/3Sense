@@ -58,7 +58,7 @@ export default function AdminFeedback() {
 
   // --- FETCH FIREBASE DATA ---
   useEffect(() => {
-    const q = query(collection(db, 'Feedback'), orderBy('CreatedAt', 'desc'));
+    const q = query(collection(db, 'feedback'), orderBy('CreatedAt', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fbData = snapshot.docs.map(doc => ({
@@ -86,9 +86,9 @@ export default function AdminFeedback() {
     let pendingCount = 0;
 
     data.forEach(fb => {
-      totalRating += Number(fb.Rating || 0);
-      if (String(fb.Sentiment).toLowerCase() === 'negative') negativeCount++;
-      if (['pending', 'analyzed', 'under review'].includes(String(fb.Status).toLowerCase())) pendingCount++;
+      totalRating += Number(fb.rating || 0);
+      if (String(fb.sentiment).toLowerCase() === 'negative') negativeCount++;
+      if (['pending', 'analyzed', 'under review'].includes(String(fb.status).toLowerCase())) pendingCount++;
     });
 
     setStats({
@@ -101,8 +101,8 @@ export default function AdminFeedback() {
     const stopWords = ['ang', 'mga', 'sa', 'ng', 'na', 'po', 'at', 'ay', 'ito', 'yung', 'the', 'to', 'and', 'a', 'is', 'in', 'of', 'for', 'it', 'was', 'that', 'with'];
     const wordCounts = {};
     data.forEach(fb => {
-      if (fb.Comment) {
-        const words = fb.Comment.toLowerCase().replace(/[^\w\s\u0900-\u097F]/gi, '').split(/\s+/);
+      if (fb.comment) {
+        const words = fb.comment.toLowerCase().replace(/[^\w\s\u0900-\u097F]/gi, '').split(/\s+/);
         words.forEach(word => {
           if (word.length > 2 && !stopWords.includes(word)) wordCounts[word] = (wordCounts[word] || 0) + 1;
         });
@@ -112,8 +112,8 @@ export default function AdminFeedback() {
 
     const hData = {};
     data.forEach(fb => {
-      const facility = fb.FacilityName || "General";
-      const sentiment = fb.Sentiment || "Neutral";
+      const facility = fb.facilityName || "General";
+      const sentiment = fb.sentiment || "Neutral";
       if (!hData[facility]) hData[facility] = { Positive: 0, Neutral: 0, Negative: 0, Total: 0 };
       if (hData[facility][sentiment] !== undefined) {
         hData[facility][sentiment]++;
@@ -127,19 +127,19 @@ export default function AdminFeedback() {
   
   // Rule: Only show Negative feedback that is NOT resolved
   const actionRequiredFeedbacks = feedbacks.filter(fb => 
-    String(fb.Sentiment).toLowerCase() === 'negative' && 
-    String(fb.Status).toLowerCase() !== 'resolved'
+    String(fb.sentiment).toLowerCase() === 'negative' && 
+    String(fb.status).toLowerCase() !== 'resolved'
   );
 
   const allFilteredFeedbacks = feedbacks.filter(fb => {
     const searchStr = String(searchTerm).toLowerCase();
     const matchesSearch = 
-      String(fb.FacilityName || "").toLowerCase().includes(searchStr) ||
-      String(fb.Comment || "").toLowerCase().includes(searchStr) ||
-      String(fb.ReferenceID || "").toLowerCase().includes(searchStr) ||
-      String(fb.UserName || "").toLowerCase().includes(searchStr);
+      String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
+      String(fb.comment || "").toLowerCase().includes(searchStr) ||
+      String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
+      String(fb.userName || "").toLowerCase().includes(searchStr);
       
-    const matchesStatus = filterStatus === 'All' || String(fb.Status).toLowerCase() === filterStatus.toLowerCase();
+    const matchesStatus = filterStatus === 'All' || String(fb.status).toLowerCase() === filterStatus.toLowerCase();
     return matchesSearch && matchesStatus;
   });
 
@@ -151,10 +151,10 @@ export default function AdminFeedback() {
 
   const handleSaveModal = async (docId, adminNote, newStatus) => {
     try {
-      const fbRef = doc(db, "Feedback", docId);
+      const fbRef = doc(db, "feedback", docId);
       await updateDoc(fbRef, { 
-        AdminNotes: adminNote, 
-        Status: newStatus,
+        adminNotes: adminNote, 
+        status: newStatus,
         processedBy: adminName,
         processedRole: adminRole,
         processedAt: new Date()

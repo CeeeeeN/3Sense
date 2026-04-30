@@ -59,7 +59,7 @@ export default function BSWDTab({ userData, householdID }) {
 
       const finalReportData = { ...reportForm, photo: finalPhotoUrl };
 
-      await submitBSWDReport(householdID || "Public", userData?.userID || "", finalReportData);
+      await submitBSWDReport(householdID || "Public", userData?.userID || "", userData?.residentID || "", finalReportData);
 
       // 🆕 Notify admins about new BSWD homeless report
       const reporterLabel = reportForm.name.trim() || "Anonymous";
@@ -91,7 +91,7 @@ export default function BSWDTab({ userData, householdID }) {
     setIsTipSubmitting(true); // 🆕
 
     try {
-      await submitBSWDTip(householdID || "Public", userData?.userID || "", tipForm);
+      await submitBSWDTip(householdID || "Public", userData?.userID || "", userData?.residentID || "", tipForm);
 
       // 🆕 Notify admins about new BSWD tip
       const tipperLabel = tipForm.contact?.trim() || "Anonymous";

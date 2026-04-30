@@ -74,23 +74,23 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
               {/* Note: Mapping over currentData instead of dataList */}
               {currentData.map((fb) => (
                 <tr key={fb.docId}>
-                  <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{fb.CreatedAt}</td>
-                  <td style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>{fb.UserName || "Resident"}</td>
-                  <td style={{ fontWeight: 500 }}>{fb.FacilityName}</td>
+                  <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{fb.createdAt}</td>
+                  <td style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>{fb.userName || "Resident"}</td>
+                  <td style={{ fontWeight: 500 }}>{fb.facilityName}</td>
                   <td>
-                    <div style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#475569', fontSize: '0.9rem' }} title={fb.Comment}>
-                      "{fb.Comment}"
+                    <div style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#475569', fontSize: '0.9rem' }} title={fb.comment}>
+                      "{fb.comment}"
                     </div>
                   </td>
                   <td>
-                    <span style={{ color: fb.Sentiment === 'Positive' ? '#166534' : fb.Sentiment === 'Negative' ? '#991b1b' : '#92400e', fontWeight: 600, fontSize: '0.85rem' }}>
-                      {fb.Sentiment || "Pending AI"}
+                    <span style={{ color: fb.sentiment === 'Positive' ? '#166534' : fb.sentiment === 'Negative' ? '#991b1b' : '#92400e', fontWeight: 600, fontSize: '0.85rem' }}>
+                      {fb.sentiment || "Pending AI"}
                     </span>
                   </td>
-                  <td><SeverityBadge severity={fb.Severity} /></td>
+                  <td><SeverityBadge severity={fb.severity} /></td>
                   <td>
-                    <span className={`status-badge ${String(fb.Status || "pending").replace(' ', '_').toLowerCase()}`}>
-                      {String(fb.Status || "Pending").charAt(0).toUpperCase() + String(fb.Status || "pending").slice(1).replace('_', ' ')}
+                    <span className={`status-badge ${String(fb.status || "pending").replace(' ', '_').toLowerCase()}`}>
+                      {String(fb.status || "Pending").charAt(0).toUpperCase() + String(fb.status || "pending").slice(1).replace('_', ' ')}
                     </span>
                   </td>
                   <td style={{ textAlign: 'center' }}>

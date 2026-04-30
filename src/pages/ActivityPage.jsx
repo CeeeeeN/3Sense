@@ -14,21 +14,21 @@ const getSaved = (key, fallback) => {
 
 // ── STATUS CONFIG ──
 const STATUS = {
-  open:         { label: "Open",             color: "#317D89", bg: "rgba(49,125,137,0.1)"  },
-  ongoing:      { label: "Ongoing",          color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
-  completed:    { label: "Completed",        color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
-  pending:      { label: "Pending",          color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  pending_ai:   { label: "Pending AI",       color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  responded:   { label: "Responded",        color: "#d86a11", bg: "rgba(45,177,123,0.1)"  },
-  analyzed:     { label: "Analyzed",         color: "#1a56a0", bg: "rgba(26,86,160,0.1)"   },
-  approved:     { label: "Approved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
-  rejected:     { label: "Rejected",         color: "#e03e3e", bg: "rgba(224,62,62,0.1)"   },
-  received:     { label: "Received",         color: "#317D89", bg: "rgba(49,125,137,0.1)"  },
-  under_review: { label: "Under Review",     color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  resolved:     { label: "Resolved",         color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
-  claimed:      { label: "Claimed",          color: "#c125d6", bg: "rgba(45,177,123,0.1)"  },
-  processing:   { label: "Processing",       color: "#e8a020", bg: "rgba(232,160,32,0.1)"  },
-  ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)"  },
+  open: { label: "Open", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
+  ongoing: { label: "Ongoing", color: "#1a56a0", bg: "rgba(26,86,160,0.1)" },
+  completed: { label: "Completed", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
+  pending: { label: "Pending", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  pending_ai: { label: "Pending AI", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  responded: { label: "Responded", color: "#d86a11", bg: "rgba(45,177,123,0.1)" },
+  analyzed: { label: "Analyzed", color: "#1a56a0", bg: "rgba(26,86,160,0.1)" },
+  approved: { label: "Approved", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
+  rejected: { label: "Rejected", color: "#e03e3e", bg: "rgba(224,62,62,0.1)" },
+  received: { label: "Received", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
+  under_review: { label: "Under Review", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  resolved: { label: "Resolved", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
+  claimed: { label: "Claimed", color: "#c125d6", bg: "rgba(45,177,123,0.1)" },
+  processing: { label: "Processing", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
 };
 
 // ── Reusable Components ──
@@ -53,7 +53,7 @@ function EmptyState({ message }) {
 }
 
 // ── MAIN ACTIVITY PAGE ──
-export default function ActivityPage({ onNavigate }) {
+export default function ActivityPage({ onNavigate, memberID: propMemberID, householdID: propHouseholdID }) {
   const [activeTab, setActiveTab] = useState("programs");
   const [loading, setLoading] = useState(true);
 
@@ -61,47 +61,48 @@ export default function ActivityPage({ onNavigate }) {
   const [programs, setPrograms] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [reservations, setReservations] = useState([]);
-  const [feedback, setFeedback] = useState([]); // --- ADDED: Feedback State ---
+  const [feedback, setFeedback] = useState([]);
 
   // Limits for "Load More" functionality
   const [progLimit, setProgLimit] = useState(5);
   const [docLimit, setDocLimit] = useState(5);
   const [resLimit, setResLimit] = useState(5);
-  const [feedbackLimit, setFeedbackLimit] = useState(5); // --- ADDED: Feedback Limit ---
+  const [feedbackLimit, setFeedbackLimit] = useState(5);
 
-  const activeUserId = getSaved("userID", null);
+  // residentID = Firestore doc ID of the resident (used for request queries)
+  const residentID = propMemberID || getSaved("memberID", null);
 
   // --- FIREBASE REAL-TIME LISTENERS ---
 
   // Initial Loading Check
   useEffect(() => {
-    if (!activeUserId) { setLoading(true); return; }
+    if (!residentID) { setLoading(true); return; }
     setLoading(false);
-  }, [activeUserId]);
+  }, [residentID]);
 
-  // A. Fetch Programs/Facilities
+  // A. Fetch Programs
   useEffect(() => {
-    if (!activeUserId) return;
+    if (!residentID) return;
     const qPrograms = query(
-      collectionGroup(db, "attendees"), 
-      where("userID", "==", activeUserId),
-      orderBy("createdAt", "desc"),
+      collection(db, "livelihoodRegistrations"),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
       limit(progLimit)
     );
     const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
-      setPrograms(snapshot.docs.map(doc => ({ 
-        id: doc.id, name: doc.data().programName, date: doc.data().programDate, ...doc.data() 
+      setPrograms(snapshot.docs.map(doc => ({
+        id: doc.id, name: doc.data().programName, date: doc.data().programDate, ...doc.data()
       })));
     });
     return () => unsubPrograms();
-  }, [activeUserId, progLimit]);
+  }, [residentID, progLimit]);
 
-  // B. Fetch Documents
+  // B. Fetch Documents — query by residentID
   useEffect(() => {
-    if (!activeUserId) return;
+    if (!residentID) return;
     const qDocs = query(
       collection(db, "document_requests"),
-      where("userID", "==", activeUserId),
+      where("residentID", "==", residentID),
       orderBy("submittedAt", "desc"),
       limit(docLimit)
     );
@@ -109,14 +110,14 @@ export default function ActivityPage({ onNavigate }) {
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubDocs();
-  }, [activeUserId, docLimit]);
+  }, [residentID, docLimit]);
 
-  // C. Fetch Reservations
+  // C. Fetch Reservations — query by residentID
   useEffect(() => {
-    if (!activeUserId) return;
+    if (!residentID) return;
     const qReservations = query(
       collection(db, "facility_reservations"),
-      where("userID", "==", activeUserId),
+      where("residentID", "==", residentID),
       orderBy("submittedAt", "desc"),
       limit(resLimit)
     );
@@ -124,22 +125,22 @@ export default function ActivityPage({ onNavigate }) {
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubReservations();
-  }, [activeUserId, resLimit]);
+  }, [residentID, resLimit]);
 
-  // D. Fetch Feedback --- ADDED ---
+  // D. Fetch Feedback — from lowercase 'feedback' collection, query by residentID
   useEffect(() => {
-    if (!activeUserId) return;
+    if (!residentID) return;
     const qFeedback = query(
-      collection(db, "Feedback"),
-      where("userID", "==", activeUserId),
-      orderBy("CreatedAt", "desc"), // Ensure this matches your Firebase field exactly
+      collection(db, "feedback"),
+      where("residentID", "==", residentID),
+      orderBy("createdAt", "desc"),
       limit(feedbackLimit)
     );
     const unsubFeedback = onSnapshot(qFeedback, (snapshot) => {
       setFeedback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubFeedback();
-  }, [activeUserId, feedbackLimit]);
+  }, [residentID, feedbackLimit]);
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
@@ -159,17 +160,18 @@ export default function ActivityPage({ onNavigate }) {
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item.category || "Program"}</span>
-                <div className="act2-card__title">{item.name || item.eventName}</div>
-                <div className="act2-card__meta">Date: {formatDate(item.createdAt || item.date)}</div>
+                <div className="act2-card__title">{item.programName || item.name || item.eventName}</div>
+                <div className="act2-card__meta">Date: {formatDate(item.createdAt || item.date || item.submittedAt)}</div>
+                <div className="act2-card__ref">Ref: {item.regNum || item.id}</div>
               </div>
-              <StatusBadge status={item.status} />
+              <StatusBadge status={item.status || "pending"} />
             </div>
           </div>
         ))}
         {/* LOAD MORE BUTTON */}
         {programs.length >= progLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button 
+            <button
               onClick={() => setProgLimit(prev => prev + 5)}
               style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
             >
@@ -190,12 +192,12 @@ export default function ActivityPage({ onNavigate }) {
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{item.documentType || item.name}</div>
+                <div className="act2-card__title">{item.documentName || item.documentType || item.name}</div>
                 <div className="act2-card__meta">Date Requested: {formatDate(item.submittedAt || item.createdAt)}</div>
-                <div className="act2-card__ref">Ref: {item.refNum || item.refId || item.id}</div>
+                <div className="act2-card__ref">Ref: {item.requestID || item.refNum || item.refId || item.id}</div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon /> 
+                    <ShieldCheckIcon />
                     <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> - Reason: <strong>{item.rejectionReason}</strong></span>
                   </div>
                 )}
@@ -207,7 +209,7 @@ export default function ActivityPage({ onNavigate }) {
         {/* LOAD MORE BUTTON */}
         {documents.length >= docLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button 
+            <button
               onClick={() => setDocLimit(prev => prev + 5)}
               style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
             >
@@ -230,10 +232,10 @@ export default function ActivityPage({ onNavigate }) {
               <div className="act2-card__main">
                 <div className="act2-card__title">{item.purpose || item.eventName}</div>
                 <div className="act2-card__subtitle">{item.facilityName || item.facility}</div>
-                <div className="act2-card__meta">{formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || "TBA"}</div>
+                <div className="act2-card__meta">Ref: {item.reservationID || item.refNum || item.id} · {formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || "TBA"}</div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon /> 
+                    <ShieldCheckIcon />
                     <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> - Reason: <strong>{item.rejectionReason}</strong> </span>
                   </div>
                 )}
@@ -253,7 +255,7 @@ export default function ActivityPage({ onNavigate }) {
         {/* LOAD MORE BUTTON */}
         {reservations.length >= resLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button 
+            <button
               onClick={() => setResLimit(prev => prev + 5)}
               style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
             >
@@ -274,27 +276,27 @@ export default function ActivityPage({ onNavigate }) {
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{item.FacilityName || "General Service"}</div>
+                <div className="act2-card__title">{item.facilityName || "General Service"}</div>
                 <div className="act2-card__subtitle" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                  <span style={{ color: '#e8a020' }}>★</span> {item.Rating} / 5 Rating
+                  <span style={{ color: '#e8a020' }}>★</span> {item.rating} / 5 Rating
                 </div>
-                <div className="act2-card__meta" style={{ marginTop: '4px' }}>Date Submitted: {formatDate(item.CreatedAt)}</div>
-                <div className="act2-card__ref">Ref: {item.ReferenceID || item.id}</div>
+                <div className="act2-card__meta" style={{ marginTop: '4px' }}>Date Submitted: {formatDate(item.createdAt)}</div>
+                <div className="act2-card__ref">Ref: {item.referenceID || item.id}</div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon /> 
+                    <ShieldCheckIcon />
                     <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
                   </div>
                 )}
               </div>
-              <StatusBadge status={item.Status || "pending"} />
+              <StatusBadge status={item.status || "pending"} />
             </div>
           </div>
         ))}
         {/* LOAD MORE BUTTON */}
         {feedback.length >= feedbackLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button 
+            <button
               onClick={() => setFeedbackLimit(prev => prev + 5)}
               style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
             >
@@ -308,10 +310,10 @@ export default function ActivityPage({ onNavigate }) {
 
   // ── TABS CONFIG ──
   const TABS = [
-    { key: "programs",     label: "Programs & Facilities", icon: <ProgramIcon />,     count: programs.length,     component: <ProgramsFacilitiesTab /> },
-    { key: "documents",    label: "Documents",             icon: <DocumentIcon />,    count: documents.length,    component: <DocumentsTab /> },
-    { key: "reservations", label: "Reservations",          icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
-    { key: "feedback",     label: "Feedback",              icon: <ActivityIcon />,    count: feedback.length,     component: <FeedbackTab /> }, // --- ADDED ---
+    { key: "programs", label: "Programs & Facilities", icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
+    { key: "documents", label: "Documents", icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
+    { key: "reservations", label: "Reservations", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "feedback", label: "Feedback", icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> }, // --- ADDED ---
   ];
 
   const current = TABS.find((t) => t.key === activeTab);
@@ -324,7 +326,7 @@ export default function ActivityPage({ onNavigate }) {
     );
   }
 
-  if (!activeUserId) {
+  if (!residentID) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
         Please select a profile to view activity history.
@@ -385,7 +387,7 @@ export default function ActivityPage({ onNavigate }) {
           <div className="db-footer-top">
             <div className="db-footer-brand">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
               <span>Barangay 3S+ Malanday</span>
               <span className="db-footer-divider">|</span>

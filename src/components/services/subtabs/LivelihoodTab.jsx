@@ -123,8 +123,8 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   // ── Real-time: MY registrations ──────────────────────────────────
   useEffect(() => {
-    const filterField = householdID ? "hhId" : "userId";
-    const filterValue = householdID || userData?.userID;
+    const filterField = "householdID";
+    const filterValue = householdID;
     if (!filterValue) return;
 
     setLoadingMyRegs(true);
@@ -141,7 +141,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       setLoadingMyRegs(false);
     });
     return () => unsub();
-  }, [householdID, userData?.userID]);
+  }, [householdID]);
 
   // ── Slot helpers ─────────────────────────────────────────────────
   // Only APPROVED registrations count toward slots
@@ -199,8 +199,9 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           contactNumber:   form.contact,
           email:           form.email || "",
           idFileName:      form.idFile || "",
-          hhId:            householdID  || "",
-          userId:          userData?.userID || "",
+          householdID:     householdID  || "",     // standardized field name
+          userID:          userData?.userID || "",  // Firebase Auth UID
+          residentID:      userData?.residentID || "",  // Firestore doc ID
           programId:       selectedProgram?.id       || "",
           programName:     selectedProgram?.title    || "",
           programDate:     selectedProgram?.date     || "",

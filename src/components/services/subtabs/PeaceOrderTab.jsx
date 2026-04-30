@@ -92,7 +92,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
       // Attach the secure URL to the form data before sending to Firestore
       const submissionData = { ...form, photoURL: uploadedImageUrl };
 
-      const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", submissionData);
+      const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", userData?.residentID || "", submissionData);
       const finalRef = generatedRef || Array.from({length:8}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random()*36))).join("");
 
       const reporterLabel = form.isAnonymous ? "Anonymous" : (form.reporterName || "Unknown");

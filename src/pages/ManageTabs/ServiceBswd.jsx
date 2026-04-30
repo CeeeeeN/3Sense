@@ -104,10 +104,11 @@ export default function ServiceBswd({ onBack }) {
 
       if (newStatus === "responded" || newStatus === "resolved") {
         const p = reports.find(r => r.id === id);
-        if (p && p.userID) {
+        const notifyID = p?.residentID || p?.userID;
+        if (notifyID) {
           const typeLabel = p.type === "tip" ? "Community Tip" : "Displacement Report";
           await createUserNotification(
-            p.userID,
+            notifyID,
             `${typeLabel} Update`,
             `Your ${typeLabel.toLowerCase()} has been marked as ${newStatus}.`,
             "general",

@@ -6,16 +6,16 @@ import { db } from "../firebase/firebase";
 
 /**
  * Create a personal notification for a specific resident.
- * @param {string} memberID – The resident's subcollection document ID
+ * @param {string} residentID – The resident's Firestore document ID
  * @param {string} title – Notification title
  * @param {string} message – Notification message body
  * @param {string} type – "document_update" | "facility_update" | "program_reminder" | "general"
  * @param {string} [refNum] – Optional reference number
  */
-export async function createUserNotification(memberID, title, message, type, refNum = "") {
+export async function createUserNotification(residentID, title, message, type, refNum = "") {
   try {
-    await addDoc(collection(db, "user_notifications"), {
-      memberID,
+    const ref = await addDoc(collection(db, "user_notifications"), {
+      residentID,           // Firestore doc ID of the resident (replaces memberID)
       title,
       message,
       type,
@@ -24,10 +24,13 @@ export async function createUserNotification(memberID, title, message, type, ref
       createdAt: serverTimestamp(),
     });
 
+    // Write userNotificationID back as a queryable field
+    await updateDoc(ref, { userNotificationID: ref.id });
+
     fetch("/api/pushNotification", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberID, title, message })
+      body: JSON.stringify({ residentID, title, message })
     }).catch(err => console.log("Silent error from FCM push endpoint", err));
   } catch (err) {
     console.error("Failed to create user notification:", err);
@@ -36,19 +39,19 @@ export async function createUserNotification(memberID, title, message, type, ref
 
 /**
  * Subscribe to real-time notifications for a specific resident.
- * @param {string} memberID – The resident's subcollection document ID
+ * @param {string} residentID – The resident's Firestore document ID
  * @param {function} callback – Called with array of notification objects
  * @returns {function} unsubscribe function
  */
-export function subscribeToUserNotifications(memberID, callback) {
-  if (!memberID) {
+export function subscribeToUserNotifications(residentID, callback) {
+  if (!residentID) {
     callback([]);
     return () => { };
   }
 
   const q = query(
     collection(db, "user_notifications"),
-    where("memberID", "==", memberID)
+    where("residentID", "==", residentID)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -85,7 +88,7 @@ export async function markNotificationAsRead(notifId) {
 }
 
 /**
- * Mark all notifications for a member as read.
+ * Mark all notifications for a resident as read.
  * @param {Array} notifications – Array of notification objects with id field
  */
 export async function markAllNotificationsAsRead(notifications) {

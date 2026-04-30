@@ -63,7 +63,7 @@ export default function ManageDocuments() {
   const [adminRole, setAdminRole] = useState("");
 
   const [newDocument, setNewDocument] = useState({
-    title: "",
+    documentName: "",
     processingTime: "",
     fee: "",
     description: "",
@@ -107,13 +107,13 @@ export default function ManageDocuments() {
 
   const handleEdit = (docType) => {
     setNewDocument({
-      title: docType.title || "",
+      documentName:   docType.documentName || docType.title || "",
       processingTime: docType.processingTime || "",
-      fee: docType.fee || "",
-      description: docType.description || "",
-      reminder: docType.reminder || "",
+      fee:            docType.fee || "",
+      description:    docType.description || "",
+      reminder:       docType.reminder || "",
       purposeOptions: docType.purposeOptions || [],
-      customFields: docType.customFields || [],
+      customFields:   docType.customFields || [],
     });
     setPurposeInput("");
     setEditingPurposeIdx(null);
@@ -153,29 +153,20 @@ export default function ManageDocuments() {
     setPurposeFormError("");
     try {
       if (editingDocId) {
-        await updateDoc(doc(db, "documents", editingDocId), { ...newDocument });
-
-        logTransaction(
-          adminName,
-          adminRole,
-          "EDITED_DOCUMENT_TYPE",
-          `Edited document type: ${newDocument.title} (ID: ${editingDocId})`,
-        );
+        await updateDoc(doc(db, "documents", editingDocId), { ...newDocument, updatedAt: serverTimestamp() });
+        logTransaction(adminName, adminRole, "EDITED_DOCUMENT_TYPE", `Edited document type: ${newDocument.documentName} (ID: ${editingDocId})`);
       } else {
-        await addDoc(collection(db, "documents"), {
+        const newRef = await addDoc(collection(db, "documents"), {
           ...newDocument,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
-
-        logTransaction(
-          adminName,
-          adminRole,
-          "ADDED_DOCUMENT_TYPE",
-          `Added new document type: ${newDocument.title} (ID: ${doc.id})`,
-        );
+        // Write documentID back as a queryable field
+        await updateDoc(newRef, { documentID: newRef.id });
+        logTransaction(adminName, adminRole, "ADDED_DOCUMENT_TYPE", `Added new document type: ${newDocument.documentName} (ID: ${newRef.id})`);
       }
       setNewDocument({
-        title: "",
+        documentName: "",
         processingTime: "",
         fee: "",
         description: "",
@@ -241,7 +232,7 @@ export default function ManageDocuments() {
   };
 
   const filteredDocs = documents.filter((d) =>
-    d.title.toLowerCase().includes(searchTerm.toLowerCase()),
+    (d.documentName || d.title || "").toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const totalPages = Math.ceil(filteredDocs.length / ITEMS_PER_PAGE);
@@ -334,7 +325,7 @@ export default function ManageDocuments() {
         {paginatedDocs.map((doc) => (
           <div className="as-card" key={doc.id}>
             <div className="as-card-header">
-              <h2 className="as-card-title">{doc.title}</h2>
+            <h2 className="as-card-title">{doc.documentName || doc.title}</h2>
             </div>
             {doc.description && (
               <div style={{ marginBottom: "10px" }}><DescriptionPreview text={doc.description} /></div>
@@ -416,15 +407,15 @@ export default function ManageDocuments() {
             <div className="as-modal-body" style={{ alignItems: "stretch" }}>
               <form className="as-form" onSubmit={handleAddDocument}>
                 <div className="as-form-group">
-                  <label className="as-form-label">Document Title</label>
+                  <label className="as-form-label">Document Name</label>
                   <input
                     type="text"
                     className="as-form-input"
                     required
                     placeholder="e.g. Barangay Clearance"
-                    value={newDocument.title}
+                    value={newDocument.documentName}
                     onChange={(e) =>
-                      setNewDocument({ ...newDocument, title: e.target.value })
+                      setNewDocument({ ...newDocument, documentName: e.target.value })
                     }
                   />
                 </div>

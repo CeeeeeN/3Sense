@@ -242,7 +242,13 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         let adminStatus = "Clear";
         let uCats = [];
 
-        const residentIdToFetch = String(userRole).toLowerCase() === "head" ? "head" : (memberID || "head");
+        const residentIdToFetch = memberID;
+        if (!residentIdToFetch) {
+          console.warn("[Dashboard] No memberID provided, skipping category fetch.");
+          setDataLoading(false);
+          return;
+        }
+
         const headRef = doc(db, "households", householdID, "residents", residentIdToFetch);
         const headSnap = await getDoc(headRef);
         console.log("[Dashboard] residentIdToFetch", residentIdToFetch, "exists", headSnap.exists());
@@ -273,7 +279,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
         const frSnap = await getDocs(query(collection(db, "facility_reservations"), where("householdID", "==", householdID)));
         const drSnap = await getDocs(query(collection(db, "document_requests"), where("householdID", "==", householdID)));
-        const fbSnap = await getDocs(query(collection(db, "Feedback"), where("householdID", "==", householdID)));
+        const fbSnap = await getDocs(query(collection(db, "feedback"), where("householdID", "==", householdID)));
 
         setWidgets([
           { icon: <VerifiedVisitIcon />, color: "teal", value: frSnap.size.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
