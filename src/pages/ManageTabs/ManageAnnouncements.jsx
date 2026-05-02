@@ -44,6 +44,7 @@ export default function ManageAnnouncements() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAnnId, setEditingAnnId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dateError, setDateError] = useState("");
 
   // For logging purposes
   const [adminName, setAdminName] = useState("");
@@ -135,8 +136,18 @@ export default function ManageAnnouncements() {
   };
 
   const handleAddAnnouncement = async (e) => {
-    e.preventDefault(); 
+    e.preventDefault();
     if (isSubmitting) return;
+
+    // Date validation — only when a date is actually entered
+    if (newAnnouncement.time) {
+      const selected = new Date(newAnnouncement.time);
+      if (selected < new Date()) {
+        setDateError("Date cannot be in the past.");
+        return;
+      }
+    }
+    setDateError("");
     setIsSubmitting(true);
     
     try {
@@ -185,6 +196,7 @@ export default function ManageAnnouncements() {
     setNewAnnouncement({
       title: "", description: "", category: "All Residents", announcementCategory: "General", requirements: [""], location: "", time: ""
     });
+    setDateError("");
     setShowAddModal(true);
   };
 
@@ -382,10 +394,22 @@ export default function ManageAnnouncements() {
                     />
                   </div>
                   <div className="as-form-group">
-                    <label className="as-form-label">Date & Time (Optional)</label>
-                    <input type="datetime-local" className="as-form-input"
-                      value={newAnnouncement.time} onChange={(e) => setNewAnnouncement({...newAnnouncement, time: e.target.value})} 
+                    <label className="as-form-label">Date &amp; Time (Optional)</label>
+                    <input
+                      type="datetime-local"
+                      className="as-form-input"
+                      min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                      value={newAnnouncement.time}
+                      onChange={(e) => {
+                        setNewAnnouncement({ ...newAnnouncement, time: e.target.value });
+                        setDateError("");
+                      }}
                     />
+                    {dateError && (
+                      <p style={{ color: "#e03e3e", fontSize: "0.8rem", marginTop: "6px", marginBottom: 0 }}>
+                        ⚠ {dateError}
+                      </p>
+                    )}
                   </div>
                 </div>
 

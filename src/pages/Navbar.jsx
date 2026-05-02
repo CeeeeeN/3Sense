@@ -18,10 +18,11 @@ const NAV_ITEMS = [
 ];
 
 const NOTIF_ICONS = {
-  document_update: { icon: "📄", bg: "rgba(232,160,32,0.1)" },
-  facility_update: { icon: "🏛️", bg: "rgba(49,125,137,0.1)" },
+  document_update:  { icon: "📄", bg: "rgba(232,160,32,0.1)" },
+  facility_update:  { icon: "🏛️", bg: "rgba(49,125,137,0.1)" },
   program_reminder: { icon: "📢", bg: "rgba(13,122,85,0.1)" },
-  general: { icon: "🔔", bg: "rgba(100,100,200,0.1)" },
+  announcement:     { icon: "📣", bg: "rgba(49,125,137,0.12)" },
+  general:          { icon: "🔔", bg: "rgba(100,100,200,0.1)" },
 };
 
 function formatNotifTime(timestamp) {
@@ -42,20 +43,35 @@ function formatNotifTime(timestamp) {
 export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
   const [notifOpen, setNotifOpen]         = useState(false);
   const [userOpen, setUserOpen]           = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [memberNotifs, setMemberNotifs]       = useState([]);
+  const [householdNotifs, setHouseholdNotifs] = useState([]);
+
+  // Merge both streams, deduplicate by id, sort newest-first
+  const notifications = [...memberNotifs, ...householdNotifs]
+    .filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i)
+    .sort((a, b) => {
+      const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+      const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+      return tb - ta;
+    });
   const notifRef  = useRef(null);
   const userRef   = useRef(null);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // Subscribe to real-time notifications for this user
+  // Transaction notifications (document_update, facility_update, etc.) — keyed by memberID
   useEffect(() => {
     if (!memberID) return;
-    const unsub = subscribeToUserNotifications(memberID, (data) => {
-      setNotifications(data);
-    });
+    const unsub = subscribeToUserNotifications(memberID, setMemberNotifs);
     return () => unsub();
   }, [memberID]);
+
+  // Announcement notifications — keyed by householdID (globally unique)
+  useEffect(() => {
+    if (!householdID) return;
+    const unsub = subscribeToUserNotifications(householdID, setHouseholdNotifs);
+    return () => unsub();
+  }, [householdID]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -78,6 +94,14 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
     await deleteUserNotification(id);
+  };
+  const handleNotifClick = (n) => {
+    markRead(n.id);
+    setNotifOpen(false);
+    // Announcement notifications deep-link to the announcement popup
+    if (n.type === "announcement" && n.refNum && onNavigate) {
+      onNavigate("home", { announcementID: n.refNum });
+    }
   };
   const nav = (page) => { if (onNavigate) onNavigate(page); };
 
@@ -131,7 +155,7 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                     notifications.map(n => {
                       const style = NOTIF_ICONS[n.type] || NOTIF_ICONS.general;
                       return (
-                        <div key={n.id} className={`nb-notif-item${!n.isRead ? " unread" : ""}`} onClick={() => markRead(n.id)}>
+                        <div key={n.id} className={`nb-notif-item${!n.isRead ? " unread" : ""}`} onClick={() => handleNotifClick(n)}>
                           <div className="nb-notif-icon" style={{ background: style.bg }}>{style.icon}</div>
                           <div className="nb-notif-body">
                             <div className="nb-notif-title">{n.title}</div>

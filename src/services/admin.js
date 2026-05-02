@@ -107,7 +107,7 @@ const sendApprovalEmail = async (householdID, name, toEmail) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Barangay 3S+ Malanday <onboarding@resend.dev>",
+      from: "Barangay 3S+ Malanday <noreply@3s-sense.site>",
       to: [toEmail],
       subject: "Your Barangay 3S+ Registration Has Been Approved",
       html: buildApprovalEmail(householdID, name),

@@ -203,7 +203,7 @@ function PaginationBar({ current, total, onChange }) {
   );
 }
 
-export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, userRole }) {
+export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, userRole, pendingAnnID, onAnnConsumed }) {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [showAllAnns, setShowAllAnns] = useState(false);
   const [alertPage, setAlertPage] = useState(1);
@@ -226,6 +226,18 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
     });
     return () => unsubAnns();
   }, []);
+
+  // Deep-link: open a specific announcement popup when arriving from a notification
+  useEffect(() => {
+    if (!pendingAnnID || announcementsData.length === 0) return;
+    const raw = announcementsData.find((a) => a.id === pendingAnnID);
+    if (raw) {
+      const processed = mapAnnouncements([raw])[0];
+      setSelectedAnn(processed);
+      if (onAnnConsumed) onAnnConsumed();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAnnID, announcementsData]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {

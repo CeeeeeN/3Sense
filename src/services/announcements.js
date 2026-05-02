@@ -1,5 +1,74 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { createUserNotification } from "./userNotifications";
+
+/**
+ * Fan out an in-app notification to every HOUSEHOLD that has at least one
+ * resident whose categories array contains the announcement's target category.
+ * Targets the householdID (globally unique) instead of the resident doc ID
+ * (which is NOT unique — e.g. "head" exists in every household).
+ * Only runs for specific-category announcements — skips "All Residents".
+ * Fire-and-forget: errors are silently swallowed so they never block the post.
+ */
+const fanOutAnnouncementNotification = async ({ title, description, category, announcementID }) => {
+  // "All Residents" announcements do NOT trigger notifications
+  if (!category || category.trim().toLowerCase() === "all residents") return;
+
+  const categoryClean = category.trim().toLowerCase();
+  console.log(`[fanOut] Starting fan-out for category: "${category}"`);
+
+  try {
+    // Fetch all residents across all households (no composite index needed)
+    const snap = await getDocs(collectionGroup(db, "residents"));
+
+    if (snap.empty) {
+      console.warn("[fanOut] No residents found in collectionGroup.");
+      return;
+    }
+
+    // Collect unique householdIDs that have at least one resident matching the category
+    const matchedHouseholdIDs = new Set();
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      const cats = Array.isArray(data.categories) ? data.categories : [];
+      const matches = cats.some((c) => String(c).trim().toLowerCase() === categoryClean);
+      if (matches) {
+        // d.ref.parent.parent.id is the householdID — always globally unique
+        const householdID = d.ref.parent.parent?.id;
+        if (householdID) matchedHouseholdIDs.add(householdID);
+      }
+    });
+
+    console.log(`[fanOut] Matched ${matchedHouseholdIDs.size} household(s) for category "${category}"`);
+
+    if (matchedHouseholdIDs.size === 0) return;
+
+    // Send ONE notification per household (keyed by householdID so the Navbar
+    // subscription can pick it up via householdID instead of residentID)
+    const results = await Promise.allSettled(
+      [...matchedHouseholdIDs].map((householdID) =>
+        createUserNotification(
+          householdID,                           // globally unique key
+          `📢 New Announcement`,
+          `${title} — ${description}`.slice(0, 200),
+          "announcement",
+          announcementID                         // refNum — used to deep-link to the announcement
+        )
+      )
+    );
+
+    const failed = results.filter((r) => r.status === "rejected");
+    if (failed.length > 0) {
+      console.warn(`[fanOut] ${failed.length} notification(s) failed:`, failed);
+    } else {
+      console.log(`[fanOut] ✅ Sent to ${matchedHouseholdIDs.size} household(s) successfully.`);
+    }
+  } catch (err) {
+    console.error("[fanOut] Announcement notification error:", err);
+  }
+};
+
+
 
 export const createAnnouncement = async (data, adminID) => {
   const announcementsRef = collection(db, "announcements");
@@ -17,6 +86,14 @@ export const createAnnouncement = async (data, adminID) => {
     updatedAt: serverTimestamp(),
   });
   await updateDoc(newRef, { announcementID: newRef.id });
+
+  // Fire-and-forget: notify matching residents (category-specific only)
+  fanOutAnnouncementNotification({
+    title: data.title || "",
+    description: data.description || "",
+    category: data.category || "All Residents",
+    announcementID: newRef.id,
+  });
 };
 
 export const updateAnnouncement = async (id, data) => {

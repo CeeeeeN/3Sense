@@ -288,8 +288,8 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
               {
                 icon: "📊",
                 bg: "rgba(26,79,138,0.07)",
-                title: "Smart Alerts",
-                desc: "Receive personalized alerts based on your profile — scholarships for students, health programs for seniors and PWDs, and more.",
+                title: "Category-Based Announcements",
+                desc: "Receive personalized announcements based on your category. Stay informed about relevant news, events, and updates in your community.",
                 delay: 0.25,
               },
             ].map((f, i) => (
