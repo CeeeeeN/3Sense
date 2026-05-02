@@ -127,7 +127,7 @@ export const resetMemberPin = async (householdID, residentID) => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                from: "Barangay 3S+ Malanday <onboarding@resend.dev>",
+                from: "Barangay 3S+ Malanday <noreply@3s-sense.site>",
                 to: [residentEmail],
                 subject: "Your 3S Sense PIN Has Been Reset",
                 html: buildPinResetEmail(

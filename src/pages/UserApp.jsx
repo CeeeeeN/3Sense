@@ -83,6 +83,7 @@ export default function UserApp() {
   );
   const [hhAddress, setHhAddress] = useState(null);
   const [hhHeadName, setHhHeadName] = useState("");
+  const [pendingAnnID, setPendingAnnID] = useState(null);
   const [feedbackService, setFeedbackService] = useState(
     scannedServiceId ? { id: scannedServiceId, name: scannedServiceName } : null,
   );
@@ -150,6 +151,9 @@ export default function UserApp() {
     } else if (p === "feedback" && data?.service) {
       setFeedbackService(data.service);
       setPage("feedback");
+    } else if ((p === "home" || p === "dashboard") && data?.announcementID) {
+      setPendingAnnID(data.announcementID);
+      setPage("home");
     } else {
       setPage(p);
     }
@@ -273,7 +277,15 @@ export default function UserApp() {
           memberID={memberID}
           userID={userID}
         />
-        <Dashboard userName={userName} onNavigate={handleNav} householdID={householdID} memberID={memberID} userRole={userRole} />
+        <Dashboard
+          userName={userName}
+          onNavigate={handleNav}
+          householdID={householdID}
+          memberID={memberID}
+          userRole={userRole}
+          pendingAnnID={pendingAnnID}
+          onAnnConsumed={() => setPendingAnnID(null)}
+        />
       </div>
     );
   }
