@@ -118,12 +118,10 @@ export const resetMemberPin = async (householdID, residentID) => {
 
     await updateDoc(ref, { pinHash: null, updatedAt: new Date() });
 
-    const apiKey = import.meta.env.VITE_RESEND_API_KEY;
-    if (apiKey) {
-        await fetch("/resend/emails", {
+    try {
+        await fetch("/api/resend-email", {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
@@ -135,6 +133,9 @@ export const resetMemberPin = async (householdID, residentID) => {
                 ),
             }),
         });
+    } catch (error) {
+        console.error("Failed to send PIN reset email:", error);
+        // Don't throw - the PIN was still reset, email is just a courtesy
     }
 
     const [user, domain] = residentEmail.split("@");

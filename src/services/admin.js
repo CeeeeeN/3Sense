@@ -97,26 +97,27 @@ export const approveRegistration = async (docID) => {
 };
 
 const sendApprovalEmail = async (householdID, name, toEmail) => {
-  const apiKey = import.meta.env.VITE_RESEND_API_KEY;
-  if (!apiKey) { console.warn("VITE_RESEND_API_KEY not set. Skipping email."); return; }
+  try {
+    const response = await fetch("/api/resend-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Barangay 3S+ Malanday <noreply@3s-sense.site>",
+        to: [toEmail],
+        subject: "Your Barangay 3S+ Registration Has Been Approved",
+        html: buildApprovalEmail(householdID, name),
+      }),
+    });
 
-  const response = await fetch("/resend/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "Barangay 3S+ Malanday <noreply@3s-sense.site>",
-      to: [toEmail],
-      subject: "Your Barangay 3S+ Registration Has Been Approved",
-      html: buildApprovalEmail(householdID, name),
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Failed to send email: ${error.message || response.statusText}`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Failed to send email: ${error.message || response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Email sending error:", error);
+    throw error;
   }
 };
 
