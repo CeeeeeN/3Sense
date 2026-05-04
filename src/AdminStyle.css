@@ -655,7 +655,9 @@ nav {
 .af-page-btn.active {
   @apply bg-[#42888D] text-[white] border-[#42888D];
 }
-
+.af-page-btn:disabled {
+  @apply opacity-50 cursor-not-allowed pointer-events-none bg-gray-100 text-gray-400;
+}
 /* Modal Popup */
 .af-modal-overlay {
   @apply fixed bg-[rgba(0,0,0,0.5)] flex items-center justify-center z-[1000] inset-0;
@@ -877,7 +879,7 @@ nav {
   @apply mt-4;
 }
 .section-header {
-  @apply flex justify-between items-center;
+  @apply flex justify-between items-center mb-4;
 }
 .admin-table {
   @apply w-full table-fixed mt-[rem] border-collapse;
@@ -1028,7 +1030,7 @@ nav {
 }
 
 /* =========================================
-   ADMIN REQUESTS PAGE STYLES
+   ADMIN REQUESTS PAGE STYLES                                                         
    ========================================= */
 .requests-container {
   @apply bg-gray-50 min-h-[calc(100vh_-_64px)] w-full box-border p-8 w-full;
