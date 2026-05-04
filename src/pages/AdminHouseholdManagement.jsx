@@ -422,7 +422,7 @@ export default function HouseholdManagement() {
       const notifMsg = statusData.status === "Clear Case"
         ? "Your barangay status is now Clear."
         : `Your barangay status has been updated to: ${statusData.status}.`;
-      await createUserNotification(statusData.id, "Status Update", notifMsg, "general");
+      await createUserNotification(statusData.householdId, statusData.id, "Status Update", notifMsg, "general");
 
       logTransaction(
         adminName,
