@@ -26,6 +26,7 @@ export default function AdminLayout({ children }) {
     "/admin/feedback": "Feedback",
     "/admin/admin-management": "Admin Management",
     "/admin/household-management": "Household Management",
+    "/admin/logs": "Audit Logs",
     "/admin/reports": "Reports",
     "/admin/profile": "My Profile",
   };
