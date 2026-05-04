@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
-import { collection, collectionGroup, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { ActivityIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 
 // ── SESSION HELPER ──
@@ -69,23 +69,26 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const [resLimit, setResLimit] = useState(5);
   const [feedbackLimit, setFeedbackLimit] = useState(5);
 
-  // residentID = Firestore doc ID of the resident (used for request queries)
-  const residentID = propMemberID || getSaved("memberID", null);
+  // SECURE IDS: Get both residentID and householdID from props or session
+  const residentID = propMemberID || getSaved("memberID", null); // Fixed to memberID
+  const householdID = propHouseholdID || getSaved("householdID", null); // Added householdID
 
   // --- FIREBASE REAL-TIME LISTENERS ---
 
   // Initial Loading Check
   useEffect(() => {
-    if (!residentID) { setLoading(true); return; }
+    // Wait until BOTH IDs are loaded
+    if (!residentID || !householdID) { setLoading(true); return; }
     setLoading(false);
-  }, [residentID]);
+  }, [residentID, householdID]);
 
-  // A. Fetch Programs
+  // A. Fetch Programs — SECURED
   useEffect(() => {
-    if (!residentID) return;
+    if (!residentID || !householdID) return;
     const qPrograms = query(
       collection(db, "livelihoodRegistrations"),
-      where("residentID", "==", residentID),
+      where("householdID", "==", householdID), // SECURE: Filter by household
+      where("residentID", "==", residentID),   // SECURE: Filter by resident
       orderBy("submittedAt", "desc"),
       limit(progLimit)
     );
@@ -95,14 +98,15 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       })));
     });
     return () => unsubPrograms();
-  }, [residentID, progLimit]);
+  }, [residentID, householdID, progLimit]);
 
-  // B. Fetch Documents — query by residentID
+  // B. Fetch Documents — SECURED
   useEffect(() => {
-    if (!residentID) return;
+    if (!residentID || !householdID) return;
     const qDocs = query(
       collection(db, "document_requests"),
-      where("residentID", "==", residentID),
+      where("householdID", "==", householdID), // SECURE: Filter by household
+      where("residentID", "==", residentID),   // SECURE: Filter by resident
       orderBy("submittedAt", "desc"),
       limit(docLimit)
     );
@@ -110,14 +114,15 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubDocs();
-  }, [residentID, docLimit]);
+  }, [residentID, householdID, docLimit]);
 
-  // C. Fetch Reservations — query by residentID
+  // C. Fetch Reservations — SECURED
   useEffect(() => {
-    if (!residentID) return;
+    if (!residentID || !householdID) return;
     const qReservations = query(
       collection(db, "facility_reservations"),
-      where("residentID", "==", residentID),
+      where("householdID", "==", householdID), // SECURE: Filter by household
+      where("residentID", "==", residentID),   // SECURE: Filter by resident
       orderBy("submittedAt", "desc"),
       limit(resLimit)
     );
@@ -125,14 +130,15 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubReservations();
-  }, [residentID, resLimit]);
+  }, [residentID, householdID, resLimit]);
 
-  // D. Fetch Feedback — from lowercase 'feedback' collection, query by residentID
+  // D. Fetch Feedback — SECURED
   useEffect(() => {
-    if (!residentID) return;
+    if (!residentID || !householdID) return;
     const qFeedback = query(
       collection(db, "feedback"),
-      where("residentID", "==", residentID),
+      where("householdID", "==", householdID), // SECURE: Filter by household
+      where("residentID", "==", residentID),   // SECURE: Filter by resident
       orderBy("createdAt", "desc"),
       limit(feedbackLimit)
     );
@@ -140,7 +146,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setFeedback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubFeedback();
-  }, [residentID, feedbackLimit]);
+  }, [residentID, householdID, feedbackLimit]);
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
@@ -156,7 +162,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return (
       <div className="act2-list">
         {programs.map((item, index) => (
-          <div key={`${item.programId}-${index}`} className="act2-card">
+          <div key={`${item.id}-${index}`} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item.category || "Program"}</span>
@@ -313,7 +319,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     { key: "programs", label: "Programs & Facilities", icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
     { key: "documents", label: "Documents", icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
     { key: "reservations", label: "Reservations", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
-    { key: "feedback", label: "Feedback", icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> }, // --- ADDED ---
+    { key: "feedback", label: "Feedback", icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
   ];
 
   const current = TABS.find((t) => t.key === activeTab);
@@ -326,7 +332,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   }
 
-  if (!residentID) {
+  if (!residentID || !householdID) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
         Please select a profile to view activity history.
