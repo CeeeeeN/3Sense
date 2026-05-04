@@ -461,11 +461,11 @@ export default function AdminManagement() {
 
                 <input
                   type="text"
-                  placeholder="Search admin..."
+                  placeholder="Search requests..."
                   className="search-input"
-                  value={searchAdmin}
-                  onChange={(e) => setSearchAdmin(e.target.value)}
-                  style={{ paddingLeft: "36px" }} // important so text doesn't overlap icon
+                  value={searchRequest}
+                  onChange={(e) => setSearchRequest(e.target.value)}
+                  style={{ paddingLeft: "36px" }}
                 />
               </div>
 
@@ -660,10 +660,10 @@ export default function AdminManagement() {
 
                 <input
                   type="text"
-                  placeholder="Search requests..."
+                  placeholder="Search admin..."
                   className="search-input"
-                  value={searchRequest}
-                  onChange={(e) => setSearchRequest(e.target.value)}
+                  value={searchAdmin}
+                  onChange={(e) => setSearchAdmin(e.target.value)}
                   style={{ paddingLeft: "36px" }}
                 />
               </div>
