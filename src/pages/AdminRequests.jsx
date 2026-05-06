@@ -266,13 +266,16 @@ export default function AdminRequests() {
         `Approved ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
       );
 
-      // Notify the resident
-      const memberID = target.allData?.residentID || target.allData?.userID || "";
-      const refNum = target.id || "";
-      if (memberID) {
+      // Notify the resident — filter by both householdID + residentID so heads
+      // in different households don't share the same notification stream.
+      const residentID = target.allData?.residentID || target.allData?.userID || "";
+      const hhID       = target.allData?.householdID || "";
+      const refNum     = target.id || "";
+      if (residentID && hhID) {
         const label = target.category === 'Document' ? target.type : target.type;
         await createUserNotification(
-          memberID,
+          hhID,
+          residentID,
           `${target.category} Request Approved`,
           `Your request for "${label}" has been approved.`,
           target.category === 'Document' ? 'document_update' : 'facility_update',
@@ -307,11 +310,13 @@ export default function AdminRequests() {
         `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`
       );
 
-      const memberID = target.allData?.residentID || target.allData?.userID || "";
-      const refNum = target.id || "";
-      if (memberID) {
+      const residentID = target.allData?.residentID || target.allData?.userID || "";
+      const hhID       = target.allData?.householdID || "";
+      const refNum     = target.id || "";
+      if (residentID && hhID) {
         await createUserNotification(
-          memberID,
+          hhID,
+          residentID,
           "Document Ready for Pickup",
           `Your document "${target.type}" is now ready for pickup at the Barangay Hall.`,
           'document_update',
@@ -346,11 +351,13 @@ export default function AdminRequests() {
         `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`
       );
 
-      const memberID = target.allData?.residentID || target.allData?.userID || "";
-      const refNum = target.id || "";
-      if (memberID) {
+      const residentID = target.allData?.residentID || target.allData?.userID || "";
+      const hhID       = target.allData?.householdID || "";
+      const refNum     = target.id || "";
+      if (residentID && hhID) {
         await createUserNotification(
-          memberID,
+          hhID,
+          residentID,
           "Document Claimed",
           `Your document "${target.type}" has been marked as claimed. Thank you!`,
           'document_update',
@@ -389,12 +396,14 @@ export default function AdminRequests() {
         `Rejected ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
       );
 
-      const memberID = selectedRequest.allData?.residentID || selectedRequest.allData?.userID || "";
-      const refNum = selectedRequest.id || "";
-      if (memberID) {
+      const residentID = selectedRequest.allData?.residentID || selectedRequest.allData?.userID || "";
+      const hhID       = selectedRequest.allData?.householdID || "";
+      const refNum     = selectedRequest.id || "";
+      if (residentID && hhID) {
         const label = selectedRequest.type || 'Request';
         await createUserNotification(
-          memberID,
+          hhID,
+          residentID,
           `${selectedRequest.category} Request Rejected`,
           `Your request for "${label}" has been rejected. Reason: ${rejectReason}`,
           selectedRequest.category === 'Document' ? 'document_update' : 'facility_update',
