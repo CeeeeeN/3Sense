@@ -1420,7 +1420,7 @@ nav {
   background: var(--primary);
 }
 .profile-card {
-  @apply border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
+  @apply border block border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
   background: white;
 }
 .profile-header {
