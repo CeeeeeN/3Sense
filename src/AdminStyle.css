@@ -1640,9 +1640,6 @@ nav {
    TABLET (<=1024px)
 ========================= */
 @media (max-width: 1024px) {
-      /* =========================
-  Dashboard
-========================= */
   .admin-layout {
     @apply grid-cols-[1fr];
   }
@@ -1670,14 +1667,6 @@ nav {
   .admin-layout .right-panel {
     @apply p-4;
   }
-
-
-/* =========================
-   For other pages
-========================= */
-/* =========================
-   For other pages
-========================= */
  
   /* ── Manage Page ── */
   .as-container {
@@ -1825,13 +1814,11 @@ nav {
     @apply flex-wrap gap-2;
   }
 }
+
 /* =========================
    MOBILE (<=640px)
 ========================= */
 @media (max-width: 640px) {
-  /* =========================
-  Dashboard
-========================= */
    .admin-layout .right-panel {
     @apply p-3;
   }
@@ -1865,10 +1852,6 @@ nav {
   .ai-issue-header {
     @apply flex-1 ;
   }
- 
-  /* =========================
-   For other pages
-========================= */
  
   /* ── Manage Page ── */
   .as-container {
