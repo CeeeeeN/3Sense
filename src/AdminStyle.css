@@ -116,7 +116,7 @@ label {
   @apply relative flex items-center;
 }
 .input-wrap .field-icon {
-  @apply absolute -translate-y-2/4 w-4 h-4 text-[color:var(--muted)] pointer-events-none transition-[color] duration-[0.2s] left-[0.9rem] top-2/4;
+  @apply absolute text-[color:var(--muted)] pointer-events-none transition-[color] duration-[0.2s] left-[0.9rem] top-2/4;
 }
 .input-wrap:focus-within .field-icon {
   @apply text-[color:var(--primary)];
