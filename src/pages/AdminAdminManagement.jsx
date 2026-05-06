@@ -430,19 +430,9 @@ export default function AdminManagement() {
               </div>
 
               {viewMode === "default" ? (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("requests")}
-                >
-                  See All Requests
-                </button>
+                <button className="view-btn" onClick={() => setViewMode("requests")}> See All Requests </button>
               ) : (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("default")}
-                >
-                  Return
-                </button>
+                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchRequest(""); setFilterStatus("All"); setRequestPage(1); }}> Return </button>
               )}
             </div>
             <div className="requests-controls">
@@ -612,7 +602,7 @@ export default function AdminManagement() {
                   )}
 
                   {/* Showing text */}
-                  <div style={{ fontSize: "0.85rem" }}>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                     Showing {requestStartIndex + 1} to{" "}
                     {Math.min(requestStartIndex + requestRowsPerPage, filteredRequests.length)} of{" "}
                     {filteredRequests.length}
@@ -629,19 +619,9 @@ export default function AdminManagement() {
             <div className="section-header">
               <h2 className="requests-title"> Admin Account Management</h2>
               {viewMode === "default" ? (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("admins")}
-                >
-                  See All Admins
-                </button>
+                <button className="view-btn" onClick={() => setViewMode("admins")}> See All Admins </button>
               ) : (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("default")}
-                >
-                  Return
-                </button>
+                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchAdmin(""); setAdminPage(1); }}> Return </button>
               )}
             </div>
             <div className="requests-controls">
@@ -782,7 +762,7 @@ export default function AdminManagement() {
                   )}
 
                   {/* Showing text */}
-                  <div style={{ fontSize: "0.85rem" }}>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                     Showing {adminStartIndex + 1} to{" "}
                     {Math.min(adminStartIndex + adminRowsPerPage, filteredAdmins.length)} of{" "}
                     {filteredAdmins.length}
