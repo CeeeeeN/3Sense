@@ -301,7 +301,7 @@ nav {
   font-family: "Poppins", sans-serif;
 }
 .admin-layout .nav-links {
-  @apply flex flex-col gap-4 relative z-[1] mt-32;
+  @apply flex flex-col gap-4 relative z-[1] mt-24;
 }
 .admin-layout .nav-links a {
   @apply w-full text-[white] no-underline font-semibold transition-[0.2s] flex items-center gap-3 p-4 rounded-lg;
