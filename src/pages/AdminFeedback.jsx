@@ -58,7 +58,7 @@ export default function AdminFeedback() {
 
   // --- FETCH FIREBASE DATA ---
   useEffect(() => {
-    const q = query(collection(db, 'feedback'), orderBy('CreatedAt', 'desc'));
+    const q = query(collection(db, "feedback"), orderBy("CreatedAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fbData = snapshot.docs.map(doc => {
