@@ -2,6 +2,7 @@ import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useCallback } from "react";
 import { loginWithHouseholdID, getMemberPin, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
 import {LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser} from "../components/Icons";
+
 function MobileHeader({ onBack }) {
   return (
     <div className="mobile-auth-header" onClick={onBack} style={{ cursor: "pointer" }}>
@@ -19,7 +20,6 @@ function MobileHeader({ onBack }) {
 function ScreenTag({ step, icon }) {
   return (
     <div className="screen-tag">
-
       {icon}
       {step}
     </div>
@@ -32,8 +32,22 @@ function ProfileCard({ profile, selected, onSelect }) {
       className={`profile-card ${selected ? "selected" : ""}`}
       onClick={() => onSelect(profile)}
     >
-      <div className="profile-avatar" style={{ background: profile.color }}>
-        {profile.initials}
+      <div 
+        className="profile-avatar" 
+        style={{ 
+          background: profile.color,
+          overflow: "hidden"
+        }}
+      >
+        {profile.profilePhoto ? (
+          <img 
+            src={profile.profilePhoto} 
+            alt={profile.name} 
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+          />
+        ) : (
+          profile.initials
+        )}
       </div>
       <div className="profile-info">
         <div className="profile-name">{profile.name}</div>
@@ -98,6 +112,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           initials: initials || "M",
           role: m.role === "head" ? "head" : "member",
           color: COLORS[i % COLORS.length],
+          profilePhoto: m.profilePhoto || null, // <-- ADDED: Extract photo from backend
         };
       });
       // head always first
@@ -379,8 +394,22 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </p>
 
               <div className="pin-profile-mini">
-                <div className="mini-avatar" style={{ background: selectedProfile?.color }}>
-                  {selectedProfile?.initials}
+                <div 
+                  className="mini-avatar" 
+                  style={{ 
+                    background: selectedProfile?.color,
+                    overflow: "hidden" // <-- ADDED: keeps the image inside the circle
+                  }}
+                >
+                  {selectedProfile?.profilePhoto ? (
+                    <img 
+                      src={selectedProfile.profilePhoto} 
+                      alt={selectedProfile.name} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                    />
+                  ) : (
+                    selectedProfile?.initials
+                  )}
                 </div>
                 <span className="mini-name">{selectedProfile?.name}</span>
               </div>
