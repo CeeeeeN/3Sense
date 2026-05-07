@@ -24,8 +24,8 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: feedback.Comment,
-          rating: Number(feedback.Rating) || 5
+          text: feedback.comment,
+          rating: Number(feedback.rating) || 5
         })
       });
 

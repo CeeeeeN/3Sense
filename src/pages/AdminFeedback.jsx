@@ -58,29 +58,31 @@ export default function AdminFeedback() {
 
   // --- FETCH FIREBASE DATA ---
   useEffect(() => {
-    const q = query(collection(db, "feedback"), orderBy("CreatedAt", "desc"));
+    const q = query(collection(db, "feedback"), orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fbData = snapshot.docs.map(doc => {
         const data = doc.data();
 
-        // Handle both createdAt and CreatedAt variations
         let formattedDate = "Unknown";
         if (data.createdAt?.toDate) {
           formattedDate = data.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
-        } else if (data.CreatedAt?.toDate) {
-          formattedDate = data.CreatedAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
         } else if (typeof data.createdAt === 'string') {
           formattedDate = data.createdAt;
-        } else if (typeof data.CreatedAt === 'string') {
-          formattedDate = data.CreatedAt;
         }
 
         return {
           docId: doc.id,
           ...data,
+          userName: data.userName || data.UserName || "Resident",
+          comment: data.comment || data.Comment || "",
+          rating: data.rating || data.Rating || 0,
+          facilityName: data.facilityName || data.FacilityName || "General",
+          sentiment: data.sentiment || data.Sentiment || "Pending AI",
+          severity: data.severity || data.Severity || null,
+          status: data.status || data.Status || "pending",
+          referenceID: data.referenceID || data.ReferenceID || "Unknown",
           createdAt: formattedDate,
-          CreatedAt: formattedDate
         };
       });
 
