@@ -132,10 +132,12 @@ export default function ServiceLivelihood({ onBack }) {
       await updateDoc(doc(db, "livelihoodRegistrations", p.id), {
         status: "approved", updatedAt: serverTimestamp(),
       });
-      const notifyID = p.residentID || p.userID;
-      if (notifyID) {
+      const residentID = p.residentID || p.userID;
+      const hhID       = p.householdID;
+      if (residentID && hhID) {
         await createUserNotification(
-          notifyID,
+          hhID,
+          residentID,
           "Livelihood Registration Approved",
           `Your registration for "${prog?.title || p.programName || "the program"}" has been approved!`,
           "general",
@@ -155,10 +157,12 @@ export default function ServiceLivelihood({ onBack }) {
       await updateDoc(doc(db, "livelihoodRegistrations", rejectTarget), {
         status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
       });
-      const notifyID = p?.residentID || p?.userID;
-      if (notifyID) {
+      const residentID = p?.residentID || p?.userID;
+      const hhID       = p?.householdID;
+      if (residentID && hhID) {
         await createUserNotification(
-          notifyID,
+          hhID,
+          residentID,
           "Livelihood Registration Rejected",
           `Your registration for "${p.programName || "the program"}" was rejected. Reason: ${rejectReason.trim()}`,
           "general",

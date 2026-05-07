@@ -19,6 +19,7 @@ import {
 } from "firebase/firestore";
 import { approveRegistration } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
+import { Search } from "lucide-react";
 
 export default function HouseholdManagement() {
 
@@ -37,8 +38,9 @@ export default function HouseholdManagement() {
   const [residentToDelete, setResidentToDelete] = useState(null);
 
   const [page, setPage] = useState(1);
-  const rowsPerPage = 10;
-  const defaultRows = 10;
+  const defaultRows = 3;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [hhRowsPerPage, setHhRowsPerPage] = useState(10);
 
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusData, setStatusData] = useState(null);
@@ -65,26 +67,26 @@ export default function HouseholdManagement() {
   const [adminProfile, setAdminProfile] = useState({ fullName: "Admin", position: "" });
 
   useEffect(() => {
-        // Listen for the currently logged-in user
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            // Find their document in the approvedAdmins collection
-            const q = query(
-              collection(db, "approvedAdmins"), 
-              where("uid", "==", user.uid)
-            );
-            const snapshot = await getDocs(q);
-    
-            if (!snapshot.empty) {
-              const data = snapshot.docs[0].data();
-              setAdminName(data.fullName || "Admin");
-              setAdminRole(data.role || "Standard Admin");
-            }
-          }
-        });
-    
-        return () => unsubscribe();
-      }, []);
+    // Listen for the currently logged-in user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Find their document in the approvedAdmins collection
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid)
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Fetch current admin's display name from Firestore
   useEffect(() => {
@@ -226,18 +228,20 @@ export default function HouseholdManagement() {
     hhViewMode === "default"
       ? filteredHhRequests.slice(0, defaultRows)
       : filteredHhRequests.slice(
-        (hhRequestPage - 1) * rowsPerPage,
-        hhRequestPage * rowsPerPage
+        (hhRequestPage - 1) * hhRowsPerPage,
+        hhRequestPage * hhRowsPerPage
       );
 
   const totalHhRequestPages =
     hhViewMode === "default"
       ? 1
-      : Math.ceil(filteredHhRequests.length / rowsPerPage);
+      : Math.ceil(filteredHhRequests.length / hhRowsPerPage);
+
+  const hhStartIndex = (hhRequestPage - 1) * hhRowsPerPage;
 
   useEffect(() => {
     setHhRequestPage(1);
-  }, [searchHhRequest, filterHhStatus]);
+  }, [searchHhRequest, filterHhStatus, hhRowsPerPage]);
 
   // ================= HH REQUEST ACTIONS =================
   const handleHhApprove = async () => {
@@ -381,9 +385,44 @@ export default function HouseholdManagement() {
     ? 1
     : Math.ceil(filteredResidents.length / rowsPerPage);
 
+  const startIndex = (page - 1) * rowsPerPage;
+
   useEffect(() => {
     setPage(1);
   }, [search, filterCategory, filterStatus]);
+
+  const renderPageNumbers = (currentPage, totalPages, setPage) => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => typeof page === "number" ? setPage(page) : null}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : ""
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   // ================= SAVE RESIDENT STATUS =================
   const handleSaveStatus = async () => {
@@ -422,7 +461,7 @@ export default function HouseholdManagement() {
       const notifMsg = statusData.status === "Clear Case"
         ? "Your barangay status is now Clear."
         : `Your barangay status has been updated to: ${statusData.status}.`;
-      await createUserNotification(statusData.id, "Status Update", notifMsg, "general");
+      await createUserNotification(statusData.householdId, statusData.id, "Status Update", notifMsg, "general");
 
       logTransaction(
         adminName,
@@ -452,29 +491,64 @@ export default function HouseholdManagement() {
         {/* ================= HOUSEHOLD REGISTRATION REQUESTS ================= */}
         {(hhViewMode === "default" || hhViewMode === "requests") && residentViewMode === "default" && (
           <div style={{ marginBottom: "40px" }}>
-            <div className="af-header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 className="af-title" style={{ fontSize: '24px' }}>
-                  Registration Requests
-                </h2>
-                <p className="af-subtitle">Pending approval ({filteredHhRequests.filter(r => r.status === "pending").length})</p>
+            <div className="section">
+              <div className="section-header">
+                <div>
+                  <h2 className="requests-title">
+                    Resident Registration Requests
+                  </h2>
+                  <p className="af-subtitle">
+                    Pending approval ({filteredHhRequests.filter(r => r.status === "pending").length})
+                  </p>
+                </div>
+
+                {hhViewMode === "default" ? (
+                  <button className="view-btn" onClick={() => setHhViewMode("requests")}>See All Requests </button>
+                ) : (
+                  <button className="view-btn" onClick={() => { setHhViewMode("default"); setSearchHhRequest(""); setFilterHhStatus("All"); setHhRequestPage(1); }}>Return</button>
+                )}
               </div>
-              {hhViewMode === "default" ? (
-                <button className="af-view-btn" onClick={() => setHhViewMode("requests")}>See All Requests</button>
-              ) : (
-                <button className="af-view-btn" style={{ background: '#6b7280' }} onClick={() => { setHhViewMode("default"); setSearchHhRequest(""); setFilterHhStatus("All"); }}>Return</button>
-              )}
+
+              <div className="requests-controls">
+                <div className="search-wrapper" style={{ position: "relative" }}>
+                  <Search
+                    size={18}
+                    style={{
+                      position: "absolute",
+                      left: "12px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "#94a3b8",
+                      pointerEvents: "none",
+                    }}
+                  />
+
+                  <input
+                    type="text"
+                    placeholder="Search resident..."
+                    className="search-input"
+                    value={searchHhRequest}
+                    onChange={(e) => setSearchHhRequest(e.target.value)}
+                  />
+                </div>
+
+                <div className="filter-group">
+                  <select
+                    className="filter-select"
+                    value={filterHhStatus}
+                    onChange={(e) => setFilterHhStatus(e.target.value)}
+                  >
+                    <option value="All">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
-            <div className="af-controls">
-              <div className="af-search-box">
-                <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                <input type="text" placeholder="Search by name..." value={searchHhRequest} onChange={(e) => setSearchHhRequest(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="af-table-wrapper">
-              <table className="af-table">
+            <div className="req-table-wrapper">
+              <table className="req-table">
                 <thead style={{ background: '#f9fafb' }}>
                   <tr>
                     <th>Full Name</th>
@@ -517,11 +591,71 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-              {hhViewMode === "requests" && totalHhRequestPages > 1 && (
-                <div className="af-pagination">
-                  <button className="af-page-btn" disabled={hhRequestPage === 1} onClick={() => setHhRequestPage(prev => prev - 1)}>Prev</button>
-                  <span style={{ margin: '0 8px', alignSelf: 'center', fontSize: '0.9rem', color: '#4b5563' }}>Page {hhRequestPage} of {totalHhRequestPages}</span>
-                  <button className="af-page-btn" disabled={hhRequestPage === totalHhRequestPages} onClick={() => setHhRequestPage(prev => prev + 1)}>Next</button>
+              {hhViewMode === "requests" && filteredHhRequests.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
+
+                  {/* Rows per page */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                    <span>Rows per page:</span>
+                    <select
+                      value={hhRowsPerPage}
+                      onChange={(e) => {
+                        setHhRowsPerPage(Number(e.target.value));
+                        setHhRequestPage(1);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+
+                  {/* Pagination */}
+                  {totalHhRequestPages > 1 && (
+                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setHhRequestPage(prev => Math.max(prev - 1, 1))}
+                        disabled={hhRequestPage === 1}
+                      >
+                        Previous
+                      </button>
+
+                      {renderPageNumbers(hhRequestPage, totalHhRequestPages, setHhRequestPage)}
+
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setHhRequestPage(prev => Math.min(prev + 1, totalHhRequestPages))}
+                        disabled={hhRequestPage === totalHhRequestPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Showing text */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Showing {hhStartIndex + 1} to{" "}
+                    {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
+                    {filteredHhRequests.length}
+                  </div>
                 </div>
               )}
             </div>
@@ -533,23 +667,51 @@ export default function HouseholdManagement() {
           <div style={{ marginBottom: "40px" }}>
             <div className="af-header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h2 className="af-title" style={{ fontSize: '24px' }}>Resident Account Management</h2>
-                <p className="af-subtitle">Manage approved residents and update their status</p>
+                <h2 className="requests-title"> Resident Account Management </h2>
               </div>
               {residentViewMode === "default" ? (
-                <button className="af-view-btn" onClick={() => setResidentViewMode("residents")}>See All Residents</button>
+                <button className="view-btn" onClick={() => setResidentViewMode("residents")}>See All Residents</button>
               ) : (
-                <button className="af-view-btn" style={{ background: '#6b7280' }} onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); }}>Return</button>
+                <button className="view-btn" onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); setPage(1); }}>Return</button>
               )}
-            </div>
 
-            <div className="af-controls">
-              <div className="af-filters" style={{ flexGrow: 1, gap: '16px' }}>
-                <div className="af-search-box" style={{ maxWidth: '350px' }}>
-                  <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                  <input type="text" placeholder="Search name or household ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
-                <select className="af-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            </div>
+            <div className="requests-controls">
+              <div className="search-wrapper" style={{ position: "relative" }}>
+                <Search
+                  size={18}
+                  style={{
+                    position: "absolute",
+                    left: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "#94a3b8",
+                    pointerEvents: "none",
+                  }}
+                />
+
+                <input
+                  type="text"
+                  placeholder="Search resident..."
+                  className="search-input"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ paddingLeft: "36px" }}
+                />
+              </div>
+
+              <div className="filter-group"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "15px",
+                  alignItems: "center"
+                }}>
+                <select
+                  className="filter-select"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                >
                   <option value="All">All Categories</option>
                   <option value="Student">Student</option>
                   <option value="Senior Citizen">Senior Citizen</option>
@@ -559,7 +721,12 @@ export default function HouseholdManagement() {
                   <option value="Indigenous">Indigenous</option>
                   <option value="PWD">PWD</option>
                 </select>
-                <select className="af-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+
+                <select
+                  className="filter-select"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
                   <option value="All">All Status</option>
                   <option value="Clear Case">Clear Case</option>
                   <option value="Pending Case">Pending Case</option>
@@ -569,8 +736,8 @@ export default function HouseholdManagement() {
               </div>
             </div>
 
-            <div className="af-table-wrapper">
-              <table className="af-table">
+            <div className="req-table-wrapper">
+              <table className="req-table">
                 <thead style={{ background: '#f9fafb' }}>
                   <tr>
                     <th>Full Name</th>
@@ -619,11 +786,71 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-              {residentViewMode === "residents" && totalPages > 1 && (
-                <div className="af-pagination">
-                  <button className="af-page-btn" disabled={page === 1} onClick={() => setPage(prev => prev - 1)}>Prev</button>
-                  <span style={{ margin: '0 8px', alignSelf: 'center', fontSize: '0.9rem', color: '#4b5563' }}>Page {page} of {totalPages}</span>
-                  <button className="af-page-btn" disabled={page === totalPages} onClick={() => setPage(prev => prev + 1)}>Next</button>
+              {residentViewMode === "residents" && filteredResidents.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
+
+                  {/* Rows per page */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                    <span>Rows per page:</span>
+                    <select
+                      value={rowsPerPage}
+                      onChange={(e) => {
+                        setRowsPerPage(Number(e.target.value));
+                        setPage(1);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                        disabled={page === 1}
+                      >
+                        Previous
+                      </button>
+
+                      {renderPageNumbers(page, totalPages, setPage)}
+
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={page === totalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Showing text */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Showing {startIndex + 1} to{" "}
+                    {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}
+                    {filteredResidents.length}
+                  </div>
                 </div>
               )}
             </div>

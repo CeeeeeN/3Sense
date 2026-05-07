@@ -43,12 +43,14 @@ const fanOutAnnouncementNotification = async ({ title, description, category, an
 
     if (matchedHouseholdIDs.size === 0) return;
 
-    // Send ONE notification per household (keyed by householdID so the Navbar
-    // subscription can pick it up via householdID instead of residentID)
+    // Send ONE notification per household.
+    // residentID = "household" marks it as a household-wide notification
+    // so the Navbar's household stream can subscribe to (householdID, "household").
     const results = await Promise.allSettled(
       [...matchedHouseholdIDs].map((householdID) =>
         createUserNotification(
-          householdID,                           // globally unique key
+          householdID,                           // householdID field
+          "household",                           // residentID = "household" for household-wide
           `📢 New Announcement`,
           `${title} — ${description}`.slice(0, 200),
           "announcement",

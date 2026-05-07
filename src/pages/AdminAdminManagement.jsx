@@ -15,6 +15,7 @@ import {
   where,
   onSnapshot,
 } from "firebase/firestore";
+import { Search } from "lucide-react";
 
 export default function AdminManagement() {
   // ================= STATE =================
@@ -47,31 +48,32 @@ export default function AdminManagement() {
 
   const [requestPage, setRequestPage] = useState(1);
   const [adminPage, setAdminPage] = useState(1);
+  const [requestRowsPerPage, setRequestRowsPerPage] = useState(10);
+  const [adminRowsPerPage, setAdminRowsPerPage] = useState(10);
 
   const defaultRows = 3;
-  const rowsPerPage = 10;
 
   useEffect(() => {
-        // Listen for the currently logged-in user
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            // Find their document in the approvedAdmins collection
-            const q = query(
-              collection(db, "approvedAdmins"), 
-              where("uid", "==", user.uid)
-            );
-            const snapshot = await getDocs(q);
-    
-            if (!snapshot.empty) {
-              const data = snapshot.docs[0].data();
-              setAdminName(data.fullName || "Admin");
-              setAdminRole(data.role || "Standard Admin");
-            }
-          }
-        });
-    
-        return () => unsubscribe();
-      }, []);
+    // Listen for the currently logged-in user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Find their document in the approvedAdmins collection
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid)
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // ================= STEP 1: CHECK IF SERVICE HEAD =================
   useEffect(() => {
@@ -314,36 +316,75 @@ export default function AdminManagement() {
       return 0;
     });
 
+  const totalRequestPages = Math.ceil(filteredRequests.length / requestRowsPerPage);
+  const requestStartIndex = (requestPage - 1) * requestRowsPerPage;
+
   const paginatedRequests =
     viewMode === "default"
       ? filteredRequests.slice(0, defaultRows)
       : filteredRequests.slice(
-          (requestPage - 1) * rowsPerPage,
-          requestPage * rowsPerPage,
-        );
+        requestStartIndex,
+        requestStartIndex + requestRowsPerPage
+      );
 
-  const totalRequestPages =
-    viewMode === "default"
-      ? 1
-      : Math.ceil(filteredRequests.length / rowsPerPage);
+  const totalAdminPages = Math.ceil(filteredAdmins.length / adminRowsPerPage);
+  const adminStartIndex = (adminPage - 1) * adminRowsPerPage;
 
   const paginatedAdmins =
     viewMode === "default"
       ? filteredAdmins.slice(0, defaultRows)
       : filteredAdmins.slice(
-          (adminPage - 1) * rowsPerPage,
-          adminPage * rowsPerPage,
-        );
-
-  const totalAdminPages =
-    viewMode === "default" ? 1 : Math.ceil(filteredAdmins.length / rowsPerPage);
+        adminStartIndex,
+        adminStartIndex + adminRowsPerPage
+      );
 
   useEffect(() => {
     setRequestPage(1);
-  }, [searchRequest, filterStatus]);
+  }, [searchRequest, filterStatus, requestRowsPerPage]);
+
   useEffect(() => {
     setAdminPage(1);
-  }, [searchAdmin]);
+  }, [searchAdmin, adminRowsPerPage]);
+
+  useEffect(() => {
+    if (viewMode === "default") {
+      setRequestPage(1);
+      setAdminPage(1);
+    }
+  }, [viewMode]);
+
+  const renderPageNumbers = (currentPage, totalPages, setPage) => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => typeof page === "number" ? setPage(page) : null}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : ""
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   // ================= LOADING =================
   if (authLoading) {
@@ -380,45 +421,59 @@ export default function AdminManagement() {
         {(viewMode === "default" || viewMode === "requests") && (
           <div className="section">
             <div className="section-header">
-              <h2>
-                Admin Registration Requests (
-                {filteredRequests.filter((r) => r.status === "pending").length})
-              </h2>
+              <div>
+                <h2 className="requests-title">
+                  Admin Registration Requests
+                </h2>
+                <p className="af-subtitle">Pending approval (
+                  {filteredRequests.filter((r) => r.status === "pending").length})</p>
+              </div>
+
               {viewMode === "default" ? (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("requests")}
-                >
-                  See All
-                </button>
+                <button className="view-btn" onClick={() => setViewMode("requests")}> See All Requests </button>
               ) : (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("default")}
-                >
-                  Return
-                </button>
+                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchRequest(""); setFilterStatus("All"); setRequestPage(1); }}> Return </button>
               )}
             </div>
-            <div className="card">
-              <div className="table-controls">
+            <div className="requests-controls">
+              <div className="search-wrapper" style={{ position: "relative" }}>
+                <Search
+                  size={18}
+                  style={{
+                    position: "absolute",
+                    left: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "#94a3b8",
+                    pointerEvents: "none",
+                  }}
+                />
+
                 <input
                   type="text"
                   placeholder="Search requests..."
+                  className="search-input"
                   value={searchRequest}
                   onChange={(e) => setSearchRequest(e.target.value)}
+                  style={{ paddingLeft: "36px" }}
                 />
+              </div>
+
+              <div className="filter-group">
                 <select
+                  className="filter-select"
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <option value="All">All Status</option>
                   <option value="pending">Pending</option>
-                  <option value="rejected">Rejected</option>
                   <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
                 </select>
               </div>
-              <table className="admin-table">
+            </div>
+            <div className="req-table-wrapper">
+              <table className="req-table">
                 <thead>
                   <tr>
                     <th>Full Name</th>
@@ -489,23 +544,69 @@ export default function AdminManagement() {
                   )}
                 </tbody>
               </table>
-              {viewMode === "requests" && totalRequestPages > 1 && (
-                <div className="pagination">
-                  <button
-                    disabled={requestPage === 1}
-                    onClick={() => setRequestPage((prev) => prev - 1)}
-                  >
-                    Prev
-                  </button>
-                  <span>
-                    Page {requestPage} of {totalRequestPages}
-                  </span>
-                  <button
-                    disabled={requestPage === totalRequestPages}
-                    onClick={() => setRequestPage((prev) => prev + 1)}
-                  >
-                    Next
-                  </button>
+              {viewMode === "requests" && filteredRequests.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
+
+                  {/* Rows per page */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                    <span>Rows per page:</span>
+                    <select
+                      value={requestRowsPerPage}
+                      onChange={(e) => setRequestRowsPerPage(Number(e.target.value))}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        color: '#334155',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+
+                  {/* Pagination buttons */}
+                  {totalRequestPages > 1 && (
+                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setRequestPage(prev => Math.max(prev - 1, 1))}
+                        disabled={requestPage === 1}
+                      >
+                        Previous
+                      </button>
+
+                      {renderPageNumbers(requestPage, totalRequestPages, setRequestPage)}
+
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setRequestPage(prev => Math.min(prev + 1, totalRequestPages))}
+                        disabled={requestPage === totalRequestPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Showing text */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Showing {requestStartIndex + 1} to{" "}
+                    {Math.min(requestStartIndex + requestRowsPerPage, filteredRequests.length)} of{" "}
+                    {filteredRequests.length}
+                  </div>
                 </div>
               )}
             </div>
@@ -516,33 +617,39 @@ export default function AdminManagement() {
         {(viewMode === "default" || viewMode === "admins") && (
           <div className="section">
             <div className="section-header">
-              <h2>Admin Account Management</h2>
+              <h2 className="requests-title"> Admin Account Management</h2>
               {viewMode === "default" ? (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("admins")}
-                >
-                  See All
-                </button>
+                <button className="view-btn" onClick={() => setViewMode("admins")}> See All Admins </button>
               ) : (
-                <button
-                  className="view-btn"
-                  onClick={() => setViewMode("default")}
-                >
-                  Return
-                </button>
+                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchAdmin(""); setAdminPage(1); }}> Return </button>
               )}
             </div>
-            <div className="card">
-              <div className="table-controls">
+            <div className="requests-controls">
+              <div className="search-wrapper" style={{ position: "relative" }}>
+                <Search
+                  size={18}
+                  style={{
+                    position: "absolute",
+                    left: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "#94a3b8",
+                    pointerEvents: "none",
+                  }}
+                />
+
                 <input
                   type="text"
                   placeholder="Search admin..."
+                  className="search-input"
                   value={searchAdmin}
                   onChange={(e) => setSearchAdmin(e.target.value)}
+                  style={{ paddingLeft: "36px" }}
                 />
               </div>
-              <table className="admin-table">
+            </div>
+            <div className="req-table-wrapper">
+              <table className="req-table">
                 <thead>
                   <tr>
                     <th>Full Name</th>
@@ -597,23 +704,69 @@ export default function AdminManagement() {
                   )}
                 </tbody>
               </table>
-              {viewMode === "admins" && totalAdminPages > 1 && (
-                <div className="pagination">
-                  <button
-                    disabled={adminPage === 1}
-                    onClick={() => setAdminPage((prev) => prev - 1)}
-                  >
-                    Prev
-                  </button>
-                  <span>
-                    Page {adminPage} of {totalAdminPages}
-                  </span>
-                  <button
-                    disabled={adminPage === totalAdminPages}
-                    onClick={() => setAdminPage((prev) => prev + 1)}
-                  >
-                    Next
-                  </button>
+              {viewMode === "admins" && filteredAdmins.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
+
+                  {/* Rows per page */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                    <span>Rows per page:</span>
+                    <select
+                      value={adminRowsPerPage}
+                      onChange={(e) => setAdminRowsPerPage(Number(e.target.value))}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        color: '#334155',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+
+                  {/* Pagination buttons */}
+                  {totalAdminPages > 1 && (
+                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
+                        disabled={adminPage === 1}
+                      >
+                        Previous
+                      </button>
+
+                      {renderPageNumbers(adminPage, totalAdminPages, setAdminPage)}
+
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
+                        disabled={adminPage === totalAdminPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Showing text */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Showing {adminStartIndex + 1} to{" "}
+                    {Math.min(adminStartIndex + adminRowsPerPage, filteredAdmins.length)} of{" "}
+                    {filteredAdmins.length}
+                  </div>
                 </div>
               )}
             </div>
@@ -706,12 +859,12 @@ export default function AdminManagement() {
       {showViewModal && selectedAdmin && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "420px" }}>
-            
+
             <div className="as-modal-header">
               <h2>Admin Details</h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
             </div>
-            
+
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
               <div className="admin-details">
                 <p><strong>Full Name:</strong> {selectedAdmin.fullName}</p>
@@ -724,11 +877,11 @@ export default function AdminManagement() {
                 <div style={{ marginTop: "16px", borderTop: "1px dashed #ccc", paddingTop: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <strong>System Role:</strong>
-                    
+
                     {/* Logic: Only Super Admin can edit, and cannot edit themselves */}
                     {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid ? (
-                      <select 
-                        value={editedRole} 
+                      <select
+                        value={editedRole}
                         onChange={(e) => setEditedRole(e.target.value)}
                         style={{ padding: "6px 10px", borderRadius: "4px", border: "1px solid #ccc", outline: "none", cursor: "pointer" }}
                       >
@@ -749,11 +902,11 @@ export default function AdminManagement() {
                         <option value="Livelihood Staff">Livelihood Staff</option>
                       </select>
                     ) : (
-                      <span style={{ 
-                        background: selectedAdmin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6', 
+                      <span style={{
+                        background: selectedAdmin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6',
                         color: selectedAdmin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
-                        padding: "4px 12px", 
-                        borderRadius: "20px", 
+                        padding: "4px 12px",
+                        borderRadius: "20px",
                         fontSize: "0.85rem",
                         fontWeight: "600"
                       }}>
@@ -763,7 +916,7 @@ export default function AdminManagement() {
                   </div>
                 </div>
               </div>
-              
+
               {/* --- NEW: SAVE CHANGES BUTTON --- */}
               {/* Only shows if user is Super Admin, is not editing themselves, and actually changed the dropdown */}
               {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && editedRole !== (selectedAdmin.role || "Standard Admin") && (

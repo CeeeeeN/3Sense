@@ -116,7 +116,7 @@ label {
   @apply relative flex items-center;
 }
 .input-wrap .field-icon {
-  @apply absolute -translate-y-2/4 w-4 h-4 text-[color:var(--muted)] pointer-events-none transition-[color] duration-[0.2s] left-[0.9rem] top-2/4;
+  @apply absolute text-[color:var(--muted)] pointer-events-none transition-[color] duration-[0.2s] left-[0.9rem] top-2/4;
 }
 .input-wrap:focus-within .field-icon {
   @apply text-[color:var(--primary)];
@@ -301,7 +301,7 @@ nav {
   font-family: "Poppins", sans-serif;
 }
 .admin-layout .nav-links {
-  @apply flex flex-col gap-4 relative z-[1] mt-32;
+  @apply flex flex-col gap-4 relative z-[1] mt-24;
 }
 .admin-layout .nav-links a {
   @apply w-full text-[white] no-underline font-semibold transition-[0.2s] flex items-center gap-3 p-4 rounded-lg;
@@ -655,7 +655,9 @@ nav {
 .af-page-btn.active {
   @apply bg-[#42888D] text-[white] border-[#42888D];
 }
-
+.af-page-btn:disabled {
+  @apply opacity-50 cursor-not-allowed pointer-events-none bg-gray-100 text-gray-400;
+}
 /* Modal Popup */
 .af-modal-overlay {
   @apply fixed bg-[rgba(0,0,0,0.5)] flex items-center justify-center z-[1000] inset-0;
@@ -877,7 +879,7 @@ nav {
   @apply mt-4;
 }
 .section-header {
-  @apply flex justify-between items-center;
+  @apply flex justify-between items-center mb-4;
 }
 .admin-table {
   @apply w-full table-fixed mt-[rem] border-collapse;
@@ -1028,7 +1030,7 @@ nav {
 }
 
 /* =========================================
-   ADMIN REQUESTS PAGE STYLES
+   ADMIN REQUESTS PAGE STYLES                                                         
    ========================================= */
 .requests-container {
   @apply bg-gray-50 min-h-[calc(100vh_-_64px)] w-full box-border p-8 w-full;
@@ -1418,7 +1420,7 @@ nav {
   background: var(--primary);
 }
 .profile-card {
-  @apply border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
+  @apply block border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
   background: white;
 }
 .profile-header {

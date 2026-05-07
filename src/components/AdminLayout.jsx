@@ -26,6 +26,7 @@ export default function AdminLayout({ children }) {
     "/admin/feedback": "Feedback",
     "/admin/admin-management": "Admin Management",
     "/admin/household-management": "Household Management",
+    "/admin/logs": "Audit Logs",
     "/admin/reports": "Reports",
     "/admin/profile": "My Profile",
   };
@@ -162,6 +163,18 @@ export default function AdminLayout({ children }) {
     setIsOpen(false);
   };
 
+  useEffect(() => {
+    if (showLogoutModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showLogoutModal]);
+
   return (
     <div className="admin-layout">
       {/* Mobile Overlay */}
@@ -196,124 +209,124 @@ export default function AdminLayout({ children }) {
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/dashboard",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={
-                location.pathname === "/admin/dashboard" ? "active" : ""
-              }
-              to="/admin/dashboard"
-            >
-              Dashboard
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={
+                  location.pathname === "/admin/dashboard" ? "active" : ""
+                }
+                to="/admin/dashboard"
+              >
+                Dashboard
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/manage",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={location.pathname === "/admin/manage" ? "active" : ""}
-              to="/admin/manage"
-            >
-              Manage
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={location.pathname === "/admin/manage" ? "active" : ""}
+                to="/admin/manage"
+              >
+                Manage
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/requests",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={
-                location.pathname === "/admin/requests" ? "active" : ""
-              }
-              to="/admin/requests"
-            >
-              Requests
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={
+                  location.pathname === "/admin/requests" ? "active" : ""
+                }
+                to="/admin/requests"
+              >
+                Requests
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/feedback",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={
-                location.pathname === "/admin/feedback" ? "active" : ""
-              }
-              to="/admin/feedback"
-            >
-              Feedback
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={
+                  location.pathname === "/admin/feedback" ? "active" : ""
+                }
+                to="/admin/feedback"
+              >
+                Feedback
+              </Link>
+            )}
 
           <div className="nav-divider"></div>
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/admin-management",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={
-                location.pathname === "/admin/admin-management" ? "active" : ""
-              }
-              to="/admin/admin-management"
-            >
-              Admin Management
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={
+                  location.pathname === "/admin/admin-management" ? "active" : ""
+                }
+                to="/admin/admin-management"
+              >
+                Admin Management
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/household-management",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={
-                location.pathname === "/admin/household-management"
-                  ? "active"
-                  : ""
-              }
-              to="/admin/household-management"
-            >
-              Household Management
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={
+                  location.pathname === "/admin/household-management"
+                    ? "active"
+                    : ""
+                }
+                to="/admin/household-management"
+              >
+                Household Management
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/logs",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={location.pathname === "/admin/logs" ? "active" : ""}
-              to="/admin/logs"
-            >
-              Audit Logs
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={location.pathname === "/admin/logs" ? "active" : ""}
+                to="/admin/logs"
+              >
+                Audit Logs
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/reports",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={location.pathname === "/admin/reports" ? "active" : ""}
-              to="/admin/reports"
-            >
-              Reports
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={location.pathname === "/admin/reports" ? "active" : ""}
+                to="/admin/reports"
+              >
+                Reports
+              </Link>
+            )}
 
           {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
             "/admin/profile",
           ) && (
-            <Link
-              onClick={handleLinkClick}
-              className={location.pathname === "/admin/profile" ? "active" : ""}
-              to="/admin/profile"
-            >
-              My Profile
-            </Link>
-          )}
+              <Link
+                onClick={handleLinkClick}
+                className={location.pathname === "/admin/profile" ? "active" : ""}
+                to="/admin/profile"
+              >
+                My Profile
+              </Link>
+            )}
         </div>
 
         <div className="sidebar-bottom">
@@ -407,8 +420,9 @@ export default function AdminLayout({ children }) {
 
         {/* MAIN CONTENT */}
         {children}
-
-        {/* LOGOUT MODAL */}
+      </div>
+      
+       {/* LOGOUT MODAL */}
         {showLogoutModal && (
           <div className="modal-overlay">
             <div className="modal">
@@ -427,7 +441,6 @@ export default function AdminLayout({ children }) {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
