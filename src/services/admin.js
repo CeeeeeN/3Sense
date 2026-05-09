@@ -15,7 +15,7 @@ export const generateHouseholdID = async () => {
 
   snapshot.forEach(doc => {
     const parts = doc.id.split('-');
-    // Expected format: HH-YYYY-NNNNN
+    // Expected format: MAL-YYYY-NNNNN
     if (parts.length === 3) {
       const num = parseInt(parts[2], 10);
       if (!isNaN(num) && num > maxCount) {
@@ -27,7 +27,7 @@ export const generateHouseholdID = async () => {
   const count = maxCount + 1;
   const year = new Date().getFullYear();
   const padded = String(count).padStart(5, "0");
-  return `HH-${year}-${padded}`;
+  return `MAL-${year}-${padded}`;
 };
 
 export const approveRegistration = async (docID) => {

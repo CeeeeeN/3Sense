@@ -391,7 +391,7 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
                 ))}
               </div>
               <div className="lp-qr-name">Household Head</div>
-              <div className="lp-qr-id">HH-XXXX-XXXXX · Household Head</div>
+              <div className="lp-qr-id">MAL-XXXX-XXXXX · Household Head</div>
               <div className="lp-qr-status">
                 <span></span> Verified Resident
               </div>

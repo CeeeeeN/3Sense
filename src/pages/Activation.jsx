@@ -112,7 +112,7 @@ export default function Activation({ onBack, onLoginClick, onSuccess }) {
                   <input
                     type="text"
                     className="act-input"
-                    placeholder="HH-2024-00142"
+                    placeholder="MAL-2026-00142"
                     value={householdID}
                     onChange={e => setHouseholdID(e.target.value)}
                     autoComplete="off"

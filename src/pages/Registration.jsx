@@ -110,26 +110,26 @@ const SvgAlert = ({ size = 18 }) => (
     <line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5" />
   </svg>
 );
-const SvgCamera    = ({ size = 17 }) => (
+const SvgCamera = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
     <circle cx="12" cy="13" r="4" />
   </svg>
 );
-const SvgUpload    = ({ size = 17 }) => (
+const SvgUpload = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 );
-const SvgRefresh   = ({ size = 17 }) => (
+const SvgRefresh = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="1 4 1 10 7 10" />
     <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
   </svg>
 );
-const SvgArrowLeft  = ({ size = 17 }) => (
+const SvgArrowLeft = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
   </svg>
@@ -139,7 +139,7 @@ const SvgArrowRight = ({ size = 17 }) => (
     <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
   </svg>
 );
-const SvgCheck      = ({ size = 17 }) => (
+const SvgCheck = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12" />
   </svg>
@@ -152,13 +152,13 @@ const SvgWheelchair = ({ size = 17 }) => (
     <line x1="15" y1="8.5" x2="18" y2="8.5" />
   </svg>
 );
-const SvgSend       = ({ size = 17 }) => (
+const SvgSend = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="22" y1="2" x2="11" y2="13" />
     <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
-const SvgHashtag    = ({ size = 17 }) => (
+const SvgHashtag = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
     <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
@@ -194,14 +194,14 @@ function mockExtractText() {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
-        firstName:  "Maria",
+        firstName: "Maria",
         middleName: "Santos",
-        lastName:   "Dela Cruz",
-        birthDate:  "1990-05-15",
-        idNumber:   "1234-5678-9012-0000",
+        lastName: "Dela Cruz",
+        birthDate: "1990-05-15",
+        idNumber: "1234-5678-9012-0000",
         houseNumber: "123",
-        street:     "Malanday Street",
-        province:   "Bulacan",
+        street: "Malanday Street",
+        province: "Bulacan",
       });
     }, 1800);
   });
@@ -209,10 +209,10 @@ function mockExtractText() {
 
 // ─── Camera hook ──────────────────────────────────────────────────────────────
 function useCamera() {
-  const videoRef  = useRef(null);
+  const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [active, setActive] = useState(false);
-  const [error,  setError]  = useState(null);
+  const [error, setError] = useState(null);
 
   const start = useCallback(async (facingMode = "environment") => {
     setError(null);
@@ -236,7 +236,7 @@ function useCamera() {
   const capture = useCallback(() => {
     if (!videoRef.current) return null;
     const canvas = document.createElement("canvas");
-    canvas.width  = videoRef.current.videoWidth  || 640;
+    canvas.width = videoRef.current.videoWidth || 640;
     canvas.height = videoRef.current.videoHeight || 480;
     canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
     return canvas.toDataURL("image/jpeg", 0.85);
@@ -319,11 +319,11 @@ function CameraError({ error, onUpload, fileRef }) {
 // ─── ID Scan Step ─────────────────────────────────────────────────────────────
 function IdScanStep({ onConfirm }) {
   // idle | camera | preview | validating | invalid | processing | done
-  const [mode, setMode]   = useState("idle");
-  const [preview, setPreview]           = useState(null);
-  const [validationResult, setResult]   = useState(null);
-  const [uploadError, setUploadError]   = useState(null);
-  const cam     = useCamera();
+  const [mode, setMode] = useState("idle");
+  const [preview, setPreview] = useState(null);
+  const [validationResult, setResult] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const cam = useCamera();
   const fileRef = useRef(null);
 
   const handleFile = (e) => {
@@ -342,11 +342,11 @@ function IdScanStep({ onConfirm }) {
     }
     const reader = new FileReader();
     reader.onerror = () => { setUploadError("Failed to read the file. Please try another image."); if (fileRef.current) fileRef.current.value = ""; };
-    reader.onload  = (ev) => { setPreview(ev.target.result); setMode("preview"); setUploadError(null); };
+    reader.onload = (ev) => { setPreview(ev.target.result); setMode("preview"); setUploadError(null); };
     reader.readAsDataURL(file);
   };
 
-  const startCamera  = async () => { setMode("camera"); await cam.start("environment"); };
+  const startCamera = async () => { setMode("camera"); await cam.start("environment"); };
   const capturePhoto = () => { const img = cam.capture(); cam.stop(); if (img) { setPreview(img); setMode("preview"); } };
 
   const retake = () => {
@@ -536,10 +536,10 @@ function IdScanStep({ onConfirm }) {
 
 // ─── Selfie Step ──────────────────────────────────────────────────────────────
 function SelfieStep({ onConfirm }) {
-  const [mode, setMode]             = useState("idle");
-  const [preview, setPreview]       = useState(null);
+  const [mode, setMode] = useState("idle");
+  const [preview, setPreview] = useState(null);
   const [uploadError, setUploadError] = useState(null);
-  const cam     = useCamera();
+  const cam = useCamera();
   const fileRef = useRef(null);
 
   const handleFile = (e) => {
@@ -547,16 +547,16 @@ function SelfieStep({ onConfirm }) {
     if (!file) return;
     setUploadError(null);
     if (!file.type.startsWith("image/")) { setUploadError("Please upload a valid image file (JPG, PNG, WEBP)."); if (fileRef.current) fileRef.current.value = ""; return; }
-    if (file.size > 10 * 1024 * 1024)   { setUploadError("Image file is too large. Maximum size is 10MB.");     if (fileRef.current) fileRef.current.value = ""; return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadError("Image file is too large. Maximum size is 10MB."); if (fileRef.current) fileRef.current.value = ""; return; }
     const reader = new FileReader();
     reader.onerror = () => { setUploadError("Failed to read the file. Please try another image."); if (fileRef.current) fileRef.current.value = ""; };
-    reader.onload  = (ev) => { setPreview(ev.target.result); setMode("preview"); setUploadError(null); };
+    reader.onload = (ev) => { setPreview(ev.target.result); setMode("preview"); setUploadError(null); };
     reader.readAsDataURL(file);
   };
 
-  const startCamera  = async () => { setMode("camera"); await cam.start("user"); };
+  const startCamera = async () => { setMode("camera"); await cam.start("user"); };
   const capturePhoto = () => { const img = cam.capture(); cam.stop(); if (img) { setPreview(img); setMode("preview"); } };
-  const retake       = () => { setPreview(null); setUploadError(null); setMode("idle"); cam.stop(); };
+  const retake = () => { setPreview(null); setUploadError(null); setMode("idle"); cam.stop(); };
 
   return (
     <div>
@@ -580,7 +580,7 @@ function SelfieStep({ onConfirm }) {
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <SvgCamera /> Open Camera
               </button>
-              
+
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
             <UploadErrorMsg msg={uploadError} />
@@ -649,15 +649,15 @@ function SelfieStep({ onConfirm }) {
 
 // ─── Main Registration Component ──────────────────────────────────────────────
 export default function Registration({ onBack }) {
-  const [step, setStep]                   = useState(0);
-  const [submitted, setSubmitted]         = useState(false);
-  const [refNumber, setRefNumber]         = useState("");
+  const [step, setStep] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+  const [refNumber, setRefNumber] = useState("");
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [isSubmitting, setIsSubmitting]   = useState(false);
-  const [errorMsg, setErrorMsg]           = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const [idImage, setIdImage]         = useState(null);
+  const [idImage, setIdImage] = useState(null);
   const [selfieImage, setSelfieImage] = useState(null);
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
@@ -665,18 +665,18 @@ export default function Registration({ onBack }) {
   const [form, setForm] = useState({
     idNumber: "",
     firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
-    birthDate: "", age: "", birthPlace: "", sex: "Male", civilStatus: "",
+    birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
     citizenship: "Filipino", contactNumber: "", email: "", residingSinceYear: "",
     houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
     categories: [],
-    pwdStatus: "", disabilityType: "",
+    pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
     educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
     totalMembers: "", householdClassification: "",
   });
 
-  const total    = STEPS.length;
+  const total = STEPS.length;
   const progress = submitted ? 100 : (step / (total - 1)) * 100;
-  const isPwd    = form.categories.includes("PWD");
+  const isPwd = form.categories.includes("PWD");
 
   const applyOcr = useCallback((data) => {
     const mapping = {
@@ -722,41 +722,41 @@ export default function Registration({ onBack }) {
 
   const validateStep = () => {
     const missing = [];
-    if (step === 0 && !idImage)     { setErrorMsg("Please scan or upload your ID to continue."); return false; }
+    if (step === 0 && !idImage) { setErrorMsg("Please scan or upload your ID to continue."); return false; }
     if (step === 1 && !selfieImage) { setErrorMsg("A selfie is required before proceeding."); return false; }
     if (step === 2) {
-      if (!form.firstName.trim())    missing.push("First Name");
-      if (!form.lastName.trim())     missing.push("Last Name");
-      if (!form.birthDate)           missing.push("Birth Date");
-      if (!form.birthPlace.trim())   missing.push("Birth Place");
-      if (!form.sex)                 missing.push("Sex");
-      if (!form.civilStatus)         missing.push("Civil Status");
-      if (!form.citizenship.trim())  missing.push("Citizenship");
-      if (!form.residingSinceYear)   missing.push("Residing Since Year");
+      if (!form.firstName.trim()) missing.push("First Name");
+      if (!form.lastName.trim()) missing.push("Last Name");
+      if (!form.birthDate) missing.push("Birth Date");
+      if (!form.birthPlace.trim()) missing.push("Birth Place");
+      if (!form.sex) missing.push("Sex");
+      if (!form.civilStatus) missing.push("Civil Status");
+      if (!form.citizenship.trim()) missing.push("Citizenship");
+      if (!form.residingSinceYear) missing.push("Residing Since Year");
       if (!form.contactNumber.trim()) missing.push("Contact Number");
       else if (form.contactNumber.length < 10) missing.push("Valid Contact Number");
-      if (!form.email.trim())        missing.push("Email Address");
+      if (!form.email.trim()) missing.push("Email Address");
       else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
     }
     if (step === 3) {
       if (!form.houseNumber.trim()) missing.push("House / Unit Number");
-      if (!form.street.trim())      missing.push("Street");
-      if (!form.region.trim())      missing.push("Region");
-      if (!form.province.trim())    missing.push("Province");
-      if (!form.city.trim())        missing.push("City");
-      if (!form.barangay.trim())    missing.push("Barangay");
+      if (!form.street.trim()) missing.push("Street");
+      if (!form.region.trim()) missing.push("Region");
+      if (!form.province.trim()) missing.push("Province");
+      if (!form.city.trim()) missing.push("City");
+      if (!form.barangay.trim()) missing.push("Barangay");
     }
     if (step === 4 && isPwd) {
-      if (!form.pwdStatus)     missing.push("PWD Status");
+      if (!form.pwdStatus) missing.push("PWD Status");
       if (!form.disabilityType) missing.push("Disability Type");
     }
     if (step === 5) {
       if (!form.educationAttainment) missing.push("Highest Educational Attainment");
-      if (!form.educationStatus)     missing.push("Education Status");
-      if (!form.employmentStatus)    missing.push("Employment Status");
+      if (!form.educationStatus) missing.push("Education Status");
+      if (!form.employmentStatus) missing.push("Employment Status");
     }
     if (step === 6) {
-      if (!form.totalMembers)            missing.push("Number of Household Members");
+      if (!form.totalMembers) missing.push("Number of Household Members");
       if (!form.householdClassification) missing.push("Household Classification");
     }
     if (step === 7 && !privacyAgreed) { setErrorMsg("You must agree to the Privacy Policy before submitting."); return false; }
@@ -789,11 +789,11 @@ export default function Registration({ onBack }) {
     if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) { if (onBack) onBack(); }
   };
 
-  const rv         = (val)  => val?.trim() || null;
-  const af         = (field) => autofilledFields.has(field);
-  const formatDate = (d)    => !d ? null : new Date(d + "T00:00:00").toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-  const fullName   = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || null;
-  const fullAddr   = [form.houseNumber, form.street].filter(Boolean).join(" ") || null;
+  const rv = (val) => val?.trim() || null;
+  const af = (field) => autofilledFields.has(field);
+  const formatDate = (d) => !d ? null : new Date(d + "T00:00:00").toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+  const fullName = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || null;
+  const fullAddr = [form.houseNumber, form.street].filter(Boolean).join(" ") || null;
 
   function ReviewField({ label, value, full }) {
     return (
@@ -836,60 +836,60 @@ export default function Registration({ onBack }) {
         </div>
 
         {/* STEPPER */}
-<div className="reg-stepper-wrap">
+        <div className="reg-stepper-wrap">
 
-  {/* Desktop stepper — hidden on mobile via CSS */}
-  <div className="reg-stepper">
-    <div className="reg-stepper-line">
-      <div className="reg-stepper-line-fill" style={{ width: `${progress}%` }} />
-    </div>
-    {STEPS.map((s, i) => {
-      const status = submitted || i < step ? "done" : i === step ? "active" : "";
-      return (
-        <div key={i} className={`reg-stepper-step ${status}`}>
-          <div className="reg-step-circle">
-            {status === "done"
-              ? <SvgCheck size={13} />
-              : <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{STEP_ICONS[i]}</span>}
+          {/* Desktop stepper — hidden on mobile via CSS */}
+          <div className="reg-stepper">
+            <div className="reg-stepper-line">
+              <div className="reg-stepper-line-fill" style={{ width: `${progress}%` }} />
+            </div>
+            {STEPS.map((s, i) => {
+              const status = submitted || i < step ? "done" : i === step ? "active" : "";
+              return (
+                <div key={i} className={`reg-stepper-step ${status}`}>
+                  <div className="reg-step-circle">
+                    {status === "done"
+                      ? <SvgCheck size={13} />
+                      : <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{STEP_ICONS[i]}</span>}
+                  </div>
+                  <span className="reg-step-label">{s.label}</span>
+                </div>
+              );
+            })}
           </div>
-          <span className="reg-step-label">{s.label}</span>
-        </div>
-      );
-    })}
-  </div>
 
-  {/* Mobile stepper — compact progress bar, hidden on desktop via CSS */}
-  <div className="reg-mobile-stepper">
-    <div className="reg-mobile-stepper-top">
-      <div className="reg-mobile-stepper-left">
-        <div className="reg-mobile-step-badge">
-          {submitted ? <SvgCheck size={14} /> : step + 1}
-        </div>
-        <div className="reg-mobile-step-info">
-          <span className="reg-mobile-step-name">
-            {submitted ? "Submitted!" : STEPS[step].label}
-          </span>
-          <span className="reg-mobile-step-sub">
-            {submitted ? "Registration complete" : step < STEPS.length - 1 ? `Next: ${STEPS[step + 1].label}` : "Last step"}
-          </span>
-        </div>
-      </div>
-      <span className="reg-mobile-step-count">
-        {submitted ? `${STEPS.length}/${STEPS.length}` : `${step + 1} / ${STEPS.length}`}
-      </span>
-    </div>
-    <div className="reg-mobile-progress-track">
-      <div className="reg-mobile-progress-fill" style={{ width: `${progress}%` }} />
-    </div>
-    <div className="reg-mobile-dots">
-      {STEPS.map((_, i) => {
-        const cls = submitted || i < step ? "done" : i === step ? "active" : "";
-        return <div key={i} className={`reg-mobile-dot ${cls}`} />;
-      })}
-    </div>
-  </div>
+          {/* Mobile stepper — compact progress bar, hidden on desktop via CSS */}
+          <div className="reg-mobile-stepper">
+            <div className="reg-mobile-stepper-top">
+              <div className="reg-mobile-stepper-left">
+                <div className="reg-mobile-step-badge">
+                  {submitted ? <SvgCheck size={14} /> : step + 1}
+                </div>
+                <div className="reg-mobile-step-info">
+                  <span className="reg-mobile-step-name">
+                    {submitted ? "Submitted!" : STEPS[step].label}
+                  </span>
+                  <span className="reg-mobile-step-sub">
+                    {submitted ? "Registration complete" : step < STEPS.length - 1 ? `Next: ${STEPS[step + 1].label}` : "Last step"}
+                  </span>
+                </div>
+              </div>
+              <span className="reg-mobile-step-count">
+                {submitted ? `${STEPS.length}/${STEPS.length}` : `${step + 1} / ${STEPS.length}`}
+              </span>
+            </div>
+            <div className="reg-mobile-progress-track">
+              <div className="reg-mobile-progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="reg-mobile-dots">
+              {STEPS.map((_, i) => {
+                const cls = submitted || i < step ? "done" : i === step ? "active" : "";
+                return <div key={i} className={`reg-mobile-dot ${cls}`} />;
+              })}
+            </div>
+          </div>
 
-</div>
+        </div>
 
         {/* CARD */}
         <div className="reg-card" key={submitted ? "success" : step}>
@@ -943,7 +943,7 @@ export default function Registration({ onBack }) {
                       <Field label="Middle Name"><InputField icon={RegisIconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
                       <Field label="Last Name" required><InputField icon={RegisIconUser} type="text" placeholder="Dela Cruz" value={form.lastName} onChange={set("lastName")} autofilled={af("lastName")} /></Field>
                     </div>
-                    <div className="reg-form-grid cols-2">
+                    <div className="reg-form-grid cols-3">
                       <Field label={<>Suffix <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
                         <SelectField icon={RegisIconUser} value={form.suffix} onChange={set("suffix")}>
                           <option value="">None</option>
@@ -951,6 +951,12 @@ export default function Registration({ onBack }) {
                         </SelectField>
                       </Field>
                       <Field label="Religion"><InputField icon={RegisIconReligion} type="text" placeholder="Roman Catholic" value={form.religion} onChange={set("religion")} /></Field>
+                      <Field label="Civil Status" required>
+                        <SelectField icon={RegisIconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
+                          <option value="">Select status</option>
+                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
+                        </SelectField>
+                      </Field>
                     </div>
                     <div className="reg-form-grid cols-3">
                       <Field label="Birth Date" required><InputField icon={RegisIconCalendar} type="date" value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
@@ -968,13 +974,24 @@ export default function Registration({ onBack }) {
                           ))}
                         </div>
                       </Field>
-                      <Field label="Civil Status" required>
-                        <SelectField icon={RegisIconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
-                          <option value="">Select status</option>
-                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
+                      <Field label="Gender">
+                        <SelectField value={form.gender} onChange={set("gender")}>
+                          <option value="">Select gender</option>
+                          <option>Cisgender</option>
+                          <option>Non-binary</option>
+                          <option>Transgender Man</option>
+                          <option>Transgender Woman</option>
+                          <option>Genderqueer</option>
+                          <option>Others</option>
+                          <option>Prefer not to say</option>
                         </SelectField>
                       </Field>
                     </div>
+                    {form.gender === "Others" && (
+                      <Field label="Please specify gender">
+                        <InputField type="text" placeholder="Please specify" value={form.genderOther} onChange={set("genderOther")} />
+                      </Field>
+                    )}
                     <div className="reg-form-grid cols-2">
                       <Field label="Citizenship" required><InputField icon={IconFlag} type="text" placeholder="Filipino" value={form.citizenship} onChange={set("citizenship")} /></Field>
                       <Field label="Residing Since (Year)" required><InputField icon={RegisIconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
@@ -1050,10 +1067,25 @@ export default function Registration({ onBack }) {
                           <Field label="Disability Type" required>
                             <SelectField icon={RegisIconInfo} value={form.disabilityType} onChange={set("disabilityType")}>
                               <option value="">Select type</option>
-                              <option>Inborn</option><option>Accident</option><option>Mental</option><option>Other</option>
+                              <option>Physical Disability</option>
+                              <option>Visual Disability</option>
+                              <option>Hearing Disability</option>
+                              <option>Speech Impairment</option>
+                              <option>Intellectual Disability</option>
+                              <option>Learning Disability</option>
+                              <option>Psychosocial Disability</option>
+                              <option>Multiple Disabilities</option>
+                              <option>Chronic Illness</option>
+                              <option>Rare Disease</option>
+                              <option>Others</option>
                             </SelectField>
                           </Field>
                         </div>
+                        {form.disabilityType === "Others" && (
+                          <Field label="Please specify disability type">
+                            <InputField type="text" placeholder="Please specify" value={form.disabilityTypeOther} onChange={set("disabilityTypeOther")} />
+                          </Field>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1148,26 +1180,27 @@ export default function Registration({ onBack }) {
                   </div>
 
                   <ReviewSection icon={<SvgPerson size={18} />} title="Personal Information">
-                    <ReviewField label="ID Number"       value={rv(form.idNumber)} full />
-                    <ReviewField label="Full Name"       value={rv(fullName)} />
-                    <ReviewField label="Birth Date"      value={formatDate(form.birthDate)} />
-                    <ReviewField label="Age"             value={rv(form.age)} />
-                    <ReviewField label="Birth Place"     value={rv(form.birthPlace)} />
-                    <ReviewField label="Sex"             value={form.sex} />
-                    <ReviewField label="Civil Status"    value={rv(form.civilStatus)} />
-                    <ReviewField label="Religion"        value={rv(form.religion)} />
-                    <ReviewField label="Citizenship"     value={rv(form.citizenship)} />
-                    <ReviewField label="Residing Since"  value={rv(form.residingSinceYear)} />
-                    <ReviewField label="Contact Number"  value={rv(form.contactNumber)} />
-                    <ReviewField label="Email Address"   value={rv(form.email)} full />
+                    <ReviewField label="ID Number" value={rv(form.idNumber)} full />
+                    <ReviewField label="Full Name" value={rv(fullName)} />
+                    <ReviewField label="Birth Date" value={formatDate(form.birthDate)} />
+                    <ReviewField label="Age" value={rv(form.age)} />
+                    <ReviewField label="Birth Place" value={rv(form.birthPlace)} />
+                    <ReviewField label="Sex" value={form.sex} />
+                    <ReviewField label="Gender" value={form.gender === "Others" ? (rv(form.genderOther) || "Others") : rv(form.gender)} />
+                    <ReviewField label="Civil Status" value={rv(form.civilStatus)} />
+                    <ReviewField label="Religion" value={rv(form.religion)} />
+                    <ReviewField label="Citizenship" value={rv(form.citizenship)} />
+                    <ReviewField label="Residing Since" value={rv(form.residingSinceYear)} />
+                    <ReviewField label="Contact Number" value={rv(form.contactNumber)} />
+                    <ReviewField label="Email Address" value={rv(form.email)} full />
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgMapPin size={18} />} title="Address">
-                    <ReviewField label="House / Street"       value={rv(fullAddr)} />
-                    <ReviewField label="Barangay"             value={rv(form.barangay)} />
-                    <ReviewField label="City / Municipality"  value={rv(form.city)} />
-                    <ReviewField label="Province"             value={rv(form.province)} />
-                    <ReviewField label="Region"               value={rv(form.region)} full />
+                    <ReviewField label="House / Street" value={rv(fullAddr)} />
+                    <ReviewField label="Barangay" value={rv(form.barangay)} />
+                    <ReviewField label="City / Municipality" value={rv(form.city)} />
+                    <ReviewField label="Province" value={rv(form.province)} />
+                    <ReviewField label="Region" value={rv(form.region)} full />
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgTag size={18} />} title="Category">
@@ -1182,21 +1215,21 @@ export default function Registration({ onBack }) {
                       </div>
                     )}
                     {isPwd && <>
-                      <ReviewField label="PWD Status"      value={rv(form.pwdStatus)} />
-                      <ReviewField label="Disability Type" value={rv(form.disabilityType)} />
+                      <ReviewField label="PWD Status" value={rv(form.pwdStatus)} />
+                      <ReviewField label="Disability Type" value={form.disabilityType === "Others" ? (rv(form.disabilityTypeOther) || "Others") : rv(form.disabilityType)} />
                     </>}
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgGradCap size={18} />} title="Education & Employment">
-                    <ReviewField label="Highest Attainment"  value={rv(form.educationAttainment)} />
-                    <ReviewField label="Education Status"    value={rv(form.educationStatus)} />
-                    <ReviewField label="Occupation"          value={rv(form.occupation)} />
-                    <ReviewField label="Employment Status"   value={rv(form.employmentStatus)} />
+                    <ReviewField label="Highest Attainment" value={rv(form.educationAttainment)} />
+                    <ReviewField label="Education Status" value={rv(form.educationStatus)} />
+                    <ReviewField label="Occupation" value={rv(form.occupation)} />
+                    <ReviewField label="Employment Status" value={rv(form.employmentStatus)} />
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgHome size={18} />} title="Household Details">
-                    <ReviewField label="No. of Members"  value={rv(form.totalMembers)} />
-                    <ReviewField label="Classification"  value={rv(form.householdClassification)} />
+                    <ReviewField label="No. of Members" value={rv(form.totalMembers)} />
+                    <ReviewField label="Classification" value={rv(form.householdClassification)} />
                   </ReviewSection>
 
                   {/* Privacy */}
@@ -1256,7 +1289,7 @@ export default function Registration({ onBack }) {
                       disabled={!privacyAgreed || isSubmitting}
                       style={{
                         opacity: (privacyAgreed && !isSubmitting) ? 1 : 0.5,
-                        cursor:  (privacyAgreed && !isSubmitting) ? "pointer" : "not-allowed",
+                        cursor: (privacyAgreed && !isSubmitting) ? "pointer" : "not-allowed",
                         display: "inline-flex", alignItems: "center", gap: "0.5rem",
                       }}>
                       {isSubmitting
