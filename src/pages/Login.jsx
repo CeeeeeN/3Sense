@@ -68,7 +68,8 @@ function PinDot({ filled, error }) {
   return <div className={cls} />;
 }
 
-export default function Login({ onBack, onForgotPassword, onSuccess, onRegister, onActivate }) {
+// ADDED onAddMember to props
+export default function Login({ onBack, onForgotPassword, onSuccess, onRegister, onActivate, onAddMember }) {
   const [screen, setScreen]                   = useState("credentials");
   const [screenKey, setScreenKey]             = useState(0);
   const [hhNumber, setHhNumber]               = useState("");
@@ -112,7 +113,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           initials: initials || "M",
           role: m.role === "head" ? "head" : "member",
           color: COLORS[i % COLORS.length],
-          profilePhoto: m.profilePhoto || null, // <-- ADDED: Extract photo from backend
+          profilePhoto: m.profilePhoto || null,
         };
       });
       // head always first
@@ -240,11 +241,9 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           </div>
         </div>
         <div className="left-content">
-          {/* FIX 1: "at your fingertips." text color changed to #D9E232 */}
           <h2>Your barangay,<br /><span style={{ color: "#D9E232" }}>at your fingertips.</span></h2>
           <p>Sign in to manage your household, request documents, and access all barangay services — securely and conveniently.</p>
 
-          {/* FIX 2: Pills layout fixed with inline styles */}
           <div
             className="feature-pills"
             style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "1.5rem" }}
@@ -371,6 +370,34 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 Continue <LoginArrowIcon />
               </button>
 
+              <button 
+                onClick={() => onAddMember && onAddMember(hhNumber.trim())}
+                style={{ 
+                  width: "100%", 
+                  marginTop: "0.75rem", 
+                  padding: "14px", 
+                  background: "#fff", 
+                  border: "1.5px solid #317D89", 
+                  color: "#317D89", 
+                  borderRadius: "12px", 
+                  fontSize: "0.95rem", 
+                  fontWeight: 600, 
+                  cursor: "pointer", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: "8px" 
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="8.5" cy="7" r="4"/>
+                  <line x1="20" y1="8" x2="20" y2="14"/>
+                  <line x1="23" y1="11" x2="17" y2="11"/>
+                </svg>
+                Add New Member
+              </button>
+
               <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
                 <button className="btn-ghost-sm" onClick={() => switchScreen("credentials")}>← Back</button>
               </div>
@@ -398,7 +425,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                   className="mini-avatar" 
                   style={{ 
                     background: selectedProfile?.color,
-                    overflow: "hidden" // <-- ADDED: keeps the image inside the circle
+                    overflow: "hidden"
                   }}
                 >
                   {selectedProfile?.profilePhoto ? (

@@ -2,6 +2,7 @@ import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { IconUser, IconCalendar, IconClock, IconPin, IconHome, IconGlobe, IconPhone, IconMail, IconHeart, IconBriefcase, IconGradCap, IconBook, IconShield, IconInfo, IconReligion, IconPlus, IconArrow, IconCheck, IconX } from "../components/Icons";
 import { addHouseholdMember } from "../services/addMembers";
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#0d7a55,#13a87a)",
@@ -564,12 +565,15 @@ const BLANK_FORM = {
 const OUTER_STEPS = ["ID Scan", "Selfie", "Personal Info", "Address", "Category", "Education"];
 const FORM_TABS   = ["Personal Info", "Address", "Category", "Education"];
 
-export default function AddMembers({ onBack, onDone, householdID, hhAddress }) {
+export default function AddMembers({ onBack, onDone, householdID: propHouseholdID, hhAddress }) {
   const [outerStep,    setOuterStep]    = useState(0); // 0=IDScan, 1=Selfie, 2=formTabs
   const [idImage,      setIdImage]      = useState(null);
   const [selfieImage,  setSelfieImage]  = useState(null);
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
+
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [members,     setMembers]    = useState([]);
   const [tab,         setTab]        = useState(1);
@@ -577,6 +581,17 @@ export default function AddMembers({ onBack, onDone, householdID, hhAddress }) {
   const [showToast,   setShowToast]  = useState(false);
   const [memberError, setMemberError] = useState("");
   const toastRef = useRef(null);
+  const householdID = propHouseholdID || searchParams.get("hhID");
+
+  const handleBack = () => {
+    if (onBack) onBack();
+    else navigate(-1);
+  };
+
+  const handleDone = () => {
+    if (onDone) onDone();
+    else navigate('/');
+  };
 
   useEffect(() => {
     if (showToast) {

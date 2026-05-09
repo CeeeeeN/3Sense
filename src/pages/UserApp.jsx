@@ -194,6 +194,10 @@ export default function UserApp() {
         }}
         onRegister={() => setPage("register")}
         onActivate={() => setPage("activate")}
+        onAddMember={(hhID) => {
+          setHouseholdID(hhID);
+          setPage("add-members");
+        }}
       />
     );
   }
