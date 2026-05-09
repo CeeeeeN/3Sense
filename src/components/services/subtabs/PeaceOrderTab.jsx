@@ -31,12 +31,12 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const [trackError, setTrackError]   = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [callExpanded, setCallExpanded] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // 🆕 Loading state for uploads
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     reporterName: "", isAnonymous: false, contact: "", reporterAddress: "",
     incidentType: "", location: "", date: "", time: "", description: "", urgency: "", 
-    photo: "", photoFile: null, // 🆕 Added photoFile to hold the actual image object
+    photo: "", photoFile: null,
   });
 
   useEffect(() => {
