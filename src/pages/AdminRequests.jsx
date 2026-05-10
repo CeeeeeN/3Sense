@@ -86,7 +86,7 @@ export default function AdminRequests() {
     const unsubscribeDocs = onSnapshot(collection(db, 'document_requests'), (snapshot) => {
       const docData = snapshot.docs.map(doc => {
         const data = doc.data();
-        let rawDate = data.submittedAt || data.dateRequested || null;
+        let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
         return {
           docId: doc.id,
           collectionName: 'document_requests',
