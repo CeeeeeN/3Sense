@@ -145,7 +145,7 @@ export async function trackIncidentReport(refNum) {
 // 💚 BSWD REPORTS & TIPS
 // ══════════════════════════════
 export async function submitBSWDReport(householdID, userID, residentID, form) {
-  await addDoc(collection(db, "bswdReports"), {
+  await addDoc(collection(db, "bswd_reports"), {
     householdID,
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
@@ -160,7 +160,7 @@ export async function submitBSWDReport(householdID, userID, residentID, form) {
 }
 
 export async function submitBSWDTip(householdID, userID, residentID, form) {
-  await addDoc(collection(db, "bswdReports"), {
+  await addDoc(collection(db, "bswd_reports"), {
     householdID,
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
