@@ -1292,6 +1292,11 @@ h4,
   margin-top: 3px;
 }
 
+.badge-household-head {
+  background: rgba(13, 122, 85, 0.12);
+  color: #0d7a55;
+}
+
 .badge-head {
   background: rgba(232, 160, 32, 0.12);
   color: #b07800;

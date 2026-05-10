@@ -1,5 +1,6 @@
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { db, auth } from "../firebase/firebase";
+import { verifyBeforeUpdateEmail } from "firebase/auth";
 
 export const getMemberProfile = async (householdID, residentID) => {
     if (!householdID || !residentID) throw new Error("Missing household or resident ID.");
@@ -133,12 +134,11 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
             ? String(updatedData.category).split(",").map(s => s.trim()).filter(Boolean)
             : [];
 
-    const isHead = String(updatedData.role || "").toLowerCase() === "head";
     const sameAddress = !!updatedData.sameAddress;
 
     const payload = {
         // Identity 
-        role: isHead ? "head" : "member",
+        role: residentID === "head" ? "Household Head" : (updatedData.role || "Member"),
         firstName: updatedData.firstName || "",
         middleName: updatedData.middleName || "",
         lastName: updatedData.lastName || "",
@@ -190,14 +190,35 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
     await updateDoc(residentRef, payload);
 
     // Keep household master record in sync when head updates profile fields.
-    if (payload.role === "head") {
+    if (residentID === "head" || payload.role === "Household Head" || payload.role === "head") {
         const householdRef = doc(db, "households", householdID);
         const householdSnap = await getDoc(householdRef);
         const existingHousehold = householdSnap.exists() ? householdSnap.data() : {};
 
         const totalMembersValue = updatedData.totalMembers ?? existingHousehold.totalMembers ?? null;
+        const newEmail = payload.email || existingHousehold.email || "";
+
+        let displayMessage = null;
+        if (newEmail && existingHousehold.email && newEmail !== existingHousehold.email) {
+            if (!auth.currentUser) {
+                throw new Error("You must be logged in to change the household login email.");
+            }
+            try {
+                await verifyBeforeUpdateEmail(auth.currentUser, newEmail);
+                displayMessage = `A verification link was sent to ${newEmail}. Your login email will not change until you verify it.`;
+            } catch (err) {
+                console.error("Firebase Auth email update failed:", err);
+                if (err.code === "auth/requires-recent-login") {
+                    throw new Error("For security reasons, changing the login email requires a recent login. Please log out, log back in, and try again.");
+                }
+                throw new Error(`Failed to initiate email change: ${err.message}`);
+            }
+        }
 
         const householdUpdate = {
+            // Only update the master email if we didn't require verification, otherwise keep the old one so login doesn't break.
+            email: displayMessage ? existingHousehold.email : newEmail,
+            pendingEmail: displayMessage ? newEmail : null,
             houseNumber: (sameAddress ? (updatedData.houseNumber || existingHousehold.houseNumber || "") : (payload.houseNumber || existingHousehold.houseNumber || "")),
             street: (sameAddress ? (updatedData.street || existingHousehold.street || "") : (payload.street || existingHousehold.street || "")),
             barangay: (sameAddress ? (updatedData.barangay || existingHousehold.barangay || "") : (payload.barangay || existingHousehold.barangay || "")),
@@ -208,6 +229,12 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
             householdClassification: updatedData.householdClassification || existingHousehold.householdClassification || "",
         };
 
-        await updateDoc(householdRef, householdUpdate);
+    await updateDoc(householdRef, householdUpdate);
+
+    // If an email verification was sent, we throw an error so the UI displays it,
+    // but ONLY after we have successfully saved all other profile and household updates!
+    if (displayMessage) {
+        throw new Error(displayMessage); // This will show up in the UI as a red alert, but the save actually succeeded.
+    }
     }
 };
