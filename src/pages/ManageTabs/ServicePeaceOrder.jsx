@@ -55,8 +55,8 @@ export default function ServicePeaceOrder({ onBack }) {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       // Sort newest first
       data.sort((a, b) => {
-        const ta = a.submittedAt?.toDate?.() ?? new Date(0);
-        const tb = b.submittedAt?.toDate?.() ?? new Date(0);
+        const ta = a.createdAt?.toDate?.() ?? new Date(0);
+        const tb = b.createdAt?.toDate?.() ?? new Date(0);
         return tb - ta;
       });
       setReports(data);
