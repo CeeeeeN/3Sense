@@ -215,14 +215,14 @@ export async function getLivelihoodRegistrations(householdID) {
 // ══════════════════════════════
 // 📋 USER TRANSACTION HISTORY
 // ══════════════════════════════
-export async function fetchUserTransactions(householdID, residentID, userID, role = "Member") {
+export async function fetchUserTransactions(householdID, residentID, userID, role = "member") {
   if (!householdID) return [];
 
   const isMyRecord = (item) => {
     const rId = item.residentID || "";
     const uId = item.userID || "";
     if (rId === residentID || uId === residentID) return true;
-    if ((role === "Household Head" || role === "head") && (rId === "head" || uId === "head" || rId === userID || uId === userID)) {
+    if (role === "head" && (rId === "head" || uId === "head" || rId === userID || uId === userID)) {
       return true;
     }
     return false;

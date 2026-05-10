@@ -149,7 +149,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       householdID: householdID,
       memberID: memberID,
       name: fullName || "Resident",
-      role: userRole || "Member",
+      role: data.role || "member",
       barangay: data.barangay || "Malanday",
     });
     QRCode.toDataURL(qrData, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
@@ -161,7 +161,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const closeModal = () => setOpen(false);
 
   const computeSameAddress = () => {
-    if (userRole !== "Household Head" && data.sameAddress) {
+    if (data.role !== "head" && data.sameAddress) {
       const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
       const isUnchanged = addressFields.every(field => draft[field] === data[field]);
       return isUnchanged;
@@ -305,7 +305,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             {/* Info column */}
             <div className="pf-qr-info">
               <div className="pf-qr-name">{fullName || "Your Full Name"}</div>
-              <div className="pf-qr-id">{householdID || "MAL-XXXX-XXXXX"} • {userRole || "Member"}</div>
+              <div className="pf-qr-id">{householdID || "MAL-XXXX-XXXXX"} · {data.role === "head" ? "Household Head" : "Member"}</div>
               <div className="pf-qr-verified"><span className="dot" /> Verified Resident</div>
 
               <div style={{ borderTop: "1.5px solid var(--bg)", margin: "1rem 0" }} />

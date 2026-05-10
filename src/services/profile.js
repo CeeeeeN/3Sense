@@ -1,6 +1,5 @@
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db, auth } from "../firebase/firebase";
-import { verifyBeforeUpdateEmail } from "firebase/auth";
+import { db } from "../firebase/firebase";
 
 export const getMemberProfile = async (householdID, residentID) => {
     if (!householdID || !residentID) throw new Error("Missing household or resident ID.");
@@ -73,7 +72,7 @@ export const getMemberProfile = async (householdID, residentID) => {
         residentID:  residentID,        // Firestore doc ID
         householdID: householdID,        // parent household
         userID:      d.userID || "",     // Firebase Auth UID
-        role: d.role || "Member",
+        role: d.role || "member",
 
         firstName:   d.firstName || "",
         middleName:  d.middleName || "",
@@ -84,8 +83,6 @@ export const getMemberProfile = async (householdID, residentID) => {
         age:              d.age ?? null,
         birthPlace:       d.birthPlace || "",
         sex:              d.sex || "",
-        gender:           ["Cisgender", "Non-binary", "Transgender Man", "Transgender Woman", "Genderqueer", "Prefer not to say", ""].includes(d.genderOrientation) ? (d.genderOrientation || "") : "Others",
-        genderOther:      ["Cisgender", "Non-binary", "Transgender Man", "Transgender Woman", "Genderqueer", "Prefer not to say", ""].includes(d.genderOrientation) ? "" : d.genderOrientation,
         civilStatus:      d.civilStatus || "",
         religion:         d.religion || "",
         citizenship:      d.citizenship || "",
@@ -98,8 +95,7 @@ export const getMemberProfile = async (householdID, residentID) => {
 
         categories:    normalizedCategories,
         pwdStatus:     d.pwdStatus || "",
-        disabilityType: ["Physical Disability", "Visual Disability", "Hearing Disability", "Speech Impairment", "Intellectual Disability", "Learning Disability", "Psychosocial Disability", "Multiple Disabilities", "Chronic Illness", "Rare Disease", ""].includes(d.disabilityType) ? (d.disabilityType || "") : "Others",
-        disabilityTypeOther: ["Physical Disability", "Visual Disability", "Hearing Disability", "Speech Impairment", "Intellectual Disability", "Learning Disability", "Psychosocial Disability", "Multiple Disabilities", "Chronic Illness", "Rare Disease", ""].includes(d.disabilityType) ? "" : d.disabilityType,
+        disabilityType: d.disabilityType || "",
 
         totalMembers:             d.totalMembers ?? d.householdMembers ?? h.totalMembers ?? "",
         householdClassification:  d.householdClassification || h.householdClassification || "",
@@ -134,11 +130,12 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
             ? String(updatedData.category).split(",").map(s => s.trim()).filter(Boolean)
             : [];
 
+    const isHead = String(updatedData.role || "").toLowerCase() === "head";
     const sameAddress = !!updatedData.sameAddress;
 
     const payload = {
         // Identity 
-        role: residentID === "head" ? "Household Head" : (updatedData.role || "Member"),
+        role: isHead ? "head" : "member",
         firstName: updatedData.firstName || "",
         middleName: updatedData.middleName || "",
         lastName: updatedData.lastName || "",
@@ -149,7 +146,6 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         age: updatedData.age ? Number(updatedData.age) : null,
         birthPlace: updatedData.birthPlace || "",
         sex: updatedData.sex || "",
-        genderOrientation: updatedData.gender === "Others" ? (updatedData.genderOther || "Others") : (updatedData.gender || ""),
         civilStatus: updatedData.civilStatus || "",
         religion: updatedData.religion || "",
         citizenship: updatedData.citizenship || "",
@@ -161,7 +157,7 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
 
         categories: normalizedCategories,
         pwdStatus: updatedData.pwdStatus || "",
-        disabilityType: updatedData.disabilityType === "Others" ? (updatedData.disabilityTypeOther || "Others") : (updatedData.disabilityType || ""),
+        disabilityType: updatedData.disabilityType || "",
 
         totalMembers: updatedData.totalMembers || updatedData.householdMembers || "",
         householdClassification: updatedData.householdClassification || "",
@@ -190,35 +186,14 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
     await updateDoc(residentRef, payload);
 
     // Keep household master record in sync when head updates profile fields.
-    if (residentID === "head" || payload.role === "Household Head" || payload.role === "head") {
+    if (payload.role === "head") {
         const householdRef = doc(db, "households", householdID);
         const householdSnap = await getDoc(householdRef);
         const existingHousehold = householdSnap.exists() ? householdSnap.data() : {};
 
         const totalMembersValue = updatedData.totalMembers ?? existingHousehold.totalMembers ?? null;
-        const newEmail = payload.email || existingHousehold.email || "";
-
-        let displayMessage = null;
-        if (newEmail && existingHousehold.email && newEmail !== existingHousehold.email) {
-            if (!auth.currentUser) {
-                throw new Error("You must be logged in to change the household login email.");
-            }
-            try {
-                await verifyBeforeUpdateEmail(auth.currentUser, newEmail);
-                displayMessage = `A verification link was sent to ${newEmail}. Your login email will not change until you verify it.`;
-            } catch (err) {
-                console.error("Firebase Auth email update failed:", err);
-                if (err.code === "auth/requires-recent-login") {
-                    throw new Error("For security reasons, changing the login email requires a recent login. Please log out, log back in, and try again.");
-                }
-                throw new Error(`Failed to initiate email change: ${err.message}`);
-            }
-        }
 
         const householdUpdate = {
-            // Only update the master email if we didn't require verification, otherwise keep the old one so login doesn't break.
-            email: displayMessage ? existingHousehold.email : newEmail,
-            pendingEmail: displayMessage ? newEmail : null,
             houseNumber: (sameAddress ? (updatedData.houseNumber || existingHousehold.houseNumber || "") : (payload.houseNumber || existingHousehold.houseNumber || "")),
             street: (sameAddress ? (updatedData.street || existingHousehold.street || "") : (payload.street || existingHousehold.street || "")),
             barangay: (sameAddress ? (updatedData.barangay || existingHousehold.barangay || "") : (payload.barangay || existingHousehold.barangay || "")),
@@ -229,12 +204,6 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
             householdClassification: updatedData.householdClassification || existingHousehold.householdClassification || "",
         };
 
-    await updateDoc(householdRef, householdUpdate);
-
-    // If an email verification was sent, we throw an error so the UI displays it,
-    // but ONLY after we have successfully saved all other profile and household updates!
-    if (displayMessage) {
-        throw new Error(displayMessage); // This will show up in the UI as a red alert, but the save actually succeeded.
-    }
+        await updateDoc(householdRef, householdUpdate);
     }
 };

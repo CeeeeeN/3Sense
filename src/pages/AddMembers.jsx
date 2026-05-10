@@ -1,10 +1,8 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { IconUser, IconCalendar, IconClock, IconPin, IconHome, IconGlobe, IconPhone, IconMail, IconHeart, IconBriefcase, IconGradCap, IconBook, IconShield, IconInfo, IconReligion, IconPlus, IconArrow, IconCheck, IconX } from "../components/Icons";
-import { addHouseholdMember, createBranch } from "../services/addMembers";
+import { addHouseholdMember } from "../services/addMembers";
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../firebase/firebase";
 
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#0d7a55,#13a87a)",
@@ -184,56 +182,27 @@ const SvgBranch = ({ size = 22 }) => (
   </svg>
 );
 
-// ─── Family Branch Step (with inline Create Branch modal) ────────────────────
+// ─── Family Branch Step ───────────────────────────────────────────────────────
+const DEFAULT_BRANCHES = ["Cruz Family", "Santos Family", "Rosa Family"];
+
 function AmFamilyBranchStep({ onConfirm, householdID }) {
-  const [branches, setBranches] = useState([]);
+  const [branches, setBranches] = useState(DEFAULT_BRANCHES);
   const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [newBranchName, setNewBranchName] = useState("");
-  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  const fetchBranches = useCallback(async () => {
-    setLoading(true);
-    try {
-      const snap = await getDocs(collection(db, "households", householdID, "branches"));
-      const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      fetched.sort((a, b) => a.id.localeCompare(b.id));
-      setBranches(fetched);
-      if (fetched.length > 0 && !selected) setSelected(fetched[0].id);
-    } catch (err) {
-      console.error("Failed to fetch branches", err);
-    } finally {
-      setLoading(false);
+  const handleCreate = () => {
+    const name = newBranchName.trim();
+    if (!name) { setCreateError("Please enter a branch name."); return; }
+    if (branches.some(b => b.toLowerCase() === name.toLowerCase())) {
+      setCreateError("This branch already exists."); return;
     }
-  }, [householdID]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { if (householdID) fetchBranches(); }, [householdID, fetchBranches]);
-
-  const handleConfirm = () => {
-    if (!selected) { setError("Please select a family branch."); return; }
-    const branch = branches.find(b => b.id === selected);
-    const needsHead = selected !== "BR-001" && !branch?.residentID;
-    onConfirm(selected, needsHead, branch?.branchName || selected);
-  };
-
-  const handleCreateBranch = async () => {
-    if (!newBranchName.trim()) { setCreateError("Please enter a branch name."); return; }
-    setCreating(true);
-    try {
-      const newBranchID = await createBranch(householdID, newBranchName.trim());
-      await fetchBranches();
-      setSelected(newBranchID);
-      setShowModal(false);
-      setNewBranchName("");
-      setCreateError("");
-    } catch (err) {
-      setCreateError("Failed to create branch: " + err.message);
-    } finally {
-      setCreating(false);
-    }
+    setBranches(prev => [...prev, name]);
+    setSelected(name);
+    setNewBranchName("");
+    setCreateError("");
+    setShowModal(false);
   };
 
   return (
@@ -246,59 +215,36 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
         </div>
       </div>
 
-      {loading ? (
-        <div style={{ padding: "2rem", textAlign: "center" }}><SvgLoader size={24} /></div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", margin: "1rem 0" }}>
-          {branches.map(branch => {
-            const hasHead = !!branch.residentID;
-            const isBR001 = branch.id === "BR-001";
-            return (
-              <label key={branch.id} style={{ cursor: "pointer" }}>
-                <div
-                  className={`am-branch-card${selected === branch.id ? " selected" : ""}`}
-                  onClick={() => { setSelected(branch.id); setError(""); }}
-                >
-                  <span className="am-branch-radio"><span className="am-branch-radio-dot" /></span>
-                  <span style={{ flex: 1 }}>
-                    <span className="am-branch-label">{branch.branchName}</span>
-                    <span style={{
-                      display: "block", fontSize: "0.72rem", marginTop: "0.2rem",
-                      color: hasHead ? "#0d7a55" : "#e8a020",
-                      fontFamily: "'Poppins', sans-serif", fontWeight: 500
-                    }}>
-                      {isBR001 ? "Original Branch · Head Permanent"
-                        : hasHead ? "Branch Head Assigned"
-                          : "⚠ Head Not Yet Assigned"}
-                    </span>
-                  </span>
-                  <span style={{
-                    fontSize: "0.68rem", color: "var(--muted)",
-                    fontFamily: "'JetBrains Mono', monospace"
-                  }}>{branch.id}</span>
-                </div>
-              </label>
-            );
-          })}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", margin: "1rem 0" }}>
+        {branches.map(branch => (
+          <label key={branch} style={{ cursor: "pointer" }}>
+            <div
+              className={`am-branch-card${selected === branch ? " selected" : ""}`}
+              onClick={() => setSelected(branch)}
+            >
+              <span className="am-branch-radio">
+                <span className="am-branch-radio-dot" />
+              </span>
+              <span className="am-branch-label">{branch}</span>
+            </div>
+          </label>
+        ))}
+      </div>
 
-          <button
-            className="am-btn am-btn-ghost"
-            onClick={() => { setShowModal(true); setCreateError(""); setNewBranchName(""); }}
-            style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", marginBottom: "1.25rem" }}
-          >
-            <IconPlus /> Create New Family Branch
-          </button>
-        </div>
-      )}
+      <button
+        className="am-btn am-btn-ghost"
+        onClick={() => { setShowModal(true); setCreateError(""); setNewBranchName(""); }}
+        style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", marginBottom: "1.25rem" }}
+      >
+        <IconPlus /> Create New Family Branch
+      </button>
 
-      {error && <div className="am-field-error" style={{ marginTop: "0.5rem" }}>⚠️ {error}</div>}
-
-      {selected && !loading && (
+      {selected && (
         <div className="am-form-actions" style={{ marginTop: 0 }}>
           <div />
           <button
             className="am-btn am-btn-primary"
-            onClick={handleConfirm}
+            onClick={() => onConfirm(selected)}
             style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
           >
             Next: ID Scan <IconArrow />
@@ -322,7 +268,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
                   placeholder="e.g. Reyes Family"
                   value={newBranchName}
                   onChange={e => { setNewBranchName(e.target.value); setCreateError(""); }}
-                  onKeyDown={e => e.key === "Enter" && handleCreateBranch()}
+                  onKeyDown={e => e.key === "Enter" && handleCreate()}
                 />
               </Field>
               {createError && <div className="am-field-error" style={{ marginTop: "0.5rem" }}>⚠️ {createError}</div>}
@@ -331,11 +277,10 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
               <button className="am-btn am-btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
               <button
                 className="am-btn am-btn-primary"
-                onClick={handleCreateBranch}
+                onClick={handleCreate}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
               >
-                {creating ? <SvgLoader size={15} /> : <IconCheck />}
-                {creating ? "Saving..." : "Save Branch"}
+                <IconCheck /> Save Branch
               </button>
             </div>
           </div>
@@ -736,11 +681,8 @@ const OUTER_STEPS = ["Family Branch", "ID Scan", "Selfie", "Personal Info", "Add
 const FORM_TABS = ["Personal Info", "Address", "Category", "Education"];
 
 export default function AddMembers({ onBack, onDone, householdID: propHouseholdID, hhAddress }) {
-  const [outerStep, setOuterStep] = useState(0);
-  // outerStep: 0=FamilyBranch, 1=IDScan, 2=Selfie, 3+=formTabs
+  const [outerStep, setOuterStep] = useState(0); // 0=FamilyBranch, 1=IDScan, 2=Selfie, 3=formTabs
   const [familyBranch, setFamilyBranch] = useState(null);
-  const [branchName, setBranchName] = useState("");
-  const [needsHead, setNeedsHead] = useState(false);
   const [idImage, setIdImage] = useState(null);
   const [selfieImage, setSelfieImage] = useState(null);
   const [autofilledFields, setAutofilledFields] = useState(new Set());
@@ -861,38 +803,37 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const goNext = (nextTab) => {
     if (!validateTab(tab)) return;
+    if (tab === 1 && form.isBranchHead && members.some(m => m.familyBranch === familyBranch && m.isBranchHead)) {
+      setMemberError("Branch already has a head");
+      return;
+    }
     setTab(nextTab); window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const goBack = (prevTab) => { setMemberError(""); setTab(prevTab); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const addMember = async () => {
     if (!validateTab(1) || !validateTab(4)) { setTab(1); return; }
-
-    // Branch head enforcement:
-    // - BR-001: no head reassignment ever
-    // - needsHead: this member MUST be the head
-    // - otherwise: regular member
-    const isBR001 = familyBranch === "BR-001";
-    const isHead = !isBR001 && (needsHead || form.isBranchHead);
-
+    if (form.isBranchHead && members.some(m => m.familyBranch === familyBranch && m.isBranchHead)) {
+      setMemberError("Branch already has a head"); setTab(1); return;
+    }
     const fullName = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || `Member ${members.length + 1}`;
     const initials = (form.firstName?.[0] || "") + (form.lastName?.[0] || "M");
     const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
     try {
+      // BACKEND: calls addHouseholdMember — this already goes to Firebase via your services/addMembers file
+      // TODO (backend): make sure addHouseholdMember also saves idImage and selfieImage to Firebase Storage
+      // and stores the download URLs in the member's Firestore document.
       await addHouseholdMember(householdID, {
         ...form,
-        branchID: familyBranch,
+        familyBranch,
         idImage,
         selfieImage,
         categories: form.categories || [],
-        isBranchHead: isHead,
       });
     } catch (err) { alert("Failed to save member: " + err.message); return; }
 
     setMembers(m => [...m, {
-      fullName, initials, color,
-      familyBranch, branchDisplayName: branchName,
-      isBranchHead: isHead,
+      fullName, initials, color, familyBranch, isBranchHead: form.isBranchHead,
       meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
     }]);
 
@@ -901,12 +842,10 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     setIdImage(null);
     setSelfieImage(null);
     setFamilyBranch(null);
-    setBranchName("");
-    setNeedsHead(false);
     setAutofilledFields(new Set());
     manuallyEdited.current = new Set();
     setTab(1);
-    setOuterStep(0);
+    setOuterStep(0); // back to Family Branch step for next member
     setMemberError("");
     setShowToast(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -920,10 +859,8 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
-  // outerStep: 0=FamilyBranch, 1=IDScan, 2=Selfie, 3+=formTabs
-  const stepperStep = outerStep <= 2 ? outerStep : 2 + tab;
   const totalOuter = OUTER_STEPS.length;
-  const currentOuter = stepperStep;
+  const currentOuter = outerStep === 0 ? 0 : outerStep === 1 ? 1 : outerStep === 2 ? 2 : 2 + tab;
   const outerProgress = (currentOuter / (totalOuter - 1)) * 100;
 
   return (
@@ -964,9 +901,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
             <div className="am-branch-groups">
               {branchOrder.map(branch => {
                 const branchMembers = members.filter(m => m.familyBranch === branch);
-                // We only enforce that there's at least one branch head if branches are fully implemented,
-                // but since members might be added to existing branches that already have heads, 
-                // we'll bypass this strict check for now if they are just adding members to existing branches.
+                const headIdx = members.findIndex(m => m.familyBranch === branch && m.isBranchHead);
                 return (
                   <div key={branch} className="am-branch-group">
                     <div className="am-branch-group-header">
@@ -1008,8 +943,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
             </h3>
             <button className="am-btn am-btn-ghost am-btn-sm" onClick={() => {
               setForm({ ...BLANK_FORM }); setTab(1); setOuterStep(0);
-              setIdImage(null); setSelfieImage(null);
-              setFamilyBranch(null); setBranchName(""); setNeedsHead(false);
+              setIdImage(null); setSelfieImage(null); setFamilyBranch(null);
               setAutofilledFields(new Set()); manuallyEdited.current = new Set();
             }}>
               Clear Form
@@ -1058,10 +992,8 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
           {outerStep === 0 && (
             <AmFamilyBranchStep
               householdID={householdID}
-              onConfirm={(branchID, hasNoHead, bName) => {
-                setFamilyBranch(branchID);
-                setNeedsHead(hasNoHead);
-                setBranchName(bName);
+              onConfirm={(branch) => {
+                setFamilyBranch(branch);
                 setOuterStep(1);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
@@ -1216,46 +1148,36 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       <Field label="Residing Since (Year)" required><InputField icon={IconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                     </div>
 
-                    {/* Branch Head Section — rules enforced here */}
-                    {familyBranch === "BR-001" ? (
-                      // BR-001: head is always the original registrant, never changeable
-                      <div className="am-special-checks">
-                        <div style={{
-                          padding: "0.75rem 1rem", borderRadius: "10px",
-                          background: "rgba(13,122,85,0.07)", border: "1px solid rgba(13,122,85,0.18)",
-                          fontSize: "0.82rem", color: "#0d7a55", fontFamily: "'Poppins',sans-serif"
-                        }}>
-                          ⭐ <strong>Original Branch</strong> — The branch head of BR-001 is permanently the registered household head.
-                        </div>
-                      </div>
-                    ) : needsHead ? (
-                      // Branch has no head yet — first member MUST be the head
-                      <div className="am-special-checks">
-                        <div style={{
-                          padding: "0.75rem 1rem", borderRadius: "10px",
-                          background: "rgba(232,160,32,0.09)", border: "1px solid rgba(232,160,32,0.35)",
-                          fontSize: "0.82rem", color: "#b37a00", fontFamily: "'Poppins',sans-serif"
-                        }}>
-                          ⚠️ <strong>Branch Head Required</strong> — This branch has no head yet. This member will automatically be assigned as the Branch Head.
-                        </div>
-                      </div>
-                    ) : (
-                      // Branch already has a head — show info only, no option to change
-                      <div className="am-special-checks">
-                        <div style={{
-                          padding: "0.75rem 1rem", borderRadius: "10px",
-                          background: "rgba(13,122,85,0.05)", border: "1px solid rgba(13,122,85,0.15)",
-                          fontSize: "0.82rem", color: "var(--muted)", fontFamily: "'Poppins',sans-serif"
-                        }}>
-                          ✅ <strong>Branch Head Already Assigned</strong> — This member will be added as a regular branch member.
-                        </div>
-                      </div>
-                    )}
+                    {/* Branch Head Toggle */}
+                    <div className="am-special-checks">
+                      <label className="am-special-check">
+                        <input
+                          type="checkbox"
+                          checked={form.isBranchHead}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            const alreadyHasHead = members.some(m => m.familyBranch === familyBranch && m.isBranchHead);
+                            if (checked && alreadyHasHead) {
+                              setMemberError(`Branch already has a head`);
+                            } else {
+                              setMemberError("");
+                            }
+                            set("isBranchHead")(e);
+                          }}
+                        />
+                        <span className="am-special-check-label">
+                          <span className="am-check-icon-box">{form.isBranchHead && "✓"}</span>
+                          <span className="am-check-text">
+                            <strong>Set as Branch Head</strong>
+                            <span>Designate this member as the head of {familyBranch || "the selected family branch"}</span>
+                          </span>
+                        </span>
+                      </label>
+                    </div>
                   </div>
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
                     <button className="am-btn am-btn-ghost" onClick={() => { setOuterStep(2); setMemberError(""); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← Back</button>
-
                     <button className="am-btn am-btn-primary" onClick={() => goNext(2)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Next: Address <IconArrow /></button>
                   </div>
                 </div>

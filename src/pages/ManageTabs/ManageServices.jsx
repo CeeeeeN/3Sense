@@ -15,19 +15,19 @@ import ServiceBswd from "./ServiceBswd";
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 export default function ManageServices() {
-  const [activeDashboard, setActiveDashboard]     = useState(null);
+  const [activeDashboard, setActiveDashboard] = useState(null);
   const [selectedServiceQR, setSelectedServiceQR] = useState(null);
-  const [userRole, setUserRole]                   = useState(null);
+  const [userRole, setUserRole] = useState(null);
 
   // ── Real-time stats ──────────────────────────────────────────────────────────
-  const [peaceStats, setPeaceStats]           = useState({ total: 0, byStatus: {}, latest: null });
+  const [peaceStats, setPeaceStats] = useState({ total: 0, byStatus: {}, latest: null });
   const [livelihoodStats, setLivelihoodStats] = useState({ total: 0, byStatus: {}, latest: null });
-  const [bswdStats, setBswdStats]             = useState({ total: 0, byStatus: {}, latest: null });
+  const [bswdStats, setBswdStats] = useState({ total: 0, byStatus: {}, latest: null });
 
   const computeStats = (snapshot, dateField = "submittedAt") => {
-    const docs     = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const byStatus = {};
-    let latest     = null;
+    let latest = null;
 
     docs.forEach((doc) => {
       const s = doc.status || "unknown";
@@ -40,24 +40,24 @@ export default function ManageServices() {
     });
 
     return {
-      total:    docs.length,
+      total: docs.length,
       byStatus,
-      latest:   latest ? latest.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—",
+      latest: latest ? latest.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—",
     };
   };
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const q    = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
         const snap = await getDocs(q);
         if (!snap.empty) setUserRole(snap.docs[0].data().role || "Standard Admin");
       }
     });
 
-    const unsubPeace      = onSnapshot(collection(db, "incidentReports"),        (snap) => setPeaceStats(computeStats(snap, "submittedAt")));
+    const unsubPeace = onSnapshot(collection(db, "incidentReports"), (snap) => setPeaceStats(computeStats(snap, "submittedAt")));
     const unsubLivelihood = onSnapshot(collection(db, "livelihoodRegistrations"), (snap) => setLivelihoodStats(computeStats(snap, "submittedAt")));
-    const unsubBswd       = onSnapshot(collection(db, "bswdReports"),             (snap) => setBswdStats(computeStats(snap, "submittedAt")));
+    const unsubBswd = onSnapshot(collection(db, "bswdReports"), (snap) => setBswdStats(computeStats(snap, "submittedAt")));
 
     return () => { unsubscribeAuth(); unsubPeace(); unsubLivelihood(); unsubBswd(); };
   }, []);
@@ -69,7 +69,7 @@ export default function ManageServices() {
   // No startDate/endDate for services — they are ongoing (no expiry beyond the daily token)
   const handleGenerateQR = (serviceName, category) => {
     const today = getTodayStr();
-    const base  = "https://3-sense.vercel.app/";
+    const base = "https://3-sense.vercel.app/";
     const url =
       `${base}?serviceId=${encodeURIComponent(serviceName.toLowerCase())}` +
       `&serviceName=${encodeURIComponent(serviceName)}` +
@@ -81,15 +81,15 @@ export default function ManageServices() {
 
   const handleDownloadQR = () => {
     const svgElement = document.getElementById("as-qr-svg");
-    const svgData    = new XMLSerializer().serializeToString(svgElement);
-    const canvas     = document.createElement("canvas");
-    const ctx        = canvas.getContext("2d");
-    const img        = new Image();
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
     img.onload = () => {
       canvas.width = img.width; canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
-      const link    = document.createElement("a");
-      link.href     = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
       link.download = `3Sense-QR-${selectedServiceQR.name}-${getTodayStr()}.png`;
       link.click();
     };
@@ -97,20 +97,20 @@ export default function ManageServices() {
   };
 
   // ── Sub-page routing ─────────────────────────────────────────────────────────
-  if (activeDashboard === "peace")      return <ServicePeaceOrder onBack={() => setActiveDashboard(null)} />;
+  if (activeDashboard === "peace") return <ServicePeaceOrder onBack={() => setActiveDashboard(null)} />;
   if (activeDashboard === "livelihood") return <ServiceLivelihood onBack={() => setActiveDashboard(null)} />;
-  if (activeDashboard === "bswd")       return <ServiceBswd onBack={() => setActiveDashboard(null)} />;
+  if (activeDashboard === "bswd") return <ServiceBswd onBack={() => setActiveDashboard(null)} />;
 
   // ── Stat bar component ───────────────────────────────────────────────────────
   const StatBar = ({ stats }) => {
     const statusColors = {
-      pending:   { bg: "#fef3c7", text: "#92400e" },
-      received:  { bg: "#fef3c7", text: "#92400e" },
+      pending: { bg: "#fef3c7", text: "#92400e" },
+      received: { bg: "#fef3c7", text: "#92400e" },
       responded: { bg: "#e0e7ff", text: "#3730a3" },
-      resolved:  { bg: "#dcfce7", text: "#166534" },
-      approved:  { bg: "#dcfce7", text: "#166534" },
-      rejected:  { bg: "#fee2e2", text: "#991b1b" },
-      analyzed:  { bg: "#e0e7ff", text: "#3730a3" },
+      resolved: { bg: "#dcfce7", text: "#166534" },
+      approved: { bg: "#dcfce7", text: "#166534" },
+      rejected: { bg: "#fee2e2", text: "#991b1b" },
+      analyzed: { bg: "#e0e7ff", text: "#3730a3" },
     };
     return (
       <div style={{ marginTop: "12px", padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
@@ -133,9 +133,9 @@ export default function ManageServices() {
     );
   };
 
-  const allowedServices   = ROLE_PERMISSIONS[userRole]?.services || [];
+  const allowedServices = ROLE_PERMISSIONS[userRole]?.services || [];
   const hasWorkspaceServices = allowedServices.some((s) => ["Peace & Order", "Livelihood", "BSWD"].includes(s));
-  const hasInfoServices      = allowedServices.some((s) => ["BADAC", "VAWC", "BOSCA"].includes(s));
+  const hasInfoServices = allowedServices.some((s) => ["BADAC", "VAWC", "BOSCA"].includes(s));
 
   // ── Shared QR modal (reused for all services) ────────────────────────────────
   const QRModal = () => (
@@ -263,7 +263,7 @@ export default function ManageServices() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
               {[
                 { name: "BADAC", color: { bg: "#fef3c7", text: "#b45309" }, desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures." },
-                { name: "VAWC",  color: { bg: "#fce7f3", text: "#be185d" }, desc: "Violence Against Women and their Children guides, support numbers, and help." },
+                { name: "VAWC", color: { bg: "#fce7f3", text: "#be185d" }, desc: "Violence Against Women and their Children guides, support numbers, and help." },
                 { name: "BOSCA", color: { bg: "#e0e7ff", text: "#4338ca" }, desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines." },
               ]
                 .filter((svc) => allowedServices.includes(svc.name))

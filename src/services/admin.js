@@ -74,7 +74,6 @@ export const approveRegistration = async (docID) => {
       age: data.age ?? null,
       birthPlace: data.birthPlace || "",
       sex: data.sex || "",
-      genderOrientation: data.genderOrientation || "",
       civilStatus: data.civilStatus || "",
       religion: data.religion || "",
       citizenship: data.citizenship || "",
@@ -91,10 +90,7 @@ export const approveRegistration = async (docID) => {
     },
   });
 
-  // Email is fire-and-forget — a failure must NOT block the approval
-  sendApprovalEmail(householdID, fullName, data.email).catch(err =>
-    console.warn("Approval email failed (non-blocking):", err)
-  );
+  await sendApprovalEmail(householdID, fullName, data.email);
   await deleteDoc(pendingRef);
 
   return { householdID, registrationID: docID, email: data.email, name: fullName };
@@ -116,12 +112,8 @@ const sendApprovalEmail = async (householdID, name, toEmail) => {
     });
 
     if (!response.ok) {
-      let errMsg = response.statusText;
-      try {
-        const errBody = await response.json();
-        errMsg = errBody.message || errMsg;
-      } catch (_) { /* empty or non-JSON body — ignore */ }
-      throw new Error(`Failed to send email: ${errMsg}`);
+      const error = await response.json();
+      throw new Error(`Failed to send email: ${error.message || response.statusText}`);
     }
   } catch (error) {
     console.error("Email sending error:", error);

@@ -1,7 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useCallback } from "react";
 import { loginWithHouseholdID, getMemberPin, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
-import { LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser } from "../components/Icons";
+import {LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser} from "../components/Icons";
 
 function MobileHeader({ onBack }) {
   return (
@@ -32,18 +32,18 @@ function ProfileCard({ profile, selected, onSelect }) {
       className={`profile-card ${selected ? "selected" : ""}`}
       onClick={() => onSelect(profile)}
     >
-      <div
-        className="profile-avatar"
-        style={{
+      <div 
+        className="profile-avatar" 
+        style={{ 
           background: profile.color,
           overflow: "hidden"
         }}
       >
         {profile.profilePhoto ? (
-          <img
-            src={profile.profilePhoto}
-            alt={profile.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          <img 
+            src={profile.profilePhoto} 
+            alt={profile.name} 
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} 
           />
         ) : (
           profile.initials
@@ -51,12 +51,9 @@ function ProfileCard({ profile, selected, onSelect }) {
       </div>
       <div className="profile-info">
         <div className="profile-name">{profile.name}</div>
-        <div className={`profile-badge ${
-          profile.role === "Household Head" ? "badge-household-head" :
-          profile.role === "Branch Head" ? "badge-head" : "badge-member"
-        }`}>
-          {profile.role === "Member" ? <MemberIcon /> : <HouseholdHeadIcon />}
-          {profile.role}
+        <div className={`profile-badge ${profile.role === "head" ? "badge-head" : "badge-member"}`}>
+          {profile.role === "head" ? <HouseholdHeadIcon /> : <MemberIcon />}
+          {profile.role === "head" ? "Household Head" : "Member"}
         </div>
       </div>
       <div className="profile-check">{selected ? "✓" : ""}</div>
@@ -73,36 +70,21 @@ function PinDot({ filled, error }) {
 
 // ADDED onAddMember to props
 export default function Login({ onBack, onForgotPassword, onSuccess, onRegister, onActivate, onAddMember }) {
-  const [screen, setScreen] = useState("credentials");
-  const [screenKey, setScreenKey] = useState(0);
-  const [hhNumber, setHhNumber] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [profiles, setProfiles] = useState([]);
-  const [branches, setBranches] = useState([]);
+  const [screen, setScreen]                   = useState("credentials");
+  const [screenKey, setScreenKey]             = useState(0);
+  const [hhNumber, setHhNumber]               = useState("");
+  const [password, setPassword]               = useState("");
+  const [showPw, setShowPw]                   = useState(false);
+  const [profiles, setProfiles]               = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
-  const [pinValue, setPinValue] = useState("");
-  const [pinError, setPinError] = useState(false);
-  const [firstPin, setFirstPin] = useState("");
+  const [pinValue, setPinValue]               = useState("");
+  const [pinError, setPinError]               = useState(false);
+  const [firstPin, setFirstPin]               = useState("");
   const [isConfirmingPin, setIsConfirmingPin] = useState(false);
-  const [pinLabel, setPinLabel] = useState("Enter PIN");
-  const [hasExistingPin, setHasExistingPin] = useState(false);
+  const [pinLabel, setPinLabel]               = useState("Enter PIN");
+  const [hasExistingPin, setHasExistingPin]   = useState(false);
   const [redirectProgress, setRedirectProgress] = useState(0);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [expandedBranches, setExpandedBranches] = useState({});
-
-  function toggleBranch(branchId) {
-    setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
-  }
-
-  // Auto-expand all branches on load
-  useEffect(() => {
-    if (branches.length > 0) {
-      const allExpanded = {};
-      branches.forEach(b => { allExpanded[b.id] = true; });
-      setExpandedBranches(allExpanded);
-    }
-  }, [branches]);
+  const [loginLoading, setLoginLoading]       = useState(false);
 
   function switchScreen(s) {
     setScreen(s);
@@ -124,35 +106,19 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
       const mapped = result.residents.map((m, i) => {
         const fullName = [m.firstName, m.lastName].filter(Boolean).join(" ") || `Member ${i + 1}`;
         const initials = ((m.firstName?.[0] || "") + (m.lastName?.[0] || "M")).toUpperCase();
-
-        // Find which branch this member belongs to
-        const myBranch = result.branches?.find(b => b.id === m.branchID);
-
-        // Normalize role — backward compat with old "head" value
-        const rawRole = m.role || "Member";
-        const isHouseholdHead = rawRole === "Household Head" || rawRole === "head";
-        const isBranchHead = !isHouseholdHead &&
-          (rawRole === "Branch Head" || (myBranch ? myBranch.residentID === m.id : false));
-
-        const displayRole = isHouseholdHead ? "Household Head"
-          : isBranchHead ? "Branch Head" : "Member";
-
         return {
           id: m.id,
           userID: m.userID || "",
           name: fullName,
           initials: initials || "M",
-          role: displayRole,
-          branchID: m.branchID || null,
-          isBranchHead: isHouseholdHead || isBranchHead,
+          role: m.role === "head" ? "head" : "member",
           color: COLORS[i % COLORS.length],
           profilePhoto: m.profilePhoto || null,
         };
       });
       // head always first
-      mapped.sort((a) => (a.role === "Household Head" ? -1 : a.role === "Branch Head" ? 0 : 1));
+      mapped.sort((a, b) => (a.role === "head" ? -1 : 1));
       setProfiles(mapped);
-      setBranches(result.branches || []);
       switchScreen("profiles");
     } catch (err) {
       alert(err.message);
@@ -234,9 +200,9 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setTimeout(() => {
       if (onSuccess) onSuccess({
         ...selectedProfile,
-        memberID: selectedProfile.id,
+        memberID:    selectedProfile.id,
         householdID: hhNumber.trim(),
-        userID: selectedProfile.userID || "",
+        userID:      selectedProfile.userID || "",
       });
     }, 2200);
   }
@@ -284,19 +250,19 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           >
             {[
               [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
                 "Manage your household profile"
               ],
               [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>,
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
                 "Track document requests in real time"
               ],
               [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>,
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
                 "Stay updated with barangay announcements"
               ],
               [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>,
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
                 "Quick access to emergency services"
               ],
             ].map(([icon, text]) => (
@@ -392,90 +358,42 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               <h2 className="screen-title">Select Your Profile</h2>
               <p className="screen-sub">Choose which household member you are to continue.</p>
 
-              <div className="profile-groups">
-                {branches.map(branch => {
-                  const branchProfiles = profiles.filter(p => p.branchID === branch.id);
-                  if (branchProfiles.length === 0) return null;
-                  const isExpanded = expandedBranches[branch.id] !== false;
-                  const hasSelected = branchProfiles.some(p => p.branchID === branch.id && selectedProfile?.id === p.id);
-                  return (
-                    <div
-                      key={branch.id}
-                      className={`branch-card${hasSelected ? " has-selection" : ""}`}
-                    >
-                      {/* Branch Header */}
-                      <button
-                        onClick={() => toggleBranch(branch.id)}
-                        className={`branch-header-btn${isExpanded ? " expanded" : ""}`}
-                      >
-                        <div className="branch-header-left">
-                          <div className="branch-icon-tile">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                              <polyline points="9 22 9 12 15 12 15 22" />
-                            </svg>
-                          </div>
-                          <div className="branch-title-group">
-                            <div className="branch-name">{branch.branchName}</div>
-                            <div className="branch-member-count">
-                              {branchProfiles.length} {branchProfiles.length === 1 ? "Member" : "Members"}
-                            </div>
-                          </div>
-                        </div>
-                        <div className={`branch-chevron${isExpanded ? " expanded" : ""}`}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                            stroke={isExpanded ? "#317D89" : "#64748b"} strokeWidth="2.5"
-                            strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                        </div>
-                      </button>
-
-                      {/* Members list */}
-                      {isExpanded && (
-                        <div className="branch-members-body">
-                          <div className="profile-grid">
-                            {branchProfiles.map(profile => (
-                              <ProfileCard key={profile.id} profile={profile}
-                                selected={selectedProfile?.id === profile.id}
-                                onSelect={setSelectedProfile} />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="profile-grid">
+                {profiles.map(profile => (
+                  <ProfileCard key={profile.id} profile={profile}
+                    selected={selectedProfile?.id === profile.id}
+                    onSelect={setSelectedProfile} />
+                ))}
               </div>
 
               <button className="act-btn-main" onClick={handleContinueToPin} disabled={!selectedProfile}>
                 Continue <LoginArrowIcon />
               </button>
 
-              <button
+              <button 
                 onClick={() => onAddMember && onAddMember(hhNumber.trim())}
-                style={{
-                  width: "100%",
-                  marginTop: "0.75rem",
-                  padding: "14px",
-                  background: "#fff",
-                  border: "1.5px solid #317D89",
-                  color: "#317D89",
-                  borderRadius: "12px",
-                  fontSize: "0.95rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px"
+                style={{ 
+                  width: "100%", 
+                  marginTop: "0.75rem", 
+                  padding: "14px", 
+                  background: "#fff", 
+                  border: "1.5px solid #317D89", 
+                  color: "#317D89", 
+                  borderRadius: "12px", 
+                  fontSize: "0.95rem", 
+                  fontWeight: 600, 
+                  cursor: "pointer", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: "8px" 
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="8.5" cy="7" r="4" />
-                  <line x1="20" y1="8" x2="20" y2="14" />
-                  <line x1="23" y1="11" x2="17" y2="11" />
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="8.5" cy="7" r="4"/>
+                  <line x1="20" y1="8" x2="20" y2="14"/>
+                  <line x1="23" y1="11" x2="17" y2="11"/>
                 </svg>
                 Add New Member
               </button>
@@ -503,18 +421,18 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </p>
 
               <div className="pin-profile-mini">
-                <div
-                  className="mini-avatar"
-                  style={{
+                <div 
+                  className="mini-avatar" 
+                  style={{ 
                     background: selectedProfile?.color,
                     overflow: "hidden"
                   }}
                 >
                   {selectedProfile?.profilePhoto ? (
-                    <img
-                      src={selectedProfile.profilePhoto}
-                      alt={selectedProfile.name}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    <img 
+                      src={selectedProfile.profilePhoto} 
+                      alt={selectedProfile.name} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }} 
                     />
                   ) : (
                     selectedProfile?.initials
@@ -531,7 +449,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               <div className="pin-pad">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(d => (
+                {["1","2","3","4","5","6","7","8","9"].map(d => (
                   <button key={d} className="pin-key" onClick={() => handlePinPress(d)}>{d}</button>
                 ))}
                 <button className="pin-key empty" disabled />
