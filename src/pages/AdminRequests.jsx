@@ -108,7 +108,7 @@ export default function AdminRequests() {
         const facData = facSnapshot.docs.map(doc => {
           const data = doc.data();
           const time = data.timeSlot ? ` (${data.timeSlot})` : '';
-          let rawDate = data.submittedAt || data.dateRequested || null;
+          let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
           return {
             docId: doc.id,
             collectionName: 'facility_reservations',
