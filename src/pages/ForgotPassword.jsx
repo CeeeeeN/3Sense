@@ -132,7 +132,7 @@ export default function ForgotPassword({ onBack, onLoginClick, onRegister }) {
                   <input
                     type="text"
                     className={`fp-input ${hhError ? "error-state" : hhValue ? "valid-state" : ""}`}
-                    placeholder="e.g. HH-2024-00142"
+                    placeholder="e.g. MAL-2026-00142"
                     value={hhValue}
                     onChange={e => setHhValue(e.target.value)}
                     autoComplete="off"

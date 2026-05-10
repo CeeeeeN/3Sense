@@ -81,14 +81,14 @@ async function extractIdData(imageBase64) {
     // Delete this block and uncomment the Cloud Function call above when ready.
     return new Promise((resolve) =>
       setTimeout(() => resolve({
-        firstName:   "Maria",
-        middleName:  "Santos",
-        lastName:    "Dela Cruz",
-        birthDate:   "1990-05-15",
-        idNumber:    "1234-5678-9012-0000",
+        firstName: "Maria",
+        middleName: "Santos",
+        lastName: "Dela Cruz",
+        birthDate: "1990-05-15",
+        idNumber: "1234-5678-9012-0000",
         houseNumber: "123",
-        street:      "Malanday Street",
-        province:    "Bulacan",
+        street: "Malanday Street",
+        province: "Bulacan",
       }), 1800)
     );
     // ──────────────────────────────────────────────────────────────────────
@@ -113,45 +113,45 @@ const SvgSelfie = ({ size = 22 }) => (
     <circle cx="12" cy="13" r="3.5" />
   </svg>
 );
-const SvgCamera   = ({ size = 16 }) => (
+const SvgCamera = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
     <circle cx="12" cy="13" r="4" />
   </svg>
 );
-const SvgUpload   = ({ size = 16 }) => (
+const SvgUpload = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 );
-const SvgRefresh  = ({ size = 16 }) => (
+const SvgRefresh = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="1 4 1 10 7 10" />
     <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
   </svg>
 );
-const SvgCheck2   = ({ size = 16 }) => (
+const SvgCheck2 = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
-const SvgAlert    = ({ size = 16 }) => (
+const SvgAlert = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
     <line x1="12" y1="9" x2="12" y2="13" />
     <line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5" />
   </svg>
 );
-const SvgInfo2    = ({ size = 16 }) => (
+const SvgInfo2 = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <line x1="12" y1="8" x2="12" y2="12" />
     <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5" />
   </svg>
 );
-const SvgLoader   = ({ size = 36 }) => (
+const SvgLoader = ({ size = 36 }) => (
   <svg style={{ animation: "am-spin 0.9s linear infinite", transformOrigin: "center" }} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#31547c" strokeWidth="2.2" strokeLinecap="round">
     <path d="M21 12a9 9 0 11-2.636-6.364" />
   </svg>
@@ -162,28 +162,142 @@ const SvgCheckCircle = ({ size = 40, color = "#0d7a55" }) => (
     <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
-const SvgXCircle  = ({ size = 26, color = "#dc2626" }) => (
+const SvgXCircle = ({ size = 26, color = "#dc2626" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <line x1="15" y1="9" x2="9" y2="15" />
     <line x1="9" y1="9" x2="15" y2="15" />
   </svg>
 );
-const SvgPerson   = ({ size = 22 }) => (
+const SvgPerson = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
+const SvgBranch = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 3v12" /><circle cx="6" cy="18" r="3" /><circle cx="6" cy="3" r="3" /><circle cx="18" cy="9" r="3" />
+    <path d="M6 9h6a3 3 0 013 3v3" />
+  </svg>
+);
+
+// ─── Family Branch Step ───────────────────────────────────────────────────────
+const DEFAULT_BRANCHES = ["Cruz Family", "Santos Family", "Rosa Family"];
+
+function AmFamilyBranchStep({ onConfirm, householdID }) {
+  const [branches, setBranches] = useState(DEFAULT_BRANCHES);
+  const [selected, setSelected] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [createError, setCreateError] = useState("");
+
+  const handleCreate = () => {
+    const name = newBranchName.trim();
+    if (!name) { setCreateError("Please enter a branch name."); return; }
+    if (branches.some(b => b.toLowerCase() === name.toLowerCase())) {
+      setCreateError("This branch already exists."); return;
+    }
+    setBranches(prev => [...prev, name]);
+    setSelected(name);
+    setNewBranchName("");
+    setCreateError("");
+    setShowModal(false);
+  };
+
+  return (
+    <div>
+      <div className="am-scan-header">
+        <div className="am-scan-icon-wrap"><SvgBranch size={22} /></div>
+        <div>
+          <h3 className="am-scan-title">Family Branch</h3>
+          <p className="am-scan-sub">Which family branch does this member belong to?</p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", margin: "1rem 0" }}>
+        {branches.map(branch => (
+          <label key={branch} style={{ cursor: "pointer" }}>
+            <div
+              className={`am-branch-card${selected === branch ? " selected" : ""}`}
+              onClick={() => setSelected(branch)}
+            >
+              <span className="am-branch-radio">
+                <span className="am-branch-radio-dot" />
+              </span>
+              <span className="am-branch-label">{branch}</span>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      <button
+        className="am-btn am-btn-ghost"
+        onClick={() => { setShowModal(true); setCreateError(""); setNewBranchName(""); }}
+        style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", marginBottom: "1.25rem" }}
+      >
+        <IconPlus /> Create New Family Branch
+      </button>
+
+      {selected && (
+        <div className="am-form-actions" style={{ marginTop: 0 }}>
+          <div />
+          <button
+            className="am-btn am-btn-primary"
+            onClick={() => onConfirm(selected)}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+          >
+            Next: ID Scan <IconArrow />
+          </button>
+        </div>
+      )}
+
+      {/* CREATE NEW BRANCH MODAL */}
+      {showModal && (
+        <div className="am-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="am-modal" onClick={e => e.stopPropagation()}>
+            <div className="am-modal-header">
+              <h4 className="am-modal-title">Create New Family Branch</h4>
+              <button className="am-modal-close" onClick={() => setShowModal(false)}><IconX /></button>
+            </div>
+            <div className="am-modal-body">
+              <Field label="Family Branch Name" required>
+                <InputField
+                  icon={SvgBranch}
+                  type="text"
+                  placeholder="e.g. Reyes Family"
+                  value={newBranchName}
+                  onChange={e => { setNewBranchName(e.target.value); setCreateError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleCreate()}
+                />
+              </Field>
+              {createError && <div className="am-field-error" style={{ marginTop: "0.5rem" }}>⚠️ {createError}</div>}
+            </div>
+            <div className="am-modal-footer">
+              <button className="am-btn am-btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+              <button
+                className="am-btn am-btn-primary"
+                onClick={handleCreate}
+                style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+              >
+                <IconCheck /> Save Branch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 
 // ─── Camera hook ──────────────────────────────────────────────────────────────
 function useCamera() {
-  const videoRef  = useRef(null);
+  const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [active, setActive] = useState(false);
-  const [error,  setError]  = useState(null);
+  const [error, setError] = useState(null);
 
   const start = useCallback(async (facingMode = "environment") => {
     setError(null);
@@ -207,7 +321,7 @@ function useCamera() {
   const capture = useCallback(() => {
     if (!videoRef.current) return null;
     const canvas = document.createElement("canvas");
-    canvas.width  = videoRef.current.videoWidth  || 640;
+    canvas.width = videoRef.current.videoWidth || 640;
     canvas.height = videoRef.current.videoHeight || 480;
     canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
     return canvas.toDataURL("image/jpeg", 0.85);
@@ -263,11 +377,11 @@ function SelectField({ icon: Icon, children, ...props }) {
 // ─── ID Scan Step ─────────────────────────────────────────────────────────────
 function AmIdScanStep({ onConfirm }) {
   // idle | camera | preview | validating | invalid | processing | done
-  const [mode,      setMode]      = useState("idle");
-  const [preview,   setPreview]   = useState(null);
-  const [result,    setResult]    = useState(null);
+  const [mode, setMode] = useState("idle");
+  const [preview, setPreview] = useState(null);
+  const [result, setResult] = useState(null);
   const [uploadErr, setUploadErr] = useState(null);
-  const cam     = useCamera();
+  const cam = useCamera();
   const fileRef = useRef(null);
 
   const handleFile = (e) => {
@@ -284,14 +398,14 @@ function AmIdScanStep({ onConfirm }) {
     }
     const reader = new FileReader();
     reader.onerror = () => { setUploadErr("Failed to read file. Try another image."); fileRef.current.value = ""; };
-    reader.onload  = ev  => { setPreview(ev.target.result); setMode("preview"); setUploadErr(null); };
+    reader.onload = ev => { setPreview(ev.target.result); setMode("preview"); setUploadErr(null); };
     reader.readAsDataURL(file);
   };
 
-  const startCamera  = async () => { setMode("camera"); await cam.start("environment"); };
+  const startCamera = async () => { setMode("camera"); await cam.start("environment"); };
   const capturePhoto = () => { const img = cam.capture(); cam.stop(); if (img) { setPreview(img); setMode("preview"); } };
-  const retake       = () => { setPreview(null); setResult(null); setUploadErr(null); setMode("idle"); cam.stop(); if (fileRef.current) fileRef.current.value = ""; };
-  const reverify     = () => { setResult(null); setMode("preview"); };
+  const retake = () => { setPreview(null); setResult(null); setUploadErr(null); setMode("idle"); cam.stop(); if (fileRef.current) fileRef.current.value = ""; };
+  const reverify = () => { setResult(null); setMode("preview"); };
 
   const confirm = async () => {
     setMode("validating"); setResult(null);
@@ -451,10 +565,10 @@ function AmIdScanStep({ onConfirm }) {
 
 // ─── Selfie Step ──────────────────────────────────────────────────────────────
 function AmSelfieStep({ onConfirm }) {
-  const [mode,      setMode]      = useState("idle");
-  const [preview,   setPreview]   = useState(null);
+  const [mode, setMode] = useState("idle");
+  const [preview, setPreview] = useState(null);
   const [uploadErr, setUploadErr] = useState(null);
-  const cam     = useCamera();
+  const cam = useCamera();
   const fileRef = useRef(null);
 
   const handleFile = (e) => {
@@ -462,16 +576,16 @@ function AmSelfieStep({ onConfirm }) {
     if (!file) return;
     setUploadErr(null);
     if (!file.type.startsWith("image/")) { setUploadErr("Please upload a valid image file."); fileRef.current.value = ""; return; }
-    if (file.size > 10 * 1024 * 1024)   { setUploadErr("File too large. Max 10MB.");          fileRef.current.value = ""; return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadErr("File too large. Max 10MB."); fileRef.current.value = ""; return; }
     const reader = new FileReader();
     reader.onerror = () => { setUploadErr("Failed to read file."); fileRef.current.value = ""; };
-    reader.onload  = ev  => { setPreview(ev.target.result); setMode("preview"); setUploadErr(null); };
+    reader.onload = ev => { setPreview(ev.target.result); setMode("preview"); setUploadErr(null); };
     reader.readAsDataURL(file);
   };
 
-  const startCamera  = async () => { setMode("camera"); await cam.start("user"); };
+  const startCamera = async () => { setMode("camera"); await cam.start("user"); };
   const capturePhoto = () => { const img = cam.capture(); cam.stop(); if (img) { setPreview(img); setMode("preview"); } };
-  const retake       = () => { setPreview(null); setUploadErr(null); setMode("idle"); cam.stop(); };
+  const retake = () => { setPreview(null); setUploadErr(null); setMode("idle"); cam.stop(); };
 
   // TODO (backend): Optionally call a Firebase Cloud Function "verifySelfie"
   // after confirmation for liveness / face-match against the ID photo.
@@ -553,32 +667,34 @@ function AmSelfieStep({ onConfirm }) {
 // ─── Form steps tabs ──────────────────────────────────────────────────────────
 const BLANK_FORM = {
   firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
-  birthDate: "", age: "", birthPlace: "", sex: "Male", civilStatus: "",
+  birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
   contactNumber: "", email: "", residingSinceYear: "",
   houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
   categories: [],
-  pwdStatus: "", disabilityType: "",
+  pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
   educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
   sameAddress: false,
+  isBranchHead: false,
 };
 
-const OUTER_STEPS = ["ID Scan", "Selfie", "Personal Info", "Address", "Category", "Education"];
-const FORM_TABS   = ["Personal Info", "Address", "Category", "Education"];
+const OUTER_STEPS = ["Family Branch", "ID Scan", "Selfie", "Personal Info", "Address", "Category", "Education"];
+const FORM_TABS = ["Personal Info", "Address", "Category", "Education"];
 
 export default function AddMembers({ onBack, onDone, householdID: propHouseholdID, hhAddress }) {
-  const [outerStep,    setOuterStep]    = useState(0); // 0=IDScan, 1=Selfie, 2=formTabs
-  const [idImage,      setIdImage]      = useState(null);
-  const [selfieImage,  setSelfieImage]  = useState(null);
+  const [outerStep, setOuterStep] = useState(0); // 0=FamilyBranch, 1=IDScan, 2=Selfie, 3=formTabs
+  const [familyBranch, setFamilyBranch] = useState(null);
+  const [idImage, setIdImage] = useState(null);
+  const [selfieImage, setSelfieImage] = useState(null);
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [members,     setMembers]    = useState([]);
-  const [tab,         setTab]        = useState(1);
-  const [form,        setForm]       = useState({ ...BLANK_FORM });
-  const [showToast,   setShowToast]  = useState(false);
+  const [members, setMembers] = useState([]);
+  const [tab, setTab] = useState(1);
+  const [form, setForm] = useState({ ...BLANK_FORM });
+  const [showToast, setShowToast] = useState(false);
   const [memberError, setMemberError] = useState("");
   const toastRef = useRef(null);
   const householdID = propHouseholdID || searchParams.get("hhID");
@@ -660,11 +776,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const validateTab = (tabNum) => {
     const missing = [];
     if (tabNum === 1) {
-      if (!form.firstName.trim())  missing.push("First Name");
-      if (!form.lastName.trim())   missing.push("Last Name");
-      if (!form.birthDate)         missing.push("Birth Date");
+      if (!form.firstName.trim()) missing.push("First Name");
+      if (!form.lastName.trim()) missing.push("Last Name");
+      if (!form.birthDate) missing.push("Birth Date");
       if (!form.birthPlace.trim()) missing.push("Birth Place");
-      if (!form.civilStatus)       missing.push("Civil Status");
+      if (!form.civilStatus) missing.push("Civil Status");
       if (!form.residingSinceYear) missing.push("Residing Since Year");
       if (!form.contactNumber.trim()) missing.push("Contact Number");
       else if (form.contactNumber.replace(/\D/g, "").length < 10) missing.push("Valid Contact Number");
@@ -673,32 +789,43 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     }
     if (tabNum === 2 && !form.sameAddress) {
       if (!form.houseNumber.trim()) missing.push("House / Unit Number");
-      if (!form.street.trim())      missing.push("Street");
-      if (!form.province.trim())    missing.push("Province");
+      if (!form.street.trim()) missing.push("Street");
+      if (!form.province.trim()) missing.push("Province");
     }
     if (tabNum === 4) {
       if (!form.educationAttainment) missing.push("Highest Educational Attainment");
-      if (!form.educationStatus)     missing.push("Education Status");
-      if (!form.employmentStatus)    missing.push("Employment Status");
+      if (!form.educationStatus) missing.push("Education Status");
+      if (!form.employmentStatus) missing.push("Employment Status");
     }
     if (missing.length > 0) { setMemberError(`Please fill in required fields: ${missing.join(", ")}`); return false; }
     setMemberError(""); return true;
   };
 
-  const goNext = (nextTab) => { if (!validateTab(tab)) return; setTab(nextTab); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const goNext = (nextTab) => {
+    if (!validateTab(tab)) return;
+    if (tab === 1 && form.isBranchHead && members.some(m => m.familyBranch === familyBranch && m.isBranchHead)) {
+      setMemberError("Branch already has a head");
+      return;
+    }
+    setTab(nextTab); window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const goBack = (prevTab) => { setMemberError(""); setTab(prevTab); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const addMember = async () => {
     if (!validateTab(1) || !validateTab(4)) { setTab(1); return; }
+    if (form.isBranchHead && members.some(m => m.familyBranch === familyBranch && m.isBranchHead)) {
+      setMemberError("Branch already has a head"); setTab(1); return;
+    }
     const fullName = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || `Member ${members.length + 1}`;
     const initials = (form.firstName?.[0] || "") + (form.lastName?.[0] || "M");
-    const color    = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
+    const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
     try {
       // BACKEND: calls addHouseholdMember — this already goes to Firebase via your services/addMembers file
       // TODO (backend): make sure addHouseholdMember also saves idImage and selfieImage to Firebase Storage
       // and stores the download URLs in the member's Firestore document.
       await addHouseholdMember(householdID, {
         ...form,
+        familyBranch,
         idImage,
         selfieImage,
         categories: form.categories || [],
@@ -706,7 +833,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     } catch (err) { alert("Failed to save member: " + err.message); return; }
 
     setMembers(m => [...m, {
-      fullName, initials, color,
+      fullName, initials, color, familyBranch, isBranchHead: form.isBranchHead,
       meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
     }]);
 
@@ -714,10 +841,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     setForm({ ...BLANK_FORM });
     setIdImage(null);
     setSelfieImage(null);
+    setFamilyBranch(null);
     setAutofilledFields(new Set());
     manuallyEdited.current = new Set();
     setTab(1);
-    setOuterStep(0); // back to ID scan for next member
+    setOuterStep(0); // back to Family Branch step for next member
     setMemberError("");
     setShowToast(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -731,8 +859,8 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
-  const totalOuter   = OUTER_STEPS.length;
-  const currentOuter = outerStep === 0 ? 0 : outerStep === 1 ? 1 : 1 + tab;
+  const totalOuter = OUTER_STEPS.length;
+  const currentOuter = outerStep === 0 ? 0 : outerStep === 1 ? 1 : outerStep === 2 ? 2 : 2 + tab;
   const outerProgress = (currentOuter / (totalOuter - 1)) * 100;
 
   return (
@@ -748,7 +876,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
         </div>
         <div className="am-hh-badge">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
-          <span>{householdID || "HH-XXXX-XXXXX"}</span>
+          <span>{householdID || "MAL-XXXX-XXXXX"}</span>
         </div>
       </nav>
 
@@ -764,21 +892,47 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
           <p>Enter the details of each household member. You can add members one at a time.</p>
         </div>
 
-        {/* MEMBERS LIST */}
-        {members.length > 0 && (
-          <div className="am-members-list">
-            {members.map((m, i) => (
-              <div key={i} className={`am-member-chip ${m.isHead ? "head" : ""}`}>
-                <div className="am-chip-avatar" style={{ background: m.color }}>{m.initials}</div>
-                <div className="am-chip-info">
-                  <div className="am-chip-name">{m.fullName}{m.isHead && <span className="am-chip-badge">⭐ Household Head</span>}</div>
-                  <div className="am-chip-meta">{m.meta || "Added just now"}</div>
-                </div>
-                <button className="am-chip-remove" onClick={() => removeMember(i)}><IconX /></button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* MEMBERS LIST — grouped by family branch */}
+        {members.length > 0 && (() => {
+          // Build ordered unique branch list (preserving insertion order)
+          const branchOrder = [];
+          members.forEach(m => { if (!branchOrder.includes(m.familyBranch)) branchOrder.push(m.familyBranch); });
+          return (
+            <div className="am-branch-groups">
+              {branchOrder.map(branch => {
+                const branchMembers = members.filter(m => m.familyBranch === branch);
+                const headIdx = members.findIndex(m => m.familyBranch === branch && m.isBranchHead);
+                return (
+                  <div key={branch} className="am-branch-group">
+                    <div className="am-branch-group-header">
+                      <span className="am-branch-group-icon"><SvgBranch size={14} /></span>
+                      <span className="am-branch-group-title">{branch}</span>
+                      <span className="am-branch-group-count">{branchMembers.length} {branchMembers.length === 1 ? "member" : "members"}</span>
+                    </div>
+                    <div className="am-branch-group-body">
+                      {branchMembers.map((m) => {
+                        const globalIdx = members.indexOf(m);
+                        return (
+                          <div key={globalIdx} className={`am-member-chip${m.isBranchHead ? " head" : ""}`}>
+                            <div className="am-chip-avatar" style={{ background: m.color }}>{m.initials}</div>
+                            <div className="am-chip-info">
+                              <div className="am-chip-name">
+                                {m.fullName}
+                                {m.isBranchHead && <span className="am-chip-badge">⭐ Branch Head</span>}
+                              </div>
+                              <div className="am-chip-meta">{m.meta || "Added just now"}</div>
+                            </div>
+                            <button className="am-chip-remove" onClick={() => removeMember(globalIdx)}><IconX /></button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* FORM CARD */}
         <div className="am-form-card">
@@ -789,7 +943,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
             </h3>
             <button className="am-btn am-btn-ghost am-btn-sm" onClick={() => {
               setForm({ ...BLANK_FORM }); setTab(1); setOuterStep(0);
-              setIdImage(null); setSelfieImage(null);
+              setIdImage(null); setSelfieImage(null); setFamilyBranch(null);
               setAutofilledFields(new Set()); manuallyEdited.current = new Set();
             }}>
               Clear Form
@@ -799,7 +953,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
           {/* ── OUTER STEPPER (desktop) ── */}
           <div className="am-outer-stepper">
             {OUTER_STEPS.map((label, i) => {
-              const isDone   = i < currentOuter;
+              const isDone = i < currentOuter;
               const isActive = i === currentOuter;
               return (
                 <div key={i} className={`am-outer-step ${isDone ? "done" : isActive ? "active" : ""}`}>
@@ -834,38 +988,57 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
             </div>
           </div>
 
-          {/* ── STEP 0: ID SCAN ── */}
+          {/* ── STEP 0: FAMILY BRANCH ── */}
           {outerStep === 0 && (
-            <AmIdScanStep
-              onConfirm={(img, data) => {
-                setIdImage(img);
-                applyOcr(data);
+            <AmFamilyBranchStep
+              householdID={householdID}
+              onConfirm={(branch) => {
+                setFamilyBranch(branch);
                 setOuterStep(1);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             />
           )}
 
-          {/* ── STEP 1: SELFIE ── */}
+          {/* ── STEP 1: ID SCAN ── */}
           {outerStep === 1 && (
             <div>
-              <AmSelfieStep
-                onConfirm={(img) => {
-                  setSelfieImage(img);
+              <AmIdScanStep
+                onConfirm={(img, data) => {
+                  setIdImage(img);
+                  applyOcr(data);
                   setOuterStep(2);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               />
               <div style={{ marginTop: "1rem" }}>
                 <button className="am-btn am-btn-ghost" onClick={() => setOuterStep(0)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
+                  ← Back to Family Branch
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 2: SELFIE ── */}
+          {outerStep === 2 && (
+            <div>
+              <AmSelfieStep
+                onConfirm={(img) => {
+                  setSelfieImage(img);
+                  setOuterStep(3);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+              <div style={{ marginTop: "1rem" }}>
+                <button className="am-btn am-btn-ghost" onClick={() => setOuterStep(1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
                   ← Back to ID Scan
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── STEP 2+: FORM TABS ── */}
-          {outerStep === 2 && (
+          {/* ── STEP 3+: FORM TABS ── */}
+          {outerStep === 3 && (
             <div>
               {autofilledFields.size > 0 && tab === 1 && (
                 <div className="am-autofill-banner">
@@ -898,7 +1071,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               {/* INNER STEPPER (form tabs) */}
               <div className="am-inner-stepper">
                 {FORM_TABS.map((label, i) => {
-                  const num    = i + 1;
+                  const num = i + 1;
                   const status = num < tab ? "done" : num === tab ? "active" : "";
                   return (
                     <div key={num} className={`am-inner-step ${status}`} onClick={() => setTab(num)}>
@@ -918,7 +1091,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       <Field label="Middle Name"><InputField icon={IconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
                       <Field label="Last Name" required><InputField icon={IconUser} type="text" placeholder="Dela Cruz" value={form.lastName} onChange={set("lastName")} autofilled={af("lastName")} /></Field>
                     </div>
-                    <div className="am-form-grid cols-2">
+                    <div className="am-form-grid cols-3">
                       <Field label={<>Suffix <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
                         <SelectField icon={IconUser} value={form.suffix} onChange={set("suffix")}>
                           <option value="">None</option>
@@ -926,6 +1099,12 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                         </SelectField>
                       </Field>
                       <Field label="Religion"><InputField icon={IconReligion} type="text" placeholder="Roman Catholic" value={form.religion} onChange={set("religion")} /></Field>
+                      <Field label="Civil Status" required>
+                        <SelectField icon={IconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
+                          <option value="">Select</option>
+                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
+                        </SelectField>
+                      </Field>
                     </div>
                     <div className="am-form-grid cols-3">
                       <Field label="Birth Date" required><InputField icon={IconCalendar} type="date" value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
@@ -943,22 +1122,62 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                           ))}
                         </div>
                       </Field>
-                      <Field label="Civil Status" required>
-                        <SelectField icon={IconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
-                          <option value="">Select</option>
-                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
+                      <Field label="Gender">
+                        <SelectField icon={IconUser} value={form.gender} onChange={set("gender")}>
+                          <option value="">Select gender</option>
+                          <option>Cisgender</option>
+                          <option>Non-binary</option>
+                          <option>Transgender Man</option>
+                          <option>Transgender Woman</option>
+                          <option>Genderqueer</option>
+                          <option>Others</option>
+                          <option>Prefer not to say</option>
                         </SelectField>
                       </Field>
                     </div>
-                    <div className="am-form-grid cols-3">
+                    {form.gender === "Others" && (
+                      <Field label="Please specify gender">
+                        <InputField type="text" placeholder="Please specify" value={form.genderOther} onChange={set("genderOther")} />
+                      </Field>
+                    )}
+                    <div className="am-form-grid cols-2">
                       <Field label="Contact Number" required><InputField icon={IconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
                       <Field label="Email Address" required hint="Used for account notifications."><InputField icon={IconMail} type="email" placeholder="email@example.com" value={form.email} onChange={set("email")} /></Field>
+                    </div>
+                    <div className="am-form-grid cols-2">
                       <Field label="Residing Since (Year)" required><InputField icon={IconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
+                    </div>
+
+                    {/* Branch Head Toggle */}
+                    <div className="am-special-checks">
+                      <label className="am-special-check">
+                        <input
+                          type="checkbox"
+                          checked={form.isBranchHead}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            const alreadyHasHead = members.some(m => m.familyBranch === familyBranch && m.isBranchHead);
+                            if (checked && alreadyHasHead) {
+                              setMemberError(`Branch already has a head`);
+                            } else {
+                              setMemberError("");
+                            }
+                            set("isBranchHead")(e);
+                          }}
+                        />
+                        <span className="am-special-check-label">
+                          <span className="am-check-icon-box">{form.isBranchHead && "✓"}</span>
+                          <span className="am-check-text">
+                            <strong>Set as Branch Head</strong>
+                            <span>Designate this member as the head of {familyBranch || "the selected family branch"}</span>
+                          </span>
+                        </span>
+                      </label>
                     </div>
                   </div>
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
-                    <button className="am-btn am-btn-ghost" onClick={() => { setOuterStep(1); setMemberError(""); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← Back</button>
+                    <button className="am-btn am-btn-ghost" onClick={() => { setOuterStep(2); setMemberError(""); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← Back</button>
                     <button className="am-btn am-btn-primary" onClick={() => goNext(2)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Next: Address <IconArrow /></button>
                   </div>
                 </div>
@@ -1015,10 +1234,25 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                           <Field label="Disability Type">
                             <SelectField icon={IconInfo} value={form.disabilityType} onChange={set("disabilityType")}>
                               <option value="">Select</option>
-                              <option>Inborn</option><option>Accident</option><option>Mental</option><option>Other</option>
+                              <option>Physical Disability</option>
+                              <option>Visual Disability</option>
+                              <option>Hearing Disability</option>
+                              <option>Speech Impairment</option>
+                              <option>Intellectual Disability</option>
+                              <option>Learning Disability</option>
+                              <option>Psychosocial Disability</option>
+                              <option>Multiple Disabilities</option>
+                              <option>Chronic Illness</option>
+                              <option>Rare Disease</option>
+                              <option>Others</option>
                             </SelectField>
                           </Field>
                         </div>
+                        {form.disabilityType === "Others" && (
+                          <Field label="Please specify disability type">
+                            <InputField type="text" placeholder="Please specify" value={form.disabilityTypeOther} onChange={set("disabilityTypeOther")} />
+                          </Field>
+                        )}
                       </div>
                     )}
                   </div>

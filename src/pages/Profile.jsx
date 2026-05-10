@@ -6,47 +6,47 @@ import { fetchUserTransactions } from "../services/services";
 import QRCode from "qrcode";
 
 const QR_PAT = [
-  true,true,true,false,true,
-  true,false,true,true,false,
-  true,true,false,true,true,
-  false,true,true,false,true,
-  true,false,true,true,true,
+  true, true, true, false, true,
+  true, false, true, true, false,
+  true, true, false, true, true,
+  false, true, true, false, true,
+  true, false, true, true, true,
 ];
 
 const TABS = ["Personal", "Address", "Category", "Education", "Household"];
 const CATS = ["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"];
 
 const BLANK = {
-  firstName:"", middleName:"", lastName:"", suffix:"",
-  birthDate:"", birthPlace:"", sex:"Male", civilStatus:"",
-  citizenship:"", religion:"", contactNumber:"", email:"", residingSinceYear: "",
-  houseNumber:"", street:"", region:"NCR", province:"", city:"Valenzuela City", barangay:"Malanday",
+  firstName: "", middleName: "", lastName: "", suffix: "",
+  birthDate: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
+  citizenship: "", religion: "", contactNumber: "", email: "", residingSinceYear: "",
+  houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
   sameAddress: false,
-  categories:[],
-  pwdStatus:"", disabilityType:"",
-  educationAttainment:"", educationStatus:"", occupation:"", employmentStatus:"",
-  totalMembers:"", householdClassification:"",
+  categories: [],
+  pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
+  educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
+  totalMembers: "", householdClassification: "",
 };
 
 const STATUS_MAP = {
-  "Clear Case":   { label: "Clear Case",   cls: "clear",     color: "#0d7a55", desc: "This resident has no pending cases or violations on record." },
-  "Pending Case": { label: "Pending Case", cls: "pending",   color: "#e8a020", desc: "This resident has a case currently under review." },
-  "Violation":    { label: "Violation",    cls: "violation", color: "#e03e3e", desc: "This resident has a recorded violation." },
+  "Clear Case": { label: "Clear Case", cls: "clear", color: "#0d7a55", desc: "This resident has no pending cases or violations on record." },
+  "Pending Case": { label: "Pending Case", cls: "pending", color: "#e8a020", desc: "This resident has a case currently under review." },
+  "Violation": { label: "Violation", cls: "violation", color: "#e03e3e", desc: "This resident has a recorded violation." },
 };
 
-const IconQR      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/></svg>;
-const ProfileIconUser    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
-const ProfileIconPin     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>;
-const IconTag     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
-const IconGrad    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>;
-const IconHome2   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
-const ProfileIconShield  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
-const IconHistory = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4.08"/><polyline points="3 3 3 9 9 9"/></svg>;
-const IconEdit    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
-const IconDl      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
-const ProfileIconX       = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-const ProfileIconArrow   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>;
-const IconSave    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+const IconQR = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3" /></svg>;
+const ProfileIconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
+const ProfileIconPin = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>;
+const IconTag = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>;
+const IconGrad = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>;
+const IconHome2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>;
+const ProfileIconShield = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
+const IconHistory = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 8 12 12 14 14" /><path d="M3.05 11a9 9 0 1 0 .5-4.08" /><polyline points="3 3 3 9 9 9" /></svg>;
+const IconEdit = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>;
+const IconDl = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
+const ProfileIconX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+const ProfileIconArrow = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>;
+const IconSave = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
 
 
 function InfoItem({ label, value }) {
@@ -93,17 +93,17 @@ function formatHistoryDate(isoString) {
 }
 
 export default function Profile({ onBack, onNavigate, householdID, memberID, userRole, userID }) {
-  const [data, setData]       = useState({ ...BLANK });
-  const [draft, setDraft]     = useState({ ...BLANK });
-  const [open, setOpen]       = useState(false);
-  const [tab, setTab]         = useState(0);
+  const [data, setData] = useState({ ...BLANK });
+  const [draft, setDraft] = useState({ ...BLANK });
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [qrUrl, setQrUrl]     = useState("");
-  const qrCanvasRef           = useRef(null);
+  const [saving, setSaving] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const qrCanvasRef = useRef(null);
   const [transactions, setTransactions] = useState([]);
-  const [txLoading, setTxLoading]       = useState(true);
-  const [txPage, setTxPage]             = useState(1);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txPage, setTxPage] = useState(1);
   const txPerPage = 8;
 
   const fullName = [data.firstName, data.middleName, data.lastName, data.suffix].filter(Boolean).join(" ");
@@ -157,7 +157,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       .catch(console.error);
   }, [fullName, householdID, memberID, data.role, data.barangay]);
 
-  const openModal  = () => { setDraft({ ...data }); setTab(0); setOpen(true); };
+  const openModal = () => { setDraft({ ...data }); setTab(0); setOpen(true); };
   const closeModal = () => setOpen(false);
 
   const computeSameAddress = () => {
@@ -196,12 +196,12 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
     let list = [];
     if (Array.isArray(cats)) list = cats;
     else if (typeof cats === "string") list = cats.split(",").map(s => s.trim()).filter(Boolean);
-    
+
     // strip out emojis to clean up old DB state
     return list.map(c => {
-       let cln = c.replace(/[^\w\s-]/gi, '').trim();
-       if (cln === "Indigenous") cln = "Indigenous People";
-       return cln;
+      let cln = c.replace(/[^\w\s-]/gi, '').trim();
+      if (cln === "Indigenous") cln = "Indigenous People";
+      return cln;
     });
   };
 
@@ -305,7 +305,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             {/* Info column */}
             <div className="pf-qr-info">
               <div className="pf-qr-name">{fullName || "Your Full Name"}</div>
-              <div className="pf-qr-id">{householdID || "HH-XXXX-XXXXX"} · {data.role === "head" ? "Household Head" : "Member"}</div>
+              <div className="pf-qr-id">{householdID || "MAL-XXXX-XXXXX"} · {data.role === "head" ? "Household Head" : "Member"}</div>
               <div className="pf-qr-verified"><span className="dot" /> Verified Resident</div>
 
               <div style={{ borderTop: "1.5px solid var(--bg)", margin: "1rem 0" }} />
@@ -336,6 +336,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               <InfoItem label="Date of Birth" value={data.birthDate} />
               <InfoItem label="Birth Place" value={data.birthPlace} />
               <InfoItem label="Sex" value={data.sex} />
+              <InfoItem label="Gender" value={data.gender === "Others" ? (data.genderOther || "Others") : data.gender} />
               <InfoItem label="Civil Status" value={data.civilStatus} />
               <InfoItem label="Citizenship" value={data.citizenship} />
               <InfoItem label="Religion" value={data.religion} />
@@ -366,10 +367,10 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             <div className="pf-cat-grid">
               {data.categories && data.categories.length > 0
                 ? data.categories.map(cat => (
-                    <div key={cat} className="pf-chip on">
-                      {cat}
-                    </div>
-                  ))
+                  <div key={cat} className="pf-chip on">
+                    {cat}
+                  </div>
+                ))
                 : <div className="pf-chip off">No categories assigned</div>
               }
             </div>
@@ -378,7 +379,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <div className="pf-subtitle">♿ PWD Details</div>
                 <div className="pf-info-grid">
                   <InfoItem label="PWD Status" value={data.pwdStatus} />
-                  <InfoItem label="Disability Type" value={data.disabilityType} />
+                  <InfoItem label="Disability Type" value={data.disabilityType === "Others" ? (data.disabilityTypeOther || "Others") : data.disabilityType} />
                 </div>
               </div>
             )}
@@ -531,7 +532,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 )}
               </tbody>
             </table>
-            
+
             {/* Pagination Controls */}
             {transactions.length > txPerPage && (
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "1rem", gap: "0.5rem" }}>
@@ -604,11 +605,14 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                   <Field label="Middle Name"><input className="pf-inp" placeholder="Santos" value={draft.middleName} onChange={set("middleName")} /></Field>
                   <Field label="Last Name" req><input className="pf-inp" placeholder="Dela Cruz" value={draft.lastName} onChange={set("lastName")} /></Field>
                 </div>
-                <div className="fg">
+                <div className="fg c3">
                   <Field label="Suffix">
                     <div className="pf-sel-wrap"><select className="pf-sel" value={draft.suffix} onChange={set("suffix")}><option value="">None</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option></select></div>
                   </Field>
                   <Field label="Religion"><input className="pf-inp" placeholder="Roman Catholic" value={draft.religion} onChange={set("religion")} /></Field>
+                  <Field label="Civil Status">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.civilStatus} onChange={set("civilStatus")}><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
+                  </Field>
                 </div>
                 <div className="fg c3">
                   <Field label="Date of Birth" req><input className="pf-inp" type="date" value={draft.birthDate} onChange={set("birthDate")} /></Field>
@@ -626,13 +630,33 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                       ))}
                     </div>
                   </Field>
-                  <Field label="Civil Status">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.civilStatus} onChange={set("civilStatus")}><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
+                  <Field label="Gender">
+                    <div className="pf-sel-wrap">
+                      <select className="pf-sel" value={draft.gender} onChange={set("gender")}>
+                        <option value="">Select gender</option>
+                        <option>Cisgender</option>
+                        <option>Non-binary</option>
+                        <option>Transgender Man</option>
+                        <option>Transgender Woman</option>
+                        <option>Genderqueer</option>
+                        <option>Others</option>
+                        <option>Prefer not to say</option>
+                      </select>
+                    </div>
                   </Field>
                 </div>
-                <div className="fg c3">
+                {draft.gender === "Others" && (
+                  <div className="fg c1">
+                    <Field label="Please specify gender">
+                      <input className="pf-inp" placeholder="Please specify" value={draft.genderOther || ""} onChange={set("genderOther")} />
+                    </Field>
+                  </div>
+                )}
+                <div className="fg">
                   <Field label="Contact Number"><input className="pf-inp" type="tel" placeholder="09XX XXX XXXX" value={draft.contactNumber} onChange={set("contactNumber")} /></Field>
                   <Field label="Email Address"><input className="pf-inp" type="email" placeholder="email@example.com" value={draft.email} onChange={set("email")} /></Field>
+                </div>
+                <div className="fg">
                   <Field label="Residing Since (Year)" req><input className="pf-inp" type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={draft.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                 </div>
               </>}
@@ -681,9 +705,29 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                         <div className="pf-sel-wrap"><select className="pf-sel" value={draft.pwdStatus} onChange={set("pwdStatus")}><option value="">Select</option><option>Children with Disabilities</option><option>Person with Disabilities</option></select></div>
                       </Field>
                       <Field label="Disability Type">
-                        <div className="pf-sel-wrap"><select className="pf-sel" value={draft.disabilityType} onChange={set("disabilityType")}><option value="">Select</option><option>Inborn</option><option>Accident</option><option>Mental</option><option>Other</option></select></div>
+                        <div className="pf-sel-wrap"><select className="pf-sel" value={draft.disabilityType} onChange={set("disabilityType")}>
+                          <option value="">Select</option>
+                          <option>Physical Disability</option>
+                          <option>Visual Disability</option>
+                          <option>Hearing Disability</option>
+                          <option>Speech Impairment</option>
+                          <option>Intellectual Disability</option>
+                          <option>Learning Disability</option>
+                          <option>Psychosocial Disability</option>
+                          <option>Multiple Disabilities</option>
+                          <option>Chronic Illness</option>
+                          <option>Rare Disease</option>
+                          <option>Others</option>
+                        </select></div>
                       </Field>
                     </div>
+                    {draft.disabilityType === "Others" && (
+                      <div className="fg c1">
+                        <Field label="Please specify disability type">
+                          <input className="pf-inp" placeholder="Please specify" value={draft.disabilityTypeOther || ""} onChange={set("disabilityTypeOther")} />
+                        </Field>
+                      </div>
+                    )}
                   </div>
                 )}
               </>}

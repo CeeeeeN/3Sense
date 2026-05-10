@@ -312,7 +312,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <label>Household Number</label>
                 <div className="input-wrap">
                   <span className="field-icon"><LoginHomeIcon /></span>
-                  <input type="text" placeholder="e.g. HH-2024-00142"
+                  <input type="text" placeholder="e.g. MAL-2026-00142"
                     value={hhNumber} onChange={e => setHhNumber(e.target.value)}
                     autoComplete="off" onKeyDown={e => e.key === "Enter" && handleLogin()} />
                 </div>
