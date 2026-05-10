@@ -205,7 +205,8 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                     <div className="nb-user-info-id">{householdID || "—"}</div>
                     { }
                     <div className="nb-user-info-role">
-                      {userRole === "head" ? "⭐ Household Head" : "👤 Member"}
+                      {userRole === "Household Head" ? "⭐ Household Head" : 
+                       userRole === "Branch Head" ? "⭐ Branch Head" : "👤 Member"}
                     </div>
                   </div>
                   <button className="nb-dd-item" onClick={() => { nav("profile"); setUserOpen(false); }}><IconProfile2 /> My Profile</button>
