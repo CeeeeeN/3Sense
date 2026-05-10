@@ -1,0 +1,1659 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;600;700;800&display=swap");
+
+html,
+body,
+#root {
+  @apply w-full min-h-screen m-0 p-0;
+}
+:root {
+  --primary: #1a4f8a;
+  --primary-light: #2563b0;
+  --teal: #317d89;
+  --accent: #e8a020;
+  --accent-light: #f5c04a;
+  --success: #0d7a55;
+  --bg: #f0f4f9;
+  --text: #0f1f35;
+  --muted: #5e7a99;
+  --border: #d8e4f0;
+  --input-bg: #f8fafd;
+  --hover-bg: #0e7385;
+}
+*,
+*::before,
+*::after {
+  @apply box-border m-0 p-0;
+}
+body {
+  @apply text-[color:var(--text)] overflow-x-hidden;
+  font-family: "Inter", sans-serif;
+  background: var(--bg);
+}
+.login-page {
+  @apply grid grid-cols-[minmax(380px,40%)_1fr] min-h-screen;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Poppins", sans-serif;
+}
+.login-page .left-panel {
+  @apply flex flex-col justify-between text-[white] relative overflow-hidden p-10;
+  background: #10292d;
+}
+.left-panel::before {
+  @apply content-[''] absolute top-[-120px] right-[-120px] w-[400px] h-[400px] rounded-[50%];
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.07),
+    transparent 70%
+  );
+}
+.left-logo {
+  @apply flex items-center gap-[0.6rem] no-underline z-[1];
+}
+.logo-img {
+  @apply w-[38px] h-[38px] object-contain;
+}
+.left-logo-text {
+  @apply font-bold text-[0.95rem] text-[white] leading-[1.2];
+  font-family: "Poppins", sans-serif;
+}
+.left-content {
+  @apply z-[1];
+}
+.left-content h2 {
+  @apply text-[1.9rem] font-extrabold leading-[1.3] mb-4;
+}
+.left-content h2 span {
+  @apply text-[color:var(--accent)];
+}
+.left-content p {
+  @apply text-[0.9rem] text-[rgba(255,255,255,0.65)] leading-[1.7] max-w-[360px] mb-8;
+}
+.feature-box {
+  @apply border text-[0.82rem] mb-[0.7rem] p-4 rounded-[10px] border-solid border-[rgba(255,255,255,0.12)];
+  background: rgba(255, 255, 255, 0.06);
+}
+.footer {
+  @apply text-xs text-[rgba(255,255,255,0.3)];
+}
+
+/* ===== RIGHT PANEL ===== */
+.login-page .right-panel {
+  @apply flex items-center justify-center opacity-0 translate-y-[18px] animate-[rightFadeIn_0.2s_ease_forwards] p-10;
+}
+@keyframes rightFadeIn {
+  to {
+    opacity: 100;
+    transform: translateY(0);
+  }
+}
+.login-box {
+  @apply w-full max-w-[420px];
+}
+.screen-tag {
+  @apply inline-flex items-center gap-1.5 border text-[#317D89] text-[0.7rem] font-bold uppercase tracking-[0.08em] mb-4 px-[0.8rem] py-[0.3rem] rounded-[100px] border-solid border-[rgba(49,125,137,0.2)];
+  background: rgba(49, 125, 137, 0.09);
+  font-family: "Poppins", sans-serif;
+}
+.login-box h2 {
+  @apply text-2xl font-extrabold mb-[0.4rem];
+}
+.login-box p {
+  @apply text-[0.85rem] text-[color:var(--muted)] mb-[1.8rem];
+}
+.field {
+  @apply flex flex-col gap-[0.4rem] mb-4;
+}
+label {
+  @apply text-[0.78rem] font-semibold text-[color:var(--text)];
+  font-family: "Poppins", sans-serif;
+}
+.input-wrap {
+  @apply relative flex items-center;
+}
+.input-wrap .field-icon {
+  @apply absolute text-[color:var(--muted)] pointer-events-none transition-[color] duration-[0.2s] left-[0.9rem] top-2/4;
+}
+.input-wrap:focus-within .field-icon {
+  @apply text-[color:var(--primary)];
+}
+.input-wrap input {
+  @apply w-full border-[color:var(--border)] text-[0.9rem] text-[color:var(--text)] transition-[border-color] duration-[0.2s,box-shadow] delay-[0.2s] pl-[2.6rem] pr-4 py-4 rounded-[9px] border-[1.5px] border-solid focus:border-[color:var(--primary)] focus:shadow-[0_0_0_3px_rgba(26,79,138,0.1)];
+  background: var(--input-bg);
+  font-family: "Inter", sans-serif;
+}
+.input-wrap input:focus {
+  outline: none;
+  background: white;
+}
+.input-wrap input::placeholder {
+  @apply text-[color:var(--muted)] opacity-[0.80];
+}
+.input-wrap.has-toggle input {
+  @apply pr-14;
+}
+.toggle-pw {
+  @apply absolute -translate-y-2/4 cursor-pointer text-[color:var(--muted)] flex items-center justify-center transition-[color] duration-[0.2s] p-0 border-[none] right-[0.9rem] top-2/4 hover:text-[color:var(--primary)];
+  background: none;
+}
+.btn-main {
+  @apply w-full text-[white] font-bold text-base cursor-pointer transition-[0.2s] mt-2 p-[0.8rem] rounded-[10px] border-[none] hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(49,125,137,0.3)];
+  background: #317d89;
+  font-family: "Poppins", sans-serif;
+}
+.bottom-link {
+  @apply text-center text-[0.82rem] mt-[1.3rem];
+}
+.bottom-link a {
+  @apply text-[#317D89] font-semibold no-underline hover:underline;
+}
+
+/* ===================================================== */
+/* SIGNUP PAGE */
+/* ===================================================== */
+nav {
+  @apply fixed h-16 flex items-center justify-between z-[100] px-10 py-0 top-0 inset-x-0;
+  background: #10292d;
+}
+.nav-logo {
+  @apply text-[white] font-extrabold no-underline text-[0.95rem] flex items-center gap-[0.6rem];
+  font-family: "Poppins", sans-serif;
+}
+.nav-logo-text {
+  @apply font-bold text-[0.95rem] text-[white];
+}
+.req {
+  @apply text-[red];
+}
+.auth-section {
+  @apply min-h-screen grid place-items-center pt-20 pb-8 px-4;
+}
+.signnup-card {
+  @apply w-full max-w-[700px] border border-[color:var(--border)] shadow-[0_24px_64px_rgba(26,79,138,0.12)] opacity-0 translate-y-10 animate-[fadeSlideUp_0.4s_ease-out_forwards] p-12 rounded-[20px] border-solid;
+  background: white;
+}
+.auth-title {
+  @apply text-[1.8rem] font-extrabold text-center mb-2;
+}
+.auth-sub {
+  @apply text-base text-[color:var(--muted)] text-center mb-8;
+}
+.adminSignupForm {
+  @apply grid grid-cols-[repeat(2,1fr)] gap-[0rem_1.2rem];
+}
+.full-width {
+  @apply col-[span_2] col-[span_2];
+}
+.labelSignup {
+  @apply font-bold uppercase;
+}
+.toggle-password {
+  @apply absolute -translate-y-2/4 cursor-pointer border-[none] right-[0.9rem] top-2/4;
+  background: none;
+}
+.toggle-password svg {
+  @apply w-[18px] h-[18px] text-[color:var(--muted)] transition-[0.2s];
+}
+.toggle-password:hover svg {
+  @apply text-[color:var(--primary)];
+}
+.password-strength {
+  @apply h-1.5 overflow-hidden col-[span_2] mt-1.5 rounded-md;
+  background: #e5edf5;
+}
+.strength-bar {
+  @apply h-full w-[0%] transition-[0.3s] duration-[ease];
+}
+.strength-text {
+  @apply text-xs block col-[span_2] mt-1 mb-4;
+}
+.match-text {
+  @apply text-xs col-[span_2] mt-1;
+}
+.pw-rule {
+  @apply flex items-center text-xs text-[color:var(--muted)] gap-1.5 mt-1;
+}
+.pw-rule .rule-dot {
+  @apply w-3.5 h-3.5 border-[color:var(--border)] inline-block rounded-[50%] border-[1.5px] border-solid;
+}
+.pw-rule.pass {
+  @apply text-[#28a745];
+}
+.pw-rule.pass .rule-dot {
+  @apply relative after:content-["✓"] after:text-[white] after:text-[0.65rem] after:absolute after:-translate-x-2/4 after:-translate-y-2/4 after:left-2/4 after:top-2/4;
+  background: #28a745;
+}
+.auth-bottom {
+  @apply text-center text-[0.85rem] mt-6;
+}
+.auth-bottom a {
+  @apply text-[color:var(--teal)] font-semibold no-underline hover:underline;
+}
+.password-strength-left {
+  @apply flex flex-col items-start min-w-[100px] text-xs;
+}
+.password-strength-left .strength-bar {
+  @apply w-full h-1.5 rounded relative overflow-hidden mb-[0.3rem];
+  background: #e5edf5;
+}
+.strength-fill {
+  @apply h-full rounded;
+}
+.password-strength-left .pw-rule {
+  @apply mb-[0.2rem];
+}
+@keyframes fadeSlideUp {
+  to {
+    opacity: 100;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================================== */
+/* APPROVAL PENDING PAGE */
+/* ===================================================== */
+.pending-card {
+  @apply w-full max-w-[520px] border border-[color:var(--border)] shadow-[0_24px_64px_rgba(26,79,138,0.12)] opacity-0 translate-y-10 animate-[fadeSlideUp_0.4s_ease-out_forwards] p-12 rounded-[20px] border-solid;
+  background: white;
+}
+.btn-pending {
+  @apply w-[200px] text-[white] font-semibold text-base cursor-pointer transition-[0.2s] no-underline block text-center mt-6 mb-0 mx-auto p-[0.8rem] rounded-[10px] border-[none] hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(49,125,137,0.3)];
+  background: #317d89;
+  font-family: "Poppins", sans-serif;
+}
+
+/* ===================================================== */
+/* SIDEBAR/TOP BAR SECTION */
+/* ===================================================== */
+.admin-layout {
+  @apply grid grid-cols-[minmax(280px,20%)_1fr] min-h-screen;
+  background: var(--bg);
+}
+.admin-layout .left-panel {
+  @apply flex flex-col justify-between text-[white] relative overflow-hidden sticky h-screen p-8 top-0 before:content-[''] before:absolute before:top-[-120px] before:right-[-120px] before:w-[400px] before:h-[400px] before:pointer-events-none before:z-0 before:rounded-[50%];
+  background: #10292d;
+}
+.admin-layout .left-panel::before {
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.07),
+    transparent 70%
+  );
+}
+.admin-layout .left-logo {
+  @apply flex items-center gap-[0.6rem] no-underline;
+}
+.admin-layout .logo-img {
+  @apply w-[38px] h-[38px];
+}
+.admin-layout .logo-text-group {
+  @apply flex flex-col leading-[1.2];
+}
+.admin-layout .admin-panel-label {
+  @apply text-[0.7rem] font-semibold text-[rgba(255,255,255,0.6)] uppercase tracking-[0.08em];
+}
+.admin-layout .left-logo-text {
+  @apply font-bold text-[0.95rem] text-[white];
+  font-family: "Poppins", sans-serif;
+}
+.admin-layout .nav-links {
+  @apply flex flex-col gap-4 relative z-[1] mt-24;
+}
+.admin-layout .nav-links a {
+  @apply w-full text-[white] no-underline font-semibold transition-[0.2s] flex items-center gap-3 p-4 rounded-lg;
+}
+.admin-layout .nav-links a:hover {
+  background: var(--primary-light);
+}
+.admin-layout .nav-links a.active {
+  @apply text-[white];
+  background: var(--teal);
+}
+.nav-divider {
+  @apply w-full h-px mt-4 mb-2 mx-0;
+  background: rgba(255, 255, 255, 0.15);
+}
+.nav-icon {
+  @apply w-[18px] h-[18px] shrink-0;
+}
+.sidebar-bottom {
+  @apply flex flex-col gap-[0.8rem] mt-auto;
+}
+.admin-layout .logout-link {
+  @apply text-[white] no-underline font-semibold transition-[0.2s] self-stretch text-center flex items-center gap-[0.6rem] justify-center mt-auto px-4 py-[0.6rem] rounded-lg;
+  background: #ff383c;
+}
+.admin-layout .logout-link:hover {
+  background: #df3838;
+}
+.logout-icon {
+  @apply w-[18px] h-[18px];
+}
+.admin-layout .right-panel {
+  @apply flex flex-col justify-start items-stretch animate-[dashboardFade_0.25s_ease_forwards] p-8;
+}
+.admin-layout .burger-menu {
+  @apply hidden text-[1.8rem] cursor-pointer mb-4 border-[none];
+  background: none;
+}
+.admin-profile {
+  @apply flex items-center gap-[0.7rem] border mt-4 p-[0.7rem] rounded-[10px] border-solid border-[rgba(255,255,255,0.1)];
+  background: rgba(255, 255, 255, 0.06);
+}
+.admin-name {
+  @apply text-[0.85rem] font-semibold text-[white];
+}
+.admin-role {
+  @apply text-[0.7rem] text-[rgba(255,255,255,0.6)];
+}
+.top-bar {
+  @apply flex justify-between items-center px-6 py-4 rounded-xl;
+  background: #10292d;
+}
+.top-bar h1 {
+  @apply text-[white];
+}
+.top-actions {
+  @apply flex items-center gap-6;
+}
+.bell-btn {
+  @apply w-[50px] h-[50px] border-[color:var(--teal)] flex items-center justify-center relative cursor-pointer rounded-[50%] border-[1.5px] border-solid;
+  background: var(--teal);
+}
+.top-divider {
+  @apply w-px h-7;
+  background: var(--muted);
+}
+.profile-wrapper {
+  @apply relative inline-block;
+}
+.bell-btn:hover {
+  background: var(--hover-bg);
+}
+.bell-btn2 {
+  @apply w-[30px] h-[30px];
+}
+.notif-wrapper {
+  @apply relative;
+}
+.notif-dropdown {
+  @apply absolute w-[300px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[100] animate-[fadeDrop_0.2s_ease] p-[0.8rem] rounded-2xl right-0 top-[130%];
+  background: #ffffff;
+}
+.notif-header {
+  @apply flex justify-between items-center mb-[0.6rem];
+}
+.notif-dot {
+  @apply absolute w-2.5 h-2.5 rounded-[50%] right-2.5 top-2.5;
+  background: red;
+}
+.notif-title {
+  @apply font-bold text-[0.9rem];
+}
+.notif-count {
+  @apply text-[white] text-[0.7rem] ml-[5px] px-1.5 py-0.5 rounded-md;
+  background: #317d89;
+}
+.notif-header button {
+  @apply text-xs text-[#317D89] cursor-pointer border-[none];
+  background: none;
+}
+.notif-list {
+  @apply flex flex-col gap-[0.4rem] scroll-smooth max-h-[300px] overflow-y-auto pr-2;
+}
+.notif-item {
+  @apply flex gap-[0.6rem] items-start relative transition-[0.2s] p-[0.6rem] rounded-[10px];
+  background: #f7fafc;
+}
+.notif-item:hover {
+  background: #eef3f7;
+}
+.notif-icon {
+  @apply w-[34px] h-[34px] flex items-center justify-center text-base rounded-[10px];
+  background: #e6f0f2;
+}
+.notif-text strong {
+  @apply text-[0.8rem] block;
+}
+.notif-text p {
+  @apply text-[0.72rem] text-gray-500 mx-0 my-0.5;
+}
+.notif-time {
+  @apply text-[0.65rem] text-gray-400;
+}
+.notif-item.read {
+  @apply opacity-60;
+}
+.dropdown-role {
+  @apply text-[0.65rem] text-[#7a5200] inline-block mt-[3px] px-1.5 py-0.5 rounded-md;
+  background: var(--accent-light);
+}
+
+/* --- Community Sentiment Summary Cards --- */
+.af-summary-grid {
+  @apply grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-5 mb-10;
+}
+.af-summary-card {
+  @apply bg-[white] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 flex flex-col p-5 rounded-xl border-solid;
+}
+.af-summary-title {
+  @apply text-base font-bold text-gray-900 text-left mt-0 mb-5 mx-0;
+}
+.af-summary-badges {
+  @apply flex flex-col items-center gap-3;
+}
+.af-summary-pill {
+  @apply flex items-center justify-center gap-2 text-sm font-semibold w-[120px] border px-4 py-2 rounded-md border-solid;
+}
+
+/* Specific Badge Colors */
+.af-pill-pos {
+  @apply bg-green-50 text-green-600 border-green-300;
+}
+.af-pill-neu {
+  @apply bg-yellow-50 text-yellow-600 border-yellow-300;
+}
+.af-pill-neg {
+  @apply bg-red-50 text-red-600 border-red-300;
+}
+@keyframes dashboardFade {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 100;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 100;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================================== */
+/* DASHBOARD PAGE */
+/* ===================================================== */
+.admin-layout .main-content {
+  @apply max-w-[1400px] w-full mt-6 mb-0 mx-auto;
+}
+.card-grid {
+  @apply grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 mt-6;
+}
+.card {
+  @apply border border-[color:var(--border)] font-semibold shadow-[0_6px_18px_rgba(0,0,0,0.05)] p-[1.2rem] rounded-xl border-solid;
+  background: white;
+}
+.sentiment {
+  @apply flex justify-center items-center gap-4 text-base flex-wrap mt-4;
+}
+.sentiment span {
+  @apply flex items-center gap-1 p-[0.3rem] rounded-md;
+}
+.positive {
+  @apply text-[#2F7445] border border-solid border-[#36C061];
+  background: #c0ffd4;
+}
+.neutral {
+  @apply text-amber-600 border border-solid border-[#BDBD64];
+  background: #fff7e6;
+}
+.negative {
+  @apply text-[#DF3838] border border-solid border-[#FF383C];
+  background: #ffeaea;
+}
+.face {
+  @apply w-[30px] h-[30px] inline-flex;
+}
+.face svg {
+  @apply w-full h-full;
+}
+.section {
+  @apply mt-8;
+}
+.request-card {
+  @apply border border-[color:var(--border)] flex justify-between items-center mt-4 p-4 rounded-[10px] border-solid;
+  background: white;
+}
+.approve-btn {
+  @apply text-[white] cursor-pointer px-[0.9rem] py-2 rounded-lg border-[none];
+  background: #0d7a55;
+}
+.reject-btn {
+  @apply text-[white] cursor-pointer px-[0.9rem] py-2 rounded-lg border-[none];
+  background: #ff383c;
+}
+.chart-placeholder {
+  @apply h-[200px] border border-[color:var(--border)] flex items-center justify-center text-[color:var(--muted)] mt-4 rounded-xl border-dashed;
+  background: white;
+}
+.insight-card {
+  @apply border mt-4 p-4 rounded-[10px] border-solid border-[#f5c04a];
+  background: #fff8e6;
+}
+.modal-overlay {
+  @apply fixed w-full h-full flex items-center justify-center left-0 top-0 fixed w-screen h-screen bg-[rgba(0,0,0,0.4)] flex items-center justify-center z-[1000] box-border p-4 left-0 top-0 fixed backdrop-blur-sm flex items-center justify-center z-[10000] p-8 inset-0;
+  background: rgba(0, 0, 0, 0.5);
+}
+.modal {
+  @apply w-[300px] p-6 rounded-xl;
+  background: white;
+}
+.modal textarea {
+  @apply w-full h-20 border border-[color:var(--border)] mx-0 my-4 p-2 rounded-lg border-solid;
+}
+.modal-title {
+  @apply text-center mb-4;
+}
+.modal-actions {
+  @apply flex gap-[0.6rem] justify-center mt-2;
+}
+
+/* ===================================================== */
+/* FEEDBACK PAGE*/
+/* ===================================================== */
+.af-container {
+  @apply bg-slate-50 min-h-screen p-6;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Header */
+.af-header-section {
+  @apply mb-6;
+}
+.af-title {
+  @apply text-[28px] font-[bold] text-gray-900 m-0;
+}
+.af-subtitle {
+  @apply text-gray-500 mt-1;
+}
+
+/* Filters & Search */
+.af-controls {
+  @apply flex justify-between items-center bg-[white] shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-6 py-4 rounded-[12px_12px_0_0] border-b border-solid;
+}
+.af-search-box {
+  @apply flex items-center border border-gray-300 w-full max-w-[300px] px-3 py-2 rounded-md border-solid;
+}
+.af-search-box input {
+  @apply w-full ml-2 border-[none];
+  outline: none;
+}
+.af-filters {
+  @apply flex items-center gap-3;
+}
+.af-filter-label {
+  @apply text-gray-600 font-medium;
+}
+.af-select {
+  @apply border border-gray-300 px-3 py-1.5 rounded-md border-solid;
+  outline: none;
+  background: white;
+}
+
+/* Table */
+.af-table-wrapper {
+  @apply bg-[white] shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-x-auto rounded-[0_0_12px_12px];
+}
+.af-table {
+  @apply w-full text-left border-collapse;
+}
+.af-table th,
+.af-table td {
+  @apply px-6 py-4 border-b border-solid;
+}
+.af-table th {
+  @apply font-semibold text-gray-700;
+}
+
+/* Dynamic Badges (Matches your Figma exactly) */
+.af-badge {
+  @apply text-[13px] font-semibold inline-block text-center px-3 py-1 rounded-full;
+}
+.af-badge.negative {
+  @apply bg-red-100 text-red-500;
+}
+.af-badge.neutral {
+  @apply bg-[#D4CE99] text-[white];
+}
+.af-badge.positive {
+  @apply bg-green-100 text-green-600;
+}
+.af-badge.under-review {
+  @apply bg-[#D4CE99] text-[white];
+}
+.af-badge.received {
+  @apply bg-gray-200 text-gray-500;
+}
+.af-badge.resolved {
+  @apply bg-green-100 text-green-600;
+}
+
+/* Buttons */
+.af-view-btn {
+  @apply bg-[#42888D] text-[white] cursor-pointer transition-[background-color] duration-[0.2s] px-4 py-1.5 rounded-md border-[none] hover:bg-[color:var(--hover-bg)];
+}
+
+/* Pagination */
+.af-pagination {
+  @apply flex justify-end gap-2 px-6 py-4;
+}
+.af-page-btn {
+  @apply border border-gray-300 rounded cursor-pointer px-3 py-1 border-solid;
+  background: white;
+}
+.af-page-btn.active {
+  @apply bg-[#42888D] text-[white] border-[#42888D];
+}
+.af-page-btn:disabled {
+  @apply opacity-50 cursor-not-allowed pointer-events-none bg-gray-100 text-gray-400;
+}
+/* Modal Popup */
+.af-modal-overlay {
+  @apply fixed bg-[rgba(0,0,0,0.5)] flex items-center justify-center z-[1000] inset-0;
+}
+.af-modal-content {
+  @apply bg-[white] w-full max-w-[500px] overflow-hidden rounded-lg;
+}
+.af-modal-header {
+  @apply bg-[#128FA6] flex justify-between items-center text-[white] px-6 py-4;
+}
+.af-modal-header h2 {
+  @apply text-xl m-0;
+}
+.af-modal-close {
+  @apply text-[white] text-2xl cursor-pointer border-[none];
+  background: none;
+}
+.af-modal-body {
+  @apply p-6;
+}
+.af-modal-body h3 {
+  @apply text-lg mt-0 mb-2;
+}
+.af-modal-body p {
+  @apply text-gray-600 leading-normal mb-6;
+}
+.af-sentiment-list {
+  @apply m-0 p-0;
+  list-style: none;
+}
+.af-sentiment-list li {
+  @apply mb-2;
+}
+.af-sentiment-list strong {
+  @apply text-gray-900;
+}
+
+/* ===================================================== */
+/* MANAGE PAGE */
+/* ===================================================== */
+.as-container {
+  @apply bg-slate-50 min-h-screen p-6;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Header */
+.as-header-section {
+  @apply flex justify-between items-center mb-6;
+}
+.as-title-wrap h1 {
+  @apply text-[28px] font-[bold] text-gray-900 m-0;
+}
+.as-subtitle {
+  @apply text-gray-500 mt-1;
+}
+
+/* Buttons */
+.as-btn-aqua {
+  @apply bg-[#128FA6] text-[white] font-semibold text-[0.9rem] cursor-pointer flex items-center gap-2 transition-[background-color] duration-[0.2s] whitespace-nowrap px-4 py-2 rounded-md border-[none] hover:bg-[color:var(--hover-bg)];
+}
+.as-btn-ghost {
+  @apply bg-[white] text-gray-600 border border-gray-300 font-medium text-[0.9rem] cursor-pointer flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-md border-solid hover:bg-gray-50;
+}
+
+/* Controls/Filters (Standard look from previous pages) */
+.as-controls {
+  @apply flex justify-between items-center bg-[white] shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-6 py-4 rounded-[12px_12px_0_0] border-b border-solid;
+}
+
+/* Reusing af-search styles conceptually here, just renaming prefix as needed */
+.as-search-box {
+  @apply flex items-center border border-gray-300 w-full max-w-[300px] px-3 py-2 rounded-md border-solid;
+}
+.as-search-box input {
+  @apply w-full ml-2 border-[none];
+  outline: none;
+}
+.as-filters {
+  @apply flex items-center gap-3;
+}
+.as-select {
+  @apply border border-gray-300 px-3 py-1.5 rounded-md border-solid;
+  outline: none;
+  background: white;
+}
+
+/* Service Card Grid */
+.as-card-grid {
+  @apply grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6 bg-[white] shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-6 rounded-[0_0_12px_12px];
+}
+
+/* Individual Card */
+.as-card {
+  @apply border border bg-[white] transition-transform duration-[0.2s,box-shadow] delay-[0.2s] flex flex-col p-5 rounded-xl border-solid hover:translate-y-[-3px] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)];
+}
+.as-card-header {
+  @apply flex justify-between items-center mb-3;
+}
+.as-card-title {
+  @apply text-lg font-bold text-gray-900 m-0;
+}
+.as-card-desc {
+  @apply text-gray-500 text-sm leading-normal grow mb-4;
+}
+.as-card-details {
+  @apply flex flex-col gap-2.5 mt-0 mb-5 mx-0 p-0;
+  list-style: none;
+}
+.as-card-details li {
+  @apply flex items-center gap-2 text-gray-600 text-sm;
+}
+.as-card-details li svg {
+  @apply text-gray-400;
+}
+
+/* Badges */
+.as-badge {
+  @apply text-xs font-semibold px-3 py-1 rounded-full;
+}
+
+/* Figma Status Colors */
+.as-badge.on-going {
+  @apply bg-green-100 text-green-600;
+}
+.as-badge.upcoming {
+  @apply bg-yellow-100 text-yellow-700;
+}
+.as-badge.completed {
+  @apply bg-gray-100 text-gray-500;
+}
+
+/* Card Footer */
+.as-card-footer {
+  @apply mt-auto pt-4 border-t border-solid;
+}
+.as-qr-btn {
+  @apply bg-[white] text-[#128FA6] border font-semibold text-[0.9rem] cursor-pointer flex items-center justify-center gap-2 transition-all duration-[0.2s] whitespace-nowrap px-4 py-2 rounded-md border-solid border-[#128FA6] hover:bg-[#128FA6] hover:text-[white];
+}
+
+/* Modal Styles (Matches Design 1) */
+.as-modal-overlay {
+  @apply fixed bg-[rgba(0,0,0,0.5)] flex items-center justify-center z-[1000] inset-0;
+}
+.as-modal-content {
+  @apply bg-[white] w-full overflow-hidden shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)] rounded-xl;
+  max-w: 400px;
+}
+.as-modal-header {
+  @apply bg-[#128FA6] flex justify-between items-center text-[white] px-5 py-4;
+
+  /* Aqua matching design */
+}
+.as-modal-header h2 {
+  @apply text-xl font-bold m-0;
+}
+.as-modal-close {
+  @apply text-[white] text-2xl cursor-pointer border-[none];
+  background: none;
+}
+.as-modal-body {
+  @apply flex flex-col items-center text-center p-6;
+}
+.as-modal-confirm-icon {
+  @apply mb-5;
+}
+.as-modal-body h3 {
+  @apply text-[22px] font-bold text-gray-900 mt-0 mb-2 mx-0;
+}
+.as-modal-desc {
+  @apply text-gray-500 text-[15px] leading-normal mb-6;
+}
+
+/* The actual QR code container */
+.as-qr-holder {
+  @apply bg-gray-50 border border mb-6 p-5 rounded-lg border-solid;
+}
+
+/* --- Form Elements for Add Service Modal --- */
+.as-form {
+  @apply flex flex-col gap-4 text-left w-full;
+}
+.as-form-group {
+  @apply flex flex-col gap-1.5;
+}
+.as-form-label {
+  @apply text-sm font-semibold text-gray-700;
+}
+.as-form-input,
+.as-form-textarea,
+.as-form-select {
+  @apply w-full border border-gray-300 text-sm transition-[border-color] duration-[0.2s] px-3 py-2.5 rounded-md border-solid;
+  outline: none;
+  font-family: inherit;
+}
+.as-form-input:focus,
+.as-form-textarea:focus,
+.as-form-select:focus {
+  @apply border-[#128FA6];
+}
+.as-form-textarea {
+  @apply resize-y min-h-[80px];
+}
+.as-form-row {
+  @apply flex gap-4;
+}
+.as-form-row > * {
+  @apply flex-1;
+}
+
+/* Modal Actions (Buttons at the bottom) */
+.as-modal-actions {
+  @apply flex justify-end gap-3 mt-6 pt-4 border-t border-solid;
+}
+
+/* ===================================================== */
+/* ADMIN MANAGEMENT PAGE */
+/* ===================================================== */
+.section .card {
+  @apply mt-4;
+}
+.section-header {
+  @apply flex justify-between items-center mb-4;
+}
+.admin-table {
+  @apply w-full table-fixed mt-[rem] border-collapse;
+}
+.admin-table th,
+.admin-table td {
+  @apply text-[0.85rem] border-b-[color:var(--border)] text-center align-middle px-4 py-3 border-b border-solid;
+  word-wrap: break-word;
+}
+.admin-table th {
+  @apply font-bold;
+  background: #f5f7fa;
+}
+.admin-table td {
+  @apply leading-[1.4];
+}
+.admin-table tr:hover {
+  background: #f9fbfd;
+}
+.admin-table th:nth-child(1),
+.admin-table td:nth-child(1) {
+  @apply w-[18%];
+}
+.admin-table th:nth-child(2),
+.admin-table td:nth-child(2) {
+  @apply w-[15%];
+}
+.admin-table th:last-child,
+.admin-table td:last-child {
+  @apply w-1/5 text-center;
+}
+.admin-table tr:hover {
+  @apply transition-[background] duration-[0.2s] ease-[ease];
+  background: #f9fbfd;
+}
+.admin-table .btn-group button {
+  @apply mr-1.5;
+}
+.table-controls {
+  @apply flex gap-[0.8rem] mx-0 my-4;
+}
+.table-controls input {
+  @apply flex-1 border-[color:var(--border)] px-[0.8rem] py-[0.6rem] rounded-lg border-[1.5px] border-solid;
+  background: var(--input-bg);
+}
+.table-controls select {
+  @apply border-[color:var(--border)] font-semibold px-[0.8rem] py-[0.6rem] rounded-lg border-[1.5px] border-solid;
+  background: white;
+}
+.status-badge {
+  @apply text-[0.7rem] font-semibold px-[0.6rem] py-1 rounded-md rounded text-sm font-medium px-2 py-1 text-xs font-semibold inline-block px-3 py-1 rounded-full inline-flex items-center gap-1.5 text-[0.8rem] font-semibold whitespace-nowrap px-4 py-[0.4rem] rounded-[100px] before:content-[''] before:w-1.5 before:h-1.5 before:rounded-[50%];
+}
+.status-approved {
+  @apply text-[#0d7a55];
+  background: #e6f9f0;
+}
+.status-pending {
+  @apply text-amber-600;
+  background: #fff7e6;
+}
+.status-rejected {
+  @apply text-[#df3838];
+  background: #ffeaea;
+}
+.btn-group {
+  @apply flex gap-[0.4rem] justify-center flex-wrap;
+}
+.view-btn {
+  @apply bg-[#128FA6] text-[white] font-semibold cursor-pointer gap-2 transition-[background-color] duration-[0.2s] px-5 py-2.5 rounded-md border-[none] hover:bg-[color:var(--hover-bg)];
+}
+.modal.large {
+  @apply w-[420px] max-w-[95%];
+}
+.admin-details {
+  @apply flex flex-col gap-[0.6rem] mt-2;
+}
+.admin-details p {
+  @apply text-base flex justify-between border-b-[color:var(--border)] pb-[0.3rem] border-b border-dashed;
+}
+.admin-details strong {
+  @apply text-[color:var(--muted)] font-semibold;
+}
+.role-badge-kapitan {
+  @apply inline-block text-[#7a5200] text-xs font-semibold px-[0.6rem] py-[0.2rem] rounded-md;
+  background: var(--accent-light);
+}
+.role-badge-secretary {
+  @apply inline-block text-[#2e7d32] text-xs font-semibold px-[0.6rem] py-[0.2rem] rounded-md;
+  background: #c8e6c9;
+}
+.role-badge-servicehead {
+  @apply inline-block text-[#1565c0] text-xs font-semibold px-[0.6rem] py-[0.2rem] rounded-md;
+  background: #bbdefb;
+}
+.pagination {
+  @apply flex justify-center items-center gap-2.5 mt-2.5;
+}
+.pagination button {
+  @apply text-[white] cursor-pointer px-3 py-1.5 rounded-md border-[none] disabled:cursor-not-allowed;
+  background: #317d89;
+}
+.pagination button:disabled {
+  background: #ccc;
+}
+
+/* ===================================================== */
+/* HOUSEHOLD MANAGEMENT PAGE */
+/* ===================================================== */
+.status-clearcase {
+  @apply text-[#0d7a55];
+  background: #e6f9f0;
+}
+.status-pendingcase {
+  @apply text-amber-600;
+  background: #fff7e6;
+}
+.status-violation {
+  @apply text-[#df3838];
+  background: #ffeaea;
+}
+.resident-btns {
+  @apply inline-flex gap-2 items-center;
+}
+.resident-btns .view-btn,
+.resident-btns .update-btn {
+  @apply bg-[#128FA6] text-[white] font-semibold cursor-pointer transition-[background-color] duration-[0.2s] whitespace-nowrap px-5 py-2.5 rounded-md border-[none];
+}
+.resident-btns .view-btn:hover,
+.resident-btns .update-btn:hover {
+  @apply bg-[color:var(--hover-bg)];
+}
+.hm-input {
+  @apply w-full text-sm mt-[5px] mb-3 p-2.5;
+}
+.hm-textarea {
+  @apply w-full text-sm min-h-[80px] overflow-hidden resize-none mt-[5px] mb-3 p-2.5;
+}
+.hm-textarea-large {
+  @apply min-h-[110px];
+}
+.hm-input:focus,
+.hm-textarea:focus {
+  @apply border shadow-[0_0_3px_rgba(0,123,255,0.3)] border-solid border-[#007bff];
+  outline: none;
+}
+.hm-status-actions {
+  @apply pb-3;
+}
+
+/* =========================================
+   ADMIN REQUESTS PAGE STYLES                                                         
+   ========================================= */
+.requests-container {
+  @apply bg-gray-50 min-h-[calc(100vh_-_64px)] w-full box-border p-8 w-full;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+.requests-header {
+  @apply mb-6 mb-8;
+}
+.requests-title {
+  @apply text-2xl font-bold text-gray-800 m-0 text-[1.8rem] font-extrabold text-[#10292D] mb-2;
+}
+.requests-subtitle {
+  @apply text-sm text-gray-500 mt-1 text-[color:var(--muted)] text-[0.95rem];
+}
+
+/* Controls (Search & Filter) */
+.requests-controls {
+  @apply bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-gray-100 flex justify-between items-center gap-4 flex-wrap mb-6 p-4 rounded-lg border-solid flex flex-wrap gap-6 justify-between items-center border border-[color:var(--border)] shadow-[0_4px_12px_rgba(0,0,0,0.03)] mb-8 p-6 rounded-xl border-solid;
+}
+.search-wrapper {
+  @apply relative flex-1 max-w-[400px] min-w-[250px] relative flex-1 min-w-[300px];
+}
+.search-icon {
+  @apply absolute -translate-y-2/4 text-gray-400 left-3 top-2/4 absolute -translate-y-2/4 text-[color:var(--muted)] left-4 top-2/4;
+}
+.search-input {
+  @apply w-full border border text-sm box-border transition-[border-color] duration-[0.2s] pl-10 pr-4 py-2.5 rounded-md border-solid focus:border-blue-500 focus:shadow-[0_0_0_2px_rgba(59,130,246,0.2)] w-full border-[color:var(--border)] text-[0.9rem] transition-[0.2s] pl-[2.8rem] pr-4 py-[0.8rem] rounded-[10px] border-[1.5px] border-solid focus:border-[color:var(--teal)] focus:shadow-[0_0_0_3px_rgba(49,125,137,0.1)];
+  outline: none;
+}
+.filter-group {
+  @apply flex gap-3 flex flex-col text-xs font-semibold text-[color:var(--muted)] flex gap-3;
+}
+.filter-select {
+  @apply border border text-sm text-gray-700 bg-white cursor-pointer px-4 py-2.5 rounded-md border-solid focus:border-blue-500 border-[color:var(--border)] text-[color:var(--text)] font-semibold cursor-pointer transition-[0.2s] px-[1.2rem] py-[0.8rem] rounded-[10px] border-[1.5px] border-solid focus:border-[color:var(--teal)];
+  outline: none;
+}
+
+/* Table Styles */
+.table-container {
+  @apply bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-gray-100 overflow-x-auto rounded-lg border-solid;
+}
+.requests-table {
+  @apply w-full text-left whitespace-nowrap border-collapse;
+}
+.requests-table th {
+  @apply bg-gray-50 text-gray-600 text-sm font-semibold p-4 border-b border-solid;
+}
+.requests-table td {
+  @apply text-sm text-gray-800 p-4 border-b border-solid;
+}
+.requests-table tbody tr:hover {
+  @apply bg-gray-50;
+}
+.requests-table .text-center {
+  @apply text-center;
+}
+.req-id {
+  @apply text-blue-600 font-medium;
+}
+.req-type {
+  @apply font-medium text-gray-800;
+}
+.req-category {
+  @apply text-xs text-gray-500 mt-0.5;
+}
+.empty-state {
+  @apply text-center text-gray-500 p-8;
+}
+
+/* Badges */
+.status-badge.approved {
+  @apply bg-emerald-100 text-emerald-700 text-green-700 border border-green-100 border-solid;
+}
+.status-badge.rejected {
+  @apply bg-red-100 text-red-700 text-red-700 border border-red-100 border-solid;
+}
+.status-badge.pending {
+  @apply bg-amber-100 text-amber-700 text-amber-700 border border-amber-100 border-solid;
+}
+
+/* Action Buttons */
+.btn-view {
+  @apply text-blue-600 font-medium text-sm cursor-pointer inline-flex items-center justify-center gap-1.5 rounded transition-[background-color] duration-[0.2s] px-3 py-1.5 border-[none] hover:bg-blue-50 hover:text-blue-700 text-[color:var(--text)] border border-[color:var(--border)] border-solid hover:border-[color:var(--teal)] hover:text-[color:var(--teal)];
+  background: none;
+}
+
+/* =========================================
+   MODAL STYLES
+   ========================================= */
+.modal-content {
+  @apply bg-white w-full max-w-[500px] max-h-[90vh] flex flex-col shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)] overflow-hidden rounded-xl w-full max-w-[800px] max-h-[90vh] flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden animate-[modalIn_0.3s_ease-out] rounded-xl border-solid;
+}
+.modal-header {
+  @apply bg-gray-50 flex justify-between items-center px-6 py-5 border-b border-solid border-b-slate-100 flex justify-between items-center text-slate-900 px-8 py-5 border-b border-solid;
+}
+.modal-header h2 {
+  @apply text-lg font-bold text-gray-800 m-0 text-[1.3rem] font-bold;
+}
+.btn-close-icon {
+  @apply text-gray-400 cursor-pointer flex rounded p-1 border-[none] hover:text-gray-600 hover:bg-gray-200 text-slate-400 transition-[0.2s] p-2 rounded-lg hover:text-slate-900;
+  background: none;
+}
+.modal-body {
+  @apply overflow-y-auto p-6 overflow-y-auto flex-1 p-8;
+}
+.details-grid {
+  @apply grid grid-cols-[1fr_1fr] gap-4 mb-6 grid grid-cols-[repeat(2,1fr)] gap-[1.25rem_2rem];
+}
+.detail-item label {
+  @apply block text-[11px] uppercase tracking-wider text-gray-500 mb-1 text-xs font-semibold text-slate-400 uppercase tracking-wide;
+}
+.detail-value {
+  @apply text-sm text-gray-800 m-0 text-[0.95rem] font-medium text-slate-800;
+}
+.detail-value.bold {
+  @apply font-semibold;
+}
+.detail-value.large {
+  @apply text-base font-semibold;
+}
+.detail-value.large span {
+  @apply text-sm font-normal text-gray-500;
+}
+.detail-item.full-width {
+  @apply col-[span_2];
+}
+.detail-item.has-border {
+  @apply mt-2 pt-4 border-t border-solid;
+}
+.purpose-box {
+  @apply bg-gray-50 border border text-sm text-gray-700 mt-1 p-3 rounded-md border-solid;
+}
+
+/* Rejection Section */
+.reject-reason-section {
+  @apply mb-2;
+}
+.reject-reason-section label {
+  @apply block text-sm font-semibold text-red-600 mb-2;
+}
+.reject-reason-section textarea {
+  @apply w-full border border-red-300 text-sm resize-y box-border p-3 rounded-md border-solid focus:border-red-500 focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)];
+  outline: none;
+}
+
+/* Modal Footer */
+.modal-footer {
+  @apply bg-gray-50 flex justify-end gap-3 px-6 py-4 border-t border-solid border-t-slate-100 flex justify-end gap-3 px-8 py-5 border-t border-solid;
+}
+.modal-footer button {
+  @apply text-sm font-medium cursor-pointer flex items-center gap-2 transition-all duration-[0.2s] px-4 py-2 rounded-md border-[none];
+}
+.btn-cancel {
+  @apply bg-transparent text-gray-600 hover:bg-gray-200;
+}
+.btn-reject {
+  @apply bg-red-100 text-red-700 hover:bg-red-200 text-red-500 border border-red-200 border-solid hover:border-red-500;
+}
+.btn-approve {
+  @apply bg-emerald-600 text-white hover:bg-emerald-700 text-[white] border-[none] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(49,125,137,0.2)];
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .requests-controls {
+    @apply flex-col items-stretch;
+  }
+  .search-wrapper {
+    @apply max-w-full;
+  }
+  .filter-group {
+    @apply flex-col;
+  }
+  .details-grid {
+    @apply grid-cols-[1fr];
+  }
+  .detail-item.full-width {
+    @apply col-[span_1];
+  }
+}
+
+/* ===================================================== */
+/* REPORTS PAGE */
+/* ===================================================== */
+.reports-container {
+  @apply max-w-[1200px] w-full mt-6 mb-0 mx-auto;
+}
+.reports-title {
+  @apply text-[1.6rem] font-extrabold mb-[1.2rem];
+}
+.reports-grid {
+  @apply grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4 mt-4;
+}
+.report-card {
+  @apply border border-[color:var(--border)] shadow-[0_10px_25px_rgba(0,0,0,0.05)] transition-[0.2s] p-[1.2rem] rounded-[14px] border-solid hover:translate-y-[-3px];
+  background: white;
+}
+.report-card h3 {
+  @apply text-[0.95rem] font-bold text-[color:var(--muted)] mb-[0.8rem];
+}
+.report-header {
+  @apply flex justify-between items-center flex-wrap gap-4 mb-[1.2rem];
+}
+.report-controls {
+  @apply flex items-end gap-[0.8rem] flex-wrap;
+}
+.report-controls .filter-group {
+  @apply text-[0.7rem];
+}
+.report-controls .clear-btn,
+.report-controls .export-btn {
+  @apply h-[38px] flex items-center;
+}
+.report-card ul {
+  @apply p-0;
+  list-style: none;
+}
+.report-card li {
+  @apply text-[0.9rem] flex justify-between border-b-[color:var(--border)] px-0 py-[0.4rem] border-b border-dashed last:border-b-[none];
+}
+.category-sentiment {
+  @apply text-center mb-6;
+}
+.category-sentiment:not(:last-child) {
+  @apply border-b-[color:var(--border)] pb-4 border-b border-solid;
+}
+.sentiment-box {
+  @apply flex justify-center items-center gap-4 flex-wrap mt-2;
+}
+.sentiment-pill {
+  @apply flex flex-col text-[0.8rem] font-semibold w-3/12 gap-1 px-3 py-2 rounded-lg;
+}
+.sentiment-label {
+  @apply font-semibold;
+}
+.stat-block:not(:last-child) {
+  @apply border-r-[color:var(--border)] border-r border-solid border-r-[color:var(--border)] border-r border-solid;
+}
+.split-card {
+  @apply flex justify-around items-center text-center gap-8;
+}
+.stat-block {
+  @apply flex-1 flex flex-col items-center;
+}
+.highlight-positive {
+  @apply text-[1.4rem] font-extrabold text-green-600 mt-2;
+}
+.highlight-negative {
+  @apply text-[1.4rem] font-extrabold text-[#ff383c] mt-2;
+}
+.stat-sub {
+  @apply text-[0.8rem] text-[color:var(--muted)];
+}
+.export-btn {
+  @apply text-[white] font-bold text-[0.9rem] cursor-pointer transition-[0.2s] px-[1.3rem] py-[0.7rem] rounded-[10px] border-[none] hover:-translate-y-px hover:shadow-[0_10px_25px_rgba(49,125,137,0.3)];
+  background: var(--teal);
+  font-family: "Poppins", sans-serif;
+}
+.export-btn:hover {
+  background: var(--hover-bg);
+}
+.filter-group input {
+  @apply border border-[color:var(--border)] mt-[0.3rem] p-2 rounded-lg border-solid;
+  background: white;
+  font-family: "Inter", sans-serif;
+}
+.clear-btn {
+  @apply text-[white] cursor-pointer font-semibold transition-[0.2s] px-4 py-[0.55rem] rounded-lg border-[none];
+  background: #ff383c;
+}
+.clear-btn:hover {
+  background: #df3838;
+}
+
+/* =========================================
+   AI INSIGHTS WIDGET STYLES
+   ========================================= */
+.ai-insights-card {
+  @apply bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] border border overflow-hidden mt-5 rounded-xl border-solid;
+  font-family: inherit;
+}
+.ai-header {
+  @apply bg-slate-50 border-b-slate-100 flex justify-between items-center px-5 py-4 border-b border-solid;
+}
+.ai-title {
+  @apply text-[1.1rem] font-bold text-slate-800 flex items-center gap-2 m-0;
+}
+.ai-icon-primary {
+  @apply text-[#20747a];
+
+  /* Matches your Malanday theme */
+}
+
+/* Segmented Tabs */
+.ai-tabs {
+  @apply flex bg-slate-200 gap-1 p-1 rounded-lg;
+}
+.ai-tab-btn {
+  @apply text-[0.85rem] font-semibold text-slate-500 cursor-pointer transition-all duration-[0.2s] ease-[ease] px-4 py-1.5 rounded-md border-[none] hover:text-slate-700;
+  background: transparent;
+}
+.ai-tab-btn.active {
+  @apply bg-white text-[#20747a] shadow-[0_1px_2px_rgba(0,0,0,0.1)];
+}
+
+/* Content Area */
+.ai-content {
+  @apply p-6;
+}
+.ai-empty-state {
+  @apply flex flex-col items-center justify-center text-slate-400 text-center px-0 py-10;
+}
+.ai-empty-state p {
+  @apply text-[0.95rem] mt-3;
+}
+
+/* Warning Box */
+.ai-issue-box {
+  @apply bg-orange-50 border border-orange-100 p-5 rounded-xl border-solid;
+}
+.ai-issue-header {
+  @apply flex items-start gap-4 border-b-orange-200 mb-5 pb-5 border-b border-solid;
+}
+.ai-warning-icon {
+  @apply bg-orange-100 text-orange-600 flex items-center justify-center p-2.5 rounded-[50%];
+}
+.ai-issue-text {
+  @apply flex-1;
+}
+.ai-issue-label {
+  @apply text-xs font-bold uppercase tracking-[0.5px] text-orange-700;
+}
+.ai-issue-name {
+  @apply text-xl font-bold text-gray-900 mx-0 my-1;
+}
+.ai-issue-stats {
+  @apply text-[0.9rem] text-gray-600 m-0;
+}
+
+/* Suggestions Grid */
+.ai-suggestions-grid {
+  @apply grid grid-cols-[1fr_1fr] gap-5;
+}
+.ai-suggestion-col h5 {
+  @apply flex items-center gap-2 text-[0.9rem] font-bold text-gray-800 mt-0 mb-3 mx-0;
+}
+.ai-suggestion-col.immediate h5 {
+  @apply text-red-600;
+}
+
+/* Red for immediate */
+.ai-suggestion-col.strategy h5 {
+  @apply text-blue-600;
+}
+
+/* Blue for strategy */
+.ai-suggestion-col ul {
+  @apply text-gray-700 text-[0.9rem] leading-normal m-0 pl-5;
+}
+.ai-suggestion-col li {
+  @apply mb-2;
+}
+
+/* Responsive adjustment for smaller screens */
+@media (max-width: 768px) {
+  .ai-suggestions-grid {
+    @apply grid-cols-[1fr];
+  }
+}
+
+/* ===================================================== */
+/* PROFILE PAGE */
+/* ===================================================== */
+.btn-back {
+  @apply inline-flex items-center gap-[0.35rem] text-[color:var(--primary)] border-[color:var(--primary)] font-semibold text-[0.9rem] cursor-pointer transition-[0.2s] mb-4 px-[0.9rem] py-[0.45rem] rounded-lg border-[1.5px] border-solid hover:text-[white] hover:shadow-[0_6px_16px_rgba(26,79,138,0.2)] before:content-["←"] before:inline-block before:-translate-y-px;
+  background: white;
+}
+.btn-edit {
+  @apply border-[color:var(--primary)] text-[color:var(--primary)] font-semibold cursor-pointer transition-[0.2s] px-[0.9rem] py-[0.4rem] rounded-lg border-[1.5px] border-solid hover:text-[white];
+  background: transparent;
+}
+.btn-edit:hover {
+  background: var(--primary);
+}
+.btn-back:hover {
+  background: var(--primary);
+}
+.profile-card {
+  @apply block border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
+  background: white;
+}
+.profile-header {
+  @apply flex items-center gap-4 mb-6;
+}
+.profile-grid {
+  @apply grid grid-cols-[repeat(2,1fr)] gap-4;
+}
+.profile-grid .full-width {
+  @apply col-[span_2];
+}
+.profile-card .input-wrap {
+  @apply relative;
+}
+.profile-card .input-wrap input {
+  @apply w-full border-[color:var(--border)] text-[0.9rem] text-[color:var(--text)] transition-[border] duration-[0.2s,box-shadow] delay-[0.2s] px-4 py-[0.9rem] rounded-[10px] border-[1.5px] border-solid focus:border-[color:var(--primary)] focus:shadow-[0_0_0_3px_rgba(26,79,138,0.1)];
+  font-family: "Inter", sans-serif;
+  background: var(--input-bg);
+}
+.profile-card .input-wrap input:focus {
+  outline: none;
+  background: white;
+}
+.profile-card .input-wrap input::placeholder {
+  @apply text-[color:var(--muted)] opacity-80;
+}
+.profile-card .input-wrap .field-icon {
+  @apply absolute -translate-y-2/4 text-[color:var(--muted)] pointer-events-none left-[0.8rem] top-2/4;
+}
+.profile-card .input-wrap.has-toggle .toggle-pw {
+  @apply absolute -translate-y-2/4 cursor-pointer text-[color:var(--muted)] border-[none] right-[0.8rem] top-2/4 hover:text-[color:var(--primary)];
+  background: none;
+}
+.no-scroll-page {
+  @apply h-full overflow-hidden flex flex-col;
+}
+.no-scroll-page .section {
+  @apply mt-4 first:mt-0;
+}
+
+/* ===================================================== */
+/* MOBILE */
+/* ===================================================== */
+@media (max-width: 480px) {
+  /* ===================================================== */
+
+  /* MOBILE-  DASHBOARD PAGE*/
+
+  /* ===================================================== */
+  .admin-layout {
+    @apply grid-cols-[1fr];
+  }
+  .admin-layout .left-panel {
+    @apply hidden;
+  }
+  .admin-layout .left-panel.active {
+    @apply block absolute w-[260px] h-full z-[1000];
+  }
+  .admin-layout .burger-menu {
+    @apply block;
+  }
+}
+
+/* ===================================================== */
+/* REDESIGNED REQUESTS PAGE */
+/* ===================================================== */
+
+/* Tabs */
+.req-tabs {
+  @apply flex gap-4 border-b-[color:var(--border)] mb-8 pb-0 border-b border-solid;
+}
+.req-tab {
+  @apply font-semibold text-[0.95rem] text-[color:var(--muted)] cursor-pointer relative transition-[0.2s] px-6 py-4 border-[none] hover:text-[color:var(--teal)];
+  font-family: "Poppins", sans-serif;
+  background: none;
+}
+.req-tab.active {
+  @apply text-[color:var(--teal)] after:content-[''] after:absolute after:h-[3px] after:rounded-t-[3px] after:-bottom-px after:inset-x-0;
+}
+.req-tab.active::after {
+  background: var(--teal);
+}
+
+/* Controls */
+.requests-controls {
+  background: white;
+}
+.search-input {
+  background: var(--input-bg);
+  font-family: "Inter", sans-serif;
+}
+.search-input:focus {
+  outline: none;
+  background: white;
+}
+.filter-select {
+  background: var(--input-bg);
+  font-family: "Inter", sans-serif;
+}
+.filter-select:focus {
+  outline: none;
+  background: white;
+}
+
+/* Table Styles for Requests */
+.req-table-wrapper {
+  @apply border border-[color:var(--border)] shadow-[0_10px_30px_rgba(0,0,0,0.05)] overflow-hidden w-full rounded-2xl border-solid;
+  background: white;
+}
+.req-table {
+  @apply w-full text-left border-collapse;
+}
+.req-table th {
+  @apply text-[0.85rem] font-bold text-slate-500 uppercase tracking-wider border-b-[color:var(--border)] px-6 py-5 border-b-2 border-solid;
+  background: #f8fafc;
+  font-family: "Poppins", sans-serif;
+}
+.req-table td {
+  @apply border-b-slate-100 align-middle text-[0.95rem] px-6 py-5 border-b border-solid;
+}
+.req-table tr:last-child td {
+  @apply border-b-[none];
+}
+.req-table tr:hover {
+  background: #fbfcfd;
+}
+.req-res-info {
+  @apply flex flex-col;
+}
+.req-res-name {
+  @apply font-bold text-slate-900;
+}
+.req-res-email {
+  @apply text-[0.8rem] text-[color:var(--muted)];
+}
+.req-type-badge {
+  @apply inline-flex text-slate-800 text-[0.9rem] font-medium px-0 py-[0.3rem];
+  background: transparent;
+}
+.req-date-cell {
+  @apply text-slate-600 text-[0.9rem];
+}
+.req-actions {
+  @apply flex gap-2 justify-end;
+}
+
+/* Status Badges */
+.status-badge.pending {
+  background: #fffbeb;
+}
+.status-badge.pending::before {
+  background: #d97706;
+}
+.status-badge.approved {
+  background: #f0fdf4;
+}
+.status-badge.approved::before {
+  background: #22c55e;
+}
+.status-badge.rejected {
+  background: #fef2f2;
+}
+.status-badge.rejected::before {
+  background: #ef4444;
+}
+
+/* Action Buttons */
+.btn-view,
+.btn-approve,
+.btn-reject {
+  @apply h-[38px] font-semibold text-[0.85rem] cursor-pointer transition-all duration-[0.2s] inline-flex items-center justify-center gap-1.5 px-4 py-0 rounded-lg;
+  font-family: "Poppins", sans-serif;
+}
+.btn-view {
+  background: white;
+}
+.btn-view:hover {
+  background: #f8fafc;
+}
+.btn-approve {
+  background: var(--teal);
+}
+.btn-approve:hover {
+  background: var(--hover-bg);
+}
+.btn-reject {
+  background: white;
+}
+.btn-reject:hover {
+  background: #fef2f2;
+}
+
+/* Modal Enhancements */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.45);
+}
+.modal-content {
+  background: white;
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.modal-header {
+  background: white;
+}
+.btn-close-icon:hover {
+  background: #f1f5f9;
+}
+
+/* Modal Sections */
+.modal-section {
+  @apply mb-10 last:mb-4;
+}
+.section-title {
+  @apply text-[0.85rem] font-bold text-[color:var(--teal)] uppercase tracking-wider flex items-center gap-2.5 mb-5 after:content-[''] after:flex-1 after:h-px;
+  font-family: "Poppins", sans-serif;
+}
+.section-title::after {
+  background: #f1f5f9;
+}
+.detail-item {
+  @apply flex flex-col gap-1;
+}
+.detail-value.badge {
+  @apply inline-flex;
+}
+.modal-footer {
+  background: #f8fafc;
+}
