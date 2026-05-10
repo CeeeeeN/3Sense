@@ -89,7 +89,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       collection(db, "livelihoodRegistrations"),
       where("householdID", "==", householdID), // SECURE: Filter by household
       where("residentID", "==", residentID),   // SECURE: Filter by resident
-      orderBy("submittedAt", "desc"),
+      orderBy("submittedAt || createdAt", "desc"),
       limit(progLimit)
     );
     const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
@@ -107,7 +107,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       collection(db, "document_requests"),
       where("householdID", "==", householdID), // SECURE: Filter by household
       where("residentID", "==", residentID),   // SECURE: Filter by resident
-      orderBy("submittedAt", "desc"),
+      orderBy("submittedAt || createdAt", "desc"),
       limit(docLimit)
     );
     const unsubDocs = onSnapshot(qDocs, (snapshot) => {
@@ -123,7 +123,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       collection(db, "facility_reservations"),
       where("householdID", "==", householdID), // SECURE: Filter by household
       where("residentID", "==", residentID),   // SECURE: Filter by resident
-      orderBy("submittedAt", "desc"),
+      orderBy("submittedAt || createdAt", "desc"),
       limit(resLimit)
     );
     const unsubReservations = onSnapshot(qReservations, (snapshot) => {
