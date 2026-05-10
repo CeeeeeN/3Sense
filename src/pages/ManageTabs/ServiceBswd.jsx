@@ -52,13 +52,13 @@ export default function ServiceBswd({ onBack }) {
 
   // ── Real-time listener ───────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"));
+    const q = query(collection(db, "bswd_reports"), orderBy("submittedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReports(data);
       setLoadingReports(false);
     }, (err) => {
-      console.error("bswdReports listener error:", err);
+      console.error("bswd_reports listener error:", err);
       setLoadingReports(false);
     });
     return () => unsub();
