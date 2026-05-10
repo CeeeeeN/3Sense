@@ -35,6 +35,10 @@ const STATUS_MAP = {
 };
 
 const IconQR = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3" /></svg>;
+const IconCamera = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>;
+const IconUpload = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" /></svg>;
+const IconTrash = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>;
+const IconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
 const ProfileIconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
 const ProfileIconPin = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>;
 const IconTag = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>;
@@ -106,6 +110,12 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const [txPage, setTxPage] = useState(1);
   const txPerPage = 8;
 
+  // Profile picture state
+  const [profilePic, setProfilePic] = useState(null); // base64 data URL or null
+  const [picMenuOpen, setPicMenuOpen] = useState(false);
+  const picInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+
   const fullName = [data.firstName, data.middleName, data.lastName, data.suffix].filter(Boolean).join(" ");
 
   // Load member profile from Firestore on mount
@@ -142,20 +152,22 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       });
   }, [householdID, memberID, userID, userRole]);
 
-  // Generate QR code whenever fullName or householdID changes
+  // Generate QR code whenever identity data changes
   useEffect(() => {
     if (!fullName && !householdID) return;
     const qrData = JSON.stringify({
       householdID: householdID,
-      memberID: memberID,
+      residentID: memberID,
       name: fullName || "Resident",
       role: userRole || "Member",
+      branchID: data.branchID || "",
+      branchName: data.branchName || "",
       barangay: data.barangay || "Malanday",
     });
     QRCode.toDataURL(qrData, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
       .then(url => setQrUrl(url))
       .catch(console.error);
-  }, [fullName, householdID, memberID, data.role, data.barangay]);
+  }, [fullName, householdID, memberID, userRole, data.branchID, data.branchName, data.barangay]);
 
   const openModal = () => { setDraft({ ...data }); setTab(0); setOpen(true); };
   const closeModal = () => setOpen(false);
@@ -236,8 +248,25 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const sInfo = STATUS_MAP[currentStatus] || STATUS_MAP["Clear Case"];
   const statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
 
+  const handlePicFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setProfilePic(ev.target.result);
+      setPicMenuOpen(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleRemovePic = () => {
+    setProfilePic(null);
+    setPicMenuOpen(false);
+  };
+
   return (
-    <div className="pf-root">
+    <div className="pf-root" onClick={(e) => { if (picMenuOpen && !e.target.closest('.pf-avatar-wrap')) setPicMenuOpen(false); }}>
       {/* NAV */}
       <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} memberID={memberID} userID={userID} />
 
@@ -249,7 +278,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
       {!loading && <div className="pf-page">
 
-        {/* HEADER */}
+        {/* PAGE TITLE HEADER */}
         <div className="pf-page-header">
           <div>
             <h1>My Profile</h1>
@@ -260,69 +289,105 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           </button>
         </div>
 
-        <Card icon={IconQR} title="Personal QR Code">
-          <div className="pf-qr-wrap">
-            {/* QR image panel */}
-            <div style={{
-              background: "linear-gradient(145deg, #f0faf6, #e8f5f0)",
-              border: "2px solid rgba(13,122,85,0.25)",
-              borderRadius: "18px",
-              padding: "20px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "12px",
-              boxShadow: "0 4px 20px rgba(13,122,85,0.12)",
-              flexShrink: 0,
-            }}>
-              <div style={{
-                background: "#fff",
-                borderRadius: "12px",
-                padding: "10px",
-                boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}>
-                {qrUrl
-                  ? <img src={qrUrl} alt="Personal QR Code" style={{ width: 180, height: 180, display: "block", borderRadius: "6px" }} />
-                  : <div style={{ width: 180, height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.75rem" }}>Generating...</div>
+        {/* PROFILE HERO CARD — Avatar + Identity + QR */}
+        <div className="pf-hero-card">
+
+          {/* Left: Profile Picture */}
+          <div className="pf-hero-avatar-col">
+            <div className="pf-avatar-wrap">
+              <div className="pf-avatar-ring">
+                {profilePic
+                  ? <img src={profilePic} alt="Profile" className="pf-avatar-img" />
+                  : <div className="pf-avatar-placeholder"><IconUser /></div>
                 }
               </div>
-              <div style={{
-                fontSize: "0.65rem",
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 700,
-                color: "#0d7a55",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-                textAlign: "center",
-              }}>
-                Scan to Verify Identity
-              </div>
-            </div>
+              {/* Camera button */}
+              <button
+                className="pf-avatar-cam-btn"
+                onClick={() => setPicMenuOpen(v => !v)}
+                aria-label="Change profile picture"
+              >
+                <IconCamera />
+              </button>
 
-            {/* Info column */}
-            <div className="pf-qr-info">
-              <div className="pf-qr-name">{fullName || "Your Full Name"}</div>
-              <div className="pf-qr-id">{householdID || "MAL-XXXX-XXXXX"} • {userRole || "Member"}</div>
-              <div className="pf-qr-verified"><span className="dot" /> Verified Resident</div>
-
-              <div style={{ borderTop: "1.5px solid var(--bg)", margin: "1rem 0" }} />
-
-              <div className="pf-qr-meta">
-                <div><div className="pf-qr-ml">Barangay</div><div className="pf-qr-mv">{data.barangay || "—"}</div></div>
-                <div><div className="pf-qr-ml">City</div><div className="pf-qr-mv">{data.city || "—"}</div></div>
-                <div>
-                  <div className="pf-qr-ml">Record</div>
-                  <div className="pf-qr-mv" style={{ color: sInfo.color }}>{sInfo.label}</div>
+              {/* Action menu */}
+              {picMenuOpen && (
+                <div className="pf-pic-menu">
+                  <input
+                    ref={picInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={handlePicFile}
+                  />
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    style={{ display: "none" }}
+                    onChange={handlePicFile}
+                  />
+                  <button className="pf-pic-menu-item" onClick={() => picInputRef.current?.click()}>
+                    <IconUpload /> Upload Photo
+                  </button>
+                  <button className="pf-pic-menu-item" onClick={() => cameraInputRef.current?.click()}>
+                    <IconCamera /> Take Picture
+                  </button>
+                  {profilePic && (
+                    <button className="pf-pic-menu-item danger" onClick={handleRemovePic}>
+                      <IconTrash /> Remove Photo
+                    </button>
+                  )}
+                  <div className="pf-pic-menu-divider" />
+                  <button className="pf-pic-menu-item muted" onClick={() => setPicMenuOpen(false)}>
+                    Cancel
+                  </button>
                 </div>
-              </div>
+              )}
+            </div>
+            <div className="pf-avatar-hint">Tap camera to change photo</div>
+          </div>
 
-              <button className="pf-btn-dl" onClick={downloadQR} disabled={!qrUrl}><IconDl /> Download QR Code</button>
+          {/* Center: Identity Info */}
+          <div className="pf-hero-identity">
+            <div className="pf-hero-name">{fullName || "Your Full Name"}</div>
+            <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {userRole || "Member"}</div>
+            <div className="pf-hero-verified"><span className="pf-hero-dot" /> Verified Resident</div>
+            <div className="pf-hero-divider" />
+            <div className="pf-hero-meta">
+              <div className="pf-hero-meta-item">
+                <div className="pf-hero-ml">Barangay</div>
+                <div className="pf-hero-mv">{data.barangay || "—"}</div>
+              </div>
+              <div className="pf-hero-meta-item">
+                <div className="pf-hero-ml">City</div>
+                <div className="pf-hero-mv">{data.city || "—"}</div>
+              </div>
+              <div className="pf-hero-meta-item">
+                <div className="pf-hero-ml">Record</div>
+                <div className="pf-hero-mv" style={{ color: sInfo.color }}>{sInfo.label}</div>
+              </div>
             </div>
           </div>
-        </Card>
+
+          {/* Right: QR Code */}
+          <div className="pf-hero-qr-col">
+            <div className="pf-hero-qr-panel">
+              <div className="pf-hero-qr-img-wrap">
+                {qrUrl
+                  ? <img src={qrUrl} alt="Personal QR Code" className="pf-hero-qr-img" />
+                  : <div className="pf-hero-qr-generating">Generating...</div>
+                }
+              </div>
+              <div className="pf-hero-qr-label">Scan to Verify</div>
+              <button className="pf-btn-dl" onClick={downloadQR} disabled={!qrUrl}>
+                <IconDl /> Download QR
+              </button>
+            </div>
+          </div>
+
+        </div>
 
         {/* 2. PERSONAL INFO */}
         <Card icon={ProfileIconUser} title="Personal Information">
