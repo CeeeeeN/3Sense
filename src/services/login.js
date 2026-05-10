@@ -47,11 +47,19 @@ export const loginWithHouseholdID = async (householdID, password) => {
 
     const residents = residentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
+    // Load all branches from the sub-collection
+    const branchesSnap = await getDocs(
+        collection(db, "households", householdID.trim(), "branches")
+    );
+    
+    const branches = branchesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
     return {
         householdID: householdID.trim(),
-        householdName: [residents.find(r => r.role === "head")?.firstName,
-        residents.find(r => r.role === "head")?.lastName]
-            .filter(Boolean).join(" ") || householdData.email,
+        householdName: (() => {
+            const head = residents.find(r => r.role === "Household Head" || r.role === "head");
+            return [head?.firstName, head?.lastName].filter(Boolean).join(" ") || householdData.email;
+        })(),
         email: householdData.email,
         address: {
             houseNumber: householdData.houseNumber || "",
@@ -62,6 +70,7 @@ export const loginWithHouseholdID = async (householdID, password) => {
             region: householdData.region || "",
         },
         residents,
+        branches,
     };
 };
 

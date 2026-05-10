@@ -12,6 +12,7 @@ export const submitRegistration = async (formData) => {
         age: formData.age ? Number(formData.age) : null,
         birthPlace: formData.birthPlace || "",
         sex: formData.sex || "",
+        genderOrientation: formData.gender === "Others" ? (formData.genderOther || "Others") : (formData.gender || ""),
         civilStatus: formData.civilStatus || "",
         religion: formData.religion || "",
         citizenship: formData.citizenship || "",
@@ -30,7 +31,7 @@ export const submitRegistration = async (formData) => {
         // Category 
         categories: formData.categories || [],
         pwdStatus: formData.pwdStatus || "",
-        disabilityType: formData.disabilityType || "",
+        disabilityType: formData.disabilityType === "Others" ? (formData.disabilityTypeOther || "Others") : (formData.disabilityType || ""),
 
         // Education & Employment 
         educationAttainment: formData.educationAttainment || "",
