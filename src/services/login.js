@@ -38,7 +38,55 @@ export const loginWithHouseholdID = async (householdID, password) => {
         );
     }
 
-    await signInWithEmailAndPassword(auth, householdData.email, password);
+    try {
+        await signInWithEmailAndPassword(auth, householdData.email, password);
+    } catch (err) {
+        // If the old email is invalid, but we have a pendingEmail, try it.
+        // This handles the case where the user verified their new email via the verification link,
+        // which automatically switched their Firebase Auth email to the new one.
+        if (err.code === "auth/invalid-credential") {
+            let success = false;
+            
+            if (householdData.pendingEmail) {
+                try {
+                    await signInWithEmailAndPassword(auth, householdData.pendingEmail, password);
+                    await updateDoc(householdRef, {
+                        email: householdData.pendingEmail,
+                        pendingEmail: null
+                    });
+                    householdData.email = householdData.pendingEmail;
+                    success = true;
+                } catch (innerErr) {
+                    if (innerErr.code !== "auth/invalid-credential") throw innerErr;
+                }
+            }
+
+            // Fallback for edge cases where pendingEmail wasn't set but the head resident doc HAS the new email
+            if (!success) {
+                const headRef = doc(db, "households", householdID.trim(), "residents", "head");
+                const headSnap = await getDoc(headRef);
+                if (headSnap.exists()) {
+                    const headData = headSnap.data();
+                    if (headData.email && headData.email !== householdData.email) {
+                        try {
+                            await signInWithEmailAndPassword(auth, headData.email, password);
+                            await updateDoc(householdRef, { email: headData.email });
+                            householdData.email = headData.email;
+                            success = true;
+                        } catch (innerErr) {
+                            // let it fall through and throw original error
+                        }
+                    }
+                }
+            }
+
+            if (!success) {
+                throw err;
+            }
+        } else {
+            throw err;
+        }
+    }
 
     // Load all residents from the sub-collection
     const residentsSnap = await getDocs(
