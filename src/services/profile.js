@@ -72,7 +72,7 @@ export const getMemberProfile = async (householdID, residentID) => {
         residentID:  residentID,        // Firestore doc ID
         householdID: householdID,        // parent household
         userID:      d.userID || "",     // Firebase Auth UID
-        role: d.role || "member",
+        role: d.role || "Member",
 
         firstName:   d.firstName || "",
         middleName:  d.middleName || "",
@@ -83,6 +83,8 @@ export const getMemberProfile = async (householdID, residentID) => {
         age:              d.age ?? null,
         birthPlace:       d.birthPlace || "",
         sex:              d.sex || "",
+        gender:           ["Cisgender", "Non-binary", "Transgender Man", "Transgender Woman", "Genderqueer", "Prefer not to say", ""].includes(d.genderOrientation) ? (d.genderOrientation || "") : "Others",
+        genderOther:      ["Cisgender", "Non-binary", "Transgender Man", "Transgender Woman", "Genderqueer", "Prefer not to say", ""].includes(d.genderOrientation) ? "" : d.genderOrientation,
         civilStatus:      d.civilStatus || "",
         religion:         d.religion || "",
         citizenship:      d.citizenship || "",
@@ -95,7 +97,8 @@ export const getMemberProfile = async (householdID, residentID) => {
 
         categories:    normalizedCategories,
         pwdStatus:     d.pwdStatus || "",
-        disabilityType: d.disabilityType || "",
+        disabilityType: ["Physical Disability", "Visual Disability", "Hearing Disability", "Speech Impairment", "Intellectual Disability", "Learning Disability", "Psychosocial Disability", "Multiple Disabilities", "Chronic Illness", "Rare Disease", ""].includes(d.disabilityType) ? (d.disabilityType || "") : "Others",
+        disabilityTypeOther: ["Physical Disability", "Visual Disability", "Hearing Disability", "Speech Impairment", "Intellectual Disability", "Learning Disability", "Psychosocial Disability", "Multiple Disabilities", "Chronic Illness", "Rare Disease", ""].includes(d.disabilityType) ? "" : d.disabilityType,
 
         totalMembers:             d.totalMembers ?? d.householdMembers ?? h.totalMembers ?? "",
         householdClassification:  d.householdClassification || h.householdClassification || "",
@@ -146,6 +149,7 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         age: updatedData.age ? Number(updatedData.age) : null,
         birthPlace: updatedData.birthPlace || "",
         sex: updatedData.sex || "",
+        genderOrientation: updatedData.gender === "Others" ? (updatedData.genderOther || "Others") : (updatedData.gender || ""),
         civilStatus: updatedData.civilStatus || "",
         religion: updatedData.religion || "",
         citizenship: updatedData.citizenship || "",
@@ -157,7 +161,7 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
 
         categories: normalizedCategories,
         pwdStatus: updatedData.pwdStatus || "",
-        disabilityType: updatedData.disabilityType || "",
+        disabilityType: updatedData.disabilityType === "Others" ? (updatedData.disabilityTypeOther || "Others") : (updatedData.disabilityType || ""),
 
         totalMembers: updatedData.totalMembers || updatedData.householdMembers || "",
         householdClassification: updatedData.householdClassification || "",

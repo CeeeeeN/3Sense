@@ -45,7 +45,7 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
     await setDoc(headRef, {
         residentID:  "head",       // canonical self-reference
         householdID,               // parent household
-        role:        "head",
+        role:        "Household Head",
         userID:      userCredential.user.uid,  // Firebase Auth UID
 
         firstName:   head.firstName || "",
@@ -57,6 +57,7 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         age:         head.age ?? null,
         birthPlace:  head.birthPlace || "",
         sex:         head.sex || "",
+        genderOrientation: head.genderOrientation || "",
         civilStatus: head.civilStatus || "",
         religion:    head.religion || "",
         citizenship: head.citizenship || "",
@@ -75,6 +76,8 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         occupation:          head.occupation || "",
         employmentStatus:    head.employmentStatus || "",
 
+        branchID: "BR-001",
+
         pinHash:   null,
         createdAt: serverTimestamp(),
         addedAt:   serverTimestamp(),
@@ -86,6 +89,13 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         activatedAt: serverTimestamp(),
         userID: userCredential.user.uid,
         _pendingHeadData: deleteField(), // clean up the temp staging field
+    });
+
+    const branchRef = doc(db, "households", householdID, "branches", "BR-001");
+    await setDoc(branchRef, {
+        branchName: `${head.lastName || ""} Family`.trim(),
+        residentID: "head",
+        createdAt: serverTimestamp(),
     });
 
     return {
