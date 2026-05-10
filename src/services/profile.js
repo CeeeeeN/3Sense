@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 import { verifyBeforeUpdateEmail } from "firebase/auth";
 
@@ -40,6 +40,17 @@ export const getMemberProfile = async (householdID, residentID) => {
         };
     }
 
+    // Resolve branch name from the branches sub-collection
+    const branchID = d.branchID || (residentID === "head" ? "BR-001" : null);
+    let branchName = "";
+    if (branchID) {
+        const branchRef = doc(db, "households", householdID, "branches", branchID);
+        const branchSnap = await getDoc(branchRef);
+        if (branchSnap.exists()) {
+            branchName = branchSnap.data().branchName || "";
+        }
+    }
+
     const normalizedCategories = Array.isArray(d.categories)
         ? d.categories
         : d.category
@@ -74,6 +85,8 @@ export const getMemberProfile = async (householdID, residentID) => {
         householdID: householdID,        // parent household
         userID:      d.userID || "",     // Firebase Auth UID
         role: d.role || "Member",
+        branchID:    branchID || "",
+        branchName:  branchName,
 
         firstName:   d.firstName || "",
         middleName:  d.middleName || "",
