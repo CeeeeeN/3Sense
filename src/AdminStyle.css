@@ -337,8 +337,7 @@ nav {
   @apply flex flex-col justify-start items-stretch animate-[dashboardFade_0.25s_ease_forwards] p-8;
 }
 .admin-layout .burger-menu {
-  @apply hidden text-[1.8rem] cursor-pointer mb-4 border-[none];
-  background: none;
+  @apply hidden flex items-center justify-center text-[1.8rem] cursor-pointer border-0 bg-transparent text-white;
 }
 .admin-profile {
   @apply flex items-center gap-[0.7rem] border mt-4 p-[0.7rem] rounded-[10px] border-solid border-[rgba(255,255,255,0.1)];
@@ -557,6 +556,12 @@ nav {
 }
 .modal-actions {
   @apply flex gap-[0.6rem] justify-center mt-2;
+}
+.resident-analytics-grid {
+  @apply grid gap-5 grid-cols-[repeat(auto-fit,minmax(480px,1fr))];
+}
+.analytics-card {
+  @apply w-full box-border;
 }
 
 /* ===================================================== */
@@ -799,16 +804,16 @@ nav {
 
 /* Modal Styles (Matches Design 1) */
 .as-modal-overlay {
-  @apply fixed bg-[rgba(0,0,0,0.5)] flex items-center justify-center z-[1000] inset-0;
+  @apply fixed inset-0 z-[1000] flex items-center justify-center bg-[rgba(0,0,0,0.5)] p-5;
 }
 .as-modal-content {
-  @apply bg-[white] w-full overflow-hidden shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)] rounded-xl;
-  max-w: 400px;
+  @apply w-full max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden rounded-xl bg-white shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)];
 }
 .as-modal-header {
-  @apply bg-[#128FA6] flex justify-between items-center text-[white] px-5 py-4;
-
-  /* Aqua matching design */
+  @apply flex shrink-0 items-center justify-between bg-[#128FA6] px-5 py-4 text-white;
+}
+.as-modal-body {
+  @apply flex-1 overflow-y-auto p-6 min-h-0 scroll-smooth;
 }
 .as-modal-header h2 {
   @apply text-xl font-bold m-0;
@@ -1461,28 +1466,6 @@ nav {
   @apply mt-4 first:mt-0;
 }
 
-/* ===================================================== */
-/* MOBILE */
-/* ===================================================== */
-@media (max-width: 480px) {
-  /* ===================================================== */
-
-  /* MOBILE-  DASHBOARD PAGE*/
-
-  /* ===================================================== */
-  .admin-layout {
-    @apply grid-cols-[1fr];
-  }
-  .admin-layout .left-panel {
-    @apply hidden;
-  }
-  .admin-layout .left-panel.active {
-    @apply block absolute w-[260px] h-full z-[1000];
-  }
-  .admin-layout .burger-menu {
-    @apply block;
-  }
-}
 
 /* ===================================================== */
 /* REDESIGNED REQUESTS PAGE */
@@ -1656,4 +1639,514 @@ nav {
 }
 .modal-footer {
   background: #f8fafc;
+}
+
+
+/* =========================
+   TABLET (1024px)
+========================= */
+@media (max-width: 1024px) {
+  .admin-layout {
+    @apply grid-cols-[1fr];
+  }
+
+  .admin-layout .left-panel {
+    @apply fixed -translate-x-full transition-transform duration-300 overflow-y-auto;
+  }
+
+  .admin-layout .left-panel.active {
+    @apply translate-x-0;
+  }
+
+  .admin-layout .nav-links {
+    @apply mt-[calc(var(--spacing)*20)];
+  }
+
+  .sidebar-bottom {
+    @apply mt-auto pt-4;
+  }
+
+  .admin-layout .burger-menu {
+      @apply flex text-white text-[1.8rem] cursor-pointer bg-transparent border-0;
+  }
+
+  .admin-layout .right-panel {
+    @apply p-4;
+  }
+ 
+  /* ── Manage Page ── */
+  .as-container {
+    @apply p-4;
+  }
+  .as-header-section {
+    @apply flex-col items-start gap-3;
+  }
+  .as-controls {
+    @apply flex-col items-stretch gap-3 p-4;
+  }
+  .as-search-box {
+    @apply max-w-full w-full;
+  }
+  .as-filters {
+    @apply flex-wrap;
+  }
+  .as-card-grid {
+    @apply grid-cols-[repeat(auto-fill,minmax(260px,1fr))] p-4 gap-4;
+  }
+  .as-form-row {
+    @apply flex-col gap-3;
+  }
+  .as-modal-content {
+    @apply mx-3;
+  }
+ 
+  /* ── Feedback Page ── */
+  .requests-container {
+    @apply p-5;
+  }
+  .requests-title {
+    @apply text-[1.4rem];
+  }
+  .requests-controls {
+    @apply flex-col items-stretch gap-3 p-4;
+  }
+  .search-wrapper {
+    @apply max-w-full min-w-0 w-full;
+  }
+  .filter-group {
+    @apply flex-row flex-wrap;
+  }
+  .req-table th,
+  .req-table td {
+    @apply px-4 py-3 text-[0.85rem];
+  }
+  .req-table th:nth-child(4),
+  .req-table td:nth-child(4) {
+    @apply hidden;
+  }
+  .modal-content {
+    @apply mx-3 max-w-[95vw];
+  }
+  .modal-body {
+    @apply p-5;
+  }
+  .modal-header {
+    @apply px-5 py-4;
+  }
+  .modal-footer {
+    @apply px-5 py-4;
+  }
+  .details-grid {
+    @apply grid-cols-[1fr];
+  }
+ 
+  /* ── Requests Page ── */
+  .req-tabs {
+    @apply gap-2;
+  }
+  .req-tab {
+    @apply px-3 py-3 text-[0.85rem];
+  }
+ 
+  /* ── Audit Logs Page ── */
+  .req-table-wrapper {
+    @apply rounded-xl overflow-x-auto;
+  }
+  .req-table {
+    @apply min-w-[600px];
+  }
+ 
+  /* ── Reports Page ── */
+  .reports-container {
+    @apply mt-4;
+  }
+  .reports-grid {
+    @apply grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3;
+  }
+  .report-header {
+    @apply flex-col items-start gap-3;
+  }
+  .report-controls {
+    @apply flex-wrap gap-2;
+  }
+  .split-card {
+    @apply gap-4;
+  }
+ 
+  /* ── Admin Management Page ── */
+  .section-header {
+    @apply flex-col items-start gap-3;
+  }
+  .table-controls {
+    @apply flex-col gap-2;
+  }
+  .table-controls input,
+  .table-controls select {
+    @apply w-full;
+  }
+  .admin-table {
+    @apply min-w-[600px];
+  }
+  .admin-table th:nth-child(3),
+  .admin-table td:nth-child(3) {
+    @apply hidden;
+  }
+ 
+  /* ── Household Management Page ── */
+  .resident-btns {
+    @apply flex-col gap-1;
+  }
+  .resident-btns .view-btn,
+  .resident-btns .update-btn {
+    @apply w-full text-center justify-center px-3 py-2 text-xs;
+  }
+ 
+  /* ── Profile Page ── */
+  .profile-grid {
+    @apply grid-cols-[1fr];
+  }
+  .profile-grid .full-width {
+    @apply col-[span_1];
+  }
+  .no-scroll-page {
+    @apply overflow-visible h-auto;
+  }
+
+  /* ── Modals general ── */
+  .modal.large {
+    @apply w-[95%];
+  }
+  .btn-group {
+    @apply flex-wrap gap-2;
+  }
+}
+
+/* =========================
+   MOBILE (640px)
+========================= */
+@media (max-width: 640px) {
+   .admin-layout .right-panel {
+    @apply p-3;
+  }
+  .top-bar {
+    @apply px-4 py-3;
+  }
+  .top-bar h1 {
+    @apply text-base;
+  }
+  .top-actions {
+    @apply gap-3;
+  }
+  .bell-btn {
+    @apply w-[40px] h-[40px];
+  }
+  .as-card-grid {
+    @apply grid-cols-1 p-3 gap-4;
+  }
+  .ai-header {
+    @apply flex-col items-start gap-3 px-4 py-3;
+  }
+  .ai-tab-btn {
+    @apply flex-1 text-center text-xs px-2;
+  }
+  .ai-content {
+    @apply p-4;
+  }
+  .ai-suggestions-grid {
+    @apply grid-cols-[1fr];
+  }
+  .ai-issue-header {
+    @apply flex-1 ;
+  }
+   .resident-analytics-grid {
+    @apply grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3;
+  }
+
+  /* ── Manage Page ── */
+  .as-container {
+    @apply p-3;
+  }
+  .as-card-grid {
+    @apply grid-cols-[1fr] p-3 gap-4;
+  }
+  .as-card-header {
+    @apply flex-col items-start gap-2;
+  }
+  .as-card-title {
+    @apply text-base;
+  }
+  .as-modal-content {
+    @apply mx-2 rounded-lg;
+  }
+  .as-modal-body {
+    @apply p-4;
+  }
+  .as-modal-header {
+    @apply px-4 py-3;
+  }
+  .as-form-row {
+    @apply flex-col gap-3;
+  }
+  .as-modal-actions {
+    @apply flex-col gap-2 mt-4;
+  }
+  .as-modal-actions button {
+    @apply w-full justify-center;
+  }
+  .as-btn-aqua,
+  .as-btn-ghost {
+    @apply w-full justify-center text-sm px-3 py-2;
+  }
+  .as-header-section {
+    @apply flex-col items-start gap-3;
+  }
+  .as-controls {
+    @apply flex-col items-stretch gap-3 p-3;
+  }
+  .as-search-box {
+    @apply max-w-full w-full;
+  }
+ 
+  /* ── Feedback Page ── */
+  .requests-container {
+    @apply p-3;
+  }
+  .requests-title {
+    @apply text-[1.2rem] leading-tight;
+  }
+  .requests-subtitle {
+    @apply text-xs;
+  }
+  .requests-controls {
+    @apply flex-col items-stretch gap-3 p-3;
+  }
+  .search-wrapper {
+    @apply max-w-full min-w-0 w-full;
+  }
+  .filter-group {
+    @apply flex-col;
+  }
+  .filter-select {
+    @apply w-full py-[0.7rem];
+  }
+  .req-table-wrapper {
+    @apply overflow-x-auto;
+  }
+  .req-table {
+    @apply min-w-[540px] text-xs;
+  }
+  .req-table th,
+  .req-table td {
+    @apply px-3 py-3;
+  }
+  .req-table th:nth-child(4),
+  .req-table td:nth-child(4),
+  .req-table th:nth-child(5),
+  .req-table td:nth-child(5) {
+    @apply hidden;
+  }
+  .btn-view,
+  .btn-approve,
+  .btn-reject {
+    @apply h-[34px] px-3 text-xs;
+  }
+  .req-actions {
+    @apply flex-col gap-1;
+  }
+ 
+  /* Feedback tab nav */
+  .requests-container > div[style*="border-bottom"] {
+    @apply overflow-x-auto;
+  }
+ 
+  /* ── Requests Page tabs ── */
+  .req-tabs {
+    @apply gap-1 overflow-x-auto pb-1;
+  }
+  .req-tab {
+    @apply px-2 py-2 text-xs whitespace-nowrap;
+  }
+ 
+  /* ── Modal ── */
+  .modal-content {
+    @apply mx-2 max-w-[96vw] max-h-[95vh];
+  }
+  .modal-header {
+    @apply px-4 py-3;
+  }
+  .modal-header h2 {
+    @apply text-base;
+  }
+  .modal-body {
+    @apply p-4;
+  }
+  .details-grid {
+    @apply grid-cols-[1fr] gap-3;
+  }
+  .modal-footer {
+    @apply px-4 py-3 flex-wrap gap-2;
+  }
+  .modal-footer button {
+    @apply flex-1 justify-center text-xs;
+  }
+  .modal-section {
+    @apply mb-6;
+  }
+ 
+  /* ── Audit Logs Page ── */
+  .req-table td:nth-child(2),
+  .req-table th:nth-child(2) {
+    @apply text-xs;
+  }
+  .af-pagination {
+    @apply flex-wrap gap-1 justify-center px-3;
+  }
+  .af-page-btn {
+    @apply px-2 py-1 text-xs;
+  }
+ 
+  /* ── Reports Page ── */
+  .reports-title {
+    @apply text-[1.2rem];
+  }
+  .reports-grid {
+    @apply grid-cols-[1fr] gap-3;
+  }
+  .report-header {
+    @apply flex-col items-start gap-2;
+  }
+  .report-controls {
+    @apply flex-col gap-2 w-full;
+  }
+  .report-controls .filter-group {
+    @apply w-full;
+  }
+  .report-controls .filter-group input,
+  .report-controls .filter-group select {
+    @apply w-full;
+  }
+  .export-btn,
+  .clear-btn {
+    @apply w-full text-center justify-center py-[0.6rem];
+  }
+  .split-card {
+    @apply flex-col gap-3;
+  }
+  .stat-block:not(:last-child) {
+    @apply border-r-0 border-b border-solid pb-3;
+  }
+  .sentiment-pill {
+    @apply w-full;
+  }
+  .sentiment-box {
+    @apply flex-col gap-2;
+  }
+ 
+  /* ── Admin Management Page ── */
+  .section-header {
+    @apply flex-col items-start gap-2;
+  }
+  .section-header h2 {
+    @apply text-lg;
+  }
+  .btn-edit {
+    @apply w-full text-center justify-center py-[0.5rem];
+  }
+  .table-controls {
+    @apply flex-col gap-2;
+  }
+  .table-controls input,
+  .table-controls select {
+    @apply w-full;
+  }
+  .admin-table {
+    @apply min-w-[520px] text-xs;
+  }
+  .admin-table th,
+  .admin-table td {
+    @apply px-2 py-2;
+  }
+  .admin-table .btn-group {
+    @apply flex-col gap-1;
+  }
+  .admin-table .btn-group button {
+    @apply mr-0 w-full text-xs px-2 py-1;
+  }
+  .pagination {
+    @apply flex-wrap gap-2 mt-3;
+  }
+  .pagination button {
+    @apply px-2 py-1 text-xs;
+  }
+  .modal.large {
+    @apply w-[96%] p-4;
+  }
+  .admin-details p {
+    @apply text-sm flex-col items-start gap-1;
+  }
+ 
+  /* ── Household Management Page ── */
+  .resident-btns {
+    @apply flex-col gap-1;
+  }
+  .resident-btns .view-btn,
+  .resident-btns .update-btn {
+    @apply w-full text-xs px-2 py-1.5;
+  }
+ 
+  /* ── Profile Page ── */
+  .profile-grid {
+    @apply grid-cols-[1fr] gap-3;
+  }
+  .profile-grid .full-width {
+    @apply col-[span_1];
+  }
+  .profile-card {
+    @apply p-4; @apply block;
+  }
+  .profile-header {
+    @apply flex-col items-start gap-2 mb-4;
+  }
+  .no-scroll-page {
+    @apply overflow-visible h-auto;
+  }
+  .section-header {
+    @apply flex-col items-start gap-2;
+  }
+  .btn-main {
+    @apply mt-3 py-[0.7rem];
+  }
+ 
+  /* ── Notification dropdown ── */
+  .notif-dropdown {
+    @apply w-[280px] right-[-60px];
+  }
+ 
+  /* ── Signup / Auth pages ── */
+  .adminSignupForm {
+    @apply grid-cols-[1fr];
+  }
+  .full-width {
+    @apply col-[span_1];
+  }
+  .signnup-card {
+    @apply p-6 rounded-2xl;
+  }
+  .auth-title {
+    @apply text-[1.4rem];
+  }
+ 
+  /* ── Login page ── */
+  .login-page {
+    @apply grid-cols-[1fr];
+  }
+  .login-page .left-panel {
+    @apply hidden;
+  }
+  .login-page .right-panel {
+    @apply p-5;
+  }
+  .login-box {
+    @apply max-w-full;
+  }
 }

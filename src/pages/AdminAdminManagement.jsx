@@ -778,7 +778,7 @@ export default function AdminManagement() {
 
       {/* Approve Modal */}
       {showApproveModal && (
-        <div className="modal-overlay">
+        <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Approve Admin Account</h3>
             <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
@@ -805,7 +805,7 @@ export default function AdminManagement() {
 
       {/* Reject Modal */}
       {showRejectModal && (
-        <div className="modal-overlay">
+        <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Confirm Rejection</h3>
             <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
@@ -831,7 +831,7 @@ export default function AdminManagement() {
 
       {/* Delete Modal */}
       {showDeleteModal && (
-        <div className="modal-overlay">
+        <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Delete Admin</h3>
             <p style={{ fontSize: "0.85rem", textAlign: "center" }}>

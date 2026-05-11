@@ -213,7 +213,8 @@ export default function HouseholdManagement() {
       const searchText = searchHhRequest.toLowerCase();
       const matchesSearch =
         req.fullName.toLowerCase().includes(searchText) ||
-        req.householdId.toLowerCase().includes(searchText);
+        (req.householdId || "").toLowerCase().includes(searchText) ||
+        (req.familyId || "").toLowerCase().includes(searchText);
       const matchesStatus =
         filterHhStatus === "All" || req.status === filterHhStatus;
       return matchesSearch && matchesStatus;
@@ -356,12 +357,12 @@ export default function HouseholdManagement() {
 
       const matchesSearch =
         r.fullName.toLowerCase().includes(searchText) ||
-        (r.householdId || "").toLowerCase().includes(searchText);
+        (r.householdId || "").toLowerCase().includes(searchText) ||
+        (r.familyId || "").toLowerCase().includes(searchText);
 
       const matchesCategory =
         filterCategory === "All" ||
         (Array.isArray(r.category) && r.category.some(cat => {
-          // strip emoji / non-word chars and compare
           const cleaned = cat.replace(/[^\w\s]/g, "").trim();
           return cleaned.toLowerCase().includes(filterCategory.toLowerCase());
         }));
@@ -553,6 +554,7 @@ export default function HouseholdManagement() {
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
+                    <th>Family ID</th>
                     <th>Category</th>
                     <th>Date Submitted</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -564,6 +566,7 @@ export default function HouseholdManagement() {
                       <tr key={req.id}>
                         <td style={{ fontWeight: 500 }}>{req.fullName}</td>
                         <td style={{ color: '#4b5563' }}>{req.householdId}</td>
+                        <td style={{ color: '#4b5563' }}>{req.familyId || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {req.category && req.category.map((c, i) => (
@@ -586,7 +589,7 @@ export default function HouseholdManagement() {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
+                    <tr><td colSpan={6} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -665,16 +668,17 @@ export default function HouseholdManagement() {
         {/* ================= REGISTERED RESIDENTS ================= */}
         {(residentViewMode === "default" || residentViewMode === "residents") && hhViewMode === "default" && (
           <div style={{ marginBottom: "40px" }}>
-            <div className="af-header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 className="requests-title"> Resident Account Management </h2>
+            <div className="section">
+              <div className="section-header">
+                <div>
+                  <h2 className="requests-title"> Resident Account Management </h2>
+                </div>
+                {residentViewMode === "default" ? (
+                  <button className="view-btn" onClick={() => setResidentViewMode("residents")}>See All Residents</button>
+                ) : (
+                  <button className="view-btn" onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); setPage(1); }}>Return</button>
+                )}
               </div>
-              {residentViewMode === "default" ? (
-                <button className="view-btn" onClick={() => setResidentViewMode("residents")}>See All Residents</button>
-              ) : (
-                <button className="view-btn" onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); setPage(1); }}>Return</button>
-              )}
-
             </div>
             <div className="requests-controls">
               <div className="search-wrapper" style={{ position: "relative" }}>
@@ -742,6 +746,7 @@ export default function HouseholdManagement() {
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
+                    <th>Family ID</th>
                     <th>Category</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -753,6 +758,7 @@ export default function HouseholdManagement() {
                       <tr key={`${res.householdId}__${res.id}`}>
                         <td style={{ fontWeight: 500 }}>{res.fullName}</td>
                         <td style={{ color: '#4b5563' }}>{res.householdId}</td>
+                        <td style={{ color: '#4b5563' }}>{res.familyId || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {res.category && res.category.map((c, i) => (
@@ -861,7 +867,6 @@ export default function HouseholdManagement() {
         {showResidentModal && selectedResident && (
           <div className="as-modal-overlay">
             <div className="as-modal-content" style={{ maxWidth: "600px" }}>
-
               <div className="as-modal-header">
                 <h2>Resident Details</h2>
                 <button
@@ -879,6 +884,7 @@ export default function HouseholdManagement() {
                 <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
                   <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
                     <strong>Household ID:</strong> {selectedResident.householdId}<br />
+                    <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
                     <div style={{ marginTop: '8px' }}>
                       <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
                     </div>
@@ -1061,7 +1067,7 @@ export default function HouseholdManagement() {
 
         {/* ================= HH APPROVE MODAL ================= */}
         {showHhApproveModal && (
-          <div className="modal-overlay">
+          <div className="as-modal-overlay">
             <div className="modal">
               <h3 className="modal-title">Approve Resident Registration</h3>
 
@@ -1095,7 +1101,7 @@ export default function HouseholdManagement() {
 
         {/* ================= HH REJECT MODAL ================= */}
         {showHhRejectModal && (
-          <div className="modal-overlay">
+          <div className="as-modal-overlay">
             <div className="modal">
               <h3 className="modal-title">Confirm Rejection</h3>
 
@@ -1123,7 +1129,7 @@ export default function HouseholdManagement() {
 
         {/* ================= DELETE RESIDENT MODAL ================= */}
         {showDeleteModal && residentToDelete && (
-          <div className="modal-overlay">
+          <div className="as-modal-overlay">
             <div className="modal">
               <h3 className="modal-title">Confirm Deletion</h3>
 

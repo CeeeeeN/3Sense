@@ -352,6 +352,8 @@ export default function AdminLayout({ children }) {
       {/* RIGHT PANEL */}
       <div className="right-panel">
         <div className="top-bar">
+          <button
+            className="burger-menu" onClick={() => setIsOpen(prev => !prev)}> ☰ </button>
           <h1>{topBarTitle}</h1>
 
           <div className="top-actions">
@@ -421,26 +423,26 @@ export default function AdminLayout({ children }) {
         {/* MAIN CONTENT */}
         {children}
       </div>
-      
-       {/* LOGOUT MODAL */}
-        {showLogoutModal && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <h3 className="modal-title">Confirm Logout</h3>
-              <div className="btn-group modal-actions">
-                <button className="reject-btn" onClick={handleLogout}>
-                  Logout
-                </button>
-                <button
-                  className="approve-btn"
-                  onClick={() => setShowLogoutModal(false)}
-                >
-                  Cancel
-                </button>
-              </div>
+
+      {/* LOGOUT MODAL */}
+      {showLogoutModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3 className="modal-title">Confirm Logout</h3>
+            <div className="btn-group modal-actions">
+              <button className="reject-btn" onClick={handleLogout}>
+                Logout
+              </button>
+              <button
+                className="approve-btn"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }
