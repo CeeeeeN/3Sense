@@ -213,7 +213,8 @@ export default function HouseholdManagement() {
       const searchText = searchHhRequest.toLowerCase();
       const matchesSearch =
         req.fullName.toLowerCase().includes(searchText) ||
-        req.householdId.toLowerCase().includes(searchText);
+        (req.householdId || "").toLowerCase().includes(searchText) ||
+        (req.familyId || "").toLowerCase().includes(searchText);
       const matchesStatus =
         filterHhStatus === "All" || req.status === filterHhStatus;
       return matchesSearch && matchesStatus;
@@ -356,12 +357,13 @@ export default function HouseholdManagement() {
 
       const matchesSearch =
         r.fullName.toLowerCase().includes(searchText) ||
-        (r.householdId || "").toLowerCase().includes(searchText);
+        (r.householdId || "").toLowerCase().includes(searchText) ||
+        (r.familyId || "").toLowerCase().includes(searchText);
+
 
       const matchesCategory =
         filterCategory === "All" ||
         (Array.isArray(r.category) && r.category.some(cat => {
-          // strip emoji / non-word chars and compare
           const cleaned = cat.replace(/[^\w\s]/g, "").trim();
           return cleaned.toLowerCase().includes(filterCategory.toLowerCase());
         }));
@@ -553,6 +555,7 @@ export default function HouseholdManagement() {
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
+                    <th>Family ID</th>
                     <th>Category</th>
                     <th>Date Submitted</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -564,6 +567,7 @@ export default function HouseholdManagement() {
                       <tr key={req.id}>
                         <td style={{ fontWeight: 500 }}>{req.fullName}</td>
                         <td style={{ color: '#4b5563' }}>{req.householdId}</td>
+                        <td style={{ color: '#4b5563' }}>{req.familyId || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {req.category && req.category.map((c, i) => (
@@ -586,7 +590,7 @@ export default function HouseholdManagement() {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
+                    <tr><td colSpan={6} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -742,6 +746,7 @@ export default function HouseholdManagement() {
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
+                    <th>Family ID</th>
                     <th>Category</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -753,6 +758,7 @@ export default function HouseholdManagement() {
                       <tr key={`${res.householdId}__${res.id}`}>
                         <td style={{ fontWeight: 500 }}>{res.fullName}</td>
                         <td style={{ color: '#4b5563' }}>{res.householdId}</td>
+                        <td style={{ color: '#4b5563' }}>{res.familyId || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {res.category && res.category.map((c, i) => (
@@ -879,6 +885,7 @@ export default function HouseholdManagement() {
                 <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
                   <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
                     <strong>Household ID:</strong> {selectedResident.householdId}<br />
+                    <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
                     <div style={{ marginTop: '8px' }}>
                       <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
                     </div>
