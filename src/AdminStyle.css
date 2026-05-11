@@ -557,6 +557,12 @@ nav {
 .modal-actions {
   @apply flex gap-[0.6rem] justify-center mt-2;
 }
+.resident-analytics-grid {
+  @apply grid gap-5 grid-cols-[repeat(auto-fit,minmax(480px,1fr))];
+}
+.analytics-card {
+  @apply w-full box-border;
+}
 
 /* ===================================================== */
 /* FEEDBACK PAGE*/
@@ -1636,9 +1642,8 @@ nav {
 }
 
 
-
 /* =========================
-   TABLET (<=1024px)
+   TABLET (1024px)
 ========================= */
 @media (max-width: 1024px) {
   .admin-layout {
@@ -1817,7 +1822,7 @@ nav {
 }
 
 /* =========================
-   MOBILE (<=640px)
+   MOBILE (640px)
 ========================= */
 @media (max-width: 640px) {
    .admin-layout .right-panel {
@@ -1853,7 +1858,10 @@ nav {
   .ai-issue-header {
     @apply flex-1 ;
   }
- 
+   .resident-analytics-grid {
+    @apply grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3;
+  }
+
   /* ── Manage Page ── */
   .as-container {
     @apply p-3;
