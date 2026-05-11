@@ -591,11 +591,11 @@ export default function AdminRequests() {
 
         {/* VIEW DETAILS MODAL */}
         {isModalOpen && selectedRequest && (
-          <div className="modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" onClick={closeModal}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
+              <div className="as-modal-header">
                 <h2>{activeTab === 'Facility' ? 'Reservation' : 'Request'} Details</h2>
-                <button className="btn-close-icon" onClick={closeModal}><X size={22} /></button>
+                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
               </div>
 
               <div className="modal-body">
@@ -795,11 +795,11 @@ export default function AdminRequests() {
 
         {/* REJECT REMARKS MODAL */}
         {isRejectModalOpen && selectedRequest && (
-          <div className="modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" onClick={closeModal}>
             <div className="modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
+              <div className="as-modal-header">
                 <h2>Confirm Rejection</h2>
-                <button className="btn-close-icon" onClick={closeModal}><X size={22} /></button>
+                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
               </div>
               <div className="modal-body">
                 <p style={{ marginBottom: '1.25rem', fontSize: '0.9rem', color: '#64748b', lineHeight: '1.6' }}>
