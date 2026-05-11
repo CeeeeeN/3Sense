@@ -235,7 +235,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
   const [form, setForm] = useState({
     fullName: "", email: "", contactNumber: "",
-    purpose: "", date: "", startTime: "", endTime: "",
+    purposeOption: "", purposeOther: "", date: "", startTime: "", endTime: "",
     attendees: "", notes: ""
   });
   const [refNum, setRefNum]         = useState("");
@@ -267,7 +267,8 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
   const validate = () => {
     const e = {};
     if (!form.email?.trim())    e.email     = "Email is required.";
-    if (!form.purpose.trim())   e.purpose   = "Purpose of use is required.";
+    if (!form.purposeOption)    e.purposeOption = "Purpose of use is required.";
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
     if (!form.date)             e.date      = "Please select a date.";
     if (!form.startTime)        e.startTime = "Start time is required.";
     if (!form.endTime)          e.endTime   = "End time is required.";
@@ -325,12 +326,13 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
+      const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
       const generatedRef = await submitFacilityReservation(
         householdID,
         userData?.residentID || userID || "",  // residentID = Firestore doc ID
         userName || "Unknown",
         facility,
-        form,
+        { ...form, purpose: effectivePurpose },
         customData
       );
       setRefNum(generatedRef || "");
@@ -394,9 +396,30 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Reservation Details</div>
           <div className="sv-field">
             <label className="sv-label">Purpose of Use <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} placeholder="e.g. Birthday celebration, community meeting..." value={form.purpose} onChange={e => { set("purpose", e.target.value); setErrors(p => ({...p, purpose: ""})); }} />
-            {errors.purpose && <span className="sv-error-msg">{errors.purpose}</span>}
+            <select
+              className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
+              value={form.purposeOption}
+              onChange={e => { set("purposeOption", e.target.value); setErrors(p => ({...p, purposeOption: ""})); if (e.target.value !== "Other") set("purposeOther", ""); }}
+            >
+              <option value="">— Select purpose —</option>
+              {(facility?.purposeOptions || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              <option value="Other">Other</option>
+            </select>
+            {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
           </div>
+
+          {form.purposeOption === "Other" && (
+            <div className="sv-field">
+              <label className="sv-label">Please specify <span className="sv-required">*</span></label>
+              <input
+                className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
+                placeholder="Describe your purpose..."
+                value={form.purposeOther}
+                onChange={e => { set("purposeOther", e.target.value); setErrors(p => ({...p, purposeOther: ""})); }}
+              />
+              {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
+            </div>
+          )}
           <div className="sv-field-row">
             <div className="sv-field">
               <label className="sv-label">Start Time <span className="sv-required">*</span></label>

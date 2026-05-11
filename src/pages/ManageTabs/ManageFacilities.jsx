@@ -43,6 +43,10 @@ export default function ManageFacilities() {
   const [selectedQR, setSelectedQR] = useState(null);
   const [editingFacilityId, setEditingFacilityId] = useState(null);
 
+  const [purposeInput, setPurposeInput] = useState("");
+  const [editingPurposeIdx, setEditingPurposeIdx] = useState(null);
+  const [purposeFormError, setPurposeFormError] = useState("");
+
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -109,7 +113,7 @@ export default function ManageFacilities() {
   };
 
   const [newFacility, setNewFacility] = useState({
-    facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, customFields: []
+    facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, purposeOptions: [], customFields: []
   });
 
   const handleEdit = (fac) => {
@@ -120,8 +124,12 @@ export default function ManageFacilities() {
       closeTime:     fac.closeTime || "17:00",
       description:   fac.description || fac.fullDescription || "",
       available:     fac.available !== false,
+      purposeOptions: fac.purposeOptions || [],
       customFields:  fac.customFields || []
     });
+    setPurposeInput("");
+    setEditingPurposeIdx(null);
+    setPurposeFormError("");
     setEditingFacilityId(fac.id);
     setShowAddModal(true);
   };
@@ -151,6 +159,11 @@ export default function ManageFacilities() {
 
   const handleAddFacility = async (e) => {
     e.preventDefault();
+    if (!newFacility.purposeOptions || newFacility.purposeOptions.length === 0) {
+      setPurposeFormError("At least one Purpose option is required before saving.");
+      return;
+    }
+    setPurposeFormError("");
     try {
       if (editingFacilityId) {
         await updateDoc(doc(db, "facilities", editingFacilityId), { ...newFacility, updatedAt: serverTimestamp() });
@@ -161,7 +174,10 @@ export default function ManageFacilities() {
         await updateDoc(newRef, { facilityID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_FACILITY", `Added new facility: ${newFacility.facilityName} (ID: ${newRef.id})`);
       }
-      setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, customFields: [] });
+      setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, purposeOptions: [], customFields: [] });
+      setPurposeInput("");
+      setEditingPurposeIdx(null);
+      setPurposeFormError("");
       setEditingFacilityId(null);
       setShowAddModal(false);
     } catch(error) {
@@ -171,7 +187,10 @@ export default function ManageFacilities() {
 
   const openAddModal = () => {
     setEditingFacilityId(null);
-    setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, customFields: [] });
+    setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, purposeOptions: [], customFields: [] });
+    setPurposeInput("");
+    setEditingPurposeIdx(null);
+    setPurposeFormError("");
     setShowAddModal(true);
   };
 
@@ -384,13 +403,113 @@ export default function ManageFacilities() {
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '12px', marginTop: '-10px' }}>The following information is automatically collected. Do not recreate them in the form builder.</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {["Full Name", "Contact Number", "Purpose", "Reservation Date", "Start Time", "End Time", "Estimated Number of Pax", "Additional Notes"].map(f => (
+                    {["Full Name", "Contact Number", "Purpose of Reservation", "Reservation Date", "Start Time", "End Time", "Estimated Number of Pax", "Additional Notes"].map(f => (
                       <span key={f} style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         {f}
                       </span>
                     ))}
                   </div>
+                </div>
+
+                {/* ── Purpose Options Manager ── */}
+                <div className="as-form-section" style={{ marginTop: '20px' }}>
+                  <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Purpose of Reservation Options <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>
+                    These options appear in the "Purpose of Reservation" dropdown on the resident facility request form. An "Other" option is always included automatically.
+                  </p>
+                  {purposeFormError && (
+                    <p style={{ fontSize: '0.8rem', color: '#e03e3e', fontWeight: 600, marginBottom: '8px' }}>{purposeFormError}</p>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      className="as-form-input"
+                      placeholder="e.g. Event, Meeting, Seminar, Practice..."
+                      value={purposeInput}
+                      onChange={e => setPurposeInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = purposeInput.trim();
+                          if (!val) return;
+                          if (editingPurposeIdx !== null) {
+                            const updated = [...newFacility.purposeOptions];
+                            updated[editingPurposeIdx] = val;
+                            setNewFacility({ ...newFacility, purposeOptions: updated });
+                            setEditingPurposeIdx(null);
+                          } else {
+                            setNewFacility({ ...newFacility, purposeOptions: [...(newFacility.purposeOptions || []), val] });
+                          }
+                          setPurposeInput('');
+                          setPurposeFormError('');
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="as-btn-aqua"
+                      style={{ padding: '8px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+                      onClick={() => {
+                        const val = purposeInput.trim();
+                        if (!val) return;
+                        if (editingPurposeIdx !== null) {
+                          const updated = [...newFacility.purposeOptions];
+                          updated[editingPurposeIdx] = val;
+                          setNewFacility({ ...newFacility, purposeOptions: updated });
+                          setEditingPurposeIdx(null);
+                        } else {
+                          setNewFacility({ ...newFacility, purposeOptions: [...(newFacility.purposeOptions || []), val] });
+                        }
+                        setPurposeInput('');
+                        setPurposeFormError('');
+                      }}
+                    >
+                      {editingPurposeIdx !== null ? 'Update' : '+ Add'}
+                    </button>
+                    {editingPurposeIdx !== null && (
+                      <button
+                        type="button"
+                        className="as-btn-ghost"
+                        style={{ padding: '8px 12px', fontSize: '0.82rem' }}
+                        onClick={() => { setEditingPurposeIdx(null); setPurposeInput(''); }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                  {(newFacility.purposeOptions || []).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(newFacility.purposeOptions || []).map((opt, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #e2eaf3', borderRadius: '8px', padding: '6px 10px' }}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', color: '#0f1f35' }}>{opt}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingPurposeIdx(idx); setPurposeInput(opt); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#317D89', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
+                          >Edit</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (newFacility.purposeOptions || []).filter((_, i) => i !== idx);
+                              setNewFacility({ ...newFacility, purposeOptions: updated });
+                              if (editingPurposeIdx === idx) { setEditingPurposeIdx(null); setPurposeInput(''); }
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e03e3e', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
+                          >Remove</button>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0faf5', border: '1px dashed #a7d7c1', borderRadius: '8px', padding: '6px 10px' }}>
+                        <span style={{ flex: 1, fontSize: '0.83rem', color: '#2DB17B', fontStyle: 'italic' }}>Other (always included – shows a free-text field)</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>No options added yet. Add at least one above.</p>
+                  )}
                 </div>
 
 
