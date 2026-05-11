@@ -87,6 +87,7 @@ export const getMemberProfile = async (householdID, residentID) => {
         role: d.role || "Member",
         branchID:    branchID || "",
         branchName:  branchName,
+        profilePhoto: d.profilePhoto || null,
 
         firstName:   d.firstName || "",
         middleName:  d.middleName || "",
@@ -189,6 +190,10 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
 
         updatedAt: serverTimestamp(),
     };
+
+    if (updatedData.profilePhoto !== undefined) {
+        payload.profilePhoto = updatedData.profilePhoto;
+    }
 
     // Only write address fields when the member has their own address
     if (!sameAddress) {

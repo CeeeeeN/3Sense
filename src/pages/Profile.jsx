@@ -113,6 +113,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   // Profile picture state
   const [profilePic, setProfilePic] = useState(null); // base64 data URL or null
   const [picMenuOpen, setPicMenuOpen] = useState(false);
+  const [uploadingPic, setUploadingPic] = useState(false);
   const picInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
@@ -130,6 +131,12 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       .then(profile => {
         console.log("[Profile] Loaded:", profile);
         setData(profile);
+        setLoading(false);
+
+        if (profile.profilePhoto) {
+          setProfilePic(profile.profilePhoto);
+        }
+        
         setLoading(false);
       })
       .catch(err => {
@@ -248,21 +255,73 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const sInfo = STATUS_MAP[currentStatus] || STATUS_MAP["Clear Case"];
   const statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
 
-  const handlePicFile = (e) => {
+  const handlePicFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // 1. Show image locally immediately for good UX
     const reader = new FileReader();
     reader.onload = (ev) => {
       setProfilePic(ev.target.result);
       setPicMenuOpen(false);
     };
     reader.readAsDataURL(file);
-    e.target.value = "";
+
+    // 2. Start Cloudinary Upload
+    setUploadingPic(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "3Sense+_ProfilePic"); 
+      const cloudName = "dfnqeiksu";
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Failed to upload to Cloudinary");
+      const cloudinaryData = await res.json();
+      const secureUrl = cloudinaryData.secure_url;
+
+      // 3. Save the new URL to Firestore
+      await updateMemberProfile(householdID, memberID, {
+        ...data,
+        profilePhoto: secureUrl });
+      
+      // 4. Update local data state
+      setData(prev => ({ ...prev, profilePhoto: secureUrl }));
+      
+    } catch (err) {
+      console.error("Error saving profile pic:", err);
+      alert("Failed to save profile picture permanently. Please try again.");
+    } finally {
+      setUploadingPic(false);
+      e.target.value = ""; // Reset input
+    }
   };
 
-  const handleRemovePic = () => {
-    setProfilePic(null);
+  const handleRemovePic = async () => {
+    if (!window.confirm("Are you sure you want to remove your profile picture?")) return;
+    
     setPicMenuOpen(false);
+    setUploadingPic(true);
+    
+    try {
+      // Remove from Firestore
+      await updateMemberProfile(householdID, memberID, { 
+        ...data,
+        profilePhoto: null });
+      
+      // Update UI
+      setProfilePic(null);
+      setData(prev => ({ ...prev, profilePhoto: null }));
+    } catch (err) {
+      console.error("Error removing profile pic:", err);
+      alert("Failed to remove profile picture.");
+    } finally {
+      setUploadingPic(false);
+    }
   };
 
   return (
@@ -296,10 +355,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           <div className="pf-hero-avatar-col">
             <div className="pf-avatar-wrap">
               <div className="pf-avatar-ring">
-                {profilePic
-                  ? <img src={profilePic} alt="Profile" className="pf-avatar-img" />
-                  : <div className="pf-avatar-placeholder"><IconUser /></div>
-                }
+                {uploadingPic ? (
+                  <div className="pf-avatar-placeholder" style={{ fontSize: "0.85rem", color: "var(--teal)", fontWeight: "600" }}>Saving...</div>
+                ) : profilePic ? (
+                  <img src={profilePic} alt="Profile" className="pf-avatar-img" />
+                ) : (
+                  <div className="pf-avatar-placeholder"><IconUser /></div>
+                )}
               </div>
               {/* Camera button */}
               <button
