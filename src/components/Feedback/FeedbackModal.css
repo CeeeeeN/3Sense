@@ -1,0 +1,331 @@
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+@keyframes fm-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fm-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fm-glow-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+
+  50% {
+    transform: scale(1.25);
+    opacity: 0.15;
+  }
+}
+
+@keyframes fm-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Overlay ───────────────────────────────────────────────── */
+
+.fm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+
+  background: rgba(10, 20, 35, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  animation: fm-fade-in 0.25s ease both;
+}
+
+/* ── Card ──────────────────────────────────────────────────── */
+
+.fm-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 2.5rem 2rem 2rem;
+  box-shadow:
+    0 32px 64px rgba(10, 40, 20, 0.14),
+    0 8px 24px rgba(10, 40, 20, 0.08),
+    0 0 0 1px rgba(13, 122, 85, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+  overflow: hidden;
+
+  animation: fm-scale-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Subtle top accent bar */
+.fm-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #0d7a55 0%, #16a369 50%, #0d7a55 100%);
+  background-size: 200% 100%;
+  animation: fm-ring-spin 4s linear infinite;
+  border-radius: 24px 24px 0 0;
+}
+
+/* ── Icon area ─────────────────────────────────────────────── */
+
+.fm-icon-wrap {
+  position: relative;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fm-icon-glow {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(13, 122, 85, 0.22) 0%, transparent 70%);
+  animation: fm-glow-pulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.fm-icon-ring {
+  position: relative;
+  z-index: 1;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e8f7f2 0%, #d0f0e4 100%);
+  border: 2px solid rgba(13, 122, 85, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(13, 122, 85, 0.18);
+}
+
+.fm-icon {
+  width: 34px;
+  height: 34px;
+  color: #0d7a55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fm-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Text content ──────────────────────────────────────────── */
+
+.fm-header {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.fm-type-label {
+  display: inline-block;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0d7a55;
+  background: rgba(13, 122, 85, 0.09);
+  border: 1px solid rgba(13, 122, 85, 0.18);
+  padding: 0.25rem 0.85rem;
+  border-radius: 100px;
+  margin-bottom: 0.85rem;
+}
+
+.fm-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f1f35;
+  line-height: 1.25;
+  margin-bottom: 0.75rem;
+}
+
+.fm-message {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  color: #5e7a99;
+  line-height: 1.75;
+  max-width: 340px;
+  margin: 0 auto;
+}
+
+/* ── Divider ───────────────────────────────────────────────── */
+
+.fm-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #d8e4f0, transparent);
+  margin-bottom: 1.5rem;
+}
+
+/* ── Action buttons ────────────────────────────────────────── */
+
+.fm-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fm-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  border-radius: 12px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition:
+    background 0.2s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
+.fm-btn:active {
+  transform: scale(0.97) !important;
+}
+
+/* Primary — green filled */
+.fm-btn-primary {
+  background: linear-gradient(135deg, #0d7a55 0%, #0f9268 100%);
+  color: #ffffff;
+  box-shadow:
+    0 6px 20px rgba(13, 122, 85, 0.32),
+    0 2px 6px rgba(13, 122, 85, 0.18);
+}
+
+.fm-btn-primary:hover {
+  background: linear-gradient(135deg, #0b6848 0%, #0d7a55 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 28px rgba(13, 122, 85, 0.38),
+    0 3px 8px rgba(13, 122, 85, 0.22);
+}
+
+.fm-btn-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Secondary — gray outlined */
+.fm-btn-secondary {
+  background: transparent;
+  color: #5e7a99;
+  border: 1.5px solid #d8e4f0;
+  box-shadow: none;
+}
+
+.fm-btn-secondary:hover {
+  background: #f2f7ff;
+  color: #0f1f35;
+  border-color: #b8cfe4;
+  transform: translateY(-1px);
+}
+
+/* ── Responsive — mobile ───────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .fm-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .fm-card {
+    max-width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding: 2rem 1.5rem 2.25rem;
+    animation: fm-slide-up 0.3s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  }
+
+  @keyframes fm-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Bottom sheet drag handle */
+  .fm-card::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 100px;
+    background: #d8e4f0;
+  }
+
+  .fm-title {
+    font-size: 1.2rem;
+  }
+
+  .fm-message {
+    font-size: 0.84rem;
+  }
+
+  .fm-icon-ring {
+    width: 64px;
+    height: 64px;
+  }
+
+  .fm-icon {
+    width: 28px;
+    height: 28px;
+  }
+}
