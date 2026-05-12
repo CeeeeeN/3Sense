@@ -2,13 +2,12 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitFacilityReservation } from "../../services/services";
-import { createNotification } from "../../services/notifications"; // 🆕
+import { createNotification } from "../../services/notifications";
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
 
-const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-// Convert "HH:MM" 24-hour time to "h:MM AM/PM" 12-hour display
 const to12h = (t) => {
   if (!t) return t;
   const [h, m] = t.split(":");
@@ -18,28 +17,81 @@ const to12h = (t) => {
   return `${h12}:${m} ${suffix}`;
 };
 
-// ── Helper: does a set of approved reservations cover the full operating hours? ──
-// We use a simple interval-union approach: merge all approved intervals on a date
-// and check if they collectively span [openTime, closeTime].
+function dateOffset(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().split("T")[0];
+}
+
+const MIN_RESERVATION_DATE = dateOffset(3);
+
 function isFullyCovered(approvedOnDate, openTime, closeTime) {
   if (!openTime || !closeTime || !approvedOnDate.length) return false;
-
-  // Sort intervals by start time
   const intervals = approvedOnDate
     .map(r => ({ s: r.startTime, e: r.endTime }))
     .filter(r => r.s && r.e)
     .sort((a, b) => a.s.localeCompare(b.s));
-
   let covered = openTime;
   for (const iv of intervals) {
-    if (iv.s > covered) break; // gap found
+    if (iv.s > covered) break;
     if (iv.e > covered) covered = iv.e;
     if (covered >= closeTime) return true;
   }
   return false;
 }
 
-// ── 1. Main Facilities Tab Component ──
+function AdvanceBookingBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: "12px",
+      background: "#eff6ff",
+      border: "1px solid #93c5fd",
+      borderRadius: "10px",
+      padding: "14px 16px",
+      marginBottom: "18px",
+      fontSize: "14px",
+      color: "#1e40af",
+    }}>
+      {/* Calendar/clock icon */}
+      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+      <div style={{ flex: 1 }}>
+        <strong style={{ display: "block", marginBottom: "2px", color: "#1e3a8a" }}>
+          Advance Booking Required
+        </strong>
+        Facility reservations must be submitted at least{" "}
+        <strong>3 days before</strong> your intended date of use. Same-day
+        and next-day bookings are not accepted. Please plan accordingly.
+      </div>
+      <button
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss reminder"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#1e40af",
+          padding: "0",
+          flexShrink: 0,
+          lineHeight: 1,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function FacilitiesTab({ userData, householdID, userName, userID }) {
   const [facilities, setFacilities] = useState([]);
   const [reservationFacility, setReservationFacility] = useState(null);
@@ -53,6 +105,9 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
 
   return (
     <>
+      {/* ── Advance booking reminder shown on the facility list ── */}
+      <AdvanceBookingBanner />
+
       <div className="sv-facilities-list">
         {facilities.map(f => (
           <div key={f.id} className="sv-facility-card">
@@ -64,7 +119,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
                   <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
                   <span className="sv-facility-card__dot" />
                   <span>{f.openTime && f.closeTime ? (() => {
-                    const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h,10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
+                    const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
                     return fmt(f.openTime) + ' – ' + fmt(f.closeTime);
                   })() : f.hours}</span>
                 </div>
@@ -87,14 +142,14 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
         <div className="rsv-overlay" onClick={e => e.target === e.currentTarget && setReservationFacility(null)}>
           <div className="rsv-modal">
             <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
-            <ReservationForm 
-              facility={reservationFacility} 
-              onBack={() => setReservationFacility(null)} 
-              userData={userData} 
-              householdID={householdID} 
-              userName={userName} 
+            <ReservationForm
+              facility={reservationFacility}
+              onBack={() => setReservationFacility(null)}
+              userData={userData}
+              householdID={householdID}
+              userName={userName}
               userID={userID}
             />
           </div>
@@ -104,14 +159,12 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
   );
 }
 
-// ── 2. Calendar ──
-// fullyBookedDates: dates where approved reservations cover the full operating hours (shown Red)
 function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDates = [] }) {
   const today = new Date();
-  const [viewYear, setViewYear]   = useState(today.getFullYear());
+  const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const firstDay    = new Date(viewYear, viewMonth, 1).getDay();
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
   const isPastMonth = (year, month) => {
@@ -120,26 +173,28 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
   };
   const prevMonth = () => {
     const newMonth = viewMonth === 0 ? 11 : viewMonth - 1;
-    const newYear  = viewMonth === 0 ? viewYear - 1 : viewYear;
+    const newYear = viewMonth === 0 ? viewYear - 1 : viewYear;
     if (!isPastMonth(newYear, newMonth)) { setViewMonth(newMonth); setViewYear(newYear); }
   };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
 
   const getStatus = (d) => {
-    const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    // Past dates are unselectable
+    const str = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const date = new Date(viewYear, viewMonth, d);
-    if (date < new Date(today.getFullYear(), today.getMonth(), today.getDate())) return "past";
-    // Admin-blocked dates
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    if (date < todayMidnight) return "past";
+    if (str < MIN_RESERVATION_DATE) return "past";
     if (blockedDates.includes(str)) return "past";
-    // Fully booked by approved reservations → show red
     if (fullyBookedDates.includes(str)) return "Reserved";
-    // Everything else is available (green)
     return "available";
   };
 
   const isSelected = (d) => {
-    const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const str = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     return str === selectedDate;
   };
 
@@ -159,10 +214,11 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
           const sel = isSelected(d);
           const isBlocked = status === "past" || status === "Reserved";
           return (
-            <button key={d} className={`sv-cal-cell sv-cal-cell--${status}${sel ? " sv-cal-cell--selected" : ""}`}
+            <button key={d}
+              className={`sv-cal-cell sv-cal-cell--${status}${sel ? " sv-cal-cell--selected" : ""}`}
               onClick={() => {
                 if (isBlocked) return;
-                const str = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                const str = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                 onSelectDate(str, status);
               }}
               disabled={isBlocked}
@@ -174,22 +230,36 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
         <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Fully Reserved</span>
       </div>
+      {/* ── Inline 3-day rule note under calendar ── */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        marginTop: "10px",
+        fontSize: "12px",
+        color: "#1e40af",
+        background: "#eff6ff",
+        border: "1px solid #bfdbfe",
+        borderRadius: "6px",
+        padding: "7px 10px",
+      }}>
+        <svg style={{ flexShrink: 0 }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+        </svg>
+        Bookings must be made at least <strong style={{ margin: "0 3px" }}>3 days in advance</strong>. Greyed-out dates are unavailable.
+      </div>
     </div>
   );
 }
 
-// ── 3. Reservation Form Component ──
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
   const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
     : "Reserve a facility for your event. Approval is required before confirmation.";
 
-  // approvedReservations: only "approved" status — used for overlap check & fully-booked detection
   const [approvedReservations, setApprovedReservations] = useState([]);
-  // allActiveReservations: all non-rejected — used for overlap check on submit
   const [allActiveReservations, setAllActiveReservations] = useState([]);
-  // fullyBookedDates: dates where approved reservations cover the full operating hours
   const [fullyBookedDates, setFullyBookedDates] = useState([]);
 
   useEffect(() => {
@@ -197,24 +267,20 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     const unsub = onSnapshot(collection(db, "facility_reservations"), (snapshot) => {
       const approved = [];
       const allActive = [];
-
       snapshot.docs.forEach(doc => {
         const data = doc.data();
         if (String(data.facilityId) === String(facility.id) && data.date) {
           const stat = (data.status || "").toLowerCase();
           if (stat === "rejected") return;
-
           const entry = { id: doc.id, date: data.date, startTime: data.startTime, endTime: data.endTime, status: stat };
           allActive.push(entry);
           if (stat === "approved") approved.push(entry);
         }
       });
-
       setAllActiveReservations(allActive);
       setApprovedReservations(approved);
 
-      // Compute fully-booked dates (approved covers full operating hours)
-      const openTime  = facility?.openTime;
+      const openTime = facility?.openTime;
       const closeTime = facility?.closeTime;
       if (openTime && closeTime) {
         const dateMap = {};
@@ -235,13 +301,13 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
   const [form, setForm] = useState({
     fullName: "", email: "", contactNumber: "",
-    purposeOption: "", purposeOther: "", date: "", startTime: "", endTime: "",
+    purpose: "", date: "", startTime: "", endTime: "",
     attendees: "", notes: ""
   });
-  const [refNum, setRefNum]         = useState("");
+  const [refNum, setRefNum] = useState("");
   const [dateStatus, setDateStatus] = useState(null);
-  const [submitted, setSubmitted]   = useState(false);
-  const [errors, setErrors]         = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -256,7 +322,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     }
   }, [userData]);
 
-  // Check if the selected date+time overlaps with any approved reservation
   const hasApprovedOverlapOnDate = (date, startTime, endTime) => {
     if (!date || !startTime || !endTime) return false;
     return approvedReservations.some(r =>
@@ -266,33 +331,33 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
   const validate = () => {
     const e = {};
-    if (!form.email?.trim())    e.email     = "Email is required.";
-    if (!form.purposeOption)    e.purposeOption = "Purpose of use is required.";
-    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
-    if (!form.date)             e.date      = "Please select a date.";
-    if (!form.startTime)        e.startTime = "Start time is required.";
-    if (!form.endTime)          e.endTime   = "End time is required.";
-    // Attendees is required
+    if (!form.email?.trim()) e.email = "Email is required.";
+    if (!form.purpose.trim()) e.purpose = "Purpose of use is required.";
+    if (!form.date) e.date = "Please select a date.";
+    if (!form.startTime) e.startTime = "Start time is required.";
+    if (!form.endTime) e.endTime = "End time is required.";
     if (!form.attendees || String(form.attendees).trim() === "")
       e.attendees = "Estimated number of attendees is required.";
+
+    if (form.date && form.date < MIN_RESERVATION_DATE) {
+      e.date = "Reservations must be made at least 3 days in advance. Please select a later date.";
+    }
 
     if (form.startTime && form.endTime && form.startTime >= form.endTime)
       e.endTime = "End time must be after start time.";
 
-    // Enforce facility operating hours
-    const open  = facility?.openTime;
+    const open = facility?.openTime;
     const close = facility?.closeTime;
-    if (open  && form.startTime && form.startTime < open)
+    if (open && form.startTime && form.startTime < open)
       e.startTime = `Start time cannot be before opening time (${to12h(open)}).`;
     if (close && form.startTime && form.startTime > close)
       e.startTime = `Start time cannot be after closing time (${to12h(close)}).`;
-    if (open  && form.endTime && form.endTime < open)
+    if (open && form.endTime && form.endTime < open)
       e.endTime = `End time cannot be before opening time (${to12h(open)}).`;
     if (close && form.endTime && form.endTime > close)
       e.endTime = `End time cannot be after closing time (${to12h(close)}).`;
 
-    // Validate attendees against facility capacity
-    const capacityNum  = facility?.capacity ? parseInt(String(facility.capacity).replace(/\D/g, ""), 10) : null;
+    const capacityNum = facility?.capacity ? parseInt(String(facility.capacity).replace(/\D/g, ""), 10) : null;
     const attendeesNum = form.attendees ? parseInt(form.attendees, 10) : null;
     if (capacityNum && attendeesNum && attendeesNum > capacityNum)
       e.attendees = `Number of attendees exceeds facility capacity (max: ${capacityNum}).`;
@@ -310,12 +375,10 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
 
-    // Check overlap against all active (non-rejected) reservations on submit
     const hasOverlap = allActiveReservations.some(r => {
       if (r.date !== form.date) return false;
       return form.startTime < r.endTime && r.startTime < form.endTime;
     });
-
     if (hasOverlap) {
       setErrors({ timeOverlap: "The selected time slot conflicts with an existing reservation. Please select a different time." });
       return;
@@ -326,13 +389,12 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
-      const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
       const generatedRef = await submitFacilityReservation(
         householdID,
-        userData?.residentID || userID || "",  // residentID = Firestore doc ID
+        userData?.residentID || userID || "",
         userName || "Unknown",
         facility,
-        { ...form, purpose: effectivePurpose },
+        form,
         customData
       );
       setRefNum(generatedRef || "");
@@ -357,7 +419,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     </div>
   );
 
-  // Does the selected date have any approved reservation that overlaps with chosen times?
   const showApprovedOverlapWarning =
     form.date && form.startTime && form.endTime &&
     hasApprovedOverlapOnDate(form.date, form.startTime, form.endTime);
@@ -371,6 +432,33 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           <div className="sv-form-header-desc">{facilityDesc}</div>
         </div>
       </div>
+
+      {/* ── Advance booking reminder inside the modal form ── */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        background: "#eff6ff",
+        border: "1px solid #93c5fd",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        margin: "0 0 16px 0",
+        fontSize: "13px",
+        color: "#1e40af",
+      }}>
+        <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span>
+          Reservations must be submitted at least{" "}
+          <strong>3 days before</strong> your intended date. The earliest available date is{" "}
+          <strong>{MIN_RESERVATION_DATE}</strong>.
+        </span>
+      </div>
+
       <div className="sv-form-body">
         <div className="sv-fields">
           <div className="sv-field-section-label">Requester Information</div>
@@ -389,47 +477,26 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             <input
               className={`sv-input${errors.email ? " sv-input--error" : ""}`}
               type="email" placeholder="your@email.com" value={form.email}
-              onChange={e => { set("email", e.target.value); setErrors(p => ({...p, email: ""})); }}
+              onChange={e => { set("email", e.target.value); setErrors(p => ({ ...p, email: "" })); }}
             />
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
+
           <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Reservation Details</div>
           <div className="sv-field">
             <label className="sv-label">Purpose of Use <span className="sv-required">*</span></label>
-            <select
-              className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
-              value={form.purposeOption}
-              onChange={e => { set("purposeOption", e.target.value); setErrors(p => ({...p, purposeOption: ""})); if (e.target.value !== "Other") set("purposeOther", ""); }}
-            >
-              <option value="">— Select purpose —</option>
-              {(facility?.purposeOptions || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              <option value="Other">Other</option>
-            </select>
-            {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
+            <input className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} placeholder="e.g. Birthday celebration, community meeting..." value={form.purpose} onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }} />
+            {errors.purpose && <span className="sv-error-msg">{errors.purpose}</span>}
           </div>
-
-          {form.purposeOption === "Other" && (
-            <div className="sv-field">
-              <label className="sv-label">Please specify <span className="sv-required">*</span></label>
-              <input
-                className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
-                placeholder="Describe your purpose..."
-                value={form.purposeOther}
-                onChange={e => { set("purposeOther", e.target.value); setErrors(p => ({...p, purposeOther: ""})); }}
-              />
-              {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
-            </div>
-          )}
           <div className="sv-field-row">
             <div className="sv-field">
               <label className="sv-label">Start Time <span className="sv-required">*</span></label>
               <input
                 className={`sv-input${errors.startTime ? " sv-input--error" : ""}`}
-                type="time"
-                value={form.startTime}
+                type="time" value={form.startTime}
                 min={facility?.openTime || undefined}
                 max={facility?.closeTime || undefined}
-                onChange={e => { set("startTime", e.target.value); setErrors(p => ({...p, startTime: ""})); }}
+                onChange={e => { set("startTime", e.target.value); setErrors(p => ({ ...p, startTime: "" })); }}
               />
               {errors.startTime && <span className="sv-error-msg">{errors.startTime}</span>}
             </div>
@@ -437,22 +504,18 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
               <label className="sv-label">End Time <span className="sv-required">*</span></label>
               <input
                 className={`sv-input${errors.endTime ? " sv-input--error" : ""}`}
-                type="time"
-                value={form.endTime}
+                type="time" value={form.endTime}
                 min={facility?.openTime || undefined}
                 max={facility?.closeTime || undefined}
-                onChange={e => { set("endTime", e.target.value); setErrors(p => ({...p, endTime: ""})); }}
+                onChange={e => { set("endTime", e.target.value); setErrors(p => ({ ...p, endTime: "" })); }}
               />
               {errors.endTime && <span className="sv-error-msg">{errors.endTime}</span>}
             </div>
           </div>
           {(facility?.openTime && facility?.closeTime) && (
-            <div style={{
-              fontSize: '0.78rem', color: '#5e7a99', marginTop: '-0.25rem', marginBottom: '0.5rem',
-              display: 'flex', alignItems: 'center', gap: '5px',
-            }}>
+            <div style={{ fontSize: '0.78rem', color: '#5e7a99', marginTop: '-0.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
               </svg>
               Facility hours: <strong>{to12h(facility.openTime)}</strong> – <strong>{to12h(facility.closeTime)}</strong>
             </div>
@@ -468,9 +531,8 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             </label>
             <input
               className={`sv-input${errors.attendees ? " sv-input--error" : ""}`}
-              type="number" placeholder="e.g. 50" min="1"
-              value={form.attendees}
-              onChange={e => { set("attendees", e.target.value); setErrors(p => ({...p, attendees: ""})); }}
+              type="number" placeholder="e.g. 50" min="1" value={form.attendees}
+              onChange={e => { set("attendees", e.target.value); setErrors(p => ({ ...p, attendees: "" })); }}
             />
             {errors.attendees && <span className="sv-error-msg">{errors.attendees}</span>}
           </div>
@@ -514,11 +576,14 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             selectedDate={form.date}
             fullyBookedDates={fullyBookedDates}
             blockedDates={facility?.blockedDates || []}
-            onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({...p, date: ""})); }}
+            onSelectDate={(str, status) => { set("date", str); setDateStatus(status); setErrors(p => ({ ...p, date: "" })); }}
           />
           {errors.date && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{errors.date}</span>}
-          {errors.timeOverlap && <div className="sv-error-msg" style={{marginTop:"0.5rem",padding:"0.75rem",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"0.375rem",color:"#b91c1c"}}>{errors.timeOverlap}</div>}
-          {/* Show warning ONLY when there is a real approved-reservation overlap on the chosen date+time */}
+          {errors.timeOverlap && (
+            <div className="sv-error-msg" style={{ marginTop: "0.5rem", padding: "0.75rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "0.375rem", color: "#b91c1c" }}>
+              {errors.timeOverlap}
+            </div>
+          )}
           {showApprovedOverlapWarning && !errors.timeOverlap && (
             <div className="sv-cal-warning sv-cal-warning--pending">
               <ServiceInfoIcon /> This time slot overlaps with an existing approved reservation. Please choose a different time.
@@ -526,6 +591,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           )}
         </div>
       </div>
+
       <div className="sv-form-actions">
         <button className="sv-btn-ghost" onClick={onBack}>Cancel</button>
         <button className="sv-btn-primary" onClick={handleSubmit}>Submit Reservation</button>
