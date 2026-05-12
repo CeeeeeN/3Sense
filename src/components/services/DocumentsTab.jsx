@@ -12,6 +12,8 @@ const getSaved = (key, fallback) => {
   catch { return fallback; }
 };
 
+const getTodayStr = () => new Date().toISOString().split("T")[0];
+
 function ValidityReminderBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
@@ -28,7 +30,6 @@ function ValidityReminderBanner() {
       fontSize: "14px",
       color: "#92400e",
     }}>
-      {/* Warning icon */}
       <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
         <line x1="12" y1="9" x2="12" y2="13" />
@@ -43,7 +44,6 @@ function ValidityReminderBanner() {
         you use your document within this period. After expiry, a new
         request will be required.
       </div>
-      {/* Dismiss button */}
       <button
         onClick={() => setDismissed(true)}
         aria-label="Dismiss reminder"
@@ -305,7 +305,6 @@ function Step3({ docType, form }) {
     <div className="dr-step3">
       <p className="dr-step-hint">Please review your information before submitting. All fields are read-only.</p>
 
-      {/* ── Validity reminder in review step ── */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -354,19 +353,19 @@ function Step4({ refNum, onReset }) {
       <div className="dr-success-info">
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></svg>
-          You will receive an SMS notification once your request is processed.
+          <span>You will receive an SMS notification once your request is processed.</span>
         </div>
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          Processing time: 2–3 business days.
+          <span>Processing time: 2–3 business days.</span>
         </div>
-        {/* ── Validity reminder in success step ── */}
+        {/* ── FIXED: wrapped text in <span> so flex layout doesn't break "6 months" ── */}
         <div className="dr-success-info-item" style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "8px 10px", marginTop: "4px" }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
-          Your document will be valid for <strong>6 months</strong> from the date of issuance.
+          <span>Your document will be valid for <strong>6 months</strong> from the date of issuance.</span>
         </div>
       </div>
       <button className="sv-btn-primary" onClick={onReset}>Submit Another Request</button>
@@ -506,7 +505,6 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       <div className="dr-wizard-header"><StepIndicator step={step} /></div>
 
       <div className="dr-wizard-body">
-        {/* ── Validity Reminder Banner — shown on steps 1 and 2 only ── */}
         {(step === 1 || step === 2) && <ValidityReminderBanner />}
 
         {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} />}
