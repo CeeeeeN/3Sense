@@ -59,6 +59,9 @@ export default function HouseholdManagement() {
   const [showHhRejectModal, setShowHhRejectModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
+  const [previewImage, setPreviewImage] = useState(null);
+  const [previewLabel, setPreviewLabel] = useState("");
+
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -485,6 +488,33 @@ export default function HouseholdManagement() {
     }
   };
 
+  // ================= IMAGE PREVIEW =================
+  const renderImagePreview = (image, label) => {
+    if (!image) {
+      return (
+        <div className="hm-image-placeholder">
+          No Image
+        </div>
+      );
+    }
+
+    return (
+      <div className="hm-image-wrapper">
+        <p className="hm-image-label">{label}</p>
+
+        <img
+          src={image}
+          alt={label}
+          className="hm-image-thumb"
+          onClick={() => {
+            setPreviewImage(image);
+            setPreviewLabel(label);
+          }}
+        />
+      </div>
+    );
+  };
+
   return (
     <AdminLayout>
       <div className="main-content">
@@ -756,7 +786,22 @@ export default function HouseholdManagement() {
                   {paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
                       <tr key={`${res.householdId}__${res.id}`}>
-                        <td style={{ fontWeight: 500 }}>{res.fullName}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {res.profileImage ? (
+                              <img
+                                src={res.profileImage}
+                                alt={res.fullName}
+                                className="res-avatar"
+                              />
+                            ) : (
+                              <div className="res-avatar-placeholder">
+                                {res.fullName ? res.fullName.charAt(0).toUpperCase() : '?'}
+                              </div>
+                            )}
+                            <span>{res.fullName}</span>
+                          </div>
+                        </td>
                         <td style={{ color: '#4b5563' }}>{res.householdId}</td>
                         <td style={{ color: '#4b5563' }}>{res.familyId || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
@@ -883,10 +928,27 @@ export default function HouseholdManagement() {
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
                 <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
                   <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
-                    <strong>Household ID:</strong> {selectedResident.householdId}<br />
-                    <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
-                    <div style={{ marginTop: '8px' }}>
-                      <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+                      <div style={{ flex: 1 }}>
+                        <strong>Household ID:</strong> {selectedResident.householdId}<br />
+                        <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
+                        <div style={{ marginTop: '8px' }}>
+                          <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0 }}>
+                        {selectedResident.profileImage ? (
+                          <img
+                            src={selectedResident.profileImage}
+                            alt={selectedResident.fullName}
+                            className="res-modal-avatar"
+                          />
+                        ) : (
+                          <div className="res-modal-avatar-placeholder">
+                            {selectedResident.fullName ? selectedResident.fullName.charAt(0).toUpperCase() : '?'}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div><strong>Full Name:</strong><br />{selectedResident.fullName}</div>
@@ -909,6 +971,20 @@ export default function HouseholdManagement() {
                   <div><strong>Occupation:</strong><br />{selectedResident.occupation || "N/A"}</div>
                   <div><strong>Total Members:</strong><br />{selectedResident.totalMembers || selectedResident.members || "N/A"}</div>
                   <div><strong>Household Class.:</strong><br />{selectedResident.householdClassification || "N/A"}</div>
+
+                  <div style={{ gridColumn: "1 / -1", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #eee" }}>
+                    <div style={{ marginBottom: "12px" }}><strong>Identity Verification</strong></div>
+                    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+                      <div>
+                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Government ID</p>
+                        {renderImagePreview(selectedResident.idImage, "Government ID")}
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Selfie Photo</p>
+                        {renderImagePreview(selectedResident.selfieImage, "Selfie Photo")}
+                      </div>
+                    </div>
+                  </div>
 
                   {(selectedResident.remarks || selectedResident.incident) && (
                     <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', color: '#b91c1c' }}>
@@ -1012,6 +1088,7 @@ export default function HouseholdManagement() {
 
         {/* ================= HH REQUEST VIEW MODAL ================= */}
         {showHhViewModal && selectedHhRequest && (
+          
           <div className="as-modal-overlay">
             <div className="as-modal-content" style={{ maxWidth: "600px" }}>
 
@@ -1058,9 +1135,22 @@ export default function HouseholdManagement() {
                   <div><strong>Occupation:</strong><br />{selectedHhRequest.occupation || "N/A"}</div>
                   <div><strong>Total Members:</strong><br />{selectedHhRequest.totalMembers || "N/A"}</div>
                   <div><strong>Household Class.:</strong><br />{selectedHhRequest.householdClassification || "N/A"}</div>
+
+                  <div style={{ gridColumn: "1 / -1", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #eee" }}>
+                    <div style={{ marginBottom: "12px" }}><strong>Identity Verification</strong></div>
+                    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+                      <div>
+                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Government ID</p>
+                        {renderImagePreview(selectedHhRequest.idImage, "Government ID")}
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Selfie Photo</p>
+                        {renderImagePreview(selectedHhRequest.selfieImage, "Selfie Photo")}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -1154,6 +1244,38 @@ export default function HouseholdManagement() {
             </div>
           </div>
         )}
+
+        {/* ================= IMAGE PREVIEW MODAL ================= */}
+        {
+          previewImage && (
+            <div className="as-modal-overlay"
+              onClick={() => {
+                setPreviewImage(null);
+                setPreviewLabel("");
+              }}
+            >
+              <div className="as-modal-content" style={{ maxWidth: "90vw", maxHeight: "90vh", padding: "20px", textAlign: "center" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="as-modal-header">
+                  <h2>{previewLabel}</h2>
+
+                  <button
+                    className="as-modal-close"
+                    onClick={() => {
+                      setPreviewImage(null);
+                      setPreviewLabel("");
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <img src={previewImage} alt={previewLabel} style={{ width: "100%", maxHeight: "75vh", objectFit: "contain", borderRadius: "12px" }} />
+              </div>
+            </div>
+          )
+        }
 
       </div>
     </AdminLayout>
