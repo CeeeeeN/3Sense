@@ -386,7 +386,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                       </td>
                       <td style={{ padding: "14px 16px" }}>
                         {left !== null ? (
-                          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166534" }}>
+                          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166634" }}>
                             {left <= 0 ? "Full" : `${left} left`}
                           </span>
                         ) : <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>}
@@ -894,16 +894,37 @@ export default function ManagePrograms() {
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Start Date</label>
-                    <input type="date" className="as-form-input" required value={newProgram.date}
-                      onChange={(e) => setNewProgram({ ...newProgram, date: e.target.value })} />
+                    {/* ── FIX: min=today prevents selecting past dates ── */}
+                    <input
+                      type="date"
+                      className="as-form-input"
+                      required
+                      min={getTodayStr()}
+                      value={newProgram.date}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        // If end date is now before the new start date, reset it
+                        setNewProgram((prev) => ({
+                          ...prev,
+                          date: newDate,
+                          endDate: prev.endDate && prev.endDate < newDate ? newDate : prev.endDate,
+                        }));
+                      }}
+                    />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">
                       End Date
                       <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
                     </label>
-                    <input type="date" className="as-form-input" min={newProgram.date || undefined}
-                      value={newProgram.endDate} onChange={(e) => setNewProgram({ ...newProgram, endDate: e.target.value })} />
+                    {/* ── FIX: min is the later of today or the chosen start date ── */}
+                    <input
+                      type="date"
+                      className="as-form-input"
+                      min={newProgram.date || getTodayStr()}
+                      value={newProgram.endDate}
+                      onChange={(e) => setNewProgram({ ...newProgram, endDate: e.target.value })}
+                    />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Start Time</label>
