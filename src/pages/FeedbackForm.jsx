@@ -204,6 +204,9 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
   const [category,     setCategory]     = useState("General");
   const [authChecked,  setAuthChecked]  = useState(false);
 
+  const [alertTxId,    setAlertTxId]    = useState(null);
+  const [alertTxType,  setAlertTxType]  = useState(null);
+
   // ── QR validation state ───────────────────────────────────────────────────────
   // null = not yet checked, { valid, reason, startDate, endDate } after check
   const [qrValidation, setQrValidation] = useState(null);
@@ -222,23 +225,38 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     const urlParams = new URLSearchParams(window.location.search);
 
     if (service && service.name) {
-      // Service passed via props (not from QR scan) — skip QR validation
+      // Service passed via props
       setServiceId(service.id);
       setServiceName(service.name || service.fullName || "General Barangay Service");
       setCategory(service.category || "General");
       setQrValidation({ valid: true });
     } else {
+      // Extract QR params AND Alert params safely
       const scannedId   = urlParams.get("serviceId");
       const scannedName = urlParams.get("serviceName");
       const scannedCat  = urlParams.get("category");
+      ``
+      const alertRefId  = urlParams.get("refId");
+      const alertTitle  = urlParams.get("title");
+      const alertType   = urlParams.get("type");
 
       if (scannedId) {
+        // Came from a QR Scan
         setServiceId(scannedId);
         setServiceName(scannedName || "General Barangay Service");
         setCategory(scannedCat || "General");
+      } else if (alertRefId) {
+        // Came from a Dashboard Alert Banner
+        setServiceId(alertRefId); 
+        setServiceName(alertTitle || "Barangay Service");
+        setCategory(alertType || "General");
+        setQrValidation({ valid: true }); // Automatically approve alerts
+        setAlertTxId(alertRefId);
+        setAlertTxType(alertType);``
+        return; 
       }
 
-      // ── Run validation ──
+      // Run QR validation ONLY if it wasn't an alert link
       const result = validateQRParams(urlParams);
       setQrValidation(result);
     }
@@ -263,12 +281,12 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
 
   // ── QR Invalid → show error screen ───────────────────────────────────────────
   if (!qrValidation.valid) {
-    const urlParams = new URLSearchParams(window.location.search);
+    const fallbackParams = new URLSearchParams(window.location.search);
     return (
       <QRInvalidScreen
         reason={qrValidation.reason || "unknown"}
-        startDate={qrValidation.startDate || urlParams.get("startDate")}
-        endDate={qrValidation.endDate   || urlParams.get("endDate")}
+        startDate={qrValidation.startDate || fallbackParams.get("startDate")}
+        endDate={qrValidation.endDate   || fallbackParams.get("endDate")}
         onGoHome={() => onNavigate && onNavigate("home")}
       />
     );
@@ -340,6 +358,41 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         hybridScore:     null, textScore: null,
         detectedIssue:   "None", issueConfidence: null,
       });
+
+      // Update the original document so the Alert disappears
+      const urlParams = new URLSearchParams(window.location.search);
+      const alertType = urlParams.get("type"); // e.g., "DOCUMENT", "FACILITY"
+      const alertRefId = urlParams.get("refId"); // The ID of the original transaction
+
+      try {
+        if (alertTxId && alertTxType) {
+        let collectionName = "";
+        
+        // Map the alert type to the exact Firestore collection
+        if (alertTxType === "DOCUMENT") collectionName = "document_requests";
+        else if (alertTxType === "FACILITY") collectionName = "facility_reservations";
+        else if (alertTxType === "LIVELIHOOD") collectionName = "livelihoodRegistrations";
+        else if (alertTxType === "PEACE_AND_ORDER") collectionName = "incidentReports";
+        else if (alertTxType === "BSWD_REPORT") collectionName = "bswdReports";
+        else if (alertTxType === "GENERAL_PROGRAM") {
+             await updateDoc(doc(db, alertTxId), {
+                feedbackSubmitted: true,
+                feedbackReferenceID: ref 
+             });
+             return; 
+          }
+          
+
+        if (collectionName) {
+          await updateDoc(doc(db, collectionName, alertTxId), {
+            feedbackSubmitted: true,
+            feedbackReferenceID: ref 
+          });
+        }
+      }
+      } catch (error) {
+        
+      }
 
       setRefId(ref);
       setSubmitted(true);

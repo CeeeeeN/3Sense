@@ -75,7 +75,7 @@ const FEEDBACK_CONFIG = {
     ),
     label: 'BSWD Report',
     message:
-      'Your report has been successfully resolved. Your feedback helps improve resident assistance.',
+      'Your BSWD report has been successfully resolved. Your feedback helps improve resident assistance.',
   },
   BSWD_TIPS: {
     icon: (

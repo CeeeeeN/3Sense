@@ -25,6 +25,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
+import { runStatusMaintenance } from "../../services/statusUpdater";
 
 const PREVIEW_LIMIT = 120;
 
@@ -100,6 +101,9 @@ export default function ManagePrograms() {
 
   // ── Real-time Programs listener ──────────────────────────────────────────────
   useEffect(() => {
+    // Maintenance: auto-update program statuses based on current date
+    runStatusMaintenance();
+
     const unsubscribe = onSnapshot(
       collection(db, "Programs"),
       (snapshot) => {

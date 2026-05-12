@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import FormBuilder from "../../components/FormBuilder";
 import { createUserNotification } from "../../services/userNotifications";
+import { runStatusMaintenance } from "../../services/statusUpdater";
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -52,6 +53,9 @@ export default function ServiceLivelihood({ onBack }) {
 
   // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
+    // Maintenance: auto-update program statuses based on current date
+    runStatusMaintenance();
+
     const q = query(collection(db, "Programs"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setPrograms(snap.docs.map(d => {
