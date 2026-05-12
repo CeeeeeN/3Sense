@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, addDoc, doc, updateDoc,
-  serverTimestamp, query, orderBy, where,
+  serverTimestamp, query, orderBy,
 } from "firebase/firestore";
 import FormBuilder from "../../components/FormBuilder";
 import { createUserNotification } from "../../services/userNotifications";
@@ -17,7 +17,7 @@ const StatusBadge = ({ status }) => {
   const s = (status || "pending").toLowerCase();
   const map = {
     approved: { bg: "#dcfce7", color: "#166534" },
-    pending: { bg: "#fef3c7", color: "#92400e" },
+    pending:  { bg: "#fef3c7", color: "#92400e" },
     rejected: { bg: "#fee2e2", color: "#991b1b" },
   };
   const c = map[s] || map.pending;
@@ -30,47 +30,42 @@ const StatusBadge = ({ status }) => {
 
 export default function ServiceLivelihood({ onBack }) {
   // ── Programs ─────────────────────────────────────────────────────
-  const [programs, setPrograms] = useState([]);
+  const [programs, setPrograms]               = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
   // ── Registrations ─────────────────────────────────────────────────
-  const [participants, setParticipants] = useState([]);
-  const [loadingParts, setLoadingParts] = useState(true);
+  const [participants, setParticipants]       = useState([]);
+  const [loadingParts, setLoadingParts]       = useState(true);
 
   // ── Modals ────────────────────────────────────────────────────────
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModal, setShowAddModal]       = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [rejectTarget, setRejectTarget] = useState(null);
-  const [removeTarget, setRemoveTarget] = useState(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [rejectTarget, setRejectTarget]       = useState(null);
+  const [removeTarget, setRemoveTarget]       = useState(null);
+  const [rejectReason, setRejectReason]       = useState("");
+  const [saving, setSaving]                   = useState(false);
 
   // ── New program form ──────────────────────────────────────────────
   const BLANK = { title: "", description: "", date: "", startTime: "", endTime: "", location: "", slots: "", demographic: "", customFields: [] };
   const [newProgram, setNewProgram] = useState(BLANK);
 
-  // ── Real-time: Livelihood Programs ONLY ───────────────────────────
-  // FIX: filter by programType === "livelihood" so general programs don't appear here
+  // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
-    const q = query(
-      collection(db, "Programs"),
-      where("programType", "==", "livelihood"),
-      orderBy("updatedAt", "desc")
-    );
+    const q = query(collection(db, "Programs"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setPrograms(snap.docs.map(d => {
         const r = d.data();
         return {
-          id: d.id,
-          title: r.title || r.name || "Untitled Program",
-          description: r.description || "",
-          date: r.date || "",
-          startTime: r.startTime || "",
-          endTime: r.endTime || "",
-          location: r.location || "",
-          slots: parseInt(r.slots || "0", 10) || 0,
-          status: r.status || "Upcoming",
+          id:          d.id,
+          title:       r.title || r.name || "Untitled Program",
+          description: r.description || r.customFields?.description || "",
+          date:        r.date || r.customFields?.date || "",
+          startTime:   r.startTime || r.customFields?.startTime || "",
+          endTime:     r.endTime   || r.customFields?.endTime   || "",
+          location:    r.location  || r.customFields?.location  || "",
+          slots:       parseInt(r.slots || r.requirements?.slots || "0", 10) || 0,
+          status:      r.status || "Upcoming",
         };
       }));
       setLoadingPrograms(false);
@@ -98,27 +93,24 @@ export default function ServiceLivelihood({ onBack }) {
   };
 
   // ── Add program ───────────────────────────────────────────────────
-  // FIX: always set programType: "livelihood" so it's correctly categorized
   const handleAddProgram = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       await addDoc(collection(db, "Programs"), {
-        title: newProgram.title,
-        description: newProgram.description,
-        date: newProgram.date,
-        startTime: newProgram.startTime,
-        endTime: newProgram.endTime,
-        time: `${newProgram.startTime}${newProgram.endTime ? ` - ${newProgram.endTime}` : ""}`,
-        location: newProgram.location,
-        slots: newProgram.slots,
-        demographic: newProgram.demographic,
+        title:        newProgram.title,
+        description:  newProgram.description,
+        date:         newProgram.date,
+        startTime:    newProgram.startTime,
+        endTime:      newProgram.endTime,
+        time:         `${newProgram.startTime}${newProgram.endTime ? ` - ${newProgram.endTime}` : ""}`,
+        location:     newProgram.location,
+        slots:        newProgram.slots,
+        demographic:  newProgram.demographic,
         customFields: newProgram.customFields || [],
-        programType: "livelihood", // ← CRITICAL FIX
-        status: "Upcoming",
-        attendees: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        status:       "Upcoming",
+        attendees:    [],
+        updatedAt:    serverTimestamp(),
       });
       setNewProgram(BLANK);
       setShowAddModal(false);
@@ -141,7 +133,7 @@ export default function ServiceLivelihood({ onBack }) {
         status: "approved", updatedAt: serverTimestamp(),
       });
       const residentID = p.residentID || p.userID;
-      const hhID = p.householdID;
+      const hhID       = p.householdID;
       if (residentID && hhID) {
         await createUserNotification(
           hhID,
@@ -166,7 +158,7 @@ export default function ServiceLivelihood({ onBack }) {
         status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
       });
       const residentID = p?.residentID || p?.userID;
-      const hhID = p?.householdID;
+      const hhID       = p?.householdID;
       if (residentID && hhID) {
         await createUserNotification(
           hhID,
@@ -197,9 +189,9 @@ export default function ServiceLivelihood({ onBack }) {
 
   // ── Stats ─────────────────────────────────────────────────────────
   const stats = {
-    total: participants.length,
+    total:    participants.length,
     approved: participants.filter(p => (p.status || "").toLowerCase() === "approved").length,
-    pending: participants.filter(p => (p.status || "").toLowerCase() === "pending").length,
+    pending:  participants.filter(p => (p.status || "").toLowerCase() === "pending").length,
     rejected: participants.filter(p => (p.status || "").toLowerCase() === "rejected").length,
   };
 
@@ -222,13 +214,13 @@ export default function ServiceLivelihood({ onBack }) {
 
       {/* ── Programs ── */}
       <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: "20px", paddingBottom: "20px" }}>
-        <h3 style={{ marginBottom: "10px" }}>Active Livelihood Programs</h3>
-        {loadingPrograms ? <p style={{ color: "#9ca3af" }}>Loading…</p> : programs.length === 0 ? <p style={{ color: "#9ca3af" }}>No livelihood programs yet.</p> : (
+        <h3 style={{ marginBottom: "10px" }}>Active Programs</h3>
+        {loadingPrograms ? <p style={{ color: "#9ca3af" }}>Loading…</p> : programs.length === 0 ? <p style={{ color: "#9ca3af" }}>No programs yet.</p> : (
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {programs.map(prog => {
-              const approved = getApprovedCount(prog.id);
-              const left = getSlotsLeft(prog);
-              const full = left !== null && left <= 0;
+              const approved  = getApprovedCount(prog.id);
+              const left      = getSlotsLeft(prog);
+              const full      = left !== null && left <= 0;
               return (
                 <div key={prog.id} style={{ padding: "16px", border: `2px solid ${full ? "#fca5a5" : "#2DB17B"}`, background: full ? "#fff1f2" : "#f0fdf4", borderRadius: "8px", minWidth: "250px", maxWidth: "300px" }}>
                   <div style={{ fontWeight: "bold", color: full ? "#991b1b" : "#166534" }}>{prog.title}</div>
@@ -258,9 +250,9 @@ export default function ServiceLivelihood({ onBack }) {
       <h3 style={{ marginBottom: "10px" }}>Participant Registrations</h3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
         {[
-          { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
+          { label: "Total",    value: stats.total,    bg: "#fff",    border: "#e5e7eb", color: "#111827" },
           { label: "Approved", value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-          { label: "Pending", value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+          { label: "Pending",  value: stats.pending,  bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
           { label: "Rejected", value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
         ].map(s => (
           <div key={s.label} style={{ background: s.bg, padding: "18px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
@@ -286,9 +278,9 @@ export default function ServiceLivelihood({ onBack }) {
                 <tr><td colSpan={8} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No registrations yet.</td></tr>
               )}
               {participants.map(p => {
-                const prog = programs.find(pr => pr.id === p.programId);
-                const left = prog ? getSlotsLeft(prog) : null;
-                const status = (p.status || "pending").toLowerCase();
+                const prog      = programs.find(pr => pr.id === p.programId);
+                const left      = prog ? getSlotsLeft(prog) : null;
+                const status    = (p.status || "pending").toLowerCase();
                 const slotsFull = left !== null && left <= 0 && status === "pending";
 
                 return (
@@ -310,6 +302,7 @@ export default function ServiceLivelihood({ onBack }) {
                     <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>{formatTs(p.submittedAt)}</td>
                     <td style={{ padding: "14px 16px" }}><StatusBadge status={p.status} /></td>
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      {/* PENDING */}
                       {status === "pending" && (
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                           <button
@@ -324,6 +317,7 @@ export default function ServiceLivelihood({ onBack }) {
                           >Reject</button>
                         </div>
                       )}
+                      {/* APPROVED */}
                       {status === "approved" && (
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
                           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Approved</span>
@@ -333,6 +327,7 @@ export default function ServiceLivelihood({ onBack }) {
                           >Remove</button>
                         </div>
                       )}
+                      {/* REJECTED */}
                       {status === "rejected" && (
                         <div style={{ textAlign: "right" }}>
                           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Rejected</span>
@@ -450,7 +445,7 @@ export default function ServiceLivelihood({ onBack }) {
             </div>
             <div className="as-modal-body">
               <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
-                This will move the registration back to <strong>Pending</strong>, freeing up the slot.
+                This will move the registration back to <strong>Pending</strong>, freeing up the slot. The participant can then be re-approved or rejected.
               </p>
               <div className="as-modal-actions">
                 <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>Cancel</button>
