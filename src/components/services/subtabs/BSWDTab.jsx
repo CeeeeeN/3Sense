@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { HeartIcon, ServiceMapPinIcon, SendIcon } from "../../Icons";
 import { submitBSWDReport, submitBSWDTip } from "../../../services/services";
-import { createNotification } from "../../../services/notifications"; // 🆕
+import { createNotification } from "../../../services/notifications";
 
 export default function BSWDTab({ userData, householdID }) {
-  const [reportForm, setReportForm] = useState({ name: "", location: "", description: "", photo: "" });
-  const [reportErrors, setReportErrors]       = useState({});
+  const [reportForm, setReportForm] = useState({
+    name: "",
+    location: "",
+    landmark: "",
+    lastSeen: "",
+    description: "",
+    photo: ""
+  });
+  const [reportErrors, setReportErrors] = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);
-  const [reportFile, setReportFile]           = useState(null);
-  const [isSubmitting, setIsSubmitting]       = useState(false);
+  const [reportFile, setReportFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [tipForm, setTipForm]           = useState({ about: "", tip: "", contact: "" });
+  const [tipForm, setTipForm] = useState({ about: "", tip: "", contact: "" });
   const [tipSubmitted, setTipSubmitted] = useState(false);
-  const [tipErrors, setTipErrors]       = useState({});
-  const [isTipSubmitting, setIsTipSubmitting] = useState(false); // 🆕 separate loading for tip
+  const [tipErrors, setTipErrors] = useState({});
+  const [isTipSubmitting, setIsTipSubmitting] = useState(false);
 
   useEffect(() => {
     if (userData) {
@@ -27,10 +34,9 @@ export default function BSWDTab({ userData, householdID }) {
   const setR = (k, v) => setReportForm(f => ({ ...f, [k]: v }));
   const setT = (k, v) => setTipForm(f => ({ ...f, [k]: v }));
 
-  // ── Report Submission ──────────────────────────────────────────
   const submitReport = async () => {
     const e = {};
-    if (!reportForm.location.trim())    e.location    = "Location is required.";
+    if (!reportForm.location.trim()) e.location = "Location is required.";
     if (!reportForm.description.trim()) e.description = "Please describe what you observed.";
     if (Object.keys(e).length) { setReportErrors(e); return; }
 
@@ -39,7 +45,6 @@ export default function BSWDTab({ userData, householdID }) {
     try {
       let finalPhotoUrl = "None";
 
-      // Upload to Cloudinary if a file was selected
       if (reportFile) {
         const formData = new FormData();
         formData.append("file", reportFile);
@@ -52,7 +57,6 @@ export default function BSWDTab({ userData, householdID }) {
         if (uploadData.secure_url) {
           finalPhotoUrl = uploadData.secure_url;
         } else {
-          console.error("Cloudinary Error:", uploadData);
           throw new Error("Image upload failed");
         }
       }
@@ -61,11 +65,11 @@ export default function BSWDTab({ userData, householdID }) {
 
       await submitBSWDReport(householdID || "Public", userData?.userID || "", userData?.residentID || "", finalReportData);
 
-      // 🆕 Notify admins about new BSWD homeless report
       const reporterLabel = reportForm.name.trim() || "Anonymous";
+
       await createNotification(
         "feedback",
-        `New BSWD homeless/displaced person report at "${reportForm.location}" by ${reporterLabel}.`,
+        `New BSWD homeless report at "${reportForm.location}" ${reportForm.landmark ? `(Landmark: ${reportForm.landmark})` : ""} ${reportForm.lastSeen ? `seen at ${reportForm.lastSeen}` : ""} by ${reporterLabel}.`,
         reporterLabel,
         ""
       );
@@ -81,19 +85,17 @@ export default function BSWDTab({ userData, householdID }) {
     }
   };
 
-  // ── Tip Submission ─────────────────────────────────────────────
   const submitTip = async () => {
     const e = {};
     if (!tipForm.about.trim()) e.about = "Please describe who this is about.";
-    if (!tipForm.tip.trim())   e.tip   = "Please share what you know.";
+    if (!tipForm.tip.trim()) e.tip = "Please share what you know.";
     if (Object.keys(e).length) { setTipErrors(e); return; }
 
-    setIsTipSubmitting(true); // 🆕
+    setIsTipSubmitting(true);
 
     try {
       await submitBSWDTip(householdID || "Public", userData?.userID || "", userData?.residentID || "", tipForm);
 
-      // 🆕 Notify admins about new BSWD tip
       const tipperLabel = tipForm.contact?.trim() || "Anonymous";
       await createNotification(
         "feedback",
@@ -108,7 +110,7 @@ export default function BSWDTab({ userData, householdID }) {
       console.error("BSWD Tip failed:", err);
       setTipErrors({ submit: "Failed to send tip. Please try again." });
     } finally {
-      setIsTipSubmitting(false); // 🆕
+      setIsTipSubmitting(false);
     }
   };
 
@@ -124,7 +126,7 @@ export default function BSWDTab({ userData, householdID }) {
             <p className="svc-hero__abbr">BSWD</p>
             <p className="svc-hero__sub">Providing social protection, welfare programs, and community development services to all residents of Barangay 3S+ Malanday.</p>
             <div className="svc-hero__law">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
               Coordinating with <strong>DSWD</strong> — Department of Social Welfare and Development
             </div>
           </div>
@@ -151,32 +153,51 @@ export default function BSWDTab({ userData, householdID }) {
 
         {reportSubmitted ? (
           <div className="bswd-submitted">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
             <div>
               <div className="bswd-submitted-title">Report Submitted</div>
               <div className="bswd-submitted-sub">Thank you. Our BSWD officer will follow up within 24–48 hours.</div>
             </div>
             <button className="sv-btn-outline" style={{ fontSize: "0.75rem", padding: "0.4rem 0.9rem" }}
-              onClick={() => { setReportForm({ name: "", location: "", description: "", photo: "" }); setReportSubmitted(false); setReportFile(null); }}>
+              onClick={() => { setReportForm({ name: "", location: "", landmark: "", lastSeen: "", description: "", photo: "" }); setReportSubmitted(false); setReportFile(null); }}>
               Submit Another
             </button>
           </div>
         ) : (
           <div className="bswd-form-card">
+
+            {/* 🆕 Reporting Tips Box */}
+            <div style={{ marginBottom: "1.25rem", padding: "1rem", background: "#f0f9ff", borderRadius: "8px", borderLeft: "4px solid #3b82f6", fontSize: "0.85rem", color: "#1e40af" }}>
+              <strong>💡 Pro-tip:</strong> Being specific helps our team find people faster. Mention nearby stores, street corners, and describe clothing colors or unique physical features.
+            </div>
+
             <div className="dr-field-row dr-field-row--wrap">
               <div className="dr-field">
                 <label className="sv-label">Your Name <span className="sv-optional">(Optional)</span></label>
                 <input className="sv-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder="Leave blank to stay anonymous" disabled={isSubmitting} />
               </div>
               <div className="dr-field">
-                <label className="sv-label">Location of Person <span className="sv-required">*</span></label>
-                <input className={`sv-input${reportErrors.location ? " sv-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="Street, landmark, or area" disabled={isSubmitting} />
+                <label className="sv-label">Main Location / Street <span className="sv-required">*</span></label>
+                <input className={`sv-input${reportErrors.location ? " sv-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="e.g. McArthur Highway" disabled={isSubmitting} />
                 {reportErrors.location && <span className="sv-error-msg">{reportErrors.location}</span>}
               </div>
             </div>
+
+            {/* 🆕 Landmark and Last Seen fields */}
+            <div className="dr-field-row dr-field-row--wrap" style={{ marginTop: "0.75rem" }}>
+              <div className="dr-field">
+                <label className="sv-label">Nearby Landmark <span className="sv-optional">(Optional)</span></label>
+                <input className="sv-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder="e.g. Near 7-Eleven or Petron" disabled={isSubmitting} />
+              </div>
+              <div className="dr-field">
+                <label className="sv-label">Last Seen / Time <span className="sv-optional">(Optional)</span></label>
+                <input className="sv-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder="e.g. Corner of 5th St, 2:30 PM" disabled={isSubmitting} />
+              </div>
+            </div>
+
             <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">Description of Concern <span className="sv-required">*</span></label>
-              <textarea className={`sv-textarea${reportErrors.description ? " sv-input--error" : ""}`} rows={3} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder="Describe what you observed..." disabled={isSubmitting} />
+              <label className="sv-label">Description of Person & Concern <span className="sv-required">*</span></label>
+              <textarea className={`sv-textarea${reportErrors.description ? " sv-input--error" : ""}`} rows={3} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder="Describe clothing, age, and any immediate needs..." disabled={isSubmitting} />
               {reportErrors.description && <span className="sv-error-msg">{reportErrors.description}</span>}
             </div>
 
@@ -198,14 +219,14 @@ export default function BSWDTab({ userData, householdID }) {
                 />
                 {reportForm.photo ? (
                   <div className="dr-upload-done">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                     {reportForm.photo}
                   </div>
                 ) : (
                   <div className="dr-upload-placeholder">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
                     <span>Upload a photo</span>
-                    <span className="dr-upload-hint">JPG or PNG · Max 5MB</span>
+                    <span className="dr-upload-hint">Include surroundings to help identify the spot</span>
                   </div>
                 )}
               </label>
@@ -227,7 +248,7 @@ export default function BSWDTab({ userData, householdID }) {
 
         {tipSubmitted ? (
           <div className="bswd-submitted">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
             <div>
               <div className="bswd-submitted-title">Tip Received</div>
               <div className="bswd-submitted-sub">Your information has been forwarded to the BSWD officer. Thank you for caring.</div>
