@@ -1640,7 +1640,68 @@ nav {
 .modal-footer {
   background: #f8fafc;
 }
+/* ===== Resident Profile Avatar (Tables) ===== */
+.res-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
 
+.res-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid #e2e8f0;
+}
+
+/* ===== Resident Profile Avatar (Modal) ===== */
+.res-modal-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.res-modal-avatar-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.hm-image-wrapper {
+  @apply flex flex-col gap-2;
+}
+.hm-image-label {
+  @apply text-[0.85rem] font-semibold text-gray-700;
+}
+.hm-image-thumb {
+  @apply w-[140px] h-[140px] object-cover rounded-[10px] border border-gray-300 cursor-pointer transition-transform duration-200 ease-in-out hover:scale-[1.03];
+}
+.hm-image-placeholder {
+  @apply w-[140px] h-[140px] rounded-[10px] border border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-slate-50 text-[0.85rem];
+}
 
 /* =========================
    TABLET (1024px)
