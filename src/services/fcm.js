@@ -6,10 +6,10 @@ const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
 // Request notification permission, generate FCM token, and store it for the specified user.
 
-export const requestPushPermission = async (userID) => {
-  if (!userID) return;
+export const requestPushPermission = async (householdID, residentID) => {
+  if (!householdID || !residentID) return;
 
-  if (!("Notification" in window)) {
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) {
     console.log("This browser does not support desktop notification");
     return;
   }
@@ -17,10 +17,17 @@ export const requestPushPermission = async (userID) => {
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+      // Explicitly register the service worker
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      
+      const token = await getToken(messaging, { 
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration 
+      });
+      
       if (token) {
         // Save token to Firestore array
-        const userFcmRef = doc(db, "fcmTokens", userID);
+        const userFcmRef = doc(db, "fcmTokens", `${householdID}_${residentID}`);
         await setDoc(userFcmRef, {
           tokens: arrayUnion(token)
         }, { merge: true });
