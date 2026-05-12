@@ -136,8 +136,8 @@ function Step2({ docType, form, setForm, errors }) {
         <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
         {errors.address && <span className="sv-error-msg">{errors.address}</span>}
       </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+
+      <div className="dr-field-row">
         <div className="dr-field">
           <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.contact ? " sv-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
@@ -163,10 +163,10 @@ function Step2({ docType, form, setForm, errors }) {
       </div>
 
       {form.purposeOption === "Other" && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+        <div className="dr-field-row">
           <div />
           <div />
-          <div className="dr-field">
+          <div className="dr-field dr-field--other-specify">
             <label className="sv-label">Please specify <span className="sv-required">*</span></label>
             <input
               className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
@@ -372,7 +372,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setErrors({});
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
-    
+
     if (step === 3) {
       setIsSubmitting(true);
       try {
@@ -382,7 +382,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         if (form.validIdFile) {
           const formData = new FormData();
           formData.append("file", form.validIdFile);
-          
+
           // ⚠️ UPDATE THESE STRINGS WITH YOUR CREDENTIALS
           formData.append("upload_preset", "3Sense+_ID");
           const cloudName = "dfnqeiksu";
@@ -393,7 +393,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
           );
 
           if (!cloudinaryResponse.ok) throw new Error("Failed to upload ID to Cloudinary");
-          
+
           const cloudinaryData = await cloudinaryResponse.json();
           uploadedIdUrl = cloudinaryData.secure_url;
         }
@@ -403,12 +403,12 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
-        
+
         // Resolve effective purpose for submission
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-        
+
         const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
-        
+
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
 
@@ -419,7 +419,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
           form.email || fullName,
           generatedRef
         );
-        
+
         setStep(4);
       } catch (error) {
         console.error("Failed to submit document request:", error);
@@ -429,7 +429,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       }
       return;
     }
-    
+
     setStep(s => s + 1);
   };
 
