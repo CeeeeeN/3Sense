@@ -28,24 +28,35 @@ export default async function handler(req, res) {
     }
 
     const db = admin.firestore();
-    const fcmDocId = `${householdID}_${residentID}`;
-    const tokenDoc = await db.collection("fcmTokens").doc(fcmDocId).get();
+    
+    // Query the tokens where householdID and residentID match
+    const tokensSnapshot = await db.collection("fcmTokens")
+      .where("householdID", "==", householdID)
+      .where("residentID", "==", residentID)
+      .get();
 
-    if (!tokenDoc.exists) {
+    if (tokensSnapshot.empty) {
       return res.status(200).json({ success: true, message: 'No registered devices found for user.' });
     }
 
-    const data = tokenDoc.data();
-    let tokens = data.tokens || [];
+    let tokens = [];
+    tokensSnapshot.forEach(doc => {
+      if (doc.data().token) {
+        tokens.push(doc.data().token);
+      }
+    });
 
     if (tokens.length === 0) {
       return res.status(200).json({ success: true, message: 'User has no active devices.' });
     }
 
+    // Use a 'data' payload instead of 'notification'.
+    // If 'notification' is used, FCM auto-displays it and skips our custom Service Worker logic.
+    // By using 'data', we force the Service Worker's onBackgroundMessage to trigger.
     const payload = {
-      notification: {
+      data: {
         title: title,
-        body: message,
+        message: message,
       },
       tokens: tokens,
     };
@@ -55,7 +66,6 @@ export default async function handler(req, res) {
 
     // Auto-cleanup invalid or expired tokens in Firestore
     if (response.failureCount > 0) {
-      const failedTokens = [];
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error?.code;
@@ -63,16 +73,11 @@ export default async function handler(req, res) {
             errorCode === 'messaging/invalid-registration-token' ||
             errorCode === 'messaging/registration-token-not-registered'
           ) {
-            failedTokens.push(tokens[idx]);
+            // Delete the invalid token document
+            db.collection("fcmTokens").doc(tokens[idx]).delete().catch(console.error);
           }
         }
       });
-
-      if (failedTokens.length > 0) {
-        await tokenDoc.ref.update({
-          tokens: admin.firestore.FieldValue.arrayRemove(...failedTokens)
-        });
-      }
     }
 
     return res.status(200).json({ success: true, pushed: response.successCount });

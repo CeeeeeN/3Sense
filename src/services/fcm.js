@@ -10,26 +10,30 @@ export const requestPushPermission = async (householdID, residentID) => {
   if (!householdID || !residentID) return;
 
   if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-    console.log("This browser does not support desktop notification");
+    console.log("This browser does not support desktop notification or service workers");
     return;
   }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      // Explicitly register the service worker
+      // Explicitly register the service worker for Vercel/Vite
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       
       const token = await getToken(messaging, { 
         vapidKey: VAPID_KEY,
         serviceWorkerRegistration: registration 
       });
-      
+
       if (token) {
-        // Save token to Firestore array
-        const userFcmRef = doc(db, "fcmTokens", `${householdID}_${residentID}`);
+        // Save token using the token itself as the document ID
+        // This prevents duplicates and allows us to store the householdID & residentID as fields to be queried
+        const userFcmRef = doc(db, "fcmTokens", token);
         await setDoc(userFcmRef, {
-          tokens: arrayUnion(token)
+          token: token,
+          householdID: householdID,
+          residentID: residentID,
+          updatedAt: new Date()
         }, { merge: true });
 
         console.log("FCM Token saved successfully.");
