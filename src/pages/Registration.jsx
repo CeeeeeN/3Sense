@@ -20,6 +20,94 @@ async function validateIsGovernmentId(imageBase64) {
   );
 }
 
+// ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
+// Uses the free OCR.space API to extract text from the base64 image and parse
+// PhilSys ID formats automatically.
+async function performLiveOCR(imageBase64) {
+  try {
+    const formData = new FormData();
+    formData.append("base64Image", imageBase64);
+    formData.append("apikey", "helloworld"); // Public free key for OCR.space
+    formData.append("language", "eng");
+    formData.append("isOverlayRequired", false);
+    formData.append("detectOrientation", true);
+    formData.append("scale", true);
+    formData.append("OCREngine", 2); // Engine 2 is better for special chars & numbers
+
+    const response = await fetch("https://api.ocr.space/parse/image", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+    if (result.IsErroredOnProcessing || !result.ParsedResults || !result.ParsedResults[0]) {
+      throw new Error("OCR Processing Failed");
+    }
+
+    const text = result.ParsedResults[0].ParsedText;
+    console.log("Live OCR Extracted Text:\n", text); // Helpful for debugging in console
+
+    let data = {
+      idNumber: "", firstName: "", middleName: "", lastName: "",
+      birthDate: "", houseNumber: "", street: "", province: "NCR"
+    };
+
+    // 1. Extract ID Number (Format: XXXX-XXXX-XXXX-XXXX)
+    const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
+    if (idMatch) {
+        data.idNumber = idMatch[0].replace(/\s/g, ''); 
+    }
+
+    // 2. Parse Line-by-Line for specific labels (PhilSys layout)
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toUpperCase();
+
+      // Last Name
+      if (line.includes("LAST NAME") || line.includes("APELYIDO")) {
+        data.lastName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      }
+      // First Name
+      else if (line.includes("GIVEN NAMES") || line.includes("GIVEN NAME") || line.includes("PANGALAN")) {
+        data.firstName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      }
+      // Middle Name
+      else if (line.includes("MIDDLE NAME") || line.includes("GITNANG")) {
+        data.middleName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      }
+      // Date of Birth
+      else if (line.includes("DATE OF BIRTH") || line.includes("KAPANGANAKAN")) {
+        const dateStr = lines[i + 1] || "";
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          data.birthDate = d.toISOString().split('T')[0]; // Format for HTML date input
+        }
+      }
+      // Address
+      else if (line.includes("ADDRESS") || line.includes("TIRAHAN")) {
+         let addrLine = lines[i + 1] || "";
+         if (addrLine) {
+             const parts = addrLine.split(',');
+             if (parts.length > 0) {
+                 const firstPart = parts[0].trim().split(' ');
+                 data.houseNumber = firstPart[0].replace(/[^0-9A-Z-]/ig, ''); 
+                 data.street = firstPart.slice(1).join(' ').replace(/[^A-Z0-9\s.-]/ig, '').trim();
+             }
+         }
+      }
+    }
+
+    // Clean up empty keys so they don't overwrite manual typing
+    Object.keys(data).forEach(key => { if (!data[key]) delete data[key]; });
+
+    return data;
+  } catch (err) {
+    console.error("Live OCR Error:", err);
+    return {}; // Return empty object on failure so user can manually type
+  }
+}
+
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 const SvgIdCard = ({ size = 26 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -165,7 +253,6 @@ const SvgHashtag = ({ size = 17 }) => (
   </svg>
 );
 
-// ─── Step icon map ────────────────────────────────────────────────────────────
 const STEP_ICONS = [
   <SvgIdCard size={22} />,
   <SvgSelfie size={22} />,
@@ -177,7 +264,6 @@ const STEP_ICONS = [
   <SvgClipboard size={22} />,
 ];
 
-// ─── Steps ────────────────────────────────────────────────────────────────────
 const STEPS = [
   { label: "ID Scan" },
   { label: "Selfie" },
@@ -189,25 +275,6 @@ const STEPS = [
   { label: "Review & Submit" },
 ];
 
-// ─── OCR simulation ───────────────────────────────────────────────────────────
-function mockExtractText() {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        firstName: "Maria",
-        middleName: "Santos",
-        lastName: "Dela Cruz",
-        birthDate: "1990-05-15",
-        idNumber: "1234-5678-9012-0000",
-        houseNumber: "123",
-        street: "Malanday Street",
-        province: "Bulacan",
-      });
-    }, 1800);
-  });
-}
-
-// ─── Camera hook ──────────────────────────────────────────────────────────────
 function useCamera() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -246,7 +313,6 @@ function useCamera() {
   return { videoRef, active, error, start, stop, capture };
 }
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
 function Field({ label, required, hint, children }) {
   return (
     <div className="reg-field">
@@ -318,7 +384,6 @@ function CameraError({ error, onUpload, fileRef }) {
 
 // ─── ID Scan Step ─────────────────────────────────────────────────────────────
 function IdScanStep({ onConfirm }) {
-  // idle | camera | preview | validating | invalid | processing | done
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [validationResult, setResult] = useState(null);
@@ -362,8 +427,10 @@ function IdScanStep({ onConfirm }) {
     const result = await validateIsGovernmentId(preview);
     setResult(result);
     if (result.isValid === false || result.isValid === null) { setMode("invalid"); return; }
+    
     setMode("processing");
-    const data = await mockExtractText();
+    const data = await performLiveOCR(preview); // Calls the real API
+    
     if (result.idNumber && !data.idNumber) data.idNumber = result.idNumber;
     setMode("done");
     setTimeout(() => onConfirm(preview, data), 700);
@@ -518,7 +585,7 @@ function IdScanStep({ onConfirm }) {
         <div className="reg-status-center">
           <div className="reg-status-icon loading"><SvgLoader /></div>
           <p className="reg-status-title">Reading your ID…</p>
-          <p className="reg-status-sub">Running OCR, please wait a moment</p>
+          <p className="reg-status-sub">Running live OCR, please wait a moment</p>
         </div>
       )}
 

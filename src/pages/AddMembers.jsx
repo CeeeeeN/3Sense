@@ -55,48 +55,91 @@ async function validateIsGovernmentId(imageBase64) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BACKEND PLACEHOLDER: extractIdData  (was: mockExtractText)
-// ─────────────────────────────────────────────────────────────────────────────
-// Calls a Firebase Cloud Function named "extractIdData".
-// The Cloud Function should run OCR (Google Cloud Vision Document AI recommended)
-// on the ID image and return structured field data.
-//
-// Expected Cloud Function input:  { image: "data:image/jpeg;base64,..." }
-// Expected Cloud Function output:
-//   { firstName, middleName, lastName, birthDate, idNumber, houseNumber, street, province }
-//
-// TODO (backend):
-//   1. Create a Firebase Cloud Function named "extractIdData"
-//   2. Inside it, run OCR on the image and map results to the fields above
-//   3. Deploy, then replace the TEMPORARY PLACEHOLDER block below with:
-//
-//      const { getFunctions, httpsCallable } = await import("firebase/functions");
-//      const fn = httpsCallable(getFunctions(), "extractIdData");
-//      const result = await fn({ image: imageBase64 });
-//      return result.data;
-// ─────────────────────────────────────────────────────────────────────────────
-async function extractIdData(imageBase64) {
+// ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
+// Uses the free OCR.space API to extract text from the base64 image and parse
+// PhilSys ID formats automatically.
+async function performLiveOCR(imageBase64) {
   try {
-    // ── TEMPORARY PLACEHOLDER ──────────────────────────────────────────────
-    // Returns hardcoded mock data so autofill UI can be tested end-to-end.
-    // Delete this block and uncomment the Cloud Function call above when ready.
-    return new Promise((resolve) =>
-      setTimeout(() => resolve({
-        firstName: "Maria",
-        middleName: "Santos",
-        lastName: "Dela Cruz",
-        birthDate: "1990-05-15",
-        idNumber: "1234-5678-9012-0000",
-        houseNumber: "123",
-        street: "Malanday Street",
-        province: "Bulacan",
-      }), 1800)
-    );
-    // ──────────────────────────────────────────────────────────────────────
+    const formData = new FormData();
+    formData.append("base64Image", imageBase64);
+    formData.append("apikey", "helloworld"); // Public free key for OCR.space
+    formData.append("language", "eng");
+    formData.append("isOverlayRequired", false);
+    formData.append("detectOrientation", true);
+    formData.append("scale", true);
+    formData.append("OCREngine", 2); // Engine 2 is better for special chars & numbers
+
+    const response = await fetch("https://api.ocr.space/parse/image", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+    if (result.IsErroredOnProcessing || !result.ParsedResults || !result.ParsedResults[0]) {
+      throw new Error("OCR Processing Failed");
+    }
+
+    const text = result.ParsedResults[0].ParsedText;
+    console.log("Live OCR Extracted Text:\n", text); // Helpful for debugging in console
+
+    let data = {
+      idNumber: "", firstName: "", middleName: "", lastName: "",
+      birthDate: "", houseNumber: "", street: "", province: "NCR"
+    };
+
+    // 1. Extract ID Number (Format: XXXX-XXXX-XXXX-XXXX)
+    const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
+    if (idMatch) {
+        data.idNumber = idMatch[0].replace(/\s/g, ''); 
+    }
+
+    // 2. Parse Line-by-Line for specific labels (PhilSys layout)
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toUpperCase();
+
+      // Last Name
+      if (line.includes("LAST NAME") || line.includes("APELYIDO")) {
+        data.lastName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      }
+      // First Name
+      else if (line.includes("GIVEN NAMES") || line.includes("GIVEN NAME") || line.includes("PANGALAN")) {
+        data.firstName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      }
+      // Middle Name
+      else if (line.includes("MIDDLE NAME") || line.includes("GITNANG")) {
+        data.middleName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      }
+      // Date of Birth
+      else if (line.includes("DATE OF BIRTH") || line.includes("KAPANGANAKAN")) {
+        const dateStr = lines[i + 1] || "";
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          data.birthDate = d.toISOString().split('T')[0]; // Format for HTML date input
+        }
+      }
+      // Address
+      else if (line.includes("ADDRESS") || line.includes("TIRAHAN")) {
+         let addrLine = lines[i + 1] || "";
+         if (addrLine) {
+             const parts = addrLine.split(',');
+             if (parts.length > 0) {
+                 const firstPart = parts[0].trim().split(' ');
+                 data.houseNumber = firstPart[0].replace(/[^0-9A-Z-]/ig, ''); 
+                 data.street = firstPart.slice(1).join(' ').replace(/[^A-Z0-9\s.-]/ig, '').trim();
+             }
+         }
+      }
+    }
+
+    // Clean up empty keys so they don't overwrite manual typing
+    Object.keys(data).forEach(key => { if (!data[key]) delete data[key]; });
+
+    return data;
   } catch (err) {
-    console.error("[extractIdData] Error:", err);
-    return {}; // Empty on failure — user fills fields manually
+    console.error("Live OCR Error:", err);
+    return {}; // Return empty object on failure so user can manually type
   }
 }
 
@@ -465,15 +508,15 @@ function AmIdScanStep({ onConfirm }) {
   const confirm = async () => {
     setMode("validating"); setResult(null);
 
-    // BACKEND: calls validateIsGovernmentId placeholder above
+    // Initial check just for UI flow
     const res = await validateIsGovernmentId(preview);
     setResult(res);
     if (res.isValid === false || res.isValid === null) { setMode("invalid"); return; }
 
     setMode("processing");
 
-    // BACKEND: calls extractIdData placeholder above
-    const data = await extractIdData(preview);
+    // Live OCR!
+    const data = await performLiveOCR(preview);
     if (res.idNumber && !data.idNumber) data.idNumber = res.idNumber;
 
     setMode("done");
@@ -602,7 +645,7 @@ function AmIdScanStep({ onConfirm }) {
         <div className="am-status-center">
           <div className="am-status-icon loading"><SvgLoader /></div>
           <p className="am-status-title">Reading your ID…</p>
-          <p className="am-status-sub">Running OCR, please wait</p>
+          <p className="am-status-sub">Running live OCR, please wait</p>
         </div>
       )}
 
