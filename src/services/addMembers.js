@@ -1,9 +1,27 @@
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-// ─── Create a new branch document ────────────────────────────────────────────
-// Called from the UI *before* adding the first member to the new branch.
-// Returns the new branch ID (e.g. "BR-002").
+// ─── Cloudinary Upload Helper ────────────────────────────────────────────────
+const uploadToCloudinary = async (base64String, folder) => {
+    const cloudName = "dfnqeiksu"; 
+    const uploadPreset = "3Sense+_ID"; 
+
+    const formData = new FormData();
+    formData.append("file", base64String);
+    formData.append("upload_preset", uploadPreset);
+    formData.append("folder", folder);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!res.ok) throw new Error("Failed to upload image to Cloudinary");
+    const data = await res.json();
+    return data.secure_url;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const createBranch = async (householdID, branchName) => {
     if (!householdID) throw new Error("Household ID is required.");
     if (!branchName || !branchName.trim()) throw new Error("Branch name is required.");
@@ -18,35 +36,47 @@ export const createBranch = async (householdID, branchName) => {
     const newBranchID = `BR-${String(maxBranchNum + 1).padStart(3, "0")}`;
     await setDoc(doc(db, "households", householdID, "branches", newBranchID), {
         branchName: branchName.trim(),
-        residentID: null, // no head yet
+        residentID: null, 
         createdAt: serverTimestamp(),
     });
 
     return newBranchID;
 };
 
-// ─── Add a member to an existing branch ──────────────────────────────────────
 export const addHouseholdMember = async (householdID, memberData) => {
     if (!householdID) throw new Error("Household ID is required.");
+    
+    if (!memberData.idImage || !memberData.selfieImage) {
+        throw new Error("Selfie image and ID are REQUIRED before submission succeeds.");
+    }
 
-    // Get the household's Firebase Auth UID (shared across all members)
     const hhSnap = await getDoc(doc(db, "households", householdID));
     const hhUserID = hhSnap.data()?.userID || "";
 
     const residentsRef = collection(db, "households", householdID, "residents");
     const newMemberRef = doc(residentsRef);
     const branchID = memberData.branchID || null;
+    const residentID = newMemberRef.id;
 
-    // If this member is being set as branch head AND it's not BR-001
-    // (BR-001's residentID is always "head" — set by activation, never changed here)
     if (memberData.isBranchHead && branchID && branchID !== "BR-001") {
         await updateDoc(doc(db, "households", householdID, "branches", branchID), {
-            residentID: newMemberRef.id,
+            residentID: residentID,
         });
     }
 
+    // Upload Images to Cloudinary
+    const idImageUrl = await uploadToCloudinary(
+        memberData.idImage, 
+        `3Sense/residents/${residentID}`
+    );
+    
+    const selfieImageUrl = await uploadToCloudinary(
+        memberData.selfieImage, 
+        `3Sense/residents/${residentID}`
+    );
+
     const resident = {
-        residentID: newMemberRef.id,
+        residentID: residentID,
         householdID,
         role: memberData.isBranchHead && branchID && branchID !== "BR-001" ? "Branch Head" : "Member",
         userID: hhUserID,
@@ -88,16 +118,17 @@ export const addHouseholdMember = async (householdID, memberData) => {
         employmentStatus: memberData.employmentStatus || "",
 
         sameAddress: memberData.sameAddress !== undefined ? !!memberData.sameAddress : true,
-
         branchID,
 
+        // Meta & New Cloudinary Images (SENSE-52)
+        idImageUrl,
+        selfieImageUrl,
         pinHash: null,
         createdAt: serverTimestamp(),
         addedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     };
 
-    // Only store address fields when the member has a different address
     if (!memberData.sameAddress) {
         resident.houseNumber = memberData.houseNumber || "";
         resident.street = memberData.street || "";
@@ -108,5 +139,5 @@ export const addHouseholdMember = async (householdID, memberData) => {
     }
 
     await setDoc(newMemberRef, resident);
-    return newMemberRef.id;
+    return residentID;
 };
