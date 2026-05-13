@@ -32,6 +32,31 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// ── Pagination Component ──────────────────────────────────────────────────────
+const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
+    <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+      Page <span style={{ fontWeight: 600, color: "#111827" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#111827" }}>{totalPages || 1}</span>
+    </span>
+    <div style={{ display: "flex", gap: "8px" }}>
+      <button
+        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+        disabled={currentPage === 1}
+        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+      >
+        Previous
+      </button>
+      <button
+        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+        disabled={currentPage === totalPages || totalPages === 0}
+        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === totalPages || totalPages === 0 ? "#f3f4f6" : "#fff", color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+);
+
 // ── Blank form state ──────────────────────────────────────────────────────────
 const BLANK = {
   title: "", description: "", date: "", startTime: "", endTime: "",
@@ -46,6 +71,10 @@ export default function ServiceLivelihood({ onBack }) {
   // ── Registrations ─────────────────────────────────────────────────
   const [participants, setParticipants] = useState([]);
   const [loadingParts, setLoadingParts] = useState(true);
+
+  // ── Pagination State ──────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // ── Modals ────────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
@@ -271,6 +300,13 @@ export default function ServiceLivelihood({ onBack }) {
     rejected: participants.filter(p => (p.status || "").toLowerCase() === "rejected").length,
   };
 
+  // ── Pagination Calculation ────────────────────────────────────────
+  const totalPages = Math.ceil(participants.length / itemsPerPage);
+  const paginatedParticipants = participants.slice(
+    (currentPage - 1) * itemsPerPage, 
+    currentPage * itemsPerPage
+  );
+
   // ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
@@ -417,7 +453,7 @@ export default function ServiceLivelihood({ onBack }) {
                   </td>
                 </tr>
               )}
-              {participants.map(p => {
+              {paginatedParticipants.map(p => {
                 const prog = programs.find(pr => pr.id === p.programId);
                 const left = prog ? getSlotsLeft(prog) : null;
                 const status = (p.status || "pending").toLowerCase();
@@ -497,6 +533,14 @@ export default function ServiceLivelihood({ onBack }) {
               })}
             </tbody>
           </table>
+          {/* Pagination Controls */}
+          {participants.length > 0 && (
+            <PaginationControls 
+              currentPage={currentPage} 
+              totalPages={totalPages} 
+              setCurrentPage={setCurrentPage} 
+            />
+          )}
         </div>
       )}
 

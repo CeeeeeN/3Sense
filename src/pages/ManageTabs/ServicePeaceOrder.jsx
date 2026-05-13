@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { auth, db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, query, where, getDocs
+  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, query, where, getDocs, addDoc, deleteDoc, orderBy
 } from "firebase/firestore";
 import { ServiceAlertTriangleIcon } from "../../components/Icons";
 import { createUserNotification } from "../../services/userNotifications";
 import { logTransaction } from '../../services/logger';
 import { onAuthStateChanged } from "firebase/auth";
-
-const TANOD_LIST = ["Unassigned", "Tanod Reyes", "Tanod Garcia", "Tanod Santos"];
 
 const URGENCY_MAP = {
   "Domestic Dispute":             "emergency",
@@ -38,6 +36,31 @@ const formatTime = (ts) => {
   return d.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
 };
 
+// ── Pagination Component ──────────────────────────────────────────────────────
+const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
+    <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+      Page <span style={{ fontWeight: 600, color: "#111827" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#111827" }}>{totalPages || 1}</span>
+    </span>
+    <div style={{ display: "flex", gap: "8px" }}>
+      <button
+        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+        disabled={currentPage === 1}
+        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+      >
+        Previous
+      </button>
+      <button
+        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+        disabled={currentPage === totalPages || totalPages === 0}
+        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === totalPages || totalPages === 0 ? "#f3f4f6" : "#fff", color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+);
+
 export default function ServicePeaceOrder({ onBack }) {
   const [reports, setReports]         = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -45,11 +68,21 @@ export default function ServicePeaceOrder({ onBack }) {
   const [assignedTanod, setAssignedTanod]   = useState("Unassigned");
   const [saving, setSaving]           = useState(false);
 
+  // ── Tanod Groups State ────────────────────────────────────────────
+  const [tanodGroups, setTanodGroups] = useState([]);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newMemberInputs, setNewMemberInputs] = useState({});
+
+  // ── Pagination State ──────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7; 
+
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // ── Real-time listener ──────────────────────────────────────────
+  // ── Real-time listener for Reports ────────────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "incidentReports"), (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -67,32 +100,86 @@ export default function ServicePeaceOrder({ onBack }) {
     return () => unsub();
   }, []);
 
-    useEffect(() => {
-      // Listen for the currently logged-in user
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          // Find their document in the approvedAdmins collection
-          const q = query(
-            collection(db, "approvedAdmins"),
-            where("uid", "==", user.uid),
-          );
-          const snapshot = await getDocs(q);
-  
-          if (!snapshot.empty) {
-            const data = snapshot.docs[0].data();
-            setAdminName(data.fullName || "Admin");
-            setAdminRole(data.role || "Standard Admin");
-          }
+  // ── Real-time listener for Tanod Groups ───────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, "tanodGroups"), orderBy("createdAt", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setTanodGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  // ── Get Current Admin Info ────────────────────────────────────────
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
         }
-      });
-  
-      return () => unsubscribe();
-    }, []);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Sync tanod select when a new report is selected
   useEffect(() => {
     if (selectedReport) setAssignedTanod(selectedReport.tanod || "Unassigned");
   }, [selectedReport?.id]);
+
+  // ── Manage Tanod Groups Functions ─────────────────────────────────
+  const handleCreateGroup = async (e) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    try {
+      await addDoc(collection(db, "tanodGroups"), {
+        groupName: newGroupName.trim(),
+        members: [],
+        createdAt: serverTimestamp()
+      });
+      setNewGroupName("");
+    } catch (err) {
+      console.error("Error creating group:", err);
+    }
+  };
+
+  const handleAddMember = async (groupId) => {
+    const memberName = newMemberInputs[groupId];
+    if (!memberName || !memberName.trim()) return;
+    try {
+      await updateDoc(doc(db, "tanodGroups", groupId), {
+        members: arrayUnion(memberName.trim())
+      });
+      setNewMemberInputs(prev => ({ ...prev, [groupId]: "" }));
+    } catch (err) {
+      console.error("Error adding member:", err);
+    }
+  };
+
+  const handleRemoveMember = async (groupId, memberName) => {
+    try {
+      await updateDoc(doc(db, "tanodGroups", groupId), {
+        members: arrayRemove(memberName)
+      });
+    } catch (err) {
+      console.error("Error removing member:", err);
+    }
+  };
+
+  const handleDeleteGroup = async (groupId, groupName) => {
+    if (window.confirm(`Are you sure you want to delete ${groupName}?`)) {
+      try {
+        await deleteDoc(doc(db, "tanodGroups", groupId));
+      } catch (err) {
+        console.error("Error deleting group:", err);
+      }
+    }
+  };
 
   // ── Update status + append to updates array ─────────────────────
   const updateStatus = async (newStatus) => {
@@ -165,6 +252,11 @@ export default function ServicePeaceOrder({ onBack }) {
     }
   };
 
+  // ── Pagination Calculation ────────────────────────────────────────
+  const totalPages = Math.ceil(reports.length / itemsPerPage);
+  const paginatedReports = reports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+
   // ── Stat counters ───────────────────────────────────────────────
   const counts = {
     total:     reports.length,
@@ -182,7 +274,7 @@ export default function ServicePeaceOrder({ onBack }) {
       <div className="as-header-section">
         <div className="as-title-wrap">
           <h1>Peace &amp; Order Workspace</h1>
-          <p className="as-subtitle">Manage incident reports, dispatch tanods, and update blotters</p>
+          <p className="as-subtitle">Manage incident reports, dispatch tanod groups, and update blotters</p>
         </div>
       </div>
 
@@ -215,7 +307,7 @@ export default function ServicePeaceOrder({ onBack }) {
               {reports.length === 0 && (
                 <div style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No reports yet.</div>
               )}
-              {reports.map(r => {
+              {paginatedReports.map(r => {
                 const urgency = getUrgency(r.incidentType);
                 const uColor  = getUrgencyColor(urgency);
                 const isActive = selectedReport?.id === r.id;
@@ -250,12 +342,20 @@ export default function ServicePeaceOrder({ onBack }) {
                 );
               })}
             </div>
+            {/* Pagination Controls for List View */}
+            {reports.length > 0 && (
+              <PaginationControls 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                setCurrentPage={setCurrentPage} 
+              />
+            )}
           </div>
 
           {/* ── Detail panel ── */}
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px" }}>
+          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px", display: "flex", flexDirection: "column" }}>
             {selectedReport ? (
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px", marginBottom: "20px" }}>
                   <div>
                     <h2 style={{ margin: "0 0 6px 0" }}>Incident Details</h2>
@@ -288,7 +388,7 @@ export default function ServicePeaceOrder({ onBack }) {
                     </div>
                   </div>
 
-                  {/* ── UPDATED: PHOTO EVIDENCE DISPLAY ── */}
+                  {/* Photo Evidence */}
                   {(selectedReport.photoURL || selectedReport.photoFileName || selectedReport.photo) && (
                     <div style={{ gridColumn: "1 / -1", marginTop: "8px" }}>
                       <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 8px 0" }}>Attached Photo Evidence</p>
@@ -304,14 +404,12 @@ export default function ServicePeaceOrder({ onBack }) {
                           <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>Click image to view full size</div>
                         </div>
                       ) : (
-                        // Fallback for older reports before we added Cloudinary URLs
                         <span style={{ fontSize: "0.8rem", color: "#317D89", background: "#e0f2fe", padding: "6px 12px", borderRadius: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
                           📸 {selectedReport.photoFileName || selectedReport.photo}
                         </span>
                       )}
                     </div>
                   )}
-                  {/* ───────────────────────────────────── */}
                 </div>
 
                 {/* Reporter info */}
@@ -351,27 +449,40 @@ export default function ServicePeaceOrder({ onBack }) {
                   </div>
                 )}
 
-                {/* Admin action panel */}
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px" }}>
+                {/* Admin action panel with Dynamic Tanod Groups */}
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginTop: "auto" }}>
                   <h3 style={{ margin: "0 0 16px 0", fontSize: "1rem" }}>Admin Action Panel</h3>
-                  <div style={{ display: "flex", gap: "12px", alignItems: "flex-end" }}>
+                  <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", color: "#6b7280", fontSize: "0.85rem", marginBottom: "4px" }}>Assign Tanod</label>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+                        <label style={{ color: "#6b7280", fontSize: "0.85rem", fontWeight: 500 }}>Assign Tanod Group</label>
+                        <button 
+                          onClick={() => setShowGroupModal(true)} 
+                          style={{ background: "none", border: "none", color: "#317D89", fontSize: "0.8rem", cursor: "pointer", padding: 0 }}
+                        >
+                          + Manage Groups
+                        </button>
+                      </div>
                       <select
-                        className="as-form-select"
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
                         value={assignedTanod}
                         onChange={(e) => saveTanod(e.target.value)}
                         disabled={saving}
                       >
-                        {TANOD_LIST.map(t => <option key={t}>{t}</option>)}
+                        <option value="Unassigned">Unassigned</option>
+                        {tanodGroups.map(g => (
+                          <option key={g.id} value={g.groupName}>
+                            {g.groupName} ({g.members?.length || 0} members)
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", color: "#6b7280", fontSize: "0.85rem", marginBottom: "4px" }}>Update Status</label>
+                      <label style={{ display: "block", color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px", fontWeight: 500 }}>Update Status</label>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button
                           className="as-btn-ghost"
-                          style={{ flex: 1, borderColor: (selectedReport.status || "").toLowerCase() === "responded" ? "#BDBD64" : "#e5e7eb" }}
+                          style={{ flex: 1, padding: "10px", borderColor: (selectedReport.status || "").toLowerCase() === "responded" ? "#BDBD64" : "#e5e7eb" }}
                           onClick={() => updateStatus("responded")}
                           disabled={saving || (selectedReport.status || "").toLowerCase() === "resolved"}
                         >
@@ -379,7 +490,7 @@ export default function ServicePeaceOrder({ onBack }) {
                         </button>
                         <button
                           className="as-btn-ghost"
-                          style={{ flex: 1, borderColor: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "#e5e7eb", color: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "inherit" }}
+                          style={{ flex: 1, padding: "10px", borderColor: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "#e5e7eb", color: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "inherit" }}
                           onClick={() => updateStatus("resolved")}
                           disabled={saving}
                         >
@@ -400,6 +511,93 @@ export default function ServicePeaceOrder({ onBack }) {
           </div>
         </div>
       )}
+
+      {/* ── MANAGE TANOD GROUPS MODAL ── */}
+      {showGroupModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(17, 24, 39, 0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div style={{ background: "#fff", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
+            
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>Manage Tanod Groups</h2>
+              <button onClick={() => setShowGroupModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}>&times;</button>
+            </div>
+
+            <div style={{ padding: "24px", overflowY: "auto", flex: 1, background: "#f9fafb" }}>
+              
+              {/* Create New Group Form */}
+              <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#fff", padding: "16px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#6b7280", marginBottom: "6px", fontWeight: 600 }}>Create New Group</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Group A, Night Shift Team..." 
+                    value={newGroupName} 
+                    onChange={e => setNewGroupName(e.target.value)} 
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
+                  />
+                </div>
+                <button type="submit" disabled={!newGroupName.trim()} style={{ alignSelf: "flex-end", padding: "9px 16px", background: newGroupName.trim() ? "#317D89" : "#d1d5db", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 500, cursor: newGroupName.trim() ? "pointer" : "not-allowed" }}>
+                  Add Group
+                </button>
+              </form>
+
+              {/* List of Existing Groups */}
+              {tanodGroups.length === 0 ? (
+                <p style={{ textAlign: "center", color: "#9ca3af", margin: "20px 0" }}>No Tanod groups created yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {tanodGroups.map(group => (
+                    <div key={group.id} style={{ background: "#fff", borderRadius: "8px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f3f4f6" }}>
+                        <span style={{ fontWeight: 600, color: "#374151" }}>{group.groupName}</span>
+                        <button onClick={() => handleDeleteGroup(group.id, group.groupName)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: "0.8rem", cursor: "pointer" }}>Delete Group</button>
+                      </div>
+                      
+                      <div style={{ padding: "16px" }}>
+                        {/* Member List */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+                          {group.members && group.members.length > 0 ? (
+                            group.members.map((member, i) => (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#e0f2fe", color: "#0369a1", padding: "4px 10px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 500 }}>
+                                {member}
+                                <button onClick={() => handleRemoveMember(group.id, member)} style={{ background: "none", border: "none", color: "#0369a1", fontSize: "1rem", lineHeight: 1, cursor: "pointer", padding: "0 2px" }}>&times;</button>
+                              </div>
+                            ))
+                          ) : (
+                            <span style={{ fontSize: "0.85rem", color: "#9ca3af" }}>No members in this group yet.</span>
+                          )}
+                        </div>
+
+                        {/* Add Member Input */}
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <input 
+                            type="text" 
+                            placeholder="Add Tanod name..." 
+                            value={newMemberInputs[group.id] || ""}
+                            onChange={e => setNewMemberInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
+                            onKeyDown={e => { if(e.key === "Enter") { e.preventDefault(); handleAddMember(group.id); }}}
+                            style={{ flex: 1, padding: "6px 10px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => handleAddMember(group.id)}
+                            disabled={!newMemberInputs[group.id]?.trim()}
+                            style={{ padding: "6px 12px", background: newMemberInputs[group.id]?.trim() ? "#111827" : "#e5e7eb", color: newMemberInputs[group.id]?.trim() ? "#fff" : "#9ca3af", border: "none", borderRadius: "6px", fontSize: "0.85rem", cursor: newMemberInputs[group.id]?.trim() ? "pointer" : "not-allowed" }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
-  );
+  ); 
 }
