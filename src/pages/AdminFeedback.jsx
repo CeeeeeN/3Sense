@@ -115,7 +115,7 @@ export default function AdminFeedback() {
       pending: pendingCount
     });
 
-    const stopWords = ['ang', 'mga', 'sa', 'ng', 'na', 'po', 'at', 'ay', 'ito', 'yung', 'the', 'to', 'and', 'a', 'is', 'in', 'of', 'for', 'it', 'was', 'that', 'with'];
+    const stopWords = ['ang', 'are', 'mga', 'too', 'but', 'kaso', 'niyo', 'niya', 'sa', 'ng', 'na', 'po', 'at', 'ay', 'ito', 'yung', 'the', 'to', 'and', 'a', 'is', 'in', 'of', 'for', 'it', 'was', 'that', 'with'];
     const wordCounts = {};
     data.forEach(fb => {
       if (fb.comment) {

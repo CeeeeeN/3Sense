@@ -19,7 +19,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
   const handleRetryAI = async () => {
     setIsAnalyzing(true);
     try {
-      // Call your secure Vercel API, exactly like FeedbackForm.jsx does!
+      // Call your secure Vercel API
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,13 +39,13 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
       // Update Firestore using the exact camelCase keys your Vercel API returns
       const fbRef = doc(db, "feedback", feedback.docId);
       await updateDoc(fbRef, {
-        sentiment:       aiData.sentiment,
-        hybridScore:     aiData.hybridScore,
-        textScore:       aiData.textScore,
-        confidence:      aiData.confidence,
-        detectedIssue:   aiData.detectedIssue,
-        severity:        aiData.severity || (aiData.sentiment === "Negative" ? "High" : "Normal"),
-        status:          "analyzed"
+        sentiment: aiData.sentiment,
+        hybridScore: aiData.hybridScore,
+        textScore: aiData.textScore,
+        confidence: aiData.confidence,
+        detectedIssue: aiData.detectedIssue,
+        severity: aiData.severity || (aiData.sentiment === "Negative" ? "High" : "Normal"),
+        status: "analyzed"
       });
 
       alert("AI Analysis complete! The dashboard will now update.");
@@ -61,7 +61,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
   if (!isOpen || !feedback) return null;
 
-  const needsAI = feedback.status?.toLowerCase() === 'pending_ai' || !feedback.sentiment;
+  const needsAI = feedback.status?.toLowerCase() === 'pending_ai' || feedback.status?.toLowerCase() === 'analysis_failed' || !feedback.sentiment;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -72,18 +72,18 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
         </div>
 
         <div className="modal-body">
-          
+
           {/* --- UPDATED: AI INSIGHTS CARD --- */}
           {needsAI ? (
             <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '8px', border: '1px solid #fef3c7', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h4 style={{ margin: 0, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <BarChart2 size={16} color="#92400e"/> AI Analysis Pending
+                  <BarChart2 size={16} color="#92400e" /> AI Analysis Pending
                 </h4>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#b45309' }}>This feedback was submitted while the AI was asleep.</p>
               </div>
-              <button 
-                onClick={handleRetryAI} 
+              <button
+                onClick={handleRetryAI}
                 disabled={isAnalyzing}
                 style={{ background: '#d97706', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: isAnalyzing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
               >
@@ -94,7 +94,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
             <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h4 style={{ margin: 0, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <BarChart2 size={16} color="#317D89"/> AI Analysis Results
+                  <BarChart2 size={16} color="#317D89" /> AI Analysis Results
                 </h4>
                 <SeverityBadge severity={feedback.severity} />
               </div>
@@ -132,7 +132,7 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
           {/* Staff Action Section */}
           <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>Staff Action</h3>
-          
+
           <div className="detail-item" style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', color: '#475569', fontWeight: 600, marginBottom: '6px' }}>Update Status</label>
             <select className="filter-select" style={{ width: '100%', padding: '10px' }} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
@@ -158,9 +158,9 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
 
         <div className="modal-footer">
           <button className="btn-view" onClick={onClose}>Cancel</button>
-          <button 
-            className="btn-approve" 
-            onClick={() => onSave(feedback.docId, adminNote, newStatus)} 
+          <button
+            className="btn-approve"
+            onClick={() => onSave(feedback.docId, adminNote, newStatus)}
             disabled={needsAI}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: needsAI ? 0.5 : 1, cursor: needsAI ? 'not-allowed' : 'pointer' }}
           >
