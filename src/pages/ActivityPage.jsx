@@ -29,6 +29,7 @@ const STATUS = {
   claimed: { label: "Claimed", color: "#c125d6", bg: "rgba(45,177,123,0.1)" },
   processing: { label: "Processing", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
   ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
+  new: { label: "New", color: "#317D89", bg: "rgba(49,125,137,0.1)" }, // Added for BSWD default
 };
 
 // ── Reusable Components ──
@@ -61,35 +62,36 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const [programs, setPrograms] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [services, setServices] = useState([]); // 🆕 Added for Services Tab
   const [feedback, setFeedback] = useState([]);
 
   // Limits for "Load More" functionality
   const [progLimit, setProgLimit] = useState(5);
   const [docLimit, setDocLimit] = useState(5);
   const [resLimit, setResLimit] = useState(5);
+  const [servicesLimit, setServicesLimit] = useState(5); // 🆕 Limit for Services
   const [feedbackLimit, setFeedbackLimit] = useState(5);
 
   // SECURE IDS: Get both residentID and householdID from props or session
-  const residentID = propMemberID || getSaved("memberID", null); // Fixed to memberID
-  const householdID = propHouseholdID || getSaved("householdID", null); // Added householdID
+  const residentID = propMemberID || getSaved("memberID", null);
+  const householdID = propHouseholdID || getSaved("householdID", null);
 
   // --- FIREBASE REAL-TIME LISTENERS ---
 
   // Initial Loading Check
   useEffect(() => {
-    // Wait until BOTH IDs are loaded
     if (!residentID || !householdID) { setLoading(true); return; }
     setLoading(false);
   }, [residentID, householdID]);
 
-  // A. Fetch Programs — SECURED
+  // A. Fetch Programs
   useEffect(() => {
     if (!residentID || !householdID) return;
     const qPrograms = query(
       collection(db, "livelihoodRegistrations"),
-      where("householdID", "==", householdID), // SECURE: Filter by household
-      where("residentID", "==", residentID),   // SECURE: Filter by resident
-      orderBy("submittedAt || createdAt", "desc"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
       limit(progLimit)
     );
     const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
@@ -100,14 +102,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return () => unsubPrograms();
   }, [residentID, householdID, progLimit]);
 
-  // B. Fetch Documents — SECURED
+  // B. Fetch Documents
   useEffect(() => {
     if (!residentID || !householdID) return;
     const qDocs = query(
       collection(db, "document_requests"),
-      where("householdID", "==", householdID), // SECURE: Filter by household
-      where("residentID", "==", residentID),   // SECURE: Filter by resident
-      orderBy("submittedAt || createdAt", "desc"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
       limit(docLimit)
     );
     const unsubDocs = onSnapshot(qDocs, (snapshot) => {
@@ -116,14 +118,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return () => unsubDocs();
   }, [residentID, householdID, docLimit]);
 
-  // C. Fetch Reservations — SECURED
+  // C. Fetch Reservations
   useEffect(() => {
     if (!residentID || !householdID) return;
     const qReservations = query(
       collection(db, "facility_reservations"),
-      where("householdID", "==", householdID), // SECURE: Filter by household
-      where("residentID", "==", residentID),   // SECURE: Filter by resident
-      orderBy("submittedAt || createdAt", "desc"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
       limit(resLimit)
     );
     const unsubReservations = onSnapshot(qReservations, (snapshot) => {
@@ -132,13 +134,76 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return () => unsubReservations();
   }, [residentID, householdID, resLimit]);
 
-  // D. Fetch Feedback — SECURED
+  // 🆕 D. Fetch Services (Combined: Peace & Order and BSWD)
+  useEffect(() => {
+    if (!residentID || !householdID) return;
+
+    // 1. Setup the two individual queries
+    const qIncidents = query(
+      collection(db, "incidentReports"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
+      limit(servicesLimit)
+    );
+    
+    // Query the single consolidated BSWD collection
+    const qBswd = query(
+      collection(db, "bswdReports"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
+      limit(servicesLimit)
+    );
+
+    // 2. Arrays to hold data from each snapshot
+    let incData = [];
+    let bswdData = [];
+
+    // 3. Helper function to combine and sort them all together whenever one updates
+    const updateCombined = () => {
+      const combined = [...incData, ...bswdData];
+      combined.sort((a, b) => {
+        const timeA = (a.createdAt || a.submittedAt)?.toMillis ? (a.createdAt || a.submittedAt).toMillis() : 0;
+        const timeB = (b.createdAt || b.submittedAt)?.toMillis ? (b.createdAt || b.submittedAt).toMillis() : 0;
+        return timeB - timeA;
+      });
+      setServices(combined);
+    };
+
+    // 4. Attach the listeners
+    const unsubInc = onSnapshot(qIncidents, (snap) => {
+      incData = snap.docs.map(doc => ({ 
+        id: doc.id, 
+        _serviceCategory: "Peace & Order", 
+        ...doc.data() 
+      }));
+      updateCombined();
+    });
+    
+    const unsubBswd = onSnapshot(qBswd, (snap) => {
+      bswdData = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          // Dynamically set the category badge based on the 'type' field
+          _serviceCategory: data.type === "tip" ? "BSWD Tip" : "BSWD Report",
+          ...data
+        };
+      });
+      updateCombined();
+    });
+
+    return () => { unsubInc(); unsubBswd(); };
+  }, [residentID, householdID, servicesLimit]);
+
+  // E. Fetch Feedback
   useEffect(() => {
     if (!residentID || !householdID) return;
     const qFeedback = query(
       collection(db, "feedback"),
-      where("householdID", "==", householdID), // SECURE: Filter by household
-      where("residentID", "==", residentID),   // SECURE: Filter by resident
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
       orderBy("createdAt", "desc"),
       limit(feedbackLimit)
     );
@@ -156,9 +221,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   };
 
 
-  // ── 6.1 Programs & Facilities Tab ──
+  // ── 6.1 Programs Tab ──
   const ProgramsFacilitiesTab = () => {
-    if (programs.length === 0) return <EmptyState message="You have not availed any programs or facilities yet." />;
+    if (programs.length === 0) return <EmptyState message="You have not availed any programs yet." />;
     return (
       <div className="act2-list">
         {programs.map((item, index) => (
@@ -273,7 +338,49 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   };
 
-  // ── 6.4 Feedback Tab
+  // 🆕 6.4 Services Tab
+  const ServicesTab = () => {
+    if (services.length === 0) return <EmptyState message="You have not submitted any service reports yet." />;
+    return (
+      <div className="act2-list">
+        {services.map((item) => (
+          <div key={item.id} className="act2-card">
+            <div className="act2-card__row">
+              <div className="act2-card__main">
+                <span className="act2-card__cat">{item._serviceCategory}</span>
+                <div className="act2-card__title">
+                  {/* Handle different title fields for Incidents, BSWD Reports, and BSWD Tips */}
+                  {item.incidentType || item.about || item.name || "Service Report"}
+                </div>
+                <div className="act2-card__subtitle" style={{ marginTop: '4px', color: '#64748b', fontSize: '0.85rem' }}>
+                  {item.location || item.tip || item.description || "—"}
+                </div>
+                <div className="act2-card__meta" style={{ marginTop: '4px' }}>
+                  Date Submitted: {formatDate(item.createdAt || item.submittedAt)}
+                </div>
+                <div className="act2-card__ref">Ref: {item.refNum || item.id}</div>
+              </div>
+              {/* Uses the "new" or "received" status badge initially depending on the system */}
+              <StatusBadge status={item.status || "received"} />
+            </div>
+          </div>
+        ))}
+        {/* LOAD MORE BUTTON */}
+        {services.length >= servicesLimit && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
+            <button
+              onClick={() => setServicesLimit(prev => prev + 5)}
+              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
+            >
+              Load More
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── 6.5 Feedback Tab
   const FeedbackTab = () => {
     if (feedback.length === 0) return <EmptyState message="You have not submitted any feedback yet." />;
     return (
@@ -316,9 +423,10 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── TABS CONFIG ──
   const TABS = [
-    { key: "programs", label: "Programs & Facilities", icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
+    { key: "programs", label: "Programs", icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
     { key: "documents", label: "Documents", icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
-    { key: "reservations", label: "Reservations", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "reservations", label: "Facility Reservations", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "services", label: "Services", icon: <AlertCircleIcon />, count: services.length, component: <ServicesTab /> },
     { key: "feedback", label: "Feedback", icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
   ];
 

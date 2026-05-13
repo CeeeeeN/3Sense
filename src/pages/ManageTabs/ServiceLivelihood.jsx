@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc,
+  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
   serverTimestamp, query, orderBy,
 } from "firebase/firestore";
 import FormBuilder from "../../components/FormBuilder";
 import { createUserNotification } from "../../services/userNotifications";
+import { runStatusMaintenance } from "../../services/statusUpdater";
+
+// ── Helper: returns today's date string "YYYY-MM-DD" ──────────────────────────
+const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -17,7 +21,7 @@ const StatusBadge = ({ status }) => {
   const s = (status || "pending").toLowerCase();
   const map = {
     approved: { bg: "#dcfce7", color: "#166534" },
-    pending:  { bg: "#fef3c7", color: "#92400e" },
+    pending: { bg: "#fef3c7", color: "#92400e" },
     rejected: { bg: "#fee2e2", color: "#991b1b" },
   };
   const c = map[s] || map.pending;
@@ -28,44 +32,57 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// ── Blank form state ──────────────────────────────────────────────────────────
+const BLANK = {
+  title: "", description: "", date: "", startTime: "", endTime: "",
+  location: "", slots: "", demographic: "", customFields: [],
+};
+
 export default function ServiceLivelihood({ onBack }) {
   // ── Programs ─────────────────────────────────────────────────────
-  const [programs, setPrograms]               = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
   // ── Registrations ─────────────────────────────────────────────────
-  const [participants, setParticipants]       = useState([]);
-  const [loadingParts, setLoadingParts]       = useState(true);
+  const [participants, setParticipants] = useState([]);
+  const [loadingParts, setLoadingParts] = useState(true);
 
   // ── Modals ────────────────────────────────────────────────────────
-  const [showAddModal, setShowAddModal]       = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [rejectTarget, setRejectTarget]       = useState(null);
-  const [removeTarget, setRemoveTarget]       = useState(null);
-  const [rejectReason, setRejectReason]       = useState("");
-  const [saving, setSaving]                   = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [removeTarget, setRemoveTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // ── New program form ──────────────────────────────────────────────
-  const BLANK = { title: "", description: "", date: "", startTime: "", endTime: "", location: "", slots: "", demographic: "", customFields: [] };
+  // ── Edit state (ported from ManagePrograms) ───────────────────────
+  const [editingProgramId, setEditingProgramId] = useState(null);
+
+  // ── New / edit program form ───────────────────────────────────────
   const [newProgram, setNewProgram] = useState(BLANK);
 
   // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
+    runStatusMaintenance();
+
     const q = query(collection(db, "Programs"), orderBy("updatedAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setPrograms(snap.docs.map(d => {
         const r = d.data();
         return {
-          id:          d.id,
-          title:       r.title || r.name || "Untitled Program",
+          id: d.id,
+          title: r.title || r.name || "Untitled Program",
           description: r.description || r.customFields?.description || "",
-          date:        r.date || r.customFields?.date || "",
-          startTime:   r.startTime || r.customFields?.startTime || "",
-          endTime:     r.endTime   || r.customFields?.endTime   || "",
-          location:    r.location  || r.customFields?.location  || "",
-          slots:       parseInt(r.slots || r.requirements?.slots || "0", 10) || 0,
-          status:      r.status || "Upcoming",
+          date: r.date || r.customFields?.date || "",
+          endDate: r.endDate || r.date || "",
+          startTime: r.startTime || r.customFields?.startTime || "",
+          endTime: r.endTime || r.customFields?.endTime || "",
+          location: r.location || r.customFields?.location || "",
+          slots: parseInt(r.slots || r.requirements?.slots || "0", 10) || 0,
+          demographic: r.demographic || "",
+          customFields: r.customFields || [],
+          status: r.status || "Upcoming",
         };
       }));
       setLoadingPrograms(false);
@@ -92,29 +109,88 @@ export default function ServiceLivelihood({ onBack }) {
     return prog.slots - getApprovedCount(prog.id);
   };
 
-  // ── Add program ───────────────────────────────────────────────────
+  // ── Open "Add" modal (clean slate) ───────────────────────────────
+  const openAddModal = () => {
+    setEditingProgramId(null);
+    setNewProgram(BLANK);
+    setShowAddModal(true);
+  };
+
+  // ── Edit (ported from ManagePrograms) ────────────────────────────
+  const handleEdit = (prog) => {
+    setNewProgram({
+      title: prog.title || "",
+      description: prog.description || "",
+      date: prog.date || "",
+      endDate: prog.endDate || prog.date || "",
+      startTime: prog.startTime || "",
+      endTime: prog.endTime || "",
+      location: prog.location || "",
+      demographic: prog.demographic || "",
+      slots: prog.slots ? String(prog.slots) : "",
+      customFields: prog.customFields || [],
+    });
+    setEditingProgramId(prog.id);
+    setShowAddModal(true);
+  };
+
+  // ── Delete (ported from ManagePrograms) ──────────────────────────
+  const handleDelete = async (id, progTitle) => {
+    if (!window.confirm(`Are you sure you want to delete "${progTitle}"?`)) return;
+    try {
+      await deleteDoc(doc(db, "Programs", id));
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      alert("Failed to delete program. Please try again.");
+    }
+  };
+
+  // ── Save: add OR update (ported from ManagePrograms) ─────────────
   const handleAddProgram = async (e) => {
     e.preventDefault();
     setSaving(true);
+
+    const programData = {
+      title: newProgram.title,
+      description: newProgram.description,
+      date: newProgram.date,
+      endDate: newProgram.endDate || newProgram.date,
+      startTime: newProgram.startTime,
+      endTime: newProgram.endTime,
+      time: newProgram.startTime && newProgram.endTime
+        ? `${newProgram.startTime} - ${newProgram.endTime}`
+        : newProgram.startTime || "",
+      location: newProgram.location,
+      slots: newProgram.slots,
+      demographic: newProgram.demographic,
+      customFields: newProgram.customFields || [],
+    };
+
     try {
-      await addDoc(collection(db, "Programs"), {
-        title:        newProgram.title,
-        description:  newProgram.description,
-        date:         newProgram.date,
-        startTime:    newProgram.startTime,
-        endTime:      newProgram.endTime,
-        time:         `${newProgram.startTime}${newProgram.endTime ? ` - ${newProgram.endTime}` : ""}`,
-        location:     newProgram.location,
-        slots:        newProgram.slots,
-        demographic:  newProgram.demographic,
-        customFields: newProgram.customFields || [],
-        status:       "Upcoming",
-        attendees:    [],
-        updatedAt:    serverTimestamp(),
-      });
+      if (editingProgramId) {
+        // ── Update existing program ──
+        await updateDoc(doc(db, "Programs", editingProgramId), {
+          ...programData,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        // ── Create new program ──
+        await addDoc(collection(db, "Programs"), {
+          ...programData,
+          programType: "livelihood",
+          status: "Upcoming",
+          attendees: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
       setNewProgram(BLANK);
+      setEditingProgramId(null);
       setShowAddModal(false);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error("Error saving program:", err);
+      alert("Failed to save program. Please try again.");
+    }
     setSaving(false);
   };
 
@@ -133,7 +209,7 @@ export default function ServiceLivelihood({ onBack }) {
         status: "approved", updatedAt: serverTimestamp(),
       });
       const residentID = p.residentID || p.userID;
-      const hhID       = p.householdID;
+      const hhID = p.householdID;
       if (residentID && hhID) {
         await createUserNotification(
           hhID,
@@ -158,7 +234,7 @@ export default function ServiceLivelihood({ onBack }) {
         status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
       });
       const residentID = p?.residentID || p?.userID;
-      const hhID       = p?.householdID;
+      const hhID = p?.householdID;
       if (residentID && hhID) {
         await createUserNotification(
           hhID,
@@ -189,9 +265,9 @@ export default function ServiceLivelihood({ onBack }) {
 
   // ── Stats ─────────────────────────────────────────────────────────
   const stats = {
-    total:    participants.length,
+    total: participants.length,
     approved: participants.filter(p => (p.status || "").toLowerCase() === "approved").length,
-    pending:  participants.filter(p => (p.status || "").toLowerCase() === "pending").length,
+    pending: participants.filter(p => (p.status || "").toLowerCase() === "pending").length,
     rejected: participants.filter(p => (p.status || "").toLowerCase() === "rejected").length,
   };
 
@@ -207,7 +283,7 @@ export default function ServiceLivelihood({ onBack }) {
           <h1>Livelihood Skills Training</h1>
           <p className="as-subtitle">Manage livelihood programs, skills training, and registrations</p>
         </div>
-        <button className="as-btn-aqua" onClick={() => setShowAddModal(true)} style={{ padding: "8px 16px", fontSize: "0.9rem" }}>
+        <button className="as-btn-aqua" onClick={openAddModal} style={{ padding: "8px 16px", fontSize: "0.9rem" }}>
           + Add New Program
         </button>
       </div>
@@ -215,30 +291,86 @@ export default function ServiceLivelihood({ onBack }) {
       {/* ── Programs ── */}
       <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: "20px", paddingBottom: "20px" }}>
         <h3 style={{ marginBottom: "10px" }}>Active Programs</h3>
-        {loadingPrograms ? <p style={{ color: "#9ca3af" }}>Loading…</p> : programs.length === 0 ? <p style={{ color: "#9ca3af" }}>No programs yet.</p> : (
+        {loadingPrograms ? (
+          <p style={{ color: "#9ca3af" }}>Loading…</p>
+        ) : programs.length === 0 ? (
+          <p style={{ color: "#9ca3af" }}>No programs yet.</p>
+        ) : (
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {programs.map(prog => {
-              const approved  = getApprovedCount(prog.id);
-              const left      = getSlotsLeft(prog);
-              const full      = left !== null && left <= 0;
+              const approved = getApprovedCount(prog.id);
+              const left = getSlotsLeft(prog);
+              const full = left !== null && left <= 0;
+
               return (
-                <div key={prog.id} style={{ padding: "16px", border: `2px solid ${full ? "#fca5a5" : "#2DB17B"}`, background: full ? "#fff1f2" : "#f0fdf4", borderRadius: "8px", minWidth: "250px", maxWidth: "300px" }}>
+                <div
+                  key={prog.id}
+                  style={{
+                    padding: "16px",
+                    border: `2px solid ${full ? "#fca5a5" : "#2DB17B"}`,
+                    background: full ? "#fff1f2" : "#f0fdf4",
+                    borderRadius: "8px",
+                    minWidth: "250px",
+                    maxWidth: "300px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
                   <div style={{ fontWeight: "bold", color: full ? "#991b1b" : "#166534" }}>{prog.title}</div>
-                  <div style={{ fontSize: "0.82rem", color: "#6b7280", marginTop: "4px" }}>
-                    {prog.date}{prog.startTime ? ` • ${prog.startTime}${prog.endTime ? ` - ${prog.endTime}` : ""}` : ""}
+                  <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+                    {prog.date}
+                    {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
+                    {prog.startTime ? ` • ${prog.startTime}${prog.endTime ? ` - ${prog.endTime}` : ""}` : ""}
                   </div>
-                  {prog.location && <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>📍 {prog.location}</div>}
-                  <div style={{ marginTop: "8px", fontSize: "0.82rem" }}>
+                  {prog.location && (
+                    <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>📍 {prog.location}</div>
+                  )}
+                  {prog.demographic && (
+                    <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+                      <strong>Target:</strong> {prog.demographic}
+                    </div>
+                  )}
+                  <div style={{ marginTop: "4px", fontSize: "0.82rem" }}>
                     <span style={{ fontWeight: 600, color: "#166534" }}>{approved} approved</span>
                     {prog.slots > 0 && (
-                      <span style={{ color: "#6b7280" }}> / {prog.slots} slots · <span style={{ fontWeight: 600, color: full ? "#991b1b" : "#15803d" }}>{full ? "Full" : `${left} left`}</span></span>
+                      <span style={{ color: "#6b7280" }}>
+                        {" / "}{prog.slots} slots ·{" "}
+                        <span style={{ fontWeight: 600, color: full ? "#991b1b" : "#15803d" }}>
+                          {full ? "Full" : `${left} left`}
+                        </span>
+                      </span>
                     )}
                   </div>
                   {prog.slots > 0 && (
-                    <div style={{ marginTop: "8px", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.min((approved / prog.slots) * 100, 100)}%`, background: full ? "#ef4444" : "#2DB17B", borderRadius: "4px", transition: "width 0.3s" }} />
+                    <div style={{ marginTop: "4px", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${Math.min((approved / prog.slots) * 100, 100)}%`,
+                        background: full ? "#ef4444" : "#2DB17B",
+                        borderRadius: "4px",
+                        transition: "width 0.3s",
+                      }} />
                     </div>
                   )}
+
+                  {/* ── Edit / Delete buttons (ported from ManagePrograms) ── */}
+                  <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                    <button
+                      className="as-btn-ghost"
+                      style={{ flex: 1, padding: "6px 12px", fontSize: "0.8rem" }}
+                      onClick={() => handleEdit(prog)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="as-btn-ghost"
+                      style={{ flex: 1, padding: "6px 12px", fontSize: "0.8rem", color: "#dc2626", borderColor: "#fca5a5" }}
+                      onClick={() => handleDelete(prog.id, prog.title)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -250,9 +382,9 @@ export default function ServiceLivelihood({ onBack }) {
       <h3 style={{ marginBottom: "10px" }}>Participant Registrations</h3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
         {[
-          { label: "Total",    value: stats.total,    bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+          { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
           { label: "Approved", value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-          { label: "Pending",  value: stats.pending,  bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+          { label: "Pending", value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
           { label: "Rejected", value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
         ].map(s => (
           <div key={s.label} style={{ background: s.bg, padding: "18px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
@@ -263,46 +395,69 @@ export default function ServiceLivelihood({ onBack }) {
       </div>
 
       {/* ── Table ── */}
-      {loadingParts ? <p style={{ color: "#9ca3af" }}>Loading registrations…</p> : (
+      {loadingParts ? (
+        <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
+      ) : (
         <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               <tr>
                 {["Ref #", "Full Name", "Contact", "Program", "Slots Left", "Applied", "Status", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>{h}</th>
+                  <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {participants.length === 0 && (
-                <tr><td colSpan={8} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No registrations yet.</td></tr>
+                <tr>
+                  <td colSpan={8} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>
+                    No registrations yet.
+                  </td>
+                </tr>
               )}
               {participants.map(p => {
-                const prog      = programs.find(pr => pr.id === p.programId);
-                const left      = prog ? getSlotsLeft(prog) : null;
-                const status    = (p.status || "pending").toLowerCase();
+                const prog = programs.find(pr => pr.id === p.programId);
+                const left = prog ? getSlotsLeft(prog) : null;
+                const status = (p.status || "pending").toLowerCase();
                 const slotsFull = left !== null && left <= 0 && status === "pending";
 
                 return (
                   <tr key={p.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                    <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>{p.regNum || p.id.slice(0, 8)}</td>
-                    <td style={{ padding: "14px 16px", fontWeight: 500 }}>{p.fullName || `${p.firstName || ""} ${p.lastName || ""}`.trim() || "—"}</td>
-                    <td style={{ padding: "14px 16px", color: "#6b7280" }}>{p.contact || p.contactNumber || "—"}</td>
+                    <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>
+                      {p.regNum || p.id.slice(0, 8)}
+                    </td>
+                    <td style={{ padding: "14px 16px", fontWeight: 500 }}>
+                      {p.fullName || `${p.firstName || ""} ${p.lastName || ""}`.trim() || "—"}
+                    </td>
+                    <td style={{ padding: "14px 16px", color: "#6b7280" }}>
+                      {p.contact || p.contactNumber || "—"}
+                    </td>
                     <td style={{ padding: "14px 16px", maxWidth: "160px" }}>
-                      <div style={{ fontWeight: 500, color: "#111827", fontSize: "0.85rem" }}>{p.programName || "—"}</div>
-                      {p.programDate && <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{p.programDate}</div>}
+                      <div style={{ fontWeight: 500, color: "#111827", fontSize: "0.85rem" }}>
+                        {p.programName || "—"}
+                      </div>
+                      {p.programDate && (
+                        <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{p.programDate}</div>
+                      )}
                     </td>
                     <td style={{ padding: "14px 16px" }}>
                       {left !== null ? (
                         <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166534" }}>
                           {left <= 0 ? "Full" : `${left} left`}
                         </span>
-                      ) : <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>}
+                      ) : (
+                        <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>
+                      )}
                     </td>
-                    <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>{formatTs(p.submittedAt)}</td>
-                    <td style={{ padding: "14px 16px" }}><StatusBadge status={p.status} /></td>
+                    <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>
+                      {formatTs(p.submittedAt)}
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      <StatusBadge status={p.status} />
+                    </td>
                     <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                      {/* PENDING */}
                       {status === "pending" && (
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                           <button
@@ -317,7 +472,6 @@ export default function ServiceLivelihood({ onBack }) {
                           >Reject</button>
                         </div>
                       )}
-                      {/* APPROVED */}
                       {status === "approved" && (
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
                           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Approved</span>
@@ -327,7 +481,6 @@ export default function ServiceLivelihood({ onBack }) {
                           >Remove</button>
                         </div>
                       )}
-                      {/* REJECTED */}
                       {status === "rejected" && (
                         <div style={{ textAlign: "right" }}>
                           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Rejected</span>
@@ -347,63 +500,164 @@ export default function ServiceLivelihood({ onBack }) {
         </div>
       )}
 
-      {/* ── Add Program Modal ── */}
+      {/* ── Add / Edit Program Modal ── */}
       {showAddModal && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
             <div className="as-modal-header">
-              <h2>Add Livelihood Program</h2>
-              <button className="as-modal-close" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); }}>&times;</button>
+              {/* Title changes between Add and Edit (ported from ManagePrograms) */}
+              <h2>{editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}</h2>
+              <button className="as-modal-close" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
             </div>
             <div className="as-modal-body">
               <form onSubmit={handleAddProgram}>
                 <div style={{ marginBottom: "15px" }}>
                   <label className="as-form-label">Program Title <span style={{ color: "red" }}>*</span></label>
-                  <input type="text" className="as-form-input" required value={newProgram.title} onChange={e => setNewProgram({ ...newProgram, title: e.target.value })} placeholder="e.g. Food Processing & Packaging" />
+                  <input
+                    type="text"
+                    className="as-form-input"
+                    required
+                    value={newProgram.title}
+                    onChange={e => setNewProgram({ ...newProgram, title: e.target.value })}
+                    placeholder="e.g. Food Processing & Packaging"
+                  />
                 </div>
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
                   <div>
-                    <label className="as-form-label">Date <span style={{ color: "red" }}>*</span></label>
-                    <input type="date" className="as-form-input" required value={newProgram.date} onChange={e => setNewProgram({ ...newProgram, date: e.target.value })} />
+                    {/* ── Start Date: min=today prevents past dates (ported from ManagePrograms) ── */}
+                    <label className="as-form-label">Start Date <span style={{ color: "red" }}>*</span></label>
+                    <input
+                      type="date"
+                      className="as-form-input"
+                      required
+                      min={getTodayStr()}
+                      value={newProgram.date}
+                      onChange={e => {
+                        const newDate = e.target.value;
+                        setNewProgram(prev => ({
+                          ...prev,
+                          date: newDate,
+                          // Reset end date if it falls before the new start date
+                          endDate: prev.endDate && prev.endDate < newDate ? newDate : prev.endDate,
+                        }));
+                      }}
+                    />
                   </div>
                   <div>
-                    <label className="as-form-label">Location</label>
-                    <input type="text" className="as-form-input" value={newProgram.location} onChange={e => setNewProgram({ ...newProgram, location: e.target.value })} placeholder="e.g. Barangay Multi-Purpose Hall" />
+                    {/* ── End Date: min is the later of today or start date (ported from ManagePrograms) ── */}
+                    <label className="as-form-label">
+                      End Date
+                      <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
+                    </label>
+                    <input
+                      type="date"
+                      className="as-form-input"
+                      min={newProgram.date || getTodayStr()}
+                      value={newProgram.endDate || ""}
+                      onChange={e => setNewProgram({ ...newProgram, endDate: e.target.value })}
+                    />
                   </div>
                   <div>
                     <label className="as-form-label">Start Time <span style={{ color: "red" }}>*</span></label>
-                    <input type="time" className="as-form-input" required value={newProgram.startTime} onChange={e => setNewProgram({ ...newProgram, startTime: e.target.value })} />
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.startTime}
+                      onChange={e => setNewProgram({ ...newProgram, startTime: e.target.value })}
+                    />
                   </div>
                   <div>
                     <label className="as-form-label">End Time <span style={{ color: "red" }}>*</span></label>
-                    <input type="time" className="as-form-input" required value={newProgram.endTime} onChange={e => setNewProgram({ ...newProgram, endTime: e.target.value })} />
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.endTime}
+                      onChange={e => setNewProgram({ ...newProgram, endTime: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="as-form-label">Location</label>
+                    <input
+                      type="text"
+                      className="as-form-input"
+                      value={newProgram.location}
+                      onChange={e => setNewProgram({ ...newProgram, location: e.target.value })}
+                      placeholder="e.g. Barangay Multi-Purpose Hall"
+                    />
                   </div>
                   <div>
                     <label className="as-form-label">Total Slots</label>
-                    <input type="number" min="1" className="as-form-input" value={newProgram.slots} onChange={e => setNewProgram({ ...newProgram, slots: e.target.value })} placeholder="e.g. 30" />
+                    <input
+                      type="number"
+                      min="1"
+                      className="as-form-input"
+                      value={newProgram.slots}
+                      onChange={e => setNewProgram({ ...newProgram, slots: e.target.value })}
+                      placeholder="e.g. 30"
+                    />
                   </div>
                   <div>
                     <label className="as-form-label">Target Demographic</label>
-                    <input type="text" className="as-form-input" value={newProgram.demographic} onChange={e => setNewProgram({ ...newProgram, demographic: e.target.value })} placeholder="e.g. Students, Women, Senior" />
+                    <input
+                      type="text"
+                      className="as-form-input"
+                      value={newProgram.demographic}
+                      onChange={e => setNewProgram({ ...newProgram, demographic: e.target.value })}
+                      placeholder="e.g. Students, Women, Senior"
+                    />
                   </div>
                 </div>
+
                 <div style={{ marginBottom: "15px" }}>
                   <label className="as-form-label">Description <span style={{ color: "red" }}>*</span></label>
-                  <textarea className="as-form-textarea" required rows="3" value={newProgram.description} onChange={e => setNewProgram({ ...newProgram, description: e.target.value })} placeholder="Describe the program objectives…" />
+                  <textarea
+                    className="as-form-textarea"
+                    required
+                    rows="3"
+                    value={newProgram.description}
+                    onChange={e => setNewProgram({ ...newProgram, description: e.target.value })}
+                    placeholder="Describe the program objectives…"
+                  />
                 </div>
+
                 <div style={{ marginTop: "16px", background: "#f9fafb", padding: "14px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
                   <h4 style={{ margin: "0 0 8px 0", fontSize: "0.9rem", color: "#374151" }}>🔒 Default Collected Fields</h4>
-                  <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "0 0 8px 0" }}>These are automatically collected. Do not recreate them.</p>
+                  <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "0 0 8px 0" }}>
+                    These are automatically collected. Do not recreate them.
+                  </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                     {["Full Name", "Complete Address", "Contact Number", "Email", "Valid ID / Clearance"].map(f => (
-                      <span key={f} style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 500 }}>🔒 {f}</span>
+                      <span key={f} style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 500 }}>
+                        🔒 {f}
+                      </span>
                     ))}
                   </div>
                 </div>
-                <FormBuilder fields={newProgram.customFields} onChange={fields => setNewProgram({ ...newProgram, customFields: fields })} />
+
+                <FormBuilder
+                  fields={newProgram.customFields}
+                  onChange={fields => setNewProgram({ ...newProgram, customFields: fields })}
+                />
+
                 <div className="as-modal-actions" style={{ marginTop: "20px" }}>
-                  <button type="button" className="as-btn-ghost" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); }}>Cancel</button>
-                  <button type="submit" className="as-btn-aqua" style={{ padding: "8px 18px" }} disabled={saving}>{saving ? "Saving…" : "Save Program"}</button>
+                  <button
+                    type="button"
+                    className="as-btn-ghost"
+                    onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="as-btn-aqua"
+                    style={{ padding: "8px 18px" }}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving…" : editingProgramId ? "Update Program" : "Save Program"}
+                  </button>
                 </div>
               </form>
             </div>
@@ -422,10 +676,23 @@ export default function ServiceLivelihood({ onBack }) {
             <div className="as-modal-body">
               <form onSubmit={handleConfirmReject}>
                 <label className="as-form-label">Reason for Rejection <span style={{ color: "red" }}>*</span></label>
-                <textarea className="as-form-textarea" rows="3" required placeholder="Provide a brief explanation…" value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
+                <textarea
+                  className="as-form-textarea"
+                  rows="3"
+                  required
+                  placeholder="Provide a brief explanation…"
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                />
                 <div className="as-modal-actions" style={{ marginTop: "15px" }}>
-                  <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>Cancel</button>
-                  <button type="submit" style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} disabled={saving}>
+                  <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                    disabled={saving}
+                  >
                     {saving ? "Processing…" : "Confirm Rejection"}
                   </button>
                 </div>
@@ -445,11 +712,18 @@ export default function ServiceLivelihood({ onBack }) {
             </div>
             <div className="as-modal-body">
               <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
-                This will move the registration back to <strong>Pending</strong>, freeing up the slot. The participant can then be re-approved or rejected.
+                This will move the registration back to <strong>Pending</strong>, freeing up the slot.
+                The participant can then be re-approved or rejected.
               </p>
               <div className="as-modal-actions">
-                <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>Cancel</button>
-                <button style={{ padding: "8px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} onClick={handleConfirmRemove} disabled={saving}>
+                <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>
+                  Cancel
+                </button>
+                <button
+                  style={{ padding: "8px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                  onClick={handleConfirmRemove}
+                  disabled={saving}
+                >
                   {saving ? "Processing…" : "Yes, Remove Approval"}
                 </button>
               </div>

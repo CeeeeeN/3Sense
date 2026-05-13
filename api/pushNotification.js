@@ -21,14 +21,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { memberID, title, message } = req.body;
+    const { householdID, residentID, title, message } = req.body;
 
-    if (!memberID || !title || !message) {
+    if (!householdID || !residentID || !title || !message) {
       return res.status(400).json({ error: 'Missing target parameters' });
     }
 
     const db = admin.firestore();
-    const tokenDoc = await db.collection("fcmTokens").doc(memberID).get();
+    const fcmDocId = `${householdID}_${residentID}`;
+    const tokenDoc = await db.collection("fcmTokens").doc(fcmDocId).get();
 
     if (!tokenDoc.exists) {
       return res.status(200).json({ success: true, message: 'No registered devices found for user.' });

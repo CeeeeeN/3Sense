@@ -12,7 +12,59 @@ const getSaved = (key, fallback) => {
   catch { return fallback; }
 };
 
-// ── Step Indicator ──
+const getTodayStr = () => new Date().toISOString().split("T")[0];
+
+function ValidityReminderBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: "12px",
+      background: "#fffbeb",
+      border: "1px solid #fcd34d",
+      borderRadius: "10px",
+      padding: "14px 16px",
+      marginBottom: "18px",
+      fontSize: "14px",
+      color: "#92400e",
+    }}>
+      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+      <div style={{ flex: 1 }}>
+        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
+          Document Validity Reminder
+        </strong>
+        Barangay documents issued through this system are valid for{" "}
+        <strong>6 months</strong> from the date of issuance. Please ensure
+        you use your document within this period. After expiry, a new
+        request will be required.
+      </div>
+      <button
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss reminder"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#92400e",
+          padding: "0",
+          flexShrink: 0,
+          lineHeight: 1,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function StepIndicator({ step }) {
   return (
     <div className="dr-steps">
@@ -36,7 +88,6 @@ function StepIndicator({ step }) {
   );
 }
 
-// ── Step 1: Select Document ──
 function Step1({ docTypes, selected, onSelect }) {
   return (
     <div className="dr-step1">
@@ -70,7 +121,6 @@ function Step1({ docTypes, selected, onSelect }) {
   );
 }
 
-// ── Step 2: Personal Details ──
 function Step2({ docType, form, setForm, errors }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
@@ -231,7 +281,6 @@ function Step2({ docType, form, setForm, errors }) {
   );
 }
 
-// ── Step 3: Review ──
 function Step3({ docType, form }) {
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
@@ -255,6 +304,26 @@ function Step3({ docType, form }) {
   return (
     <div className="dr-step3">
       <p className="dr-step-hint">Please review your information before submitting. All fields are read-only.</p>
+
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        background: "#fffbeb",
+        border: "1px solid #fcd34d",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        marginBottom: "16px",
+        fontSize: "13px",
+        color: "#92400e",
+      }}>
+        <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span>Reminder: This document will be valid for <strong>6 months</strong> from the date of issuance.</span>
+      </div>
+
       <div className="dr-review-grid">
         {rows.map((r, i) => (
           <div key={i} className={`dr-review-row${r.full ? " dr-review-row--full" : ""}`}>
@@ -267,7 +336,6 @@ function Step3({ docType, form }) {
   );
 }
 
-// ── Step 4: Success ──
 function Step4({ refNum, onReset }) {
   return (
     <div className="sv-success-wrap">
@@ -285,11 +353,19 @@ function Step4({ refNum, onReset }) {
       <div className="dr-success-info">
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></svg>
-          You will receive an SMS notification once your request is processed.
+          <span>You will receive an SMS notification once your request is processed.</span>
         </div>
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          Processing time: 2–3 business days.
+          <span>Processing time: 2–3 business days.</span>
+        </div>
+        {/* ── FIXED: wrapped text in <span> so flex layout doesn't break "6 months" ── */}
+        <div className="dr-success-info-item" style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "8px 10px", marginTop: "4px" }}>
+          <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>Your document will be valid for <strong>6 months</strong> from the date of issuance.</span>
         </div>
       </div>
       <button className="sv-btn-primary" onClick={onReset}>Submit Another Request</button>
@@ -297,9 +373,7 @@ function Step4({ refNum, onReset }) {
   );
 }
 
-// ── Documents Tab ──
 export default function DocumentsTab({ userData, householdID, userName }) {
-  // residentID = Firestore doc ID of the resident (from userData, set by ServicesPage)
   const residentID = userData?.residentID || getSaved("memberID", null);
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
@@ -321,12 +395,10 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     return () => unsubscribe();
   }, []);
 
-  // Auto-fill form when userData loads
   useEffect(() => {
     if (userData) {
       const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city]
         .filter(Boolean).join(", ");
-
       setForm(f => ({
         ...f,
         firstName: userData.firstName || "",
@@ -348,7 +420,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   };
 
   const validateStep2 = () => {
-    const e = {}
+    const e = {};
     if (!form.firstName.trim()) e.firstName = "Required.";
     if (!form.lastName.trim()) e.lastName = "Required.";
     if (!form.dob) e.dob = "Required.";
@@ -377,36 +449,26 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       setIsSubmitting(true);
       try {
         let uploadedIdUrl = null;
-
-        // --- NEW: CLOUDINARY UPLOAD LOGIC ---
         if (form.validIdFile) {
           const formData = new FormData();
           formData.append("file", form.validIdFile);
-
-          // ⚠️ UPDATE THESE STRINGS WITH YOUR CREDENTIALS
           formData.append("upload_preset", "3Sense+_ID");
           const cloudName = "dfnqeiksu";
-
           const cloudinaryResponse = await fetch(
             `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
             { method: "POST", body: formData }
           );
-
           if (!cloudinaryResponse.ok) throw new Error("Failed to upload ID to Cloudinary");
-
           const cloudinaryData = await cloudinaryResponse.json();
           uploadedIdUrl = cloudinaryData.secure_url;
         }
-        // ------------------------------------
 
         const customData = {};
         (docType.customFields || []).forEach(f => {
           if (form[f.id] !== undefined) customData[f.label] = form[f.id];
         });
 
-        // Resolve effective purpose for submission
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-
         const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
 
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
@@ -441,7 +503,10 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   return (
     <div className="dr-wizard">
       <div className="dr-wizard-header"><StepIndicator step={step} /></div>
+
       <div className="dr-wizard-body">
+        {(step === 1 || step === 2) && <ValidityReminderBanner />}
+
         {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} />}
         {errors.docType && <p className="sv-error-msg" style={{ padding: "0 1.5rem" }}>{errors.docType}</p>}
         {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
@@ -449,6 +514,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
         {errors.submit && <p className="sv-error-msg" style={{ padding: "1rem 1.5rem", textAlign: "center" }}>{errors.submit}</p>}
       </div>
+
       {step < 4 && (
         <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
           {step > 1 && <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }} disabled={isSubmitting}>Previous</button>}
