@@ -63,13 +63,8 @@ export const addHouseholdMember = async (householdID, memberData) => {
             residentID: residentID,
         });
     }
-
-    // Upload Images to Cloudinary
-    const idImageUrl = await uploadToCloudinary(
-        memberData.idImage, 
-        `3Sense/residents/${residentID}`
-    );
     
+    // ONLY upload the Selfie. The ID image is intentionally discarded/deleted here.
     const selfieImageUrl = await uploadToCloudinary(
         memberData.selfieImage, 
         `3Sense/residents/${residentID}`
@@ -80,6 +75,9 @@ export const addHouseholdMember = async (householdID, memberData) => {
         householdID,
         role: memberData.isBranchHead && branchID && branchID !== "BR-001" ? "Branch Head" : "Member",
         userID: hhUserID,
+
+        // Auto-filler Fix: Explicitly saving the idNumber
+        idNumber: memberData.idNumber || "",
 
         firstName: memberData.firstName || "",
         middleName: memberData.middleName || "",
@@ -120,8 +118,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
         sameAddress: memberData.sameAddress !== undefined ? !!memberData.sameAddress : true,
         branchID,
 
-        // Meta & New Cloudinary Images (SENSE-52)
-        idImageUrl,
+        // Meta (Only saving the Selfie URL)
         selfieImageUrl,
         pinHash: null,
         createdAt: serverTimestamp(),
