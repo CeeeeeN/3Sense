@@ -9,6 +9,20 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
   const [selectedItem, setSelectedItem] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ADDED FOR 480px RESPONSIVE
+  const [isMobile480, setIsMobile480] = useState(window.innerWidth <= 480);
+
+  // ADDED FOR 480px RESPONSIVE
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile480(window.innerWidth <= 480);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   useEffect(() => {
     if (!householdID || !residentID) return;
 
@@ -60,13 +74,13 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
 
     const updatePending = () => {
       const combined = [...docsData, ...resData, ...progData, ...genProgData, ...incData, ...bswdData];
-      
+
       const requiresFeedback = combined.filter(item => item.feedbackSubmitted !== true);
-      
+
       requiresFeedback.sort((a, b) => {
         const timeA = (a.createdAt || a.submittedAt)?.toMillis ? (a.createdAt || a.submittedAt).toMillis() : 0;
         const timeB = (b.createdAt || b.submittedAt)?.toMillis ? (b.createdAt || b.submittedAt).toMillis() : 0;
-        return timeA - timeB; 
+        return timeA - timeB;
       });
 
       setPendingItems(requiresFeedback);
@@ -77,23 +91,23 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       docsData = snap.docs.map(doc => ({ id: doc.id, _type: "DOCUMENT", title: doc.data().documentName || doc.data().documentType || doc.data().name || "Document Request", ...doc.data() }));
       updatePending();
     });
-    
+
     const unsubRes = onSnapshot(qRes, (snap) => {
       resData = snap.docs.map(doc => ({ id: doc.id, _type: "FACILITY", title: doc.data().purpose || "Reservation", ...doc.data() }));
       updatePending();
     });
-    
+
     const unsubProg = onSnapshot(qProg, (snap) => {
       progData = snap.docs.map(doc => ({ id: doc.id, _type: "LIVELIHOOD", title: doc.data().programName, ...doc.data() }));
       updatePending();
     });
 
     const unsubGenProg = onSnapshot(qGenProg, (snap) => {
-      genProgData = snap.docs.map(doc => ({ 
-        id: doc.ref.path, 
-        _type: "GENERAL_PROGRAM", 
-        title: doc.data().programName || doc.data().eventName || doc.data().title || "Barangay Program", 
-        ...doc.data() 
+      genProgData = snap.docs.map(doc => ({
+        id: doc.ref.path,
+        _type: "GENERAL_PROGRAM",
+        title: doc.data().programName || doc.data().eventName || doc.data().title || "Barangay Program",
+        ...doc.data()
       }));
       updatePending();
     });
@@ -102,13 +116,20 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       incData = snap.docs.map(doc => ({ id: doc.id, _type: "PEACE_AND_ORDER", title: doc.data().incidentType, ...doc.data() }));
       updatePending();
     });
-    
+
     const unsubBswd = onSnapshot(qBswd, (snap) => {
       bswdData = snap.docs.map(doc => ({ id: doc.id, _type: "BSWD_REPORT", title: doc.data().reportType, ...doc.data() }));
       updatePending();
     });
 
-    return () => { unsubDocs(); unsubRes(); unsubProg(); unsubGenProg(); unsubInc(); unsubBswd(); };
+    return () => {
+      unsubDocs();
+      unsubRes();
+      unsubProg();
+      unsubGenProg();
+      unsubInc();
+      unsubBswd();
+    };
   }, [householdID, residentID]);
 
   // Handlers
@@ -128,7 +149,7 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
     window.history.pushState({}, '', queryParams);
 
     if (typeof onNavigate === "function") {
-      onNavigate("feedback"); 
+      onNavigate("feedback");
     }
   };
 
@@ -140,37 +161,56 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
   return (
     <>
       <div style={{ marginBottom: "20px" }}>
-        <div 
+        <div
           onClick={handleOpenModal}
           style={{
-            display: "flex", alignItems: "center", gap: "12px",
-            backgroundColor: "#fffbeb", borderLeft: "4px solid #f59e0b",
-            padding: "12px 16px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            cursor: "pointer", transition: "transform 0.1s ease-in-out"
+            display: isMobile480 ? "block" : "flex",
+            alignItems: isMobile480 ? "unset" : "center",
+            justifyContent: isMobile480 ? "unset" : "space-between",
+            gap: isMobile480 ? "0" : "12px",
+            backgroundColor: "#fffbeb",
+            borderLeft: "4px solid #f59e0b",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            cursor: "pointer",
+            transition: "transform 0.1s ease-in-out",
+
+            // RESPONSIVE FOR 480px
+            textAlign: isMobile480 ? "center" : "left"
           }}
           onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.01)"}
           onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
         >
-          <div style={{ color: "#d97706", display: "flex", alignItems: "center" }}>
-            <AlertCircleIcon />
-          </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: isMobile480 ? "unset" : 1, marginBottom: isMobile480 ? "10px" : "0" }}>
             <h4 style={{ margin: 0, fontSize: "0.9rem", color: "#92400e", fontFamily: "'Poppins', sans-serif" }}>
               {count > 1 ? `Action Required: ${count} Feedback Surveys Pending` : `Action Required: Feedback Needed`}
             </h4>
+
             <p style={{ margin: 0, fontSize: "0.8rem", color: "#b45309", fontFamily: "'Poppins', sans-serif" }}>
-              {count > 1 
+              {count > 1
                 ? <>Please review your recently completed <strong>{firstItem.title}</strong> to continue clearing your queue.</>
                 : <>Please provide feedback for your recently completed <strong>{firstItem.title}</strong>.</>
               }
             </p>
           </div>
-          <button 
+
+          <button
             style={{
-              backgroundColor: "#f59e0b", color: "#fff", border: "none",
-              padding: "6px 14px", borderRadius: "6px", fontSize: "0.75rem",
-              fontWeight: "bold", cursor: "pointer", fontFamily: "'Poppins', sans-serif",
-              whiteSpace: "nowrap"
+              backgroundColor: "#f59e0b",
+              color: "#fff",
+              border: "none",
+              padding: "6px 14px",
+              borderRadius: "6px",
+              fontSize: "0.75rem",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontFamily: "'Poppins', sans-serif",
+              whiteSpace: "nowrap",
+
+              // RESPONSIVE FOR 480px
+              display: "block",
+              margin: isMobile480 ? "10px auto 0 auto" : "0"
             }}
           >
             Review Now
@@ -178,9 +218,9 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
         </div>
       </div>
 
-      <FeedbackModal 
+      <FeedbackModal
         isOpen={isModalOpen}
-        feedbackType={selectedItem?._type} 
+        feedbackType={selectedItem?._type}
         onAnswer={handleAnswer}
         onLater={() => setIsModalOpen(false)}
       />
