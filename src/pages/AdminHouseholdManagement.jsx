@@ -788,9 +788,9 @@ export default function HouseholdManagement() {
                       <tr key={`${res.householdId}__${res.id}`}>
                         <td style={{ fontWeight: 500 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            {res.profileImage ? (
+                            {res.profilePhoto ? (
                               <img
-                                src={res.profileImage}
+                                src={res.profilePhoto}
                                 alt={res.fullName}
                                 className="res-avatar"
                               />
@@ -937,9 +937,9 @@ export default function HouseholdManagement() {
                         </div>
                       </div>
                       <div style={{ flexShrink: 0 }}>
-                        {selectedResident.profileImage ? (
+                        {selectedResident.profilePhoto ? (
                           <img
-                            src={selectedResident.profileImage}
+                            src={selectedResident.profilePhoto}
                             alt={selectedResident.fullName}
                             className="res-modal-avatar"
                           />
@@ -977,11 +977,11 @@ export default function HouseholdManagement() {
                     <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
                       <div>
                         <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Government ID</p>
-                        {renderImagePreview(selectedResident.idImage, "Government ID")}
+                        {renderImagePreview(selectedResident.idImageUrl, "Government ID")}
                       </div>
                       <div>
                         <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Selfie Photo</p>
-                        {renderImagePreview(selectedResident.selfieImage, "Selfie Photo")}
+                        {renderImagePreview(selectedResident.selfieImageUrl, "Selfie Photo")}
                       </div>
                     </div>
                   </div>
@@ -1141,11 +1141,11 @@ export default function HouseholdManagement() {
                     <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
                       <div>
                         <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Government ID</p>
-                        {renderImagePreview(selectedHhRequest.idImage, "Government ID")}
+                        {renderImagePreview(selectedHhRequest.idImageUrl, "Government ID")}
                       </div>
                       <div>
                         <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Selfie Photo</p>
-                        {renderImagePreview(selectedHhRequest.selfieImage, "Selfie Photo")}
+                        {renderImagePreview(selectedHhRequest.selfieImageUrl, "Selfie Photo")}
                       </div>
                     </div>
                   </div>
