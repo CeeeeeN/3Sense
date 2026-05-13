@@ -23,25 +23,28 @@ const uploadToCloudinary = async (base64String, folder) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const submitRegistration = async (formData) => {
-    // 1. Validation 
+    // 1. Hard Validation Requirement (SENSE-52)
     if (!formData.idImage || !formData.selfieImage) {
         throw new Error("Selfie image and ID are REQUIRED before submission succeeds.");
     }
 
+    // 2. Generate the ID first so we can organize the Cloudinary folders cleanly
     const pendingRef = doc(collection(db, "pending_registrations"));
     const registrationID = pendingRef.id;
 
-    // 2. ONLY upload the Selfie. The ID image is intentionally discarded/deleted here.
+    // 3. Upload Images to Cloudinary
+    const idImageUrl = await uploadToCloudinary(
+        formData.idImage, 
+        `3Sense/pending_registrations/${registrationID}`
+    );
+    
     const selfieImageUrl = await uploadToCloudinary(
         formData.selfieImage, 
         `3Sense/pending_registrations/${registrationID}`
     );
 
-    // 3. Save to Firestore
+    // 4. Save to Firestore with the new Cloudinary URLs
     await setDoc(pendingRef, {
-        // Auto-filler Fix: Explicitly saving the idNumber
-        idNumber: formData.idNumber || "",
-        
         // Personal Info
         firstName: formData.firstName || "",
         middleName: formData.middleName || "",
@@ -82,7 +85,8 @@ export const submitRegistration = async (formData) => {
         totalMembers: formData.totalMembers ? Number(formData.totalMembers) : null,
         householdClassification: formData.householdClassification || "",
 
-        // Meta (Only saving the Selfie URL)
+        // Meta & New Cloudinary Images (SENSE-52)
+        idImageUrl,
         selfieImageUrl,
         status: "pending",
         createdAt: serverTimestamp(),

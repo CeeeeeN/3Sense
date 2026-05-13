@@ -684,26 +684,21 @@ export default function Registration({ onBack }) {
       birthDate: "birthDate", idNumber: "idNumber",
       houseNumber: "houseNumber", street: "street", province: "province",
     };
-    
     const filled = new Set();
-    const updates = {};
-    
-    Object.entries(mapping).forEach(([ocrKey, formKey]) => {
-      if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { 
-          updates[formKey] = data[ocrKey]; 
-          filled.add(formKey); 
+    setForm((prev) => {
+      const next = { ...prev };
+      Object.entries(mapping).forEach(([ocrKey, formKey]) => {
+        if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { next[formKey] = data[ocrKey]; filled.add(formKey); }
+      });
+      if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
+        const dob = new Date(data.birthDate); const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
+        next.age = age > 0 ? String(age) : "";
       }
+      return next;
     });
-
-    if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
-      const dob = new Date(data.birthDate); const today = new Date();
-      let age = today.getFullYear() - dob.getFullYear();
-      if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-      updates.age = age > 0 ? String(age) : "";
-    }
-
-    setForm((prev) => ({ ...prev, ...updates }));
-    setAutofilledFields((prev) => new Set([...prev, ...filled]));
+    setAutofilledFields(filled);
   }, []);
 
   const set = (field) => (e) => {
@@ -777,13 +772,7 @@ export default function Registration({ onBack }) {
     try {
       await submitRegistration({ ...form, idImage, selfieImage });
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
-      setRefNumber(ref); 
-      setSubmitted(true);
-      
-      // SENSE-52: Clear images from device memory immediately after successful submission
-      setIdImage(null);
-      setSelfieImage(null);
-      
+      setRefNumber(ref); setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("Submission error:", err);
