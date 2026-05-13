@@ -28,6 +28,31 @@ const StatusBadge = ({ status }) => {
   return <span style={style}>{status || "pending"}</span>;
 };
 
+// ── Pagination Component ──────────────────────────────────────────────────────
+const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
+    <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+      Page <span style={{ fontWeight: 600, color: "#111827" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#111827" }}>{totalPages || 1}</span>
+    </span>
+    <div style={{ display: "flex", gap: "8px" }}>
+      <button
+        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+        disabled={currentPage === 1}
+        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+      >
+        Previous
+      </button>
+      <button
+        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+        disabled={currentPage === totalPages || totalPages === 0}
+        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === totalPages || totalPages === 0 ? "#f3f4f6" : "#fff", color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+);
+
 export default function ServiceBswd({ onBack }) {
   const [activeTab, setActiveTab] = useState("reports");
 
@@ -35,6 +60,15 @@ export default function ServiceBswd({ onBack }) {
   const [reports, setReports]         = useState([]);
   const [loadingReports, setLoadingReports] = useState(true);
   
+  // ── Pagination State ──────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  // Reset pagination when tab switches
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
   // ── Modal State ──────────────────────────────────────────────────
   const [selectedItem, setSelectedItem] = useState(null);
 
@@ -42,6 +76,11 @@ export default function ServiceBswd({ onBack }) {
   // "community_tip" / all others without a specific type as Community Tips.
   const displacementReports = reports.filter(r => (r.type || "") === "homeless_report");
   const communityTips       = reports.filter(r => (r.type || "") !== "homeless_report");
+
+  // ── Pagination Calculation ────────────────────────────────────────
+  const currentData = activeTab === "reports" ? displacementReports : communityTips;
+  const totalPages = Math.ceil(currentData.length / itemsPerPage);
+  const paginatedData = currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // ── Saving state ─────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -225,7 +264,7 @@ export default function ServiceBswd({ onBack }) {
               {displacementReports.length === 0 && (
                 <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No displacement reports yet.</td></tr>
               )}
-              {displacementReports.map(r => {
+              {paginatedData.map(r => {
                 const hasPhoto = r.photoFileName && r.photoFileName !== "None" && r.photoFileName !== "";
                 return (
                   <tr key={r.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
@@ -257,6 +296,13 @@ export default function ServiceBswd({ onBack }) {
               })}
             </tbody>
           </table>
+          {displacementReports.length > 0 && (
+            <PaginationControls 
+              currentPage={currentPage} 
+              totalPages={totalPages} 
+              setCurrentPage={setCurrentPage} 
+            />
+          )}
         </div>
 
       ) : (
@@ -275,7 +321,7 @@ export default function ServiceBswd({ onBack }) {
               {communityTips.length === 0 && (
                 <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No community tips yet.</td></tr>
               )}
-              {communityTips.map(t => (
+              {paginatedData.map(t => (
                 <tr key={t.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                   <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(t.submittedAt)}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 500 }}>{t.contact || "Anonymous"}</td>
@@ -296,6 +342,13 @@ export default function ServiceBswd({ onBack }) {
               ))}
             </tbody>
           </table>
+          {communityTips.length > 0 && (
+            <PaginationControls 
+              currentPage={currentPage} 
+              totalPages={totalPages} 
+              setCurrentPage={setCurrentPage} 
+            />
+          )}
         </div>
       )}
 
