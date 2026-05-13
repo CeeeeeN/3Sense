@@ -17,29 +17,8 @@ const AVATAR_COLORS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // BACKEND PLACEHOLDER: validateIsGovernmentId
 // ─────────────────────────────────────────────────────────────────────────────
-// Calls a Firebase Cloud Function named "validateGovernmentId".
-// The Cloud Function should use Google Cloud Vision or the Anthropic API
-// (server-side — never expose API keys on the client) to check the image.
-//
-// Expected Cloud Function input:  { image: "data:image/jpeg;base64,..." }
-// Expected Cloud Function output: { isValid: boolean, reason: string, detectedType: string | null }
-//
-// TODO (backend):
-//   1. Create a Firebase Cloud Function named "validateGovernmentId"
-//   2. Inside it, call Cloud Vision or Anthropic API with the base64 image
-//   3. Return { isValid, reason, detectedType }
-//   4. Deploy, then replace the TEMPORARY PLACEHOLDER block below with:
-//
-//      const { getFunctions, httpsCallable } = await import("firebase/functions");
-//      const fn = httpsCallable(getFunctions(), "validateGovernmentId");
-//      const result = await fn({ image: imageBase64 });
-//      return result.data;
-// ─────────────────────────────────────────────────────────────────────────────
 async function validateIsGovernmentId(imageBase64) {
   try {
-    // ── TEMPORARY PLACEHOLDER ──────────────────────────────────────────────
-    // Simulates a valid response so the full UI flow works without a backend.
-    // Delete this block and uncomment the Cloud Function call above when ready.
     return new Promise((resolve) =>
       setTimeout(() => resolve({
         isValid: true,
@@ -48,7 +27,6 @@ async function validateIsGovernmentId(imageBase64) {
         idNumber: null,
       }), 1000)
     );
-    // ──────────────────────────────────────────────────────────────────────
   } catch (err) {
     console.error("[validateIsGovernmentId] Error:", err);
     return { isValid: null, reason: "Verification service unavailable. Please try again.", detectedType: null };
@@ -57,7 +35,7 @@ async function validateIsGovernmentId(imageBase64) {
 
 // ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
 // Uses the free OCR.space API to extract text from the base64 image and parse
-// PhilSys ID formats automatically.
+// PhilSys ID formats automatically using a smart lookahead algorithm.
 async function performLiveOCR(imageBase64) {
   try {
     const formData = new FormData();
@@ -67,7 +45,7 @@ async function performLiveOCR(imageBase64) {
     formData.append("isOverlayRequired", false);
     formData.append("detectOrientation", true);
     formData.append("scale", true);
-    formData.append("OCREngine", 2); // Engine 2 is better for numbers/dates
+    formData.append("OCREngine", 2);
 
     const response = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
@@ -87,14 +65,14 @@ async function performLiveOCR(imageBase64) {
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    // 1. Extract ID Number (Format: XXXX-XXXX-XXXX-XXXX)
+    // 1. Extract ID Number
     const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
     if (idMatch) {
         data.idNumber = idMatch[0].replace(/\s/g, ''); 
     }
 
-    // 2. Extract Birth Date Globally (Format: October 09, 2005 or Oct 9 2005)
-    const dobMatch = text.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/i);
+    // 2. Extract Birth Date Globally
+    const dobMatch = text.match(/(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2},?\s+\d{4}/i);
     if (dobMatch) {
         const d = new Date(dobMatch[0].replace(/,/g, ''));
         if (!isNaN(d.getTime())) {
@@ -102,54 +80,48 @@ async function performLiveOCR(imageBase64) {
         }
     }
 
-    // 3. Parse Line-by-Line for Names and Address
+    // 3. Smart Line-by-Line Parsing for Names and Address
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
+    const cleanName = (str) => str.replace(/[^A-Z\sÑñ-]/ig, '').trim();
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toUpperCase();
 
-      // Helper to cleanly extract text on the same line or the next line
-      const getValue = (keywords) => {
-          let foundValue = "";
-          // Check if value is on the same line (e.g. "MIDDLE NAME ESPINAR")
-          for (const kw of keywords) {
-              if (line.includes(kw)) {
-                  const parts = line.split(kw);
-                  const afterKw = parts[parts.length - 1];
-                  if (afterKw.replace(/[^A-Z]/ig, '').length > 1) {
-                      foundValue = afterKw.replace(/[^A-Z\s.-]/ig, '').trim();
-                      break;
-                  }
-              }
+      const extractNextValidLine = (startIndex) => {
+          for (let j = startIndex + 1; j < Math.min(startIndex + 4, lines.length); j++) {
+              const nextLine = lines[j].toUpperCase();
+              if (nextLine.match(/NAME|GIVEN|MIDDLE|LAST|DATE|BIRTH|ADDRESS|BLOOD|SEX|MALE|FEMALE|PHILIPPINES|REPUBLIKA|KAPANGANAKAN|TIRAHAN|APELYIDO|PANGALAN|GITNANG/)) continue;
+              if (nextLine.match(/\d{4}-\d{4}/)) continue; 
+              
+              const cleaned = cleanName(lines[j]);
+              if (cleaned.length > 1) return cleaned;
           }
-          // If not on same line, grab the next line
-          if (!foundValue && lines[i + 1]) {
-              const nextLine = lines[i + 1].toUpperCase();
-              // Prevent grabbing another label by accident
-              if (!nextLine.includes("NAME") && !nextLine.includes("DATE") && !nextLine.includes("ADDRESS") && !nextLine.includes("TIRAHAN")) {
-                  foundValue = lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim();
-              }
-          }
-          return foundValue;
+          return "";
       };
 
-      // Last Name
-      if (line.includes("LAST NAME") || line.includes("APELYIDO")) {
-        data.lastName = getValue(["LAST NAME", "APELYIDO"]);
+      const extractInlineOrNext = (keywordRegex) => {
+          const parts = line.split(keywordRegex);
+          if (parts.length > 1 && parts[parts.length - 1].trim().length > 1) {
+              const inlineVal = cleanName(parts[parts.length - 1]);
+              if (inlineVal) return inlineVal;
+          }
+          return extractNextValidLine(i);
+      };
+
+      if (/(?:LAST\s*NAME|APELYIDO)/i.test(line) && !data.lastName) {
+        data.lastName = extractInlineOrNext(/(?:LAST\s*NAME|APELYIDO)/i);
       }
-      // First Name
-      else if (line.includes("GIVEN NAME") || line.includes("PANGALAN")) {
-        data.firstName = getValue(["GIVEN NAMES", "GIVEN NAME", "PANGALAN"]);
+      else if (/(?:GIVEN\s*NAMES?|PANGALAN)/i.test(line) && !data.firstName) {
+        data.firstName = extractInlineOrNext(/(?:GIVEN\s*NAMES?|PANGALAN)/i);
       }
-      // Middle Name
-      else if (line.includes("MIDDLE NAME") || line.includes("GITNANG")) {
-        data.middleName = getValue(["MIDDLE NAME", "GITNANG APELYIDO", "GITNANG"]);
+      else if (/(?:MIDDLE\s*NAME|GITNANG\s*APELYIDO|GITNANG)/i.test(line) && !data.middleName) {
+        data.middleName = extractInlineOrNext(/(?:MIDDLE\s*NAME|GITNANG\s*APELYIDO|GITNANG)/i);
       }
-      // Address
-      else if (line.includes("ADDRESS") || line.includes("TIRAHAN")) {
-         let addrLine = line.split(/ADDRESS|TIRAHAN/i).pop().trim();
-         if (!addrLine && lines[i + 1]) addrLine = lines[i + 1].trim();
-         
+      else if (/(?:ADDRESS|TIRAHAN)/i.test(line) && !data.houseNumber) {
+         let addrLine = line.split(/(?:ADDRESS|TIRAHAN)/i).pop().trim();
+         if (!addrLine && lines[i + 1]) {
+             addrLine = lines[i + 1].trim() + " " + (lines[i + 2] || "").trim();
+         }
          if (addrLine) {
              const parts = addrLine.split(',');
              if (parts.length > 0) {
@@ -161,9 +133,7 @@ async function performLiveOCR(imageBase64) {
       }
     }
 
-    // Clean up empty keys so they don't overwrite manual typing
     Object.keys(data).forEach(key => { if (!data[key]) delete data[key]; });
-
     return data;
   } catch (err) {
     console.error("Live OCR Error:", err);
@@ -254,6 +224,13 @@ const SvgBranch = ({ size = 22 }) => (
     <path d="M6 9h6a3 3 0 013 3v3" />
   </svg>
 );
+// Added SvgHashtag for ID number
+const SvgHashtag = ({ size = 17 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
+  </svg>
+);
 
 // ─── Family Branch Step (with inline Create Branch modal) ────────────────────
 function AmFamilyBranchStep({ onConfirm, householdID }) {
@@ -279,7 +256,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
     } finally {
       setLoading(false);
     }
-  }, [householdID]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [householdID]); 
 
   useEffect(() => { if (householdID) fetchBranches(); }, [householdID, fetchBranches]);
 
@@ -713,11 +690,6 @@ function AmSelfieStep({ onConfirm }) {
   const capturePhoto = () => { const img = cam.capture(); cam.stop(); if (img) { setPreview(img); setMode("preview"); } };
   const retake = () => { setPreview(null); setUploadErr(null); setMode("idle"); cam.stop(); };
 
-  // TODO (backend): Optionally call a Firebase Cloud Function "verifySelfie"
-  // after confirmation for liveness / face-match against the ID photo.
-  // Input:  { selfie: base64, idImage: base64 }
-  // Output: { isLive: boolean, faceMatch: boolean, reason: string }
-
   return (
     <div>
       <div className="am-scan-header">
@@ -792,6 +764,7 @@ function AmSelfieStep({ onConfirm }) {
 
 // ─── Form steps tabs ──────────────────────────────────────────────────────────
 const BLANK_FORM = {
+  idNumber: "", 
   firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
   birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
   contactNumber: "", email: "", residingSinceYear: "",
@@ -808,7 +781,6 @@ const FORM_TABS = ["Personal Info", "Address", "Category", "Education"];
 
 export default function AddMembers({ onBack, onDone, householdID: propHouseholdID, hhAddress }) {
   const [outerStep, setOuterStep] = useState(0);
-  // outerStep: 0=FamilyBranch, 1=IDScan, 2=Selfie, 3+=formTabs
   const [familyBranch, setFamilyBranch] = useState(null);
   const [branchName, setBranchName] = useState("");
   const [needsHead, setNeedsHead] = useState(false);
@@ -849,24 +821,29 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const applyOcr = useCallback((data) => {
     const mapping = {
       firstName: "firstName", middleName: "middleName", lastName: "lastName",
-      birthDate: "birthDate",
+      birthDate: "birthDate", idNumber: "idNumber", 
       houseNumber: "houseNumber", street: "street", province: "province",
     };
+    
     const filled = new Set();
-    setForm(prev => {
-      const next = { ...prev };
-      Object.entries(mapping).forEach(([ocrKey, formKey]) => {
-        if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { next[formKey] = data[ocrKey]; filled.add(formKey); }
-      });
-      if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
-        const dob = new Date(data.birthDate); const today = new Date();
-        let age = today.getFullYear() - dob.getFullYear();
-        if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-        next.age = age > 0 ? String(age) : "";
+    const updates = {};
+    
+    Object.entries(mapping).forEach(([ocrKey, formKey]) => {
+      if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { 
+          updates[formKey] = data[ocrKey]; 
+          filled.add(formKey); 
       }
-      return next;
     });
-    setAutofilledFields(filled);
+
+    if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
+      const dob = new Date(data.birthDate); const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
+      updates.age = age > 0 ? String(age) : "";
+    }
+
+    setForm((prev) => ({ ...prev, ...updates }));
+    setAutofilledFields((prev) => new Set([...prev, ...filled]));
   }, []);
 
   const set = (field) => (e) => {
@@ -939,10 +916,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const addMember = async () => {
     if (!validateTab(1) || !validateTab(4)) { setTab(1); return; }
 
-    // Branch head enforcement:
-    // - BR-001: no head reassignment ever
-    // - needsHead: this member MUST be the head
-    // - otherwise: regular member
     const isBR001 = familyBranch === "BR-001";
     const isHead = !isBR001 && (needsHead || form.isBranchHead);
 
@@ -967,7 +940,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
     }]);
 
-    // Reset for next member
+    // Reset for next member and explicitly delete ID image state from memory
     setForm({ ...BLANK_FORM });
     setIdImage(null);
     setSelfieImage(null);
@@ -991,7 +964,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
-  // outerStep: 0=FamilyBranch, 1=IDScan, 2=Selfie, 3+=formTabs
   const stepperStep = outerStep <= 2 ? outerStep : 2 + tab;
   const totalOuter = OUTER_STEPS.length;
   const currentOuter = stepperStep;
@@ -1028,16 +1000,12 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
         {/* MEMBERS LIST — grouped by family branch */}
         {members.length > 0 && (() => {
-          // Build ordered unique branch list (preserving insertion order)
           const branchOrder = [];
           members.forEach(m => { if (!branchOrder.includes(m.familyBranch)) branchOrder.push(m.familyBranch); });
           return (
             <div className="am-branch-groups">
               {branchOrder.map(branch => {
                 const branchMembers = members.filter(m => m.familyBranch === branch);
-                // We only enforce that there's at least one branch head if branches are fully implemented,
-                // but since members might be added to existing branches that already have heads, 
-                // we'll bypass this strict check for now if they are just adding members to existing branches.
                 return (
                   <div key={branch} className="am-branch-group">
                     <div className="am-branch-group-header">
@@ -1225,6 +1193,9 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               {tab === 1 && (
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <Field label="ID Number" hint="Extracted from your scanned ID. You may correct this if needed.">
+                      <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
+                    </Field>
                     <div className="am-form-grid cols-3">
                       <Field label="First Name" required><InputField icon={IconUser} type="text" placeholder="Maria" value={form.firstName} onChange={set("firstName")} autofilled={af("firstName")} /></Field>
                       <Field label="Middle Name"><InputField icon={IconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
