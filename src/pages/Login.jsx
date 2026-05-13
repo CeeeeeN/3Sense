@@ -52,7 +52,7 @@ function ProfileCard({ profile, selected, onSelect }) {
       <div className="profile-info">
         <div className="profile-name">{profile.name}</div>
         <div className={`profile-badge ${profile.role === "Household Head" ? "badge-household-head" :
-            profile.role === "Branch Head" ? "badge-head" : "badge-member"
+          profile.role === "Branch Head" ? "badge-head" : "badge-member"
           }`}>
           {profile.role === "Member" ? <MemberIcon /> : <HouseholdHeadIcon />}
           {profile.role}
@@ -544,7 +544,17 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {screen === "success" && (
             <div key={screenKey} className="screen-enter">
               <div style={{ textAlign: "center", padding: "1rem 0" }}>
-                <div className="success-wrap">✅</div>
+                <div className="success-wrap" style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 80, height: 80, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #e6f7f0, #d0f0e4)",
+                  boxShadow: "0 8px 32px rgba(13,122,85,0.18)",
+                  marginBottom: "1rem",
+                }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0d7a55" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
                 <h2 className="screen-title" style={{ marginBottom: "0.5rem" }}>Login Successful!</h2>
                 <p className="screen-sub" style={{ marginBottom: "2rem" }}>Redirecting you to your dashboard...</p>
                 <div style={{ width: "100%", height: "4px", background: "var(--border)", borderRadius: "100px", overflow: "hidden" }}>
