@@ -662,6 +662,7 @@ export default function Reports() {
               ) : filteredResidents.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No residents found.</div>
               ) : (
+                <>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
@@ -681,15 +682,16 @@ export default function Reports() {
                       ))}
                     </tbody>
                   </table>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
-                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                      Showing {filteredResidents.length > 0 ? (demoPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(demoPage * ITEMS_PER_PAGE, filteredResidents.length)} of {filteredResidents.length} entries
-                    </span>
-                    
-                    {/* Inject the numbered buttons! */}
-                    {renderPaginationControls(demoPage, totalDemoPages, setDemoPage)}
-                  </div>
                 </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
+                  <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                    Showing {filteredResidents.length > 0 ? (demoPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(demoPage * ITEMS_PER_PAGE, filteredResidents.length)} of {filteredResidents.length} entries
+                  </span>
+                  
+                  {/* Inject the numbered buttons! */}
+                  {renderPaginationControls(demoPage, totalDemoPages, setDemoPage)}
+                </div>
+                </>
               )}
             </div>
           </>
@@ -722,6 +724,7 @@ export default function Reports() {
               {rbiFormAData.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No household data found.</div>
               ) : (
+                <>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
@@ -747,16 +750,16 @@ export default function Reports() {
                       })}
                     </tbody>
                   </table>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
-                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                      Showing {rbiFormAData.length > 0 ? (rbiAPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(rbiAPage * ITEMS_PER_PAGE, rbiFormAData.length)} of {rbiFormAData.length} entries
-                    </span>
-                    
-                    {/* Inject the numbered buttons! */}
-                    {renderPaginationControls(rbiAPage, totalRbiAPages, setRbiAPage)}
-                  </div>
                 </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
+                  <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                    Showing {rbiFormAData.length > 0 ? (rbiAPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(rbiAPage * ITEMS_PER_PAGE, rbiFormAData.length)} of {rbiFormAData.length} entries
+                  </span>
+                  
+                  {/* Inject the numbered buttons! */}
+                  {renderPaginationControls(rbiAPage, totalRbiAPages, setRbiAPage)}
+                </div>
+                </>
               )}
             </div>
           </>
@@ -843,8 +846,8 @@ export default function Reports() {
               </div>
 
               {/* C & D side by side */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                <div className="report-card">
+                <div className="rbi-bottom-grid">
+                  <div className="report-card">
                   <h3 style={{ marginBottom: "12px" }}>Civil Status</h3>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>

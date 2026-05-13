@@ -624,74 +624,75 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-              {hhViewMode === "requests" && filteredHhRequests.length > 0 && (
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "16px 24px",
-                  borderTop: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  flexWrap: "wrap",
-                  gap: "16px"
-                }}>
-
-                  {/* Rows per page */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                    <span>Rows per page:</span>
-                    <select
-                      value={hhRowsPerPage}
-                      onChange={(e) => {
-                        setHhRowsPerPage(Number(e.target.value));
-                        setHhRequestPage(1);
-                      }}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        background: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={15}>15</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination */}
-                  {totalHhRequestPages > 1 && (
-                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setHhRequestPage(prev => Math.max(prev - 1, 1))}
-                        disabled={hhRequestPage === 1}
-                      >
-                        Previous
-                      </button>
-
-                      {renderPageNumbers(hhRequestPage, totalHhRequestPages, setHhRequestPage)}
-
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setHhRequestPage(prev => Math.min(prev + 1, totalHhRequestPages))}
-                        disabled={hhRequestPage === totalHhRequestPages}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Showing text */}
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    Showing {hhStartIndex + 1} to{" "}
-                    {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
-                    {filteredHhRequests.length}
-                  </div>
-                </div>
-              )}
             </div>
+
+            {hhViewMode === "requests" && filteredHhRequests.length > 0 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "16px 24px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                flexWrap: "wrap",
+                gap: "16px"
+              }}>
+
+                {/* Rows per page */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={hhRowsPerPage}
+                    onChange={(e) => {
+                      setHhRowsPerPage(Number(e.target.value));
+                      setHhRequestPage(1);
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                {/* Pagination */}
+                {totalHhRequestPages > 1 && (
+                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setHhRequestPage(prev => Math.max(prev - 1, 1))}
+                      disabled={hhRequestPage === 1}
+                    >
+                      Previous
+                    </button>
+
+                    {renderPageNumbers(hhRequestPage, totalHhRequestPages, setHhRequestPage)}
+
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setHhRequestPage(prev => Math.min(prev + 1, totalHhRequestPages))}
+                      disabled={hhRequestPage === totalHhRequestPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {/* Showing text */}
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Showing {hhStartIndex + 1} to{" "}
+                  {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
+                  {filteredHhRequests.length}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -837,74 +838,75 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-              {residentViewMode === "residents" && filteredResidents.length > 0 && (
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "16px 24px",
-                  borderTop: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  flexWrap: "wrap",
-                  gap: "16px"
-                }}>
-
-                  {/* Rows per page */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                    <span>Rows per page:</span>
-                    <select
-                      value={rowsPerPage}
-                      onChange={(e) => {
-                        setRowsPerPage(Number(e.target.value));
-                        setPage(1);
-                      }}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        background: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={15}>15</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                        disabled={page === 1}
-                      >
-                        Previous
-                      </button>
-
-                      {renderPageNumbers(page, totalPages, setPage)}
-
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={page === totalPages}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Showing text */}
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    Showing {startIndex + 1} to{" "}
-                    {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}
-                    {filteredResidents.length}
-                  </div>
-                </div>
-              )}
             </div>
+
+            {residentViewMode === "residents" && filteredResidents.length > 0 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "16px 24px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                flexWrap: "wrap",
+                gap: "16px"
+              }}>
+
+                {/* Rows per page */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                      disabled={page === 1}
+                    >
+                      Previous
+                    </button>
+
+                    {renderPageNumbers(page, totalPages, setPage)}
+
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={page === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {/* Showing text */}
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Showing {startIndex + 1} to{" "}
+                  {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}
+                  {filteredResidents.length}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

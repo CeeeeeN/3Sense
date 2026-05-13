@@ -52,12 +52,13 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
   };
 
   return (
-    <div className="req-table-wrapper" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+    <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
       {dataList.length === 0 ? (
         <div className="empty-state"><h3>{emptyMessage}</h3></div>
       ) : (
         <>
-          <table className="req-table">
+          <div className="req-table-wrapper">
+            <table className="req-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -100,6 +101,7 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
               ))}
             </tbody>
           </table>
+        </div>
 
           {/* --- PAGINATION CONTROLS BOTTOM BAR --- */}
           <div style={{ 

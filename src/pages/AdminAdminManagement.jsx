@@ -544,72 +544,73 @@ export default function AdminManagement() {
                   )}
                 </tbody>
               </table>
-              {viewMode === "requests" && filteredRequests.length > 0 && (
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "16px 24px",
-                  borderTop: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  flexWrap: "wrap",
-                  gap: "16px"
-                }}>
-
-                  {/* Rows per page */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                    <span>Rows per page:</span>
-                    <select
-                      value={requestRowsPerPage}
-                      onChange={(e) => setRequestRowsPerPage(Number(e.target.value))}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        background: 'white',
-                        color: '#334155',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={15}>15</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination buttons */}
-                  {totalRequestPages > 1 && (
-                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setRequestPage(prev => Math.max(prev - 1, 1))}
-                        disabled={requestPage === 1}
-                      >
-                        Previous
-                      </button>
-
-                      {renderPageNumbers(requestPage, totalRequestPages, setRequestPage)}
-
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setRequestPage(prev => Math.min(prev + 1, totalRequestPages))}
-                        disabled={requestPage === totalRequestPages}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Showing text */}
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    Showing {requestStartIndex + 1} to{" "}
-                    {Math.min(requestStartIndex + requestRowsPerPage, filteredRequests.length)} of{" "}
-                    {filteredRequests.length}
-                  </div>
-                </div>
-              )}
             </div>
+
+            {viewMode === "requests" && filteredRequests.length > 0 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "16px 24px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                flexWrap: "wrap",
+                gap: "16px"
+              }}>
+
+                {/* Rows per page */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={requestRowsPerPage}
+                    onChange={(e) => setRequestRowsPerPage(Number(e.target.value))}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: 'white',
+                      color: '#334155',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                {/* Pagination buttons */}
+                {totalRequestPages > 1 && (
+                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setRequestPage(prev => Math.max(prev - 1, 1))}
+                      disabled={requestPage === 1}
+                    >
+                      Previous
+                    </button>
+
+                    {renderPageNumbers(requestPage, totalRequestPages, setRequestPage)}
+
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setRequestPage(prev => Math.min(prev + 1, totalRequestPages))}
+                      disabled={requestPage === totalRequestPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {/* Showing text */}
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Showing {requestStartIndex + 1} to{" "}
+                  {Math.min(requestStartIndex + requestRowsPerPage, filteredRequests.length)} of{" "}
+                  {filteredRequests.length}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -704,72 +705,73 @@ export default function AdminManagement() {
                   )}
                 </tbody>
               </table>
-              {viewMode === "admins" && filteredAdmins.length > 0 && (
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "16px 24px",
-                  borderTop: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  flexWrap: "wrap",
-                  gap: "16px"
-                }}>
-
-                  {/* Rows per page */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                    <span>Rows per page:</span>
-                    <select
-                      value={adminRowsPerPage}
-                      onChange={(e) => setAdminRowsPerPage(Number(e.target.value))}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        background: 'white',
-                        color: '#334155',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={15}>15</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination buttons */}
-                  {totalAdminPages > 1 && (
-                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
-                        disabled={adminPage === 1}
-                      >
-                        Previous
-                      </button>
-
-                      {renderPageNumbers(adminPage, totalAdminPages, setAdminPage)}
-
-                      <button
-                        className="af-page-btn"
-                        onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
-                        disabled={adminPage === totalAdminPages}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Showing text */}
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    Showing {adminStartIndex + 1} to{" "}
-                    {Math.min(adminStartIndex + adminRowsPerPage, filteredAdmins.length)} of{" "}
-                    {filteredAdmins.length}
-                  </div>
-                </div>
-              )}
             </div>
+
+            {viewMode === "admins" && filteredAdmins.length > 0 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "16px 24px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                flexWrap: "wrap",
+                gap: "16px"
+              }}>
+
+                {/* Rows per page */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={adminRowsPerPage}
+                    onChange={(e) => setAdminRowsPerPage(Number(e.target.value))}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: 'white',
+                      color: '#334155',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                {/* Pagination buttons */}
+                {totalAdminPages > 1 && (
+                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
+                      disabled={adminPage === 1}
+                    >
+                      Previous
+                    </button>
+
+                    {renderPageNumbers(adminPage, totalAdminPages, setAdminPage)}
+
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
+                      disabled={adminPage === totalAdminPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {/* Showing text */}
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Showing {adminStartIndex + 1} to{" "}
+                  {Math.min(adminStartIndex + adminRowsPerPage, filteredAdmins.length)} of{" "}
+                  {filteredAdmins.length}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

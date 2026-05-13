@@ -74,8 +74,11 @@ h4 {
   @apply text-[0.9rem] text-[rgba(255,255,255,0.65)] leading-[1.7] max-w-[360px] mb-8;
 }
 .feature-box {
-  @apply border text-[0.82rem] mb-[0.7rem] p-4 rounded-[10px] border-solid border-[rgba(255,255,255,0.12)];
+  @apply flex items-center gap-3 border text-[0.82rem] mb-[0.7rem] p-4 rounded-[10px] border-solid border-[rgba(255,255,255,0.12)];
   background: rgba(255, 255, 255, 0.06);
+}
+.feature-icon {
+  @apply w-[18px] h-[18px] shrink-0;
 }
 .footer {
   @apply text-xs text-[rgba(255,255,255,0.3)];
@@ -1318,6 +1321,10 @@ nav {
   background: #df3838;
 }
 
+.rbi-bottom-grid {
+  @apply grid grid-cols-2 gap-5;
+}
+
 /* =========================================
    AI INSIGHTS WIDGET STYLES
    ========================================= */
@@ -1900,7 +1907,7 @@ nav {
     @apply px-4 py-3;
   }
   .top-bar h1 {
-    @apply text-base;
+    @apply text-base text-center;
   }
   .top-actions {
     @apply gap-3;
@@ -2108,6 +2115,9 @@ nav {
   }
   .sentiment-box {
     @apply flex-col gap-2;
+  }
+  .rbi-bottom-grid {
+    @apply grid-cols-1;
   }
  
   /* ── Admin Management Page ── */
