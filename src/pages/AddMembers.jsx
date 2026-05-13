@@ -67,7 +67,7 @@ async function performLiveOCR(imageBase64) {
     formData.append("isOverlayRequired", false);
     formData.append("detectOrientation", true);
     formData.append("scale", true);
-    formData.append("OCREngine", 2); // Engine 2 is better for special chars & numbers
+    formData.append("OCREngine", 2); // Engine 2 is better for numbers/dates
 
     const response = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
@@ -80,7 +80,7 @@ async function performLiveOCR(imageBase64) {
     }
 
     const text = result.ParsedResults[0].ParsedText;
-    console.log("Live OCR Extracted Text:\n", text); // Helpful for debugging in console
+    console.log("Live OCR Extracted Text:\n", text); // Helpful for debugging
 
     let data = {
       idNumber: "", firstName: "", middleName: "", lastName: "",
@@ -93,35 +93,63 @@ async function performLiveOCR(imageBase64) {
         data.idNumber = idMatch[0].replace(/\s/g, ''); 
     }
 
-    // 2. Parse Line-by-Line for specific labels (PhilSys layout)
+    // 2. Extract Birth Date Globally (Format: October 09, 2005 or Oct 9 2005)
+    const dobMatch = text.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/i);
+    if (dobMatch) {
+        const d = new Date(dobMatch[0].replace(/,/g, ''));
+        if (!isNaN(d.getTime())) {
+            data.birthDate = d.toISOString().split('T')[0];
+        }
+    }
+
+    // 3. Parse Line-by-Line for Names and Address
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toUpperCase();
 
+      // Helper to cleanly extract text on the same line or the next line
+      const getValue = (keywords) => {
+          let foundValue = "";
+          // Check if value is on the same line (e.g. "MIDDLE NAME ESPINAR")
+          for (const kw of keywords) {
+              if (line.includes(kw)) {
+                  const parts = line.split(kw);
+                  const afterKw = parts[parts.length - 1];
+                  if (afterKw.replace(/[^A-Z]/ig, '').length > 1) {
+                      foundValue = afterKw.replace(/[^A-Z\s.-]/ig, '').trim();
+                      break;
+                  }
+              }
+          }
+          // If not on same line, grab the next line
+          if (!foundValue && lines[i + 1]) {
+              const nextLine = lines[i + 1].toUpperCase();
+              // Prevent grabbing another label by accident
+              if (!nextLine.includes("NAME") && !nextLine.includes("DATE") && !nextLine.includes("ADDRESS") && !nextLine.includes("TIRAHAN")) {
+                  foundValue = lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim();
+              }
+          }
+          return foundValue;
+      };
+
       // Last Name
       if (line.includes("LAST NAME") || line.includes("APELYIDO")) {
-        data.lastName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+        data.lastName = getValue(["LAST NAME", "APELYIDO"]);
       }
       // First Name
-      else if (line.includes("GIVEN NAMES") || line.includes("GIVEN NAME") || line.includes("PANGALAN")) {
-        data.firstName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
+      else if (line.includes("GIVEN NAME") || line.includes("PANGALAN")) {
+        data.firstName = getValue(["GIVEN NAMES", "GIVEN NAME", "PANGALAN"]);
       }
       // Middle Name
       else if (line.includes("MIDDLE NAME") || line.includes("GITNANG")) {
-        data.middleName = lines[i + 1] ? lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim() : "";
-      }
-      // Date of Birth
-      else if (line.includes("DATE OF BIRTH") || line.includes("KAPANGANAKAN")) {
-        const dateStr = lines[i + 1] || "";
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) {
-          data.birthDate = d.toISOString().split('T')[0]; // Format for HTML date input
-        }
+        data.middleName = getValue(["MIDDLE NAME", "GITNANG APELYIDO", "GITNANG"]);
       }
       // Address
       else if (line.includes("ADDRESS") || line.includes("TIRAHAN")) {
-         let addrLine = lines[i + 1] || "";
+         let addrLine = line.split(/ADDRESS|TIRAHAN/i).pop().trim();
+         if (!addrLine && lines[i + 1]) addrLine = lines[i + 1].trim();
+         
          if (addrLine) {
              const parts = addrLine.split(',');
              if (parts.length > 0) {
@@ -139,7 +167,7 @@ async function performLiveOCR(imageBase64) {
     return data;
   } catch (err) {
     console.error("Live OCR Error:", err);
-    return {}; // Return empty object on failure so user can manually type
+    return {};
   }
 }
 
