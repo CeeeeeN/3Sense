@@ -22,7 +22,7 @@ async function validateIsGovernmentId(imageBase64) {
 
 // ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
 // Uses the free OCR.space API to extract text from the base64 image and parse
-// PhilSys ID formats automatically.
+// PhilSys ID formats automatically using a smart lookahead algorithm.
 async function performLiveOCR(imageBase64) {
   try {
     const formData = new FormData();
@@ -58,8 +58,8 @@ async function performLiveOCR(imageBase64) {
         data.idNumber = idMatch[0].replace(/\s/g, ''); 
     }
 
-    // 2. Extract Birth Date Globally (Format: October 09, 2005 or Oct 9 2005)
-    const dobMatch = text.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/i);
+    // 2. Extract Birth Date Globally (Format: October 09, 2005)
+    const dobMatch = text.match(/(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2},?\s+\d{4}/i);
     if (dobMatch) {
         const d = new Date(dobMatch[0].replace(/,/g, ''));
         if (!isNaN(d.getTime())) {
@@ -67,54 +67,49 @@ async function performLiveOCR(imageBase64) {
         }
     }
 
-    // 3. Parse Line-by-Line for Names and Address
+    // 3. Smart Line-by-Line Parsing for Names and Address
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
+    const cleanName = (str) => str.replace(/[^A-Z\sÑñ-]/ig, '').trim();
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toUpperCase();
 
-      // Helper to cleanly extract text on the same line or the next line
-      const getValue = (keywords) => {
-          let foundValue = "";
-          // Check if value is on the same line (e.g. "MIDDLE NAME ESPINAR")
-          for (const kw of keywords) {
-              if (line.includes(kw)) {
-                  const parts = line.split(kw);
-                  const afterKw = parts[parts.length - 1];
-                  if (afterKw.replace(/[^A-Z]/ig, '').length > 1) {
-                      foundValue = afterKw.replace(/[^A-Z\s.-]/ig, '').trim();
-                      break;
-                  }
-              }
+      const extractNextValidLine = (startIndex) => {
+          for (let j = startIndex + 1; j < Math.min(startIndex + 4, lines.length); j++) {
+              const nextLine = lines[j].toUpperCase();
+              // Skip if it's another label
+              if (nextLine.match(/NAME|GIVEN|MIDDLE|LAST|DATE|BIRTH|ADDRESS|BLOOD|SEX|MALE|FEMALE|PHILIPPINES|REPUBLIKA|KAPANGANAKAN|TIRAHAN|APELYIDO|PANGALAN|GITNANG/)) continue;
+              if (nextLine.match(/\d{4}-\d{4}/)) continue; // skip ID numbers
+              
+              const cleaned = cleanName(lines[j]);
+              if (cleaned.length > 1) return cleaned;
           }
-          // If not on same line, grab the next line
-          if (!foundValue && lines[i + 1]) {
-              const nextLine = lines[i + 1].toUpperCase();
-              // Prevent grabbing another label by accident
-              if (!nextLine.includes("NAME") && !nextLine.includes("DATE") && !nextLine.includes("ADDRESS") && !nextLine.includes("TIRAHAN")) {
-                  foundValue = lines[i + 1].replace(/[^A-Z\s.-]/ig, '').trim();
-              }
-          }
-          return foundValue;
+          return "";
       };
 
-      // Last Name
-      if (line.includes("LAST NAME") || line.includes("APELYIDO")) {
-        data.lastName = getValue(["LAST NAME", "APELYIDO"]);
+      const extractInlineOrNext = (keywordRegex) => {
+          const parts = line.split(keywordRegex);
+          if (parts.length > 1 && parts[parts.length - 1].trim().length > 1) {
+              const inlineVal = cleanName(parts[parts.length - 1]);
+              if (inlineVal) return inlineVal;
+          }
+          return extractNextValidLine(i);
+      };
+
+      if (/(?:LAST\s*NAME|APELYIDO)/i.test(line) && !data.lastName) {
+        data.lastName = extractInlineOrNext(/(?:LAST\s*NAME|APELYIDO)/i);
       }
-      // First Name
-      else if (line.includes("GIVEN NAME") || line.includes("PANGALAN")) {
-        data.firstName = getValue(["GIVEN NAMES", "GIVEN NAME", "PANGALAN"]);
+      else if (/(?:GIVEN\s*NAMES?|PANGALAN)/i.test(line) && !data.firstName) {
+        data.firstName = extractInlineOrNext(/(?:GIVEN\s*NAMES?|PANGALAN)/i);
       }
-      // Middle Name
-      else if (line.includes("MIDDLE NAME") || line.includes("GITNANG")) {
-        data.middleName = getValue(["MIDDLE NAME", "GITNANG APELYIDO", "GITNANG"]);
+      else if (/(?:MIDDLE\s*NAME|GITNANG\s*APELYIDO|GITNANG)/i.test(line) && !data.middleName) {
+        data.middleName = extractInlineOrNext(/(?:MIDDLE\s*NAME|GITNANG\s*APELYIDO|GITNANG)/i);
       }
-      // Address
-      else if (line.includes("ADDRESS") || line.includes("TIRAHAN")) {
-         let addrLine = line.split(/ADDRESS|TIRAHAN/i).pop().trim();
-         if (!addrLine && lines[i + 1]) addrLine = lines[i + 1].trim();
-         
+      else if (/(?:ADDRESS|TIRAHAN)/i.test(line) && !data.houseNumber) {
+         let addrLine = line.split(/(?:ADDRESS|TIRAHAN)/i).pop().trim();
+         if (!addrLine && lines[i + 1]) {
+             addrLine = lines[i + 1].trim() + " " + (lines[i + 2] || "").trim();
+         }
          if (addrLine) {
              const parts = addrLine.split(',');
              if (parts.length > 0) {
@@ -779,21 +774,26 @@ export default function Registration({ onBack }) {
       birthDate: "birthDate", idNumber: "idNumber",
       houseNumber: "houseNumber", street: "street", province: "province",
     };
+    
     const filled = new Set();
-    setForm((prev) => {
-      const next = { ...prev };
-      Object.entries(mapping).forEach(([ocrKey, formKey]) => {
-        if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { next[formKey] = data[ocrKey]; filled.add(formKey); }
-      });
-      if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
-        const dob = new Date(data.birthDate); const today = new Date();
-        let age = today.getFullYear() - dob.getFullYear();
-        if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-        next.age = age > 0 ? String(age) : "";
+    const updates = {};
+    
+    Object.entries(mapping).forEach(([ocrKey, formKey]) => {
+      if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { 
+          updates[formKey] = data[ocrKey]; 
+          filled.add(formKey); 
       }
-      return next;
     });
-    setAutofilledFields(filled);
+
+    if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
+      const dob = new Date(data.birthDate); const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
+      updates.age = age > 0 ? String(age) : "";
+    }
+
+    setForm((prev) => ({ ...prev, ...updates }));
+    setAutofilledFields((prev) => new Set([...prev, ...filled]));
   }, []);
 
   const set = (field) => (e) => {
@@ -867,7 +867,13 @@ export default function Registration({ onBack }) {
     try {
       await submitRegistration({ ...form, idImage, selfieImage });
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
-      setRefNumber(ref); setSubmitted(true);
+      setRefNumber(ref); 
+      setSubmitted(true);
+      
+      // SENSE-52: Clear images from device memory immediately after successful submission
+      setIdImage(null);
+      setSelfieImage(null);
+      
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("Submission error:", err);
