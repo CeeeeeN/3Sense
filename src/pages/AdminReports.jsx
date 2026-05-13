@@ -9,17 +9,23 @@ import { logTransaction } from "../services/logger";
 export default function Reports() {
 
   // ── State ────────────────────────────────────────────────────────────────────
-  const [reportType, setReportType] = useState("performance");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [feedbackData, setFeedbackData] = useState([]);
+  const [reportType, setReportType] = useState("demographics"); // Default changed to demographics
   const [residentData, setResidentData] = useState([]);
   const [householdData, setHouseholdData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [sexFilter, setSexFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
+  const [demoPage, setDemoPage] = useState(1);
+  const [rbiAPage, setRbiAPage] = useState(1);
+  const ITEMS_PER_PAGE = 20; // change to whatever fits best for performance and readability
+
+  useEffect(() => {
+    setDemoPage(1);
+  }, [sexFilter]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -37,35 +43,10 @@ export default function Reports() {
     return () => unsubscribe();
   }, []);
 
-  // ── Fetch Feedback ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchFeedback = async () => {
-      setLoading(true);
-      try {
-        const q = query(collection(db, "feedback"), where("Status", "==", "analyzed"));
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map((doc) => {
-          const d = doc.data();
-          const rawSentiment = (d.Sentiment || "").toLowerCase();
-          const sentiment = ["positive", "neutral", "negative"].includes(rawSentiment) ? rawSentiment : "neutral";
-          let dateStr = "";
-          if (d.CreatedAt?.toDate) dateStr = d.CreatedAt.toDate().toISOString().split("T")[0];
-          return {
-            id: doc.id, service: d.FacilityName || "Unknown", category: d.Category || "General",
-            sentiment, date: dateStr, userName: d.UserName || "Anonymous",
-            comment: d.Comment || "", rating: d.Rating ?? 0, referenceId: d.ReferenceID || "",
-          };
-        });
-        setFeedbackData(data);
-      } catch (err) { console.error("Error fetching feedback:", err); }
-      setLoading(false);
-    };
-    fetchFeedback();
-  }, []);
-
   // ── Fetch Residents via collectionGroup ──────────────────────────────────────
   useEffect(() => {
     const fetchResidents = async () => {
+      setLoading(true);
       try {
         const snapshot = await getDocs(collectionGroup(db, "residents"));
         const data = snapshot.docs.map((doc) => {
@@ -105,6 +86,7 @@ export default function Reports() {
         });
         setResidentData(data);
       } catch (err) { console.error("Error fetching residents:", err); }
+      setLoading(false);
     };
     fetchResidents();
   }, []);
@@ -132,74 +114,12 @@ export default function Reports() {
     fetchHouseholds();
   }, []);
 
-  // ── Performance memos ────────────────────────────────────────────────────────
-  const filteredData = useMemo(() => {
-    if (!startDate || !endDate) return feedbackData;
-    return feedbackData.filter((item) => item.date >= startDate && item.date <= endDate);
-  }, [feedbackData, startDate, endDate]);
-
-  const categorizedServices = useMemo(() => {
-    const result = {};
-    filteredData.forEach((item) => {
-      const cat = item.category || "General";
-      if (!result[cat]) result[cat] = new Set();
-      result[cat].add(item.service);
-    });
-    return Object.fromEntries(Object.entries(result).map(([k, v]) => [k, [...v].sort()]));
-  }, [filteredData]);
-
-  const feedbackPerService = useMemo(() => {
-    const result = {};
-    filteredData.forEach((item) => { result[item.service] = (result[item.service] || 0) + 1; });
-    return result;
-  }, [filteredData]);
-
-  const categorySentiment = useMemo(() => {
-    const result = {};
-    filteredData.forEach((item) => {
-      const cat = item.category || "General";
-      if (!result[cat]) result[cat] = { positive: 0, neutral: 0, negative: 0 };
-      result[cat][item.sentiment]++;
-    });
-    return result;
-  }, [filteredData]);
-
-  const sentimentBreakdown = useMemo(() => {
-    const result = { positive: 0, neutral: 0, negative: 0 };
-    filteredData.forEach((item) => { result[item.sentiment]++; });
-    return result;
-  }, [filteredData]);
-
-  const mostPositive = useMemo(() => {
-    const counts = {};
-    filteredData.forEach((item) => {
-      if (item.sentiment === "positive") counts[item.service] = (counts[item.service] || 0) + 1;
-    });
-    const entries = Object.entries(counts);
-    if (!entries.length) return { service: "No positive feedback", count: 0 };
-    const [service, count] = entries.reduce((a, b) => (a[1] > b[1] ? a : b));
-    return { service, count };
-  }, [filteredData]);
-
-  const mostNegative = useMemo(() => {
-    const counts = {};
-    filteredData.forEach((item) => {
-      if (item.sentiment === "negative") counts[item.service] = (counts[item.service] || 0) + 1;
-    });
-    const entries = Object.entries(counts);
-    if (!entries.length) return { service: "No negative feedback", count: 0 };
-    const [service, count] = entries.reduce((a, b) => (a[1] > b[1] ? a : b));
-    return { service, count };
-  }, [filteredData]);
-
   // ── Demographics filter ──────────────────────────────────────────────────────
   const filteredResidents = useMemo(() => {
     if (sexFilter === "all") return residentData;
-    // Added safety check (r.sex || "") to prevent crashes
     return residentData.filter((r) => (r.sex || "").toLowerCase() === sexFilter.toLowerCase());
   }, [residentData, sexFilter]);
 
-  // Calculates the stats dynamically based on the filtered data for the Demographics Tab
   const filteredStats = useMemo(() => {
     const counts = { Male: 0, Female: 0 };
     filteredResidents.forEach((r) => {
@@ -209,7 +129,6 @@ export default function Reports() {
     return { total: filteredResidents.length, ...counts };
   }, [filteredResidents]);
 
-  // Global count (Used for RBI Forms to maintain accurate total population)
   const maleFemaleCount = useMemo(() => {
     const counts = { Male: 0, Female: 0 };
     residentData.forEach((r) => {
@@ -219,7 +138,7 @@ export default function Reports() {
     return counts;
   }, [residentData]);
 
-  // ── RBI Form C age brackets (5-year increments matching physical form) ────────
+  // ── RBI Form C age brackets ──────────────────────────────────────────────────
   const AGE_BRACKETS = [
     { label: "Under 5 years old", min: 0, max: 4 },
     { label: "5–9 years old", min: 5, max: 9 },
@@ -321,22 +240,6 @@ export default function Reports() {
     }));
   }, [householdData, residentData]);
 
-  // ── CSV Export (Performance) ─────────────────────────────────────────────────
-  const handleExportCSV = () => {
-    const headers = ["Reference ID", "Category", "Service / Facility", "Sentiment", "Rating", "Comment", "User", "Date"];
-    const rows = filteredData.map((item) => [
-      item.referenceId, item.category, item.service, item.sentiment, item.rating,
-      `"${(item.comment || "").replace(/"/g, '""')}"`, item.userName, item.date,
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `performance_report_${startDate || "all"}_to_${endDate || "all"}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    logTransaction(adminName, adminRole, "Exported CSV Report", `Total: ${filteredData.length}.`);
-  };
-
   // ── Demographics CSV Export ──────────────────────────────────────────────────
   const handleExportDemographicsCSV = () => {
     const headers = ["Full Name", "Sex", "Age", "Birth Date", "Civil Status", "Citizenship", "Occupation", "Household ID"];
@@ -351,57 +254,6 @@ export default function Reports() {
     a.href = url; a.download = `resident_demographics_${sexFilter}.csv`; a.click();
     URL.revokeObjectURL(url);
     logTransaction(adminName, adminRole, "Exported Demographics CSV", `Filter: ${sexFilter}. Total: ${filteredResidents.length}.`);
-  };
-
-  // ── Performance PDF Export ───────────────────────────────────────────────────
-  const handleExportPDF = async () => {
-    setExportLoading(true);
-    try {
-      const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF();
-      const pageH = doc.internal.pageSize.height;
-      let y = 20;
-      const checkPage = () => { if (y > pageH - 20) { doc.addPage(); y = 20; } };
-      const write = (text, indent = 14, bold = false, size = 10) => {
-        checkPage(); doc.setFont("helvetica", bold ? "bold" : "normal");
-        doc.setFontSize(size); doc.text(String(text), indent, y); y += 7;
-      };
-      write("Community Performance Report", 14, true, 16); y += 2;
-      write(`Date Range: ${startDate || "All"} — ${endDate || "All"}`);
-      write(`Generated: ${new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })}`);
-      y += 4;
-      write("Summary", 14, true, 12);
-      write(`Total Feedback: ${filteredData.length}`, 18);
-      write(`Positive: ${sentimentBreakdown.positive}`, 18);
-      write(`Neutral: ${sentimentBreakdown.neutral}`, 18);
-      write(`Negative: ${sentimentBreakdown.negative}`, 18);
-      y += 4;
-      write("Feedback Per Category", 14, true, 12);
-      Object.entries(categorizedServices).forEach(([cat, services]) => {
-        write(`${cat}:`, 18, true, 10);
-        services.forEach((svc) => write(`${svc}: ${feedbackPerService[svc] || 0}`, 24, false, 9));
-        y += 2;
-      });
-      write("Sentiment Breakdown Per Category", 14, true, 12);
-      Object.entries(categorySentiment).forEach(([cat, s]) => {
-        const total = s.positive + s.neutral + s.negative;
-        const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
-        write(`${cat} (Total: ${total}):`, 18, true, 10);
-        write(`Positive: ${s.positive} (${pct(s.positive)}%)`, 24, false, 9);
-        write(`Neutral: ${s.neutral} (${pct(s.neutral)}%)`, 24, false, 9);
-        write(`Negative: ${s.negative} (${pct(s.negative)}%)`, 24, false, 9);
-        y += 2;
-      });
-      write("Highlights", 14, true, 12);
-      write(`Most Positive: ${mostPositive.service} (${mostPositive.count})`, 18, false, 10);
-      write(`Most Negative: ${mostNegative.service} (${mostNegative.count})`, 18, false, 10);
-      doc.save(`performance_report_${startDate || "all"}_to_${endDate || "all"}.pdf`);
-      logTransaction(adminName, adminRole, "Exported PDF Report", `Total: ${filteredData.length}.`);
-    } catch (err) {
-      console.error("PDF export failed:", err);
-      alert("PDF export failed. Make sure jsPDF is installed:\nnpm install jspdf");
-    }
-    setExportLoading(false);
   };
 
   // ── Demographics PDF Export ──────────────────────────────────────────────────
@@ -452,7 +304,7 @@ export default function Reports() {
     setExportLoading(false);
   };
 
-  // ── RBI Form A PDF Export — one PDF per household ───────────────────────────
+  // ── RBI Form A PDF Export ────────────────────────────────────────────────────
   const handleExportRBIFormA = async () => {
     setExportLoading(true);
     try {
@@ -464,20 +316,17 @@ export default function Reports() {
         const pageH = doc.internal.pageSize.height;
         let y = 12;
 
-        // Title
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.text("RBI FORM A (Revised 2024)", 14, y);
         doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
         doc.text("RECORDS OF BARANGAY INHABITANTS BY HOUSEHOLD", pageW / 2, y, { align: "center" });
         y += 7;
 
-        // Header row (skip Region/Province/City/Barangay — filled manually)
         doc.setFontSize(8);
         doc.text(`HOUSEHOLD ADDRESS: ${hh.householdAddress || "—"}`, 14, y);
         doc.text(`NO. OF HOUSEHOLD MEMBERS: ${hh.members.length || hh.totalMembers}`, 175, y);
         y += 8;
 
-        // Column definitions
         const colDefs = [
           { label: "LAST NAME", x: 14, w: 33 },
           { label: "FIRST NAME", x: 47, w: 33 },
@@ -493,7 +342,6 @@ export default function Reports() {
           { label: "CATEGORY", x: 256, w: pageW - 256 - 14 },
         ];
 
-        // Header row
         doc.setFillColor(230, 236, 245);
         doc.rect(14, y, pageW - 28, 8, "F");
         doc.setFont("helvetica", "bold"); doc.setFontSize(6);
@@ -503,7 +351,6 @@ export default function Reports() {
         });
         y += 8;
 
-        // Member rows — minimum 8 rows displayed
         doc.setFont("helvetica", "normal"); doc.setFontSize(7);
         const minRows = Math.max(8, hh.members.length);
         for (let i = 0; i < minRows; i++) {
@@ -539,7 +386,6 @@ export default function Reports() {
         }
 
         y += 10;
-        // Signatures
         doc.setFontSize(7.5);
         doc.text("Prepared by:", 14, y); y += 5;
         doc.line(14, y, 75, y);
@@ -579,7 +425,6 @@ export default function Reports() {
 
       const checkPage = () => { if (y > pageH - 28) { doc.addPage(); y = 14; } };
 
-      // Title
       doc.setFont("helvetica", "bold"); doc.setFontSize(11);
       doc.text("RBI FORM C (Revised 2024)", 14, y);
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
@@ -587,13 +432,11 @@ export default function Reports() {
       doc.text(`Generated: ${new Date().toLocaleDateString("en-PH")}`, pageW - 14, y, { align: "right" });
       y += 8;
 
-      // Summary counts
       doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
       doc.text(`Total No. of Barangay Inhabitants: ${residentData.length}`, 14, y); y += 5;
       doc.text(`Total No. of Households: ${householdData.length}`, 14, y); y += 5;
       doc.text(`Total No. of Families: ${householdData.length}`, 14, y); y += 9;
 
-      // Table layout
       const COL_X = { ind: 14, male: 120, female: 146, total: 170, remarks: 192 };
       const COL_W = { ind: 105, male: 25, female: 25, total: 21, remarks: pageW - 192 - 4 };
 
@@ -633,7 +476,6 @@ export default function Reports() {
         y += rowH;
       };
 
-      // Draw all sections
       drawTableHeader();
       drawSectionHeader("Population by Age Bracket:");
       rbiFormCData.ageBrackets.forEach((b) => drawDataRow(b.label, b.male, b.female));
@@ -650,7 +492,6 @@ export default function Reports() {
       drawSectionHeader("Citizenship:");
       rbiFormCData.citizenshipRows.forEach((s) => drawDataRow(s.label, s.male, s.female));
 
-      // Total row
       y += 4; checkPage();
       doc.setFillColor(215, 228, 243);
       doc.rect(COL_X.ind, y, pageW - 28, 7, "F");
@@ -662,7 +503,6 @@ export default function Reports() {
       doc.text(String(residentData.length), COL_X.total + 16, y + 5, { align: "right" });
       y += 16;
 
-      // Signatures
       checkPage();
       doc.setFont("helvetica", "normal"); doc.setFontSize(8);
       doc.text("Prepared by:", 14, y); y += 5;
@@ -691,6 +531,82 @@ export default function Reports() {
   const tdNum = { ...tdStyle, textAlign: "right", fontWeight: "600" };
   const thNum = { ...thStyle, textAlign: "right" };
 
+  const totalDemoPages = Math.ceil(filteredResidents.length / ITEMS_PER_PAGE);
+  const paginatedResidents = filteredResidents.slice(
+    (demoPage - 1) * ITEMS_PER_PAGE,
+    demoPage * ITEMS_PER_PAGE
+  );
+
+  const totalRbiAPages = Math.ceil(rbiFormAData.length / ITEMS_PER_PAGE);
+  const paginatedRbiA = rbiFormAData.slice(
+    (rbiAPage - 1) * ITEMS_PER_PAGE,
+    rbiAPage * ITEMS_PER_PAGE
+  );
+
+  // ── Pagination Helper ────────────────────────────────────────────────────────
+  const renderPaginationControls = (currentPage, totalPages, setPageFn) => {
+    if (totalPages <= 1) return null;
+
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    if (endPage - startPage + 1 < maxVisible) {
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    const btnStyle = { padding: "6px 12px", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "13px" };
+
+    return (
+      <div style={{ display: "flex", gap: "4px" }}>
+        <button
+          onClick={() => setPageFn(p => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          style={{ ...btnStyle, background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+        >
+          Prev
+        </button>
+        
+        {startPage > 1 && (
+          <>
+            <button onClick={() => setPageFn(1)} style={{ ...btnStyle, background: "#fff", color: "#374151" }}>1</button>
+            {startPage > 2 && <span style={{ padding: "6px 4px", color: "#6b7280" }}>...</span>}
+          </>
+        )}
+
+        {pages.map(i => (
+          <button
+            key={i}
+            onClick={() => setPageFn(i)}
+            style={{ ...btnStyle, background: currentPage === i ? "#2563eb" : "#fff", color: currentPage === i ? "#fff" : "#374151", fontWeight: currentPage === i ? "bold" : "normal" }}
+          >
+            {i}
+          </button>
+        ))}
+
+        {endPage < totalPages && (
+          <>
+            {endPage < totalPages - 1 && <span style={{ padding: "6px 4px", color: "#6b7280" }}>...</span>}
+            <button onClick={() => setPageFn(totalPages)} style={{ ...btnStyle, background: "#fff", color: "#374151" }}>{totalPages}</button>
+          </>
+        )}
+
+        <button
+          onClick={() => setPageFn(p => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          style={{ ...btnStyle, background: currentPage === totalPages ? "#f3f4f6" : "#fff", color: currentPage === totalPages ? "#9ca3af" : "#374151", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+        >
+          Next
+        </button>
+      </div>
+    );
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <AdminLayout>
@@ -699,7 +615,7 @@ export default function Reports() {
         {/* ── TABS ── */}
         <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
           {[
-            { key: "performance", label: "Performance Report" },
+            // 👇 The Performance Report tab has been removed from this list
             { key: "demographics", label: "Demographics" },
             { key: "rbi-a", label: "RBI Form A" },
             { key: "rbi-c", label: "RBI Form C" },
@@ -713,91 +629,13 @@ export default function Reports() {
           ))}
         </div>
 
-        {/* ══ PERFORMANCE REPORT ══════════════════════════════════════════════ */}
-        {reportType === "performance" && (
-          <>
-            <div className="card-grid">
-              <div className="card">Total Feedback<br /><strong>{loading ? "…" : filteredData.length}</strong></div>
-              <div className="card">Positive<br /><strong>{loading ? "…" : sentimentBreakdown.positive}</strong></div>
-              <div className="card">Neutral<br /><strong>{loading ? "…" : sentimentBreakdown.neutral}</strong></div>
-              <div className="card">Negative<br /><strong>{loading ? "…" : sentimentBreakdown.negative}</strong></div>
-            </div>
-            <div className="section">
-              <div className="report-header">
-                <h2>Community Performance Report</h2>
-                <div className="report-controls">
-                  <div className="filter-group"><label>Start</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
-                  <div className="filter-group"><label>End</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
-                  <button className="clear-btn" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
-                  <button className="export-btn" onClick={handleExportCSV} disabled={loading || filteredData.length === 0}>Export CSV</button>
-                  <button className="export-btn" onClick={handleExportPDF} disabled={loading || exportLoading || filteredData.length === 0}>
-                    {exportLoading ? "Generating…" : "Export PDF"}
-                  </button>
-                </div>
-              </div>
-              {loading ? (
-                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>Loading feedback data…</div>
-              ) : filteredData.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No feedback found for the selected date range.</div>
-              ) : (
-                <div className="reports-grid">
-                  <div className="report-card">
-                    <h3>Total Feedback per Category</h3>
-                    <ul>
-                      {Object.entries(categorizedServices).map(([cat, services]) => (
-                        <li key={cat}><strong>{cat}</strong>
-                          <ul className="sub-list">{services.map((svc) => (<li key={svc}>{svc}: {feedbackPerService[svc] || 0}</li>))}</ul>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="report-card">
-                    <h3>Sentiment Breakdown per Category</h3>
-                    {Object.entries(categorySentiment).map(([category, sentiments]) => {
-                      const total = sentiments.positive + sentiments.neutral + sentiments.negative;
-                      return (
-                        <div key={category} className="category-sentiment">
-                          <strong>{category}</strong>
-                          <div className="sentiment-box">
-                            {["positive", "neutral", "negative"].map((type) => {
-                              const count = sentiments[type];
-                              const pct = total ? Math.round((count / total) * 100) : 0;
-                              return (
-                                <div key={type} className={`sentiment-pill ${type}`}>
-                                  <div className="sentiment-label">{type.charAt(0).toUpperCase() + type.slice(1)}: {count} ({pct}%)</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="report-card split-card">
-                    <div className="stat-block">
-                      <h3>Most Positive Service</h3>
-                      <p className="highlight-positive">{mostPositive.service}</p>
-                      <span className="stat-sub">({mostPositive.count} Positives)</span>
-                    </div>
-                    <div className="stat-block">
-                      <h3>Most Negative Service</h3>
-                      <p className="highlight-negative">{mostNegative.service}</p>
-                      <span className="stat-sub">({mostNegative.count} Negatives)</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
         {/* ══ DEMOGRAPHICS ════════════════════════════════════════════════════ */}
         {reportType === "demographics" && (
           <>
             <div className="card-grid">
-              <div className="card">Total Residents<br /><strong>{filteredStats.total}</strong></div>
-              <div className="card">Male<br /><strong>{filteredStats.Male}</strong></div>
-              <div className="card">Female<br /><strong>{filteredStats.Female}</strong></div>
+              <div className="card">Total Residents<br /><strong>{loading ? "..." : filteredStats.total}</strong></div>
+              <div className="card">Male<br /><strong>{loading ? "..." : filteredStats.Male}</strong></div>
+              <div className="card">Female<br /><strong>{loading ? "..." : filteredStats.Female}</strong></div>
             </div>
             <div className="section">
               <div className="report-header">
@@ -818,7 +656,10 @@ export default function Reports() {
                   </button>
                 </div>
               </div>
-              {filteredResidents.length === 0 ? (
+              
+              {loading ? (
+                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>Loading resident data…</div>
+              ) : filteredResidents.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No residents found.</div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -827,7 +668,7 @@ export default function Reports() {
                       <tr>{["Full Name", "Sex", "Age", "Civil Status", "Citizenship", "Occupation", "Household ID"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
-                      {filteredResidents.map((r, index) => (
+                      {paginatedResidents.map((r, index) => (
                         <tr key={`${r.id}-${index}`}>
                           <td style={tdStyle}>{r.fullName}</td>
                           <td style={tdStyle}>{r.sex}</td>
@@ -840,6 +681,14 @@ export default function Reports() {
                       ))}
                     </tbody>
                   </table>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                      Showing {filteredResidents.length > 0 ? (demoPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(demoPage * ITEMS_PER_PAGE, filteredResidents.length)} of {filteredResidents.length} entries
+                    </span>
+                    
+                    {/* Inject the numbered buttons! */}
+                    {renderPaginationControls(demoPage, totalDemoPages, setDemoPage)}
+                  </div>
                 </div>
               )}
             </div>
@@ -879,7 +728,7 @@ export default function Reports() {
                       <tr>{["Household ID", "Household Address", "No. of Members", "Head of Household", "Members Preview"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
-                      {rbiFormAData.map((hh) => {
+                      {paginatedRbiA.map((hh) => {
                         const head = hh.members.find((m) => m.role === "head");
                         return (
                           <tr key={hh.id}>
@@ -898,6 +747,15 @@ export default function Reports() {
                       })}
                     </tbody>
                   </table>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                      Showing {rbiFormAData.length > 0 ? (rbiAPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(rbiAPage * ITEMS_PER_PAGE, rbiFormAData.length)} of {rbiFormAData.length} entries
+                    </span>
+                    
+                    {/* Inject the numbered buttons! */}
+                    {renderPaginationControls(rbiAPage, totalRbiAPages, setRbiAPage)}
+                  </div>
                 </div>
               )}
             </div>
