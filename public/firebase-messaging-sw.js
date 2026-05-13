@@ -1,34 +1,32 @@
 // public/firebase-messaging-sw.js
 
-// Import Firebase App & Messaging from the CDN (Compat version)
-importScripts("https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.9.0/firebase-messaging-compat.js");
+// Import the Firebase SDK for Firebase Cloud Messaging (FCM)
+import { initializeApp } from "firebase/app";
+import { getMessaging, onBackgroundMessage } from "firebase/messaging/sw";
 
-// Initialize the Firebase app in the service worker
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyD_KHXT4JA1nUJQoOJjS562iBc5FBn-XRU",
   authDomain: "sense-27203.firebaseapp.com",
   projectId: "sense-27203",
-  storageBucket: "sense-27203.firebasestorage.app",
+  storageBucket: "sense-27203.appspot.com",
   messagingSenderId: "884277728129",
   appId: "1:884277728129:web:70dd4f699e21b82d164e80",
   measurementId: "G-7SR3JLXD3N"
 };
 
-firebase.initializeApp(firebaseConfig);
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
 
-// Retrieve an instance of Firebase Messaging so it can handle background messages
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
+// Handle background messages
+onBackgroundMessage(messaging, (payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'System Notification';
-  const notificationBody  = payload.notification?.body  || payload.data?.message || '';
+  const notificationTitle = payload.data?.title || 'System Notification';
+  const notificationBody = payload.data?.message || '';
 
-  // Use a stable tag derived from the content to prevent OS-level duplication.
-  // If the same message arrives twice, the browser replaces the existing notification
-  // instead of showing a second one.
+  // Use a stable tag derived from the content to prevent OS-level duplication
   const tagSource = `${notificationTitle}__${notificationBody}`;
   let hash = 0;
   for (let i = 0; i < tagSource.length; i++) {
@@ -39,8 +37,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationOptions = {
     body: notificationBody,
     icon: '/barangay-logo.jpg',
-    tag: dedupeTag,          // OS deduplication key
-    renotify: false,         // do NOT re-vibrate/re-sound if tag already exists
+    tag: dedupeTag,
+    renotify: false,
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
