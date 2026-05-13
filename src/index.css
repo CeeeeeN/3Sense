@@ -11268,6 +11268,15 @@ h4,
     grid-template-columns: 1fr;
   }
 
+  /* Hide the two empty spacer divs in the "Please specify" row and make the field full-width */
+  .dr-field-row:has(.dr-field--other-specify)>div:not(.dr-field--other-specify) {
+    display: none;
+  }
+
+  .dr-field--other-specify {
+    grid-column: 1 / -1;
+  }
+
   .dr-review-grid {
     grid-template-columns: 1fr;
   }

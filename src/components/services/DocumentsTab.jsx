@@ -187,7 +187,7 @@ function Step2({ docType, form, setForm, errors }) {
         {errors.address && <span className="sv-error-msg">{errors.address}</span>}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+      <div className="dr-field-row">
         <div className="dr-field">
           <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.contact ? " sv-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
@@ -213,10 +213,10 @@ function Step2({ docType, form, setForm, errors }) {
       </div>
 
       {form.purposeOption === "Other" && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+        <div className="dr-field-row">
           <div />
           <div />
-          <div className="dr-field">
+          <div className="dr-field dr-field--other-specify">
             <label className="sv-label">Please specify <span className="sv-required">*</span></label>
             <input
               className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}

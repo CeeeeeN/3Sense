@@ -36,15 +36,6 @@
   }
 }
 
-@keyframes fm-ring-spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 /* ── Overlay ───────────────────────────────────────────────── */
 
@@ -96,8 +87,6 @@
   right: 0;
   height: 4px;
   background: linear-gradient(90deg, #0d7a55 0%, #16a369 50%, #0d7a55 100%);
-  background-size: 200% 100%;
-  animation: fm-ring-spin 4s linear infinite;
   border-radius: 24px 24px 0 0;
 }
 
