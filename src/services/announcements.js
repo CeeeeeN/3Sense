@@ -51,7 +51,7 @@ const fanOutAnnouncementNotification = async ({ title, description, category, an
         createUserNotification(
           householdID,                           // householdID field
           "household",                           // residentID = "household" for household-wide
-          `📢 New Announcement`,
+          `New Announcement`,
           `${title} — ${description}`.slice(0, 200),
           "announcement",
           announcementID                         // refNum — used to deep-link to the announcement

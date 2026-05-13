@@ -553,6 +553,7 @@ export default function ManageFacilities() {
                       <button key={d} 
                         className={`sv-cal-cell sv-cal-cell--${isBlocked ? "reserved" : "available"}`}
                         onClick={() => toggleDate(dateStr)}
+                        style={{ cursor: 'pointer' }}
                       >
                         {d}
                       </button>
