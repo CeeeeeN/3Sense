@@ -108,6 +108,15 @@ export default function UserApp() {
     }
   }, [userID, page]);
 
+  // Request push notifications permission on login
+  useEffect(() => {
+    if (householdID && memberID) {
+      requestPushPermission(householdID, memberID);
+      const unsubscribe = listenForForegroundMessages();
+      return () => unsubscribe();
+    }
+  }, [householdID, memberID]);
+
   // Save session to localStorage
   useEffect(() => {
     try {

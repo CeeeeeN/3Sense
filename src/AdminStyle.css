@@ -274,8 +274,16 @@ nav {
   background: var(--bg);
 }
 .admin-layout .left-panel {
-  @apply flex flex-col justify-between text-[white] relative overflow-hidden sticky h-screen p-8 top-0 before:content-[''] before:absolute before:top-[-120px] before:right-[-120px] before:w-[400px] before:h-[400px] before:pointer-events-none before:z-0 before:rounded-[50%];
-  background: #10292d;
+  @apply flex flex-col text-white relative sticky top-0 h-screen p-8 overflow-y-auto overflow-x-hidden bg-[#10292d];
+}
+.admin-layout .left-panel::-webkit-scrollbar {
+  @apply w-1.5;
+}
+.admin-layout .left-panel::-webkit-scrollbar-thumb {
+  @apply rounded-[10px] bg-white/20;
+}
+.admin-layout .left-panel::-webkit-scrollbar-track {
+  @apply bg-transparent;
 }
 .admin-layout .left-panel::before {
   background: radial-gradient(
@@ -321,7 +329,7 @@ nav {
   @apply w-[18px] h-[18px] shrink-0;
 }
 .sidebar-bottom {
-  @apply flex flex-col gap-[0.8rem] mt-auto;
+  @apply flex flex-col gap-[0.8rem] mt-auto pt-6;
 }
 .admin-layout .logout-link {
   @apply text-[white] no-underline font-semibold transition-[0.2s] self-stretch text-center flex items-center gap-[0.6rem] justify-center mt-auto px-4 py-[0.6rem] rounded-lg;
@@ -1425,13 +1433,13 @@ nav {
   background: var(--primary);
 }
 .profile-card {
-  @apply block border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
+  @apply border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
   background: white;
 }
 .profile-header {
   @apply flex items-center gap-4 mb-6;
 }
-.profile-grid {
+.admin-profile-grid {
   @apply grid grid-cols-[repeat(2,1fr)] gap-4;
 }
 .profile-grid .full-width {

@@ -192,7 +192,7 @@ export default function AdminProfile() {
             </button>
           </div>
 
-          <div className="profile-card">
+          <div className="profile-card" style={{ display: "block" }}>
             <div className="profile-header">
               <div>
                 <h3>{form.fullName}</h3>
@@ -200,7 +200,7 @@ export default function AdminProfile() {
               </div>
             </div>
 
-            <div className="profile-grid">
+            <div className="admin-profile-grid">
               <div className="field">
                 <label>Full Name</label>
                 <div className="input-wrap">
@@ -254,8 +254,8 @@ export default function AdminProfile() {
             </button>
           </div>
 
-          <div className="profile-card">
-            <div className="profile-grid">
+          <div className="profile-card" style={{ display: "block" }}>
+            <div className="admin-profile-grid">
 
               {/* CURRENT PASSWORD */}
               <div className="field full-width">
