@@ -6,23 +6,34 @@ const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
 // Request notification permission, generate FCM token, and store it for the specified user.
 
-export const requestPushPermission = async (userID) => {
-  if (!userID) return;
+export const requestPushPermission = async (householdID, residentID) => {
+  if (!householdID || !residentID) return;
 
-  if (!("Notification" in window)) {
-    console.log("This browser does not support desktop notification");
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+    console.log("This browser does not support desktop notification or service workers");
     return;
   }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+      // Explicitly register the service worker for Vercel/Vite
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      
+      const token = await getToken(messaging, { 
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration 
+      });
+
       if (token) {
-        // Save token to Firestore array
-        const userFcmRef = doc(db, "fcmTokens", userID);
+        // Save token using the token itself as the document ID
+        // This prevents duplicates and allows us to store the householdID & residentID as fields to be queried
+        const userFcmRef = doc(db, "fcmTokens", token);
         await setDoc(userFcmRef, {
-          tokens: arrayUnion(token)
+          token: token,
+          householdID: householdID,
+          residentID: residentID,
+          updatedAt: new Date()
         }, { merge: true });
 
         console.log("FCM Token saved successfully.");
