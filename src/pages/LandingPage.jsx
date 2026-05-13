@@ -1,13 +1,177 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useEffect, useRef } from "react";
 
+// ── DATA ────────────────────────────────────────────────────────────────────
+
 const QR_PATTERN = [
-  true, true, true, false, true,
-  true, false, true, true, false,
-  true, true, false, true, true,
-  false, true, true, false, true,
-  true, false, true, true, true,
+  true,  true,  true,  false, true,
+  true,  false, true,  true,  false,
+  true,  true,  false, true,  true,
+  false, true,  true,  false, true,
+  true,  false, true,  true,  true,
 ];
+
+const FEATURES = [
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#317D89" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    ),
+    bg: "rgba(49,125,137,0.08)",
+    title: "Household Management",
+    desc: "Register and manage your household profile. Add members, update information, and maintain a complete household record.",
+    delay: 0,
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b07800" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    ),
+    bg: "#fff8e6",
+    title: "Document Requests",
+    desc: "Request barangay clearances, certificates, and other documents online. Track status in real time without visiting the office.",
+    delay: 0.1,
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d7a55" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <path d="M14 14h.01M14 17h.01M17 14h.01M20 14h.01M17 17h3v3h-3zM20 17h.01"/>
+      </svg>
+    ),
+    bg: "#edfaf5",
+    title: "QR Verification",
+    desc: "Scan official barangay QR codes to verify your visit and unlock the feedback system for continuous service improvement.",
+    delay: 0.2,
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#703381" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    ),
+    bg: "#f3eeff",
+    title: "Facility Reservations",
+    desc: "Book the Barangay Multi-Purpose Hall and other facilities. Check real-time availability and submit reservations for approval.",
+    delay: 0.05,
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e03e3e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    ),
+    bg: "#ffe8e8",
+    title: "Emergency Access",
+    desc: "One-tap access to emergency hotlines, evacuation guidelines, and disaster protocols whenever you need them most.",
+    delay: 0.15,
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a4f8a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3z"/>
+        <path d="M14 21a2 2 0 0 1-4 0"/>
+      </svg>
+    ),
+    bg: "rgba(26,79,138,0.07)",
+    title: "Category-Based Announcements",
+    desc: "Receive personalized announcements based on your category. Stay informed about relevant news, events, and updates in your community.",
+    delay: 0.25,
+  },
+];
+
+const ANNOUNCEMENTS = [
+  { color: "#317D89", text: "Free Medical Mission – Feb 22",    time: "2 hours ago" },
+  { color: "#e8a020", text: "Scholarship Applications Open",    time: "Yesterday"   },
+  { color: "#0d7a55", text: "Barangay Clean-Up Drive",          time: "Feb 17"      },
+];
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    n: "1",
+    title: "Register Your Household",
+    desc: "Fill out the household registration form with your personal and address details. Submit for Barangay review and approval.",
+    delay: 0,
+  },
+  {
+    n: "2",
+    title: "Activate Your Account",
+    desc: "Once approved, use your assigned Household ID to activate your account, set your password, and add household members.",
+    delay: 0.1,
+  },
+  {
+    n: "3",
+    title: "Login & Set Your PIN",
+    desc: "Log in with your Household ID and password, then set a secure 4-digit PIN for quick and easy access.",
+    delay: 0.2,
+  },
+  {
+    n: "4",
+    title: "Access All Barangay Services",
+    desc: "Request documents, reserve facilities, scan QR codes, submit feedback, and stay updated — all from your dashboard.",
+    delay: 0.3,
+  },
+];
+
+// ── SUB-COMPONENTS ───────────────────────────────────────────────────────────
+
+function FeatureCard({ icon, bg, title, desc, delay }) {
+  return (
+    <div
+      className="lp-feature-card lp-reveal"
+      style={{ transitionDelay: `${delay}s` }}
+    >
+      <div className="lp-feature-icon" style={{ background: bg }}>
+        {icon}
+      </div>
+      <h3>{title}</h3>
+      <p>{desc}</p>
+    </div>
+  );
+}
+
+function HowItWorksStep({ n, title, desc, delay }) {
+  return (
+    <div
+      className="lp-step lp-reveal"
+      style={{ transitionDelay: `${delay}s` }}
+    >
+      <div className="lp-step-num">{n}</div>
+      <div className="lp-step-text">
+        <h4>{title}</h4>
+        <p>{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+function AnnouncementItem({ color, text, time }) {
+  return (
+    <div className="lp-mockup-ann-item">
+      <div className="lp-ann-dot" style={{ background: color }} />
+      <div>
+        <p>{text}</p>
+        <span>{time}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function LandingPage({ onLoginClick, onRegisterClick }) {
   const navRef = useRef(null);
@@ -115,51 +279,35 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
           </p>
           <div className="lp-hero-cta">
             <button className="lp-btn-primary" onClick={handleRegister}>
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                viewBox="0 0 24 24"
-              >
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
               </svg>
               Register Household
             </button>
             <button className="lp-btn-secondary" onClick={onLoginClick}>
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                viewBox="0 0 24 24"
-              >
-                <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
-                <polyline points="10 17 15 12 10 7" />
-                <line x1="15" y1="12" x2="3" y2="12" />
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
               </svg>
               Login to Account
             </button>
           </div>
         </div>
 
-        {/* Dashboard Mockup */}
+        {/* ── Dashboard Mockup ── */}
         <div className="lp-hero-visual">
           <div style={{ position: "relative", padding: "20px" }}>
             <div className="lp-dashboard-mockup">
               <div className="lp-mockup-topbar">
                 <div className="lp-mockup-topbar-left">My Dashboard</div>
                 <div className="lp-mockup-dots">
-                  <span />
-                  <span />
-                  <span />
+                  <span /><span /><span />
                 </div>
               </div>
               <div className="lp-mockup-body">
-                <div className="lp-mockup-greeting">Good Morning! 👋</div>
+                <div className="lp-mockup-greeting">Good Morning!</div>
                 <div className="lp-mockup-sub">
                   Here's what's happening in your barangay today.
                 </div>
@@ -177,54 +325,21 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
                     <div className="lp-mockup-card-value">5</div>
                   </div>
                   <div className="lp-mockup-card light">
-                    <div
-                      className="lp-mockup-card-label"
-                      style={{ color: "var(--muted)" }}
-                    >
+                    <div className="lp-mockup-card-label" style={{ color: "var(--muted)" }}>
                       Status
                     </div>
                     <div
                       className="lp-mockup-card-value"
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "#0d7a55",
-                        fontWeight: 700,
-                        marginTop: 4,
-                      }}
+                      style={{ fontSize: "0.85rem", color: "#0d7a55", fontWeight: 700, marginTop: 4 }}
                     >
                       ✓ Clear
                     </div>
                   </div>
                 </div>
                 <div className="lp-mockup-announcements">
-                  <div className="lp-mockup-ann-header">📢 Announcements</div>
-                  {[
-                    {
-                      color: "#317D89",
-                      text: "Free Medical Mission – Feb 22",
-                      time: "2 hours ago",
-                    },
-                    {
-                      color: "#e8a020",
-                      text: "Scholarship Applications Open",
-                      time: "Yesterday",
-                    },
-                    {
-                      color: "#0d7a55",
-                      text: "Barangay Clean-Up Drive",
-                      time: "Feb 17",
-                    },
-                  ].map((item, i) => (
-                    <div className="lp-mockup-ann-item" key={i}>
-                      <div
-                        className="lp-ann-dot"
-                        style={{ background: item.color }}
-                      />
-                      <div>
-                        <p>{item.text}</p>
-                        <span>{item.time}</span>
-                      </div>
-                    </div>
+                  <div className="lp-mockup-ann-header">Announcements</div>
+                  {ANNOUNCEMENTS.map((item, i) => (
+                    <AnnouncementItem key={i} {...item} />
                   ))}
                 </div>
               </div>
@@ -249,64 +364,8 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
             </p>
           </div>
           <div className="lp-features-grid">
-            {[
-              {
-                icon: "🏠",
-                bg: "rgba(49,125,137,0.08)",
-                title: "Household Management",
-                desc: "Register and manage your household profile. Add members, update information, and maintain a complete household record.",
-                delay: 0,
-              },
-              {
-                icon: "📋",
-                bg: "#fff8e6",
-                title: "Document Requests",
-                desc: "Request barangay clearances, certificates, and other documents online. Track status in real time without visiting the office.",
-                delay: 0.1,
-              },
-              {
-                icon: "📡",
-                bg: "#edfaf5",
-                title: "QR Verification",
-                desc: "Scan official barangay QR codes to verify your visit and unlock the feedback system for continuous service improvement.",
-                delay: 0.2,
-              },
-              {
-                icon: "🗓️",
-                bg: "#f3eeff",
-                title: "Facility Reservations",
-                desc: "Book the Barangay Multi-Purpose Hall and other facilities. Check real-time availability and submit reservations for approval.",
-                delay: 0.05,
-              },
-              {
-                icon: "🚨",
-                bg: "#ffe8e8",
-                title: "Emergency Access",
-                desc: "One-tap access to emergency hotlines, evacuation guidelines, and disaster protocols whenever you need them most.",
-                delay: 0.15,
-              },
-              {
-                icon: "📊",
-                bg: "rgba(26,79,138,0.07)",
-                title: "Category-Based Announcements",
-                desc: "Receive personalized announcements based on your category. Stay informed about relevant news, events, and updates in your community.",
-                delay: 0.25,
-              },
-            ].map((f, i) => (
-              <div
-                className="lp-feature-card lp-reveal"
-                key={i}
-                style={{ transitionDelay: `${f.delay}s` }}
-              >
-                <div
-                  className="lp-feature-icon"
-                  style={{ background: f.bg }}
-                >
-                  {f.icon}
-                </div>
-                <h3>{f.title}</h3>
-                <p>{f.desc}</p>
-              </div>
+            {FEATURES.map((f, i) => (
+              <FeatureCard key={i} {...f} />
             ))}
           </div>
         </div>
@@ -325,53 +384,18 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
               smooth and transparent.
             </p>
             <div className="lp-steps">
-              {[
-                {
-                  n: "1",
-                  title: "Register Your Household",
-                  desc: "Fill out the household registration form with your personal and address details. Submit for Barangay review and approval.",
-                  delay: 0,
-                },
-                {
-                  n: "2",
-                  title: "Activate Your Account",
-                  desc: "Once approved, use your assigned Household ID to activate your account, set your password, and add household members.",
-                  delay: 0.1,
-                },
-                {
-                  n: "3",
-                  title: "Login & Set Your PIN",
-                  desc: "Log in with your Household ID and password, then set a secure 4-digit PIN for quick and easy access.",
-                  delay: 0.2,
-                },
-                {
-                  n: "4",
-                  title: "Access All Barangay Services",
-                  desc: "Request documents, reserve facilities, scan QR codes, submit feedback, and stay updated — all from your dashboard.",
-                  delay: 0.3,
-                },
-              ].map((s, i) => (
-                <div
-                  className="lp-step lp-reveal"
-                  key={i}
-                  style={{ transitionDelay: `${s.delay}s` }}
-                >
-                  <div className="lp-step-num">{s.n}</div>
-                  <div className="lp-step-text">
-                    <h4>{s.title}</h4>
-                    <p>{s.desc}</p>
-                  </div>
-                </div>
+              {HOW_IT_WORKS_STEPS.map((s, i) => (
+                <HowItWorksStep key={i} {...s} />
               ))}
             </div>
           </div>
 
-          {/* QR Profile Mockup */}
+          {/* ── QR Profile Mockup ── */}
           <div className="lp-reveal" style={{ display: "flex", justifyContent: "center" }}>
             <div className="lp-qr-mockup">
               <div
                 style={{
-                  fontFamily: "'Poppins',sans-serif",
+                  fontFamily: "'Poppins', sans-serif",
                   fontSize: "0.68rem",
                   fontWeight: 700,
                   letterSpacing: "0.08em",
@@ -384,10 +408,7 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
               </div>
               <div className="lp-qr-box">
                 {QR_PATTERN.map((filled, i) => (
-                  <div
-                    key={i}
-                    className={`lp-qr-cell${filled ? "" : " empty"}`}
-                  />
+                  <div key={i} className={`lp-qr-cell${filled ? "" : " empty"}`} />
                 ))}
               </div>
               <div className="lp-qr-name">Household Head</div>
@@ -417,15 +438,8 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
         <div className="db-footer-inner">
           <div className="db-footer-top">
             <div className="db-footer-brand">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
               <span>Barangay 3S+ Malanday</span>
               <span className="db-footer-divider">|</span>

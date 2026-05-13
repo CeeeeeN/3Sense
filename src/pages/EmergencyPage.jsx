@@ -3,9 +3,11 @@ import { PhoneIcon, AlertTriangleIcon, MapPinIcon, ShieldAlertIcon, ListIcon, Ch
 // DATA
 
 const HOTLINES = [
-  { id: "brgy",     name: "Barangay Office Landline",         number: "02-8926-7327",  sub: "Available 24/7 for barangay emergencies", variant: "red", primary: true },
-  { id: "brgy",     name: "Barangay Office Hotline",          number: "0927-373-6727", sub: "Available 24/7 for barangay emergencies"},
+  { id: "brgy",     name: "Barangay Office Hotline",          number: "0927-373-6727",  sub: "Available 24/7 for barangay emergencies", variant: "red", primary: true },
+  { id: "brgy",     name: "Barangay Office Landline",         number: "02-8926-7327",   sub: "Available 24/7 for barangay emergencies"},
+  { id: "city",     name: "City Hall",                        number: "02-8352-1000"},
   { id: "brgy",     name: "Barangay Tanod",                   number: "02-8962-7325",  sub: "Available 24/7 for barangay emergencies"},
+  { id: "brgy",     name: "Task Force Disiplina",             number: "02-8352-8000",  sub: "Available 24/7 for barangay emergencies"},
   { id: "health",   name: "Valenzuela Medical Center",        number: "02-8294-6711",  sub: "Medical assistance & first aid"},
   { id: "fire",     name: "Valenzuela Fire Station",          number: "02-8292-3519",  sub: "Bureau of Fire Protection"},
   { id: "police",   name: "Valenzuela Police Station",        number: "02-8352-4000",  sub: "PNP"},
@@ -13,14 +15,19 @@ const HOTLINES = [
 ];
 
 const EVACUATION_CENTERS = [
-  { id: "ev1", name: "Barangay Hall Multi-Purpose Area",  address: "Malanday, Valenzuela City",            capacity: "200 people",   status: "operational", floor: "Ground Floor"},
-  { id: "ev2", name: "Gen. T. De Leon Elementary School", address: "Gen. T. De Leon St., Valenzuela City", capacity: "500 people",   status: "operational", floor: "Main Building"},
-  { id: "ev3", name: "Valenzuela City Astrodome",         address: "Karuhatan, Valenzuela City",           capacity: "2,000 people", status: "standby",     floor: "Indoor Arena"},
+  { id: "ev1", name: "Andres Fernando Malanday Evacuation Site",  address: "Malanday, Valenzuela City",            capacity: "5000 people",},
+
 ];
 
 const SAFETY_REMINDERS = [
   {
-    icon: "🔥",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+      </svg>
+    ),
+    color: "#e03e3e",
+    bg: "rgba(224,62,62,0.10)",
     title: "Fire Emergency",
     items: [
       "Stay low and crawl under smoke",
@@ -30,7 +37,14 @@ const SAFETY_REMINDERS = [
     ],
   },
   {
-    icon: "🌊",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12h20M2 12c2-4 4-6 10-6s8 2 10 6M2 12c2 4 4 6 10 6s8-2 10-6"/>
+        <path d="M6 18c0 1.5 1.5 3 3 3M15 18c0 1.5 1.5 3 3 3"/>
+      </svg>
+    ),
+    color: "#1a56a0",
+    bg: "rgba(26,86,160,0.10)",
     title: "Flood / Typhoon",
     items: [
       "Avoid walking through floodwater, it could be electrically charged.",
@@ -40,7 +54,15 @@ const SAFETY_REMINDERS = [
     ],
   },
   {
-    icon: "🌍",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+        <path d="M2 12h20"/>
+      </svg>
+    ),
+    color: "#317D89",
+    bg: "rgba(49,125,137,0.10)",
     title: "Earthquake",
     items: [
       "Drop, Cover, and Hold On",
@@ -117,12 +139,27 @@ function EvacuationCard({ center }) {
 }
 
 function SafetyAccordion({ item }) {
-  const { icon, title, items } = item;
+  const { icon, color, bg, title, items } = item;
   return (
     <div className="em-accordion em-accordion--open">
       <div className="em-accordion__trigger" style={{ cursor: "default" }}>
         <div className="em-accordion__trigger-left">
-          <span className="em-accordion__emoji">{icon}</span>
+          <span
+            className="em-accordion__emoji"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              background: bg,
+              color: color,
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </span>
           <span className="em-accordion__title">{title}</span>
         </div>
       </div>

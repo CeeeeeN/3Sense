@@ -333,7 +333,7 @@ export default function UserApp() {
   // ── FEEDBACK FORM ──
   if (page === "feedback") {
     const currentUrlParams = new URLSearchParams(window.location.search);
-    if (!feedbackService && !currentUrlParams.get("serviceId")) {
+    if (!feedbackService && !currentUrlParams.get("serviceId") && !currentUrlParams.get("refId")) {
       setPage("scan");
       return null;
     }

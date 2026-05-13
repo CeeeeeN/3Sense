@@ -3,6 +3,7 @@ import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { subscribeToAnnouncements } from "../services/announcements";
+import FeedbackAlerts from "../components/Feedback/FeedbackAlerts";
 import {
   ScholarshipIcon, HealthIcon, AssistanceIcon,
   VerifiedVisitIcon, DocumentIcon, FeedbackIcon, BarangayStatusIcon,
@@ -377,6 +378,12 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       </div>
 
       <div className="db-content">
+
+        <FeedbackAlerts 
+          householdID={propsHouseholdID} 
+          residentID={memberID}
+          onNavigate={onNavigate}
+        />
 
         {/* ── 1. Your Summary ── */}
         <SectionCard icon={<GridIcon />} title="Your Summary" subtitle="Overview of your barangay activity">
