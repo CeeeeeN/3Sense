@@ -88,6 +88,10 @@ export const approveRegistration = async (docID) => {
       educationStatus: data.educationStatus || "",
       occupation: data.occupation || "",
       employmentStatus: data.employmentStatus || "",
+      
+      // SENSE-52: Cascade image URLs to the household record
+      idImageUrl: data.idImageUrl || "",
+      selfieImageUrl: data.selfieImageUrl || "",
     },
   });
 

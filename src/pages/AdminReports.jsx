@@ -195,9 +195,21 @@ export default function Reports() {
   // ── Demographics filter ──────────────────────────────────────────────────────
   const filteredResidents = useMemo(() => {
     if (sexFilter === "all") return residentData;
-    return residentData.filter((r) => r.sex.toLowerCase() === sexFilter.toLowerCase());
+    // Added safety check (r.sex || "") to prevent crashes
+    return residentData.filter((r) => (r.sex || "").toLowerCase() === sexFilter.toLowerCase());
   }, [residentData, sexFilter]);
 
+  // Calculates the stats dynamically based on the filtered data for the Demographics Tab
+  const filteredStats = useMemo(() => {
+    const counts = { Male: 0, Female: 0 };
+    filteredResidents.forEach((r) => {
+      if (r.sex === "Male") counts.Male++;
+      else if (r.sex === "Female") counts.Female++;
+    });
+    return { total: filteredResidents.length, ...counts };
+  }, [filteredResidents]);
+
+  // Global count (Used for RBI Forms to maintain accurate total population)
   const maleFemaleCount = useMemo(() => {
     const counts = { Male: 0, Female: 0 };
     residentData.forEach((r) => {
@@ -783,9 +795,9 @@ export default function Reports() {
         {reportType === "demographics" && (
           <>
             <div className="card-grid">
-              <div className="card">Total Residents<br /><strong>{residentData.length}</strong></div>
-              <div className="card">Male<br /><strong>{maleFemaleCount.Male}</strong></div>
-              <div className="card">Female<br /><strong>{maleFemaleCount.Female}</strong></div>
+              <div className="card">Total Residents<br /><strong>{filteredStats.total}</strong></div>
+              <div className="card">Male<br /><strong>{filteredStats.Male}</strong></div>
+              <div className="card">Female<br /><strong>{filteredStats.Female}</strong></div>
             </div>
             <div className="section">
               <div className="report-header">
@@ -815,8 +827,8 @@ export default function Reports() {
                       <tr>{["Full Name", "Sex", "Age", "Civil Status", "Citizenship", "Occupation", "Household ID"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
-                      {filteredResidents.map((r) => (
-                        <tr key={r.id}>
+                      {filteredResidents.map((r, index) => (
+                        <tr key={`${r.id}-${index}`}>
                           <td style={tdStyle}>{r.fullName}</td>
                           <td style={tdStyle}>{r.sex}</td>
                           <td style={tdStyle}>{r.age !== null ? r.age : "N/A"}</td>

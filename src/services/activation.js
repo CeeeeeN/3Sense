@@ -78,6 +78,10 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
 
         branchID: "BR-001",
 
+        // SENSE-52: Assign the images to the final Head Resident Profile
+        idImageUrl: head.idImageUrl || "",
+        selfieImageUrl: head.selfieImageUrl || "",
+
         pinHash:   null,
         createdAt: serverTimestamp(),
         addedAt:   serverTimestamp(),
