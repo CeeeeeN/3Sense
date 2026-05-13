@@ -290,9 +290,9 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         setRealUserName(firstName);
         setUserCategories(uCats);
 
-        const frSnap = await getDocs(query(collection(db, "facility_reservations"), where("householdID", "==", householdID)));
-        const drSnap = await getDocs(query(collection(db, "document_requests"), where("householdID", "==", householdID)));
-        const fbSnap = await getDocs(query(collection(db, "feedback"), where("householdID", "==", householdID)));
+        const frSnap = await getDocs(query(collection(db, "facility_reservations"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)));
+        const drSnap = await getDocs(query(collection(db, "document_requests"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)));
+        const fbSnap = await getDocs(query(collection(db, "feedback"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)));
 
         setWidgets([
           { icon: <VerifiedVisitIcon />, color: "teal", value: frSnap.size.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },

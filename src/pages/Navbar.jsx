@@ -134,7 +134,6 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                 onClick={() => {
                   setNotifOpen(v => !v);
                   setUserOpen(false);
-                  if (householdID && memberID) requestPushPermission(householdID, memberID);
                 }}
                 title="Notifications"
               >

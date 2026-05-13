@@ -51,10 +51,9 @@ function ProfileCard({ profile, selected, onSelect }) {
       </div>
       <div className="profile-info">
         <div className="profile-name">{profile.name}</div>
-        <div className={`profile-badge ${
-          profile.role === "Household Head" ? "badge-household-head" :
-          profile.role === "Branch Head" ? "badge-head" : "badge-member"
-        }`}>
+        <div className={`profile-badge ${profile.role === "Household Head" ? "badge-household-head" :
+            profile.role === "Branch Head" ? "badge-head" : "badge-member"
+          }`}>
           {profile.role === "Member" ? <MemberIcon /> : <HouseholdHeadIcon />}
           {profile.role}
         </div>
@@ -95,14 +94,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
   }
 
-  // Auto-expand all branches on load
-  useEffect(() => {
-    if (branches.length > 0) {
-      const allExpanded = {};
-      branches.forEach(b => { allExpanded[b.id] = true; });
-      setExpandedBranches(allExpanded);
-    }
-  }, [branches]);
+
 
   function switchScreen(s) {
     setScreen(s);
@@ -396,7 +388,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 {branches.map(branch => {
                   const branchProfiles = profiles.filter(p => p.branchID === branch.id);
                   if (branchProfiles.length === 0) return null;
-                  const isExpanded = expandedBranches[branch.id] !== false;
+                  const isExpanded = expandedBranches[branch.id] === true;
                   const hasSelected = branchProfiles.some(p => p.branchID === branch.id && selectedProfile?.id === p.id);
                   return (
                     <div
