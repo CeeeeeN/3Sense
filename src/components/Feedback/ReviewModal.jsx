@@ -64,11 +64,11 @@ export default function ReviewModal({ feedback, isOpen, onClose, onSave }) {
   const needsAI = feedback.status?.toLowerCase() === 'pending_ai' || feedback.status?.toLowerCase() === 'analysis_failed' || !feedback.sentiment;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div className="modal-header">
+    <div className="as-modal-overlay" onClick={onClose}>
+      <div className="as-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="as-modal-header">
           <h2>Feedback Review Panel</h2>
-          <button className="btn-close-icon" onClick={onClose}><X size={22} /></button>
+          <button className="as-modal-close" onClick={onClose}><X size={22} /></button>
         </div>
 
         <div className="modal-body">

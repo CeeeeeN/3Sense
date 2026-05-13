@@ -842,7 +842,6 @@ nav {
 .as-modal-desc {
   @apply text-gray-500 text-[15px] leading-normal mb-6;
 }
-
 /* The actual QR code container */
 .as-qr-holder {
   @apply bg-gray-50 border border mb-6 p-5 rounded-lg border-solid;
