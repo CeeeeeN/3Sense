@@ -17,29 +17,8 @@ const AVATAR_COLORS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // BACKEND PLACEHOLDER: validateIsGovernmentId
 // ─────────────────────────────────────────────────────────────────────────────
-// Calls a Firebase Cloud Function named "validateGovernmentId".
-// The Cloud Function should use Google Cloud Vision or the Anthropic API
-// (server-side — never expose API keys on the client) to check the image.
-//
-// Expected Cloud Function input:  { image: "data:image/jpeg;base64,..." }
-// Expected Cloud Function output: { isValid: boolean, reason: string, detectedType: string | null }
-//
-// TODO (backend):
-//   1. Create a Firebase Cloud Function named "validateGovernmentId"
-//   2. Inside it, call Cloud Vision or Anthropic API with the base64 image
-//   3. Return { isValid, reason, detectedType }
-//   4. Deploy, then replace the TEMPORARY PLACEHOLDER block below with:
-//
-//      const { getFunctions, httpsCallable } = await import("firebase/functions");
-//      const fn = httpsCallable(getFunctions(), "validateGovernmentId");
-//      const result = await fn({ image: imageBase64 });
-//      return result.data;
-// ─────────────────────────────────────────────────────────────────────────────
 async function validateIsGovernmentId(imageBase64) {
   try {
-    // ── TEMPORARY PLACEHOLDER ──────────────────────────────────────────────
-    // Simulates a valid response so the full UI flow works without a backend.
-    // Delete this block and uncomment the Cloud Function call above when ready.
     return new Promise((resolve) =>
       setTimeout(() => resolve({
         isValid: true,
@@ -48,7 +27,6 @@ async function validateIsGovernmentId(imageBase64) {
         idNumber: null,
       }), 1000)
     );
-    // ──────────────────────────────────────────────────────────────────────
   } catch (err) {
     console.error("[validateIsGovernmentId] Error:", err);
     return { isValid: null, reason: "Verification service unavailable. Please try again.", detectedType: null };
@@ -56,31 +34,10 @@ async function validateIsGovernmentId(imageBase64) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BACKEND PLACEHOLDER: extractIdData  (was: mockExtractText)
-// ─────────────────────────────────────────────────────────────────────────────
-// Calls a Firebase Cloud Function named "extractIdData".
-// The Cloud Function should run OCR (Google Cloud Vision Document AI recommended)
-// on the ID image and return structured field data.
-//
-// Expected Cloud Function input:  { image: "data:image/jpeg;base64,..." }
-// Expected Cloud Function output:
-//   { firstName, middleName, lastName, birthDate, idNumber, houseNumber, street, province }
-//
-// TODO (backend):
-//   1. Create a Firebase Cloud Function named "extractIdData"
-//   2. Inside it, run OCR on the image and map results to the fields above
-//   3. Deploy, then replace the TEMPORARY PLACEHOLDER block below with:
-//
-//      const { getFunctions, httpsCallable } = await import("firebase/functions");
-//      const fn = httpsCallable(getFunctions(), "extractIdData");
-//      const result = await fn({ image: imageBase64 });
-//      return result.data;
+// BACKEND PLACEHOLDER: extractIdData  
 // ─────────────────────────────────────────────────────────────────────────────
 async function extractIdData(imageBase64) {
   try {
-    // ── TEMPORARY PLACEHOLDER ──────────────────────────────────────────────
-    // Returns hardcoded mock data so autofill UI can be tested end-to-end.
-    // Delete this block and uncomment the Cloud Function call above when ready.
     return new Promise((resolve) =>
       setTimeout(() => resolve({
         firstName: "Maria",
@@ -93,10 +50,9 @@ async function extractIdData(imageBase64) {
         province: "Bulacan",
       }), 1800)
     );
-    // ──────────────────────────────────────────────────────────────────────
   } catch (err) {
     console.error("[extractIdData] Error:", err);
-    return {}; // Empty on failure — user fills fields manually
+    return {}; 
   }
 }
 
@@ -183,6 +139,13 @@ const SvgBranch = ({ size = 22 }) => (
     <path d="M6 9h6a3 3 0 013 3v3" />
   </svg>
 );
+// Added SvgHashtag for ID number
+const SvgHashtag = ({ size = 17 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
+  </svg>
+);
 
 // ─── Family Branch Step (with inline Create Branch modal) ────────────────────
 function AmFamilyBranchStep({ onConfirm, householdID }) {
@@ -208,7 +171,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
     } finally {
       setLoading(false);
     }
-  }, [householdID]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [householdID]); 
 
   useEffect(() => { if (householdID) fetchBranches(); }, [householdID, fetchBranches]);
 
@@ -642,11 +605,6 @@ function AmSelfieStep({ onConfirm }) {
   const capturePhoto = () => { const img = cam.capture(); cam.stop(); if (img) { setPreview(img); setMode("preview"); } };
   const retake = () => { setPreview(null); setUploadErr(null); setMode("idle"); cam.stop(); };
 
-  // TODO (backend): Optionally call a Firebase Cloud Function "verifySelfie"
-  // after confirmation for liveness / face-match against the ID photo.
-  // Input:  { selfie: base64, idImage: base64 }
-  // Output: { isLive: boolean, faceMatch: boolean, reason: string }
-
   return (
     <div>
       <div className="am-scan-header">
@@ -721,6 +679,7 @@ function AmSelfieStep({ onConfirm }) {
 
 // ─── Form steps tabs ──────────────────────────────────────────────────────────
 const BLANK_FORM = {
+  idNumber: "", 
   firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
   birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
   contactNumber: "", email: "", residingSinceYear: "",
@@ -737,7 +696,6 @@ const FORM_TABS = ["Personal Info", "Address", "Category", "Education"];
 
 export default function AddMembers({ onBack, onDone, householdID: propHouseholdID, hhAddress }) {
   const [outerStep, setOuterStep] = useState(0);
-  // outerStep: 0=FamilyBranch, 1=IDScan, 2=Selfie, 3+=formTabs
   const [familyBranch, setFamilyBranch] = useState(null);
   const [branchName, setBranchName] = useState("");
   const [needsHead, setNeedsHead] = useState(false);
@@ -778,24 +736,29 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const applyOcr = useCallback((data) => {
     const mapping = {
       firstName: "firstName", middleName: "middleName", lastName: "lastName",
-      birthDate: "birthDate",
+      birthDate: "birthDate", idNumber: "idNumber", 
       houseNumber: "houseNumber", street: "street", province: "province",
     };
+    
     const filled = new Set();
-    setForm(prev => {
-      const next = { ...prev };
-      Object.entries(mapping).forEach(([ocrKey, formKey]) => {
-        if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { next[formKey] = data[ocrKey]; filled.add(formKey); }
-      });
-      if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
-        const dob = new Date(data.birthDate); const today = new Date();
-        let age = today.getFullYear() - dob.getFullYear();
-        if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-        next.age = age > 0 ? String(age) : "";
+    const updates = {};
+    
+    Object.entries(mapping).forEach(([ocrKey, formKey]) => {
+      if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { 
+          updates[formKey] = data[ocrKey]; 
+          filled.add(formKey); 
       }
-      return next;
     });
-    setAutofilledFields(filled);
+
+    if (data.birthDate && !manuallyEdited.current.has("birthDate")) {
+      const dob = new Date(data.birthDate); const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
+      updates.age = age > 0 ? String(age) : "";
+    }
+
+    setForm((prev) => ({ ...prev, ...updates }));
+    setAutofilledFields((prev) => new Set([...prev, ...filled]));
   }, []);
 
   const set = (field) => (e) => {
@@ -868,10 +831,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const addMember = async () => {
     if (!validateTab(1) || !validateTab(4)) { setTab(1); return; }
 
-    // Branch head enforcement:
-    // - BR-001: no head reassignment ever
-    // - needsHead: this member MUST be the head
-    // - otherwise: regular member
     const isBR001 = familyBranch === "BR-001";
     const isHead = !isBR001 && (needsHead || form.isBranchHead);
 
@@ -896,7 +855,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
     }]);
 
-    // Reset for next member
+    // Reset for next member and explicitly delete ID image state from memory
     setForm({ ...BLANK_FORM });
     setIdImage(null);
     setSelfieImage(null);
@@ -920,7 +879,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
-  // outerStep: 0=FamilyBranch, 1=IDScan, 2=Selfie, 3+=formTabs
   const stepperStep = outerStep <= 2 ? outerStep : 2 + tab;
   const totalOuter = OUTER_STEPS.length;
   const currentOuter = stepperStep;
@@ -957,16 +915,12 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
         {/* MEMBERS LIST — grouped by family branch */}
         {members.length > 0 && (() => {
-          // Build ordered unique branch list (preserving insertion order)
           const branchOrder = [];
           members.forEach(m => { if (!branchOrder.includes(m.familyBranch)) branchOrder.push(m.familyBranch); });
           return (
             <div className="am-branch-groups">
               {branchOrder.map(branch => {
                 const branchMembers = members.filter(m => m.familyBranch === branch);
-                // We only enforce that there's at least one branch head if branches are fully implemented,
-                // but since members might be added to existing branches that already have heads, 
-                // we'll bypass this strict check for now if they are just adding members to existing branches.
                 return (
                   <div key={branch} className="am-branch-group">
                     <div className="am-branch-group-header">
@@ -1154,6 +1108,9 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               {tab === 1 && (
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <Field label="ID Number" hint="Extracted from your scanned ID. You may correct this if needed.">
+                      <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
+                    </Field>
                     <div className="am-form-grid cols-3">
                       <Field label="First Name" required><InputField icon={IconUser} type="text" placeholder="Maria" value={form.firstName} onChange={set("firstName")} autofilled={af("firstName")} /></Field>
                       <Field label="Middle Name"><InputField icon={IconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
