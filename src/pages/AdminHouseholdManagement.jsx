@@ -59,9 +59,6 @@ export default function HouseholdManagement() {
   const [showHhRejectModal, setShowHhRejectModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
-  const [previewImage, setPreviewImage] = useState(null);
-  const [previewLabel, setPreviewLabel] = useState("");
-
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -488,33 +485,6 @@ export default function HouseholdManagement() {
     }
   };
 
-  // ================= IMAGE PREVIEW =================
-  const renderImagePreview = (image, label) => {
-    if (!image) {
-      return (
-        <div className="hm-image-placeholder">
-          No Image
-        </div>
-      );
-    }
-
-    return (
-      <div className="hm-image-wrapper">
-        <p className="hm-image-label">{label}</p>
-
-        <img
-          src={image}
-          alt={label}
-          className="hm-image-thumb"
-          onClick={() => {
-            setPreviewImage(image);
-            setPreviewLabel(label);
-          }}
-        />
-      </div>
-    );
-  };
-
   return (
     <AdminLayout>
       <div className="main-content">
@@ -584,7 +554,7 @@ export default function HouseholdManagement() {
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
-                    <th>Family ID</th>
+                    <th>Branch ID</th>
                     <th>Category</th>
                     <th>Date Submitted</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -596,7 +566,7 @@ export default function HouseholdManagement() {
                       <tr key={req.id}>
                         <td style={{ fontWeight: 500 }}>{req.fullName}</td>
                         <td style={{ color: '#4b5563' }}>{req.householdId}</td>
-                        <td style={{ color: '#4b5563' }}>{req.familyId || "Pending"}</td>
+                        <td style={{ color: '#4b5563' }}>{req.branchId || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {req.category && req.category.map((c, i) => (
@@ -624,75 +594,74 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-            </div>
+              {hhViewMode === "requests" && filteredHhRequests.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
 
-            {hhViewMode === "requests" && filteredHhRequests.length > 0 && (
-              <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "16px 24px",
-                borderTop: "1px solid #e2e8f0",
-                background: "#f8fafc",
-                flexWrap: "wrap",
-                gap: "16px"
-              }}>
-
-                {/* Rows per page */}
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                  <span>Rows per page:</span>
-                  <select
-                    value={hhRowsPerPage}
-                    onChange={(e) => {
-                      setHhRowsPerPage(Number(e.target.value));
-                      setHhRequestPage(1);
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      background: 'white',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={15}>15</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-
-                {/* Pagination */}
-                {totalHhRequestPages > 1 && (
-                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      className="af-page-btn"
-                      onClick={() => setHhRequestPage(prev => Math.max(prev - 1, 1))}
-                      disabled={hhRequestPage === 1}
+                  {/* Rows per page */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                    <span>Rows per page:</span>
+                    <select
+                      value={hhRowsPerPage}
+                      onChange={(e) => {
+                        setHhRowsPerPage(Number(e.target.value));
+                        setHhRequestPage(1);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
                     >
-                      Previous
-                    </button>
-
-                    {renderPageNumbers(hhRequestPage, totalHhRequestPages, setHhRequestPage)}
-
-                    <button
-                      className="af-page-btn"
-                      onClick={() => setHhRequestPage(prev => Math.min(prev + 1, totalHhRequestPages))}
-                      disabled={hhRequestPage === totalHhRequestPages}
-                    >
-                      Next
-                    </button>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
                   </div>
-                )}
 
-                {/* Showing text */}
-                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                  Showing {hhStartIndex + 1} to{" "}
-                  {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
-                  {filteredHhRequests.length}
+                  {/* Pagination */}
+                  {totalHhRequestPages > 1 && (
+                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setHhRequestPage(prev => Math.max(prev - 1, 1))}
+                        disabled={hhRequestPage === 1}
+                      >
+                        Previous
+                      </button>
+
+                      {renderPageNumbers(hhRequestPage, totalHhRequestPages, setHhRequestPage)}
+
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setHhRequestPage(prev => Math.min(prev + 1, totalHhRequestPages))}
+                        disabled={hhRequestPage === totalHhRequestPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Showing text */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Showing {hhStartIndex + 1} to{" "}
+                    {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
+                    {filteredHhRequests.length}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
@@ -777,7 +746,7 @@ export default function HouseholdManagement() {
                   <tr>
                     <th>Full Name</th>
                     <th>Household ID</th>
-                    <th>Family ID</th>
+                    <th>Branch ID</th>
                     <th>Category</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -787,24 +756,9 @@ export default function HouseholdManagement() {
                   {paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
                       <tr key={`${res.householdId}__${res.id}`}>
-                        <td style={{ fontWeight: 500 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            {res.profilePhoto ? (
-                              <img
-                                src={res.profilePhoto}
-                                alt={res.fullName}
-                                className="res-avatar"
-                              />
-                            ) : (
-                              <div className="res-avatar-placeholder">
-                                {res.fullName ? res.fullName.charAt(0).toUpperCase() : '?'}
-                              </div>
-                            )}
-                            <span>{res.fullName}</span>
-                          </div>
-                        </td>
+                        <td style={{ fontWeight: 500 }}>{res.fullName}</td>
                         <td style={{ color: '#4b5563' }}>{res.householdId}</td>
-                        <td style={{ color: '#4b5563' }}>{res.familyId || "Pending"}</td>
+                        <td style={{ color: '#4b5563' }}>{res.branchID || "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {res.category && res.category.map((c, i) => (
@@ -838,75 +792,74 @@ export default function HouseholdManagement() {
                 </tbody>
               </table>
 
-            </div>
+              {residentViewMode === "residents" && filteredResidents.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
 
-            {residentViewMode === "residents" && filteredResidents.length > 0 && (
-              <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "16px 24px",
-                borderTop: "1px solid #e2e8f0",
-                background: "#f8fafc",
-                flexWrap: "wrap",
-                gap: "16px"
-              }}>
-
-                {/* Rows per page */}
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                  <span>Rows per page:</span>
-                  <select
-                    value={rowsPerPage}
-                    onChange={(e) => {
-                      setRowsPerPage(Number(e.target.value));
-                      setPage(1);
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      background: 'white',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={15}>15</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      className="af-page-btn"
-                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                      disabled={page === 1}
+                  {/* Rows per page */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                    <span>Rows per page:</span>
+                    <select
+                      value={rowsPerPage}
+                      onChange={(e) => {
+                        setRowsPerPage(Number(e.target.value));
+                        setPage(1);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
                     >
-                      Previous
-                    </button>
-
-                    {renderPageNumbers(page, totalPages, setPage)}
-
-                    <button
-                      className="af-page-btn"
-                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={page === totalPages}
-                    >
-                      Next
-                    </button>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
                   </div>
-                )}
 
-                {/* Showing text */}
-                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                  Showing {startIndex + 1} to{" "}
-                  {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}
-                  {filteredResidents.length}
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                        disabled={page === 1}
+                      >
+                        Previous
+                      </button>
+
+                      {renderPageNumbers(page, totalPages, setPage)}
+
+                      <button
+                        className="af-page-btn"
+                        onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={page === totalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Showing text */}
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Showing {startIndex + 1} to{" "}
+                    {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}
+                    {filteredResidents.length}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
@@ -930,27 +883,10 @@ export default function HouseholdManagement() {
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
                 <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
                   <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
-                      <div style={{ flex: 1 }}>
-                        <strong>Household ID:</strong> {selectedResident.householdId}<br />
-                        <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
-                        <div style={{ marginTop: '8px' }}>
-                          <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
-                        </div>
-                      </div>
-                      <div style={{ flexShrink: 0 }}>
-                        {selectedResident.profilePhoto ? (
-                          <img
-                            src={selectedResident.profilePhoto}
-                            alt={selectedResident.fullName}
-                            className="res-modal-avatar"
-                          />
-                        ) : (
-                          <div className="res-modal-avatar-placeholder">
-                            {selectedResident.fullName ? selectedResident.fullName.charAt(0).toUpperCase() : '?'}
-                          </div>
-                        )}
-                      </div>
+                    <strong>Household ID:</strong> {selectedResident.householdId}<br />
+                    <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
+                    <div style={{ marginTop: '8px' }}>
+                      <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
                     </div>
                   </div>
                   <div><strong>Full Name:</strong><br />{selectedResident.fullName}</div>
@@ -973,20 +909,6 @@ export default function HouseholdManagement() {
                   <div><strong>Occupation:</strong><br />{selectedResident.occupation || "N/A"}</div>
                   <div><strong>Total Members:</strong><br />{selectedResident.totalMembers || selectedResident.members || "N/A"}</div>
                   <div><strong>Household Class.:</strong><br />{selectedResident.householdClassification || "N/A"}</div>
-
-                  <div style={{ gridColumn: "1 / -1", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #eee" }}>
-                    <div style={{ marginBottom: "12px" }}><strong>Identity Verification</strong></div>
-                    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-                      <div>
-                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Government ID</p>
-                        {renderImagePreview(selectedResident.idImageUrl, "Government ID")}
-                      </div>
-                      <div>
-                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Selfie Photo</p>
-                        {renderImagePreview(selectedResident.selfieImageUrl, "Selfie Photo")}
-                      </div>
-                    </div>
-                  </div>
 
                   {(selectedResident.remarks || selectedResident.incident) && (
                     <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', color: '#b91c1c' }}>
@@ -1090,7 +1012,6 @@ export default function HouseholdManagement() {
 
         {/* ================= HH REQUEST VIEW MODAL ================= */}
         {showHhViewModal && selectedHhRequest && (
-          
           <div className="as-modal-overlay">
             <div className="as-modal-content" style={{ maxWidth: "600px" }}>
 
@@ -1137,22 +1058,9 @@ export default function HouseholdManagement() {
                   <div><strong>Occupation:</strong><br />{selectedHhRequest.occupation || "N/A"}</div>
                   <div><strong>Total Members:</strong><br />{selectedHhRequest.totalMembers || "N/A"}</div>
                   <div><strong>Household Class.:</strong><br />{selectedHhRequest.householdClassification || "N/A"}</div>
-
-                  <div style={{ gridColumn: "1 / -1", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #eee" }}>
-                    <div style={{ marginBottom: "12px" }}><strong>Identity Verification</strong></div>
-                    <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-                      <div>
-                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Government ID</p>
-                        {renderImagePreview(selectedHhRequest.idImageUrl, "Government ID")}
-                      </div>
-                      <div>
-                        <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "#6b7280", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Selfie Photo</p>
-                        {renderImagePreview(selectedHhRequest.selfieImageUrl, "Selfie Photo")}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         )}
@@ -1246,38 +1154,6 @@ export default function HouseholdManagement() {
             </div>
           </div>
         )}
-
-        {/* ================= IMAGE PREVIEW MODAL ================= */}
-        {
-          previewImage && (
-            <div className="as-modal-overlay"
-              onClick={() => {
-                setPreviewImage(null);
-                setPreviewLabel("");
-              }}
-            >
-              <div className="as-modal-content" style={{ maxWidth: "90vw", maxHeight: "90vh", padding: "20px", textAlign: "center" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="as-modal-header">
-                  <h2>{previewLabel}</h2>
-
-                  <button
-                    className="as-modal-close"
-                    onClick={() => {
-                      setPreviewImage(null);
-                      setPreviewLabel("");
-                    }}
-                  >
-                    &times;
-                  </button>
-                </div>
-
-                <img src={previewImage} alt={previewLabel} style={{ width: "100%", maxHeight: "75vh", objectFit: "contain", borderRadius: "12px" }} />
-              </div>
-            </div>
-          )
-        }
 
       </div>
     </AdminLayout>
