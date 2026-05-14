@@ -145,7 +145,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
       setPrograms(
         snapshot.docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((p) => p.programType !== "livelihood")
+          .filter((p) => p.programType !== "livelihood" && p.status !== "Completed")
       );
       setLoadingPrograms(false);
     });
