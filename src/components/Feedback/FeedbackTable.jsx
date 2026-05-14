@@ -57,8 +57,8 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
         <div className="empty-state"><h3>{emptyMessage}</h3></div>
       ) : (
         <>
-          <div className="req-table-wrapper">
-            <table className="req-table">
+          <div className="req-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="req-table" style={{ minWidth: '900px' }}>
             <thead>
               <tr>
                 <th>Date</th>
