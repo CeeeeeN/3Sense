@@ -110,7 +110,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           demographic: r.demographic || "",
           status: r.status || "Upcoming",
         };
-      }));
+      }).filter(p => p.status !== "Completed"));
+      setLoadingPrograms(false);
+    }, (error) => {
+      console.error("Error fetching livelihood programs:", error);
       setLoadingPrograms(false);
     });
     return () => unsub();
