@@ -478,7 +478,7 @@ export default function AdminRequests() {
         </div>
 
         {/* DATA TABLE */}
-        <div className="req-table-wrapper">
+        <div className="req-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {loading ? (
             <div className="empty-state">
               <Clock className="animate-spin mb-2" size={32} />
@@ -491,7 +491,7 @@ export default function AdminRequests() {
               <p>Try adjusting your search or filters.</p>
             </div>
           ) : (
-            <table className="req-table">
+            <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
                 <tr>
                   <th>Ref Number</th>
@@ -500,7 +500,7 @@ export default function AdminRequests() {
                   <th>Scheduled Date</th>
                   <th>Date Submitted</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -564,30 +564,31 @@ export default function AdminRequests() {
             </table>
           )}
           
-          {!loading && filteredRequests.length > 0 && totalPages > 1 && (
-            <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
-              <button 
-                className="af-page-btn" 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-              >
-                Previous
-              </button>
-              
-              {renderPageNumbers()}
-              
-              <button 
-                className="af-page-btn" 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-              >
-                Next
-              </button>
-            </div>
-          )}
         </div>
+
+        {!loading && filteredRequests.length > 0 && totalPages > 1 && (
+          <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
+            <button 
+              className="af-page-btn" 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              Previous
+            </button>
+            
+            {renderPageNumbers()}
+            
+            <button 
+              className="af-page-btn" 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Next
+            </button>
+          </div>
+        )}
 
         {/* VIEW DETAILS MODAL */}
         {isModalOpen && selectedRequest && (

@@ -271,77 +271,77 @@ export default function AdminLogs() {
               </tbody>
             </table>
           )}
-          
-          {/* UPGRADED PAGINATION CONTROLS */}
-          {!loading && filteredLogs.length > 0 && (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '16px 24px',
-              borderTop: '1px solid #e2e8f0',
-              background: '#f8fafc',
-              borderBottomLeftRadius: '12px',
-              borderBottomRightRadius: '12px',
-              flexWrap: 'wrap',
-              gap: '16px'
-            }}>
-              
-              {/* Rows Per Page Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b' }}>
-                <span>Rows per page:</span>
-                <select 
-                  value={itemsPerPage} 
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  style={{ 
-                    padding: '4px 8px', 
-                    borderRadius: '6px', 
-                    border: '1px solid #cbd5e1',
-                    background: 'white',
-                    color: '#334155',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={15}>15</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-
-              {/* Page Buttons */}
-              {totalPages > 1 && (
-                <div className="af-pagination" style={{ display: 'flex', gap: '8px', margin: 0 }}>
-                  <button 
-                    className="af-page-btn" 
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-                  >
-                    Previous
-                  </button>
-                  
-                  {renderPageNumbers()}
-                  
-                  <button 
-                    className="af-page-btn" 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-
-              {/* Showing X of Y text */}
-              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredLogs.length)} of {filteredLogs.length} logs
-              </div>
-
-            </div>
-          )}
         </div>
+
+        {/* UPGRADED PAGINATION CONTROLS */}
+        {!loading && filteredLogs.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '16px 24px',
+            borderTop: '1px solid #e2e8f0',
+            background: '#f8fafc',
+            borderBottomLeftRadius: '12px',
+            borderBottomRightRadius: '12px',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            
+            {/* Rows Per Page Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b' }}>
+              <span>Rows per page:</span>
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                style={{ 
+                  padding: '4px 8px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #cbd5e1',
+                  background: 'white',
+                  color: '#334155',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+
+            {/* Page Buttons */}
+            {totalPages > 1 && (
+              <div className="af-pagination" style={{ display: 'flex', gap: '8px', margin: 0 }}>
+                <button 
+                  className="af-page-btn" 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  Previous
+                </button>
+                
+                {renderPageNumbers()}
+                
+                <button 
+                  className="af-page-btn" 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            {/* Showing X of Y text */}
+            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredLogs.length)} of {filteredLogs.length} logs
+            </div>
+
+          </div>
+        )}
       </div>
     </AdminLayout>
   );
