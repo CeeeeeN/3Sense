@@ -230,10 +230,11 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
         <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Fully Reserved</span>
       </div>
-      {/* ── Inline 3-day rule note under calendar ── */}
+
+      {/* ── Inline 3-day rule note under calendar — mobile-responsive fix ── */}
       <div style={{
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",   /* changed from "center" so icon stays top-aligned on wrap */
         gap: "6px",
         marginTop: "10px",
         fontSize: "12px",
@@ -243,10 +244,16 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         borderRadius: "6px",
         padding: "7px 10px",
       }}>
-        <svg style={{ flexShrink: 0 }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          style={{ flexShrink: 0, marginTop: "1px" }}   /* nudge icon down 1px to align with first text line */
+          width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        >
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
-        Bookings must be made at least <strong style={{ margin: "0 3px" }}>3 days in advance</strong>. Greyed-out dates are unavailable.
+        {/* flex: 1 lets the text take all remaining width and wrap naturally */}
+        <span style={{ flex: 1, lineHeight: "1.5" }}>
+          Bookings must be made at least <strong>3 days in advance</strong>. Greyed-out dates are unavailable.
+        </span>
       </div>
     </div>
   );
@@ -436,7 +443,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       {/* ── Advance booking reminder inside the modal form ── */}
       <div style={{
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: "10px",
         background: "#eff6ff",
         border: "1px solid #93c5fd",
@@ -446,13 +453,13 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         fontSize: "13px",
         color: "#1e40af",
       }}>
-        <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
-        <span>
+        <span style={{ flex: 1, lineHeight: "1.5" }}>
           Reservations must be submitted at least{" "}
           <strong>3 days before</strong> your intended date. The earliest available date is{" "}
           <strong>{MIN_RESERVATION_DATE}</strong>.
