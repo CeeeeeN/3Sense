@@ -24,6 +24,7 @@ export default function AdminFeedback() {
   // States for 'All' tab filtering
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterSentiment, setFilterSentiment] = useState('All');
 
   // Analytics States
   const [wordCloud, setWordCloud] = useState([]);
@@ -157,7 +158,8 @@ export default function AdminFeedback() {
       String(fb.userName || "").toLowerCase().includes(searchStr);
 
     const matchesStatus = filterStatus === 'All' || String(fb.status).toLowerCase() === filterStatus.toLowerCase();
-    return matchesSearch && matchesStatus;
+    const matchesSentiment = filterSentiment === 'All' || String(fb.sentiment).toLowerCase() === filterSentiment.toLowerCase();
+    return matchesSearch && matchesStatus && matchesSentiment;
   });
 
   // --- HANDLERS ---
@@ -255,7 +257,14 @@ export default function AdminFeedback() {
                     <Search className="search-icon" size={20} />
                     <input type="text" placeholder="Search Facility, Name, or Ref #..." className="search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                   </div>
-                  <div className="filter-group">
+                  <div className="filter-group" style={{ display: 'flex', flexDirection: 'row', gap: '12px', alignItems: 'center' }}>
+                    <select className="filter-select" value={filterSentiment} onChange={(e) => setFilterSentiment(e.target.value)}>
+                      <option value="All">All Sentiments</option>
+                      <option value="Positive">Positive</option>
+                      <option value="Neutral">Neutral</option>
+                      <option value="Negative">Negative</option>
+                    </select>
+
                     <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                       <option value="All">All Statuses</option>
                       <option value="analyzed">Analyzed</option>

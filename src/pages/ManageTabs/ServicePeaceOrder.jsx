@@ -74,13 +74,22 @@ export default function ServicePeaceOrder({ onBack }) {
   const [newGroupName, setNewGroupName] = useState("");
   const [newMemberInputs, setNewMemberInputs] = useState({});
 
-  // ── Pagination State ──────────────────────────────────────────────
+  // ── Pagination & Filter State ─────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7; 
+  
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterUrgency, setFilterUrgency] = useState("All");
+  const [filterType, setFilterType] = useState("All");
 
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
+
+  // ── Reset to page 1 whenever a filter changes ─────────────────────
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, filterUrgency, filterType]);
 
   // ── Real-time listener for Reports ────────────────────────────────
   useEffect(() => {
@@ -252,10 +261,23 @@ export default function ServicePeaceOrder({ onBack }) {
     }
   };
 
-  // ── Pagination Calculation ────────────────────────────────────────
-  const totalPages = Math.ceil(reports.length / itemsPerPage);
-  const paginatedReports = reports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // ── Filtering & Pagination Calculation ────────────────────────────
+  const uniqueIncidentTypes = [...new Set(reports.map(r => r.incidentType).filter(Boolean))].sort();
 
+  const filteredReports = reports.filter(r => {
+    // Add .trim() to catch any weird database spaces!
+    const rStatus = (r.status || "received").trim().toLowerCase();
+    const rUrgency = getUrgency(r.incidentType).trim().toLowerCase();
+
+    const matchesStatus = filterStatus === "All" || rStatus === filterStatus.toLowerCase();
+    const matchesUrgency = filterUrgency === "All" || rUrgency === filterUrgency.toLowerCase();
+    const matchesType = filterType === "All" || r.incidentType === filterType;
+
+    return matchesStatus && matchesUrgency && matchesType;
+  });
+
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+  const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // ── Stat counters ───────────────────────────────────────────────
   const counts = {
@@ -301,11 +323,39 @@ export default function ServicePeaceOrder({ onBack }) {
           {/* ── Inbox list ── */}
           <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "16px", borderBottom: "1px solid #e5e7eb", fontWeight: "bold", background: "#f9fafb" }}>
-              Incoming Reports ({reports.length})
+              Incoming Reports ({filteredReports.length})
             </div>
+
+            {/* NEW FILTER PANEL */}
+            <div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                  <option value="All">All Statuses</option>
+                  <option value="received">Received</option>
+                  <option value="pending">Pending</option>
+                  <option value="responded">Responded</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+                
+                <select value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                  <option value="All">All Urgencies</option>
+                  <option value="emergency">Emergency</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="docs">Docs / Normal</option>
+                </select>
+              </div>
+              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                <option value="All">All Incident Types</option>
+                {uniqueIncidentTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            {/* END FILTER PANEL */}
+
             <div style={{ overflowY: "auto", flex: 1 }}>
-              {reports.length === 0 && (
-                <div style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No reports yet.</div>
+              {filteredReports.length === 0 && (
+                <div style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No reports match your filters.</div>
               )}
               {paginatedReports.map(r => {
                 const urgency = getUrgency(r.incidentType);
@@ -342,8 +392,9 @@ export default function ServicePeaceOrder({ onBack }) {
                 );
               })}
             </div>
+            
             {/* Pagination Controls for List View */}
-            {reports.length > 0 && (
+            {filteredReports.length > 0 && (
               <PaginationControls 
                 currentPage={currentPage} 
                 totalPages={totalPages} 
