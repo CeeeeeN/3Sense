@@ -20,6 +20,7 @@ import {
 import { approveRegistration } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
+import { formatDisplayEmail } from "../utils/maskEmail";
 
 export default function HouseholdManagement() {
 
@@ -107,7 +108,6 @@ export default function HouseholdManagement() {
     fetchAdmin();
   }, []);
 
-  // Fetch Pending Registrations
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "pending_registrations"), (snapshot) => {
       const requests = snapshot.docs.map(docSnap => {
@@ -120,20 +120,20 @@ export default function HouseholdManagement() {
           address: `${data.houseNumber || ""} ${data.street || ""}, ${data.barangay || ""}`.trim(),
           dateSubmitted: data.createdAt ? data.createdAt.toDate().toLocaleDateString() : "N/A",
           status: data.status || "pending",
-          ...data
+          ...data,
+          email: formatDisplayEmail(data.email, adminRole)
         };
       });
       setHhRequests(requests);
     });
     return () => unsub();
-  }, []);
+  }, [adminRole]);
 
   useEffect(() => {
     let latestActive = [];
     let latestPending = [];
 
     const merge = () => {
-
       const seen = new Set();
       const deduped = latestActive.filter(r => {
         const key = `${r.householdId}__${r.id}`;
@@ -141,12 +141,9 @@ export default function HouseholdManagement() {
         seen.add(key);
         return true;
       });
-      // pendingHeads only exist when activated===false, so they
-      // cannot overlap with any active resident doc. Just append.
       setResidents([...deduped, ...latestPending]);
     };
 
-    // Listener 1: all activated residents (households/{id}/residents/*)
     const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (snap) => {
       latestActive = snap.docs.map(docSnap => {
         const data = docSnap.data();
@@ -156,6 +153,7 @@ export default function HouseholdManagement() {
           id: docSnap.id,
           householdId,
           fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+          email: formatDisplayEmail(data.email, adminRole),
           category: Array.isArray(data.categories) ? data.categories
             : Array.isArray(data.category) ? data.category
               : typeof data.category === "string" && data.category ? [data.category]
@@ -172,7 +170,6 @@ export default function HouseholdManagement() {
       merge();
     });
 
-    // Listener 2: households not yet activated (pending heads)
     const unsubHouseholds = onSnapshot(collection(db, "households"), (snap) => {
       latestPending = [];
       snap.docs.forEach(hhDoc => {
@@ -184,6 +181,7 @@ export default function HouseholdManagement() {
             id: `unactivated-${hhDoc.id}`,
             householdId: hhDoc.id,
             fullName: `${head.firstName || ""} ${head.lastName || ""}`.trim(),
+            email: formatDisplayEmail(head.email, adminRole),
             category: Array.isArray(head.categories) ? head.categories
               : Array.isArray(head.category) ? head.category
                 : typeof head.category === "string" && head.category ? [head.category]
@@ -204,7 +202,7 @@ export default function HouseholdManagement() {
       unsubResidents();
       unsubHouseholds();
     };
-  }, []);
+  }, [adminRole]);
 
 
   // ================= HH REQUEST FILTERS =================
@@ -891,7 +889,7 @@ export default function HouseholdManagement() {
                   </div>
                   <div><strong>Full Name:</strong><br />{selectedResident.fullName}</div>
                   <div><strong>Contact No:</strong><br />{selectedResident.contactNumber || "N/A"}</div>
-                  <div><strong>Email:</strong><br />{selectedResident.email || "N/A"}</div>
+                  <div><strong>Email:</strong><br />{formatDisplayEmail(selectedResident.email, adminRole)}</div>
                   <div><strong>Birth Date:</strong><br />{selectedResident.birthDate} {selectedResident.age ? `(${selectedResident.age} yrs)` : ""}</div>
                   <div><strong>Birth Place:</strong><br />{selectedResident.birthPlace || "N/A"}</div>
                   <div><strong>Sex:</strong><br />{selectedResident.sex}</div>
@@ -1040,7 +1038,7 @@ export default function HouseholdManagement() {
                   </div>
                   <div><strong>Full Name:</strong><br />{selectedHhRequest.fullName}</div>
                   <div><strong>Contact No:</strong><br />{selectedHhRequest.contactNumber || "N/A"}</div>
-                  <div><strong>Email:</strong><br />{selectedHhRequest.email || "N/A"}</div>
+                  <div><strong>Email:</strong><br />{formatDisplayEmail(selectedHhRequest.email, adminRole)}</div>
                   <div><strong>Birth Date:</strong><br />{selectedHhRequest.birthDate} {selectedHhRequest.age ? `(${selectedHhRequest.age} yrs)` : ""}</div>
                   <div><strong>Birth Place:</strong><br />{selectedHhRequest.birthPlace || "N/A"}</div>
                   <div><strong>Sex:</strong><br />{selectedHhRequest.sex}</div>

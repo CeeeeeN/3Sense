@@ -7,6 +7,7 @@ import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'f
 import { onAuthStateChanged } from "firebase/auth";
 import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
+import { formatDisplayEmail } from '../utils/maskEmail';
 
 const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
@@ -81,18 +82,18 @@ export default function AdminRequests() {
       return () => unsubscribe();
     }, []);
 
-  // --- REAL-TIME FIREBASE FETCH ---
   useEffect(() => {
     const unsubscribeDocs = onSnapshot(collection(db, 'document_requests'), (snapshot) => {
       const docData = snapshot.docs.map(doc => {
         const data = doc.data();
         let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
+        const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
         return {
           docId: doc.id,
           collectionName: 'document_requests',
           id: data.requestID || data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
           residentName: data.fullName || data.residentName || formatName(data.firstName, data.middleName, data.lastName),
-          contact: data.email || 'No email provided',
+          contact: sanitizedEmail,
           category: 'Document',
           type: data.documentType || 'Unknown Document',
           purpose: data.purpose || 'No purpose stated',
@@ -100,7 +101,10 @@ export default function AdminRequests() {
           rawDate: rawDate,
           dateNeeded: formatDate(data.dateNeeded),
           status: data.status || 'Pending',
-          allData: data 
+          allData: {
+            ...data,
+            email: sanitizedEmail
+          }
         };
       });
 
@@ -109,12 +113,13 @@ export default function AdminRequests() {
           const data = doc.data();
           const time = data.timeSlot ? ` (${data.timeSlot})` : '';
           let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
+          const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
           return {
             docId: doc.id,
             collectionName: 'facility_reservations',
             id: data.reservationID || data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
             residentName: data.requesterName || data.fullName || 'Unknown Resident',
-            contact: data.email || 'No email provided',
+            contact: sanitizedEmail,
             category: 'Facility',
             type: data.facilityName || data.facility || 'Unknown Facility',
             purpose: data.purpose || 'No purpose stated',
@@ -122,7 +127,10 @@ export default function AdminRequests() {
             rawDate: rawDate,
             dateNeeded: data.date ? `${data.date} (${formatTime(data.startTime)} - ${formatTime(data.endTime)})` : (formatDate(data.reservationDate) + time),
             status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
-            allData: data
+            allData: {
+              ...data,
+              email: sanitizedEmail
+            }
           };
         });
 
@@ -139,7 +147,7 @@ export default function AdminRequests() {
     });
 
     return () => unsubscribeDocs();
-  }, []);
+  }, [adminRole]);
 
   // --- FILTERING LOGIC (FIXED) ---
   const filteredRequests = requests.filter(req => {
@@ -512,7 +520,7 @@ export default function AdminRequests() {
                     <td>
                       <div className="req-res-info">
                         <span className="req-res-name">{req.residentName}</span>
-                        <span className="req-res-email">{req.contact}</span>
+                        <span className="req-res-email">{formatDisplayEmail(req.contact, adminRole)}</span>
                       </div>
                     </td>
                     <td>
@@ -648,7 +656,7 @@ export default function AdminRequests() {
                         </div>
                         <div className="detail-item">
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Email Address</label>
-                          <p className="detail-value">{selectedRequest.allData?.email || 'N/A'}</p>
+                          <p className="detail-value">{formatDisplayEmail(selectedRequest.allData?.email, adminRole)}</p>
                         </div>
                         <div className="detail-item">
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Reservation Date</label>
@@ -709,7 +717,7 @@ export default function AdminRequests() {
                         </div>
                         <div className="detail-item">
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Email Address</label>
-                          <p className="detail-value">{selectedRequest.allData?.email || 'N/A'}</p>
+                          <p className="detail-value">{formatDisplayEmail(selectedRequest.allData?.email, adminRole)}</p>
                         </div>
                         <div className="detail-item">
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Residing Since (Year)</label>
