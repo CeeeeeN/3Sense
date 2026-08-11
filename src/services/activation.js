@@ -98,6 +98,7 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
     const branchRef = doc(db, "households", householdID, "branches", "BR-001");
     await setDoc(branchRef, {
         branchName: `${head.lastName || ""} Family`.trim(),
+        familyNumber: `${householdID}-1`,
         residentID: "head",
         createdAt: serverTimestamp(),
     });

@@ -41,13 +41,24 @@ export const getMemberProfile = async (householdID, residentID) => {
     }
 
     // Resolve branch name from the branches sub-collection
-    const branchID = d.branchID || (residentID === "head" ? "BR-001" : null);
+    const branchID = d.branchID || (residentID === "head" ? "BR-001" : "BR-001");
     let branchName = "";
+    let familyNumber = null;
     if (branchID) {
         const branchRef = doc(db, "households", householdID, "branches", branchID);
         const branchSnap = await getDoc(branchRef);
         if (branchSnap.exists()) {
-            branchName = branchSnap.data().branchName || "";
+            const branchData = branchSnap.data();
+            branchName = branchData.branchName || "";
+            if (branchData.familyNumber) {
+                familyNumber = branchData.familyNumber;
+            } else {
+                const num = parseInt(branchID.replace("BR-", ""), 10);
+                if (!isNaN(num)) familyNumber = `${householdID}-${num}`;
+            }
+        } else {
+            const num = parseInt(branchID.replace("BR-", ""), 10);
+            if (!isNaN(num)) familyNumber = `${householdID}-${num}`;
         }
     }
 
@@ -80,10 +91,11 @@ export const getMemberProfile = async (householdID, residentID) => {
         });
 
     return {
-        // Identity
-        residentID:  residentID,        // Firestore doc ID
-        householdID: householdID,        // parent household
-        userID:      d.userID || "",     // Firebase Auth UID
+        residentID:  residentID,
+        householdID: householdID,
+        householdNumber: householdID,
+        familyNumber,
+        userID:      d.userID || "",
         role: d.role || "Member",
         branchID:    branchID || "",
         branchName:  branchName,

@@ -8,6 +8,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
 import { formatDisplayEmail } from '../utils/maskEmail';
+import { getFamilyNumber } from '../utils/householdNumbers';
 
 const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
@@ -618,7 +619,15 @@ export default function AdminRequests() {
                     </div>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Household Number</label>
-                      <p className="detail-value">{selectedRequest.allData?.householdID || 'N/A'}</p>
+                      <p className="detail-value" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedRequest.allData?.householdID || 'N/A'}</p>
+                    </div>
+                    <div className="detail-item">
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Family Number</label>
+                      <p className="detail-value" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        {selectedRequest.allData?.householdID
+                          ? getFamilyNumber(selectedRequest.allData.householdID, selectedRequest.allData?.branchID || "BR-001")
+                          : 'N/A'}
+                      </p>
                     </div>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{activeTab === 'Facility' ? 'Facility' : 'Document Type'}</label>
