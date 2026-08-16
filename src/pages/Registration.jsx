@@ -21,18 +21,16 @@ async function validateIsGovernmentId(imageBase64) {
 }
 
 // ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
-// Uses the free OCR.space API to extract text from the base64 image and parse
-// PhilSys ID formats automatically using a smart lookahead algorithm.
 async function performLiveOCR(imageBase64) {
   try {
     const formData = new FormData();
     formData.append("base64Image", imageBase64);
-    formData.append("apikey", "helloworld"); // Public free key for OCR.space
+    formData.append("apikey", "helloworld");
     formData.append("language", "eng");
     formData.append("isOverlayRequired", false);
     formData.append("detectOrientation", true);
     formData.append("scale", true);
-    formData.append("OCREngine", 2); // Engine 2 is better for numbers/dates
+    formData.append("OCREngine", 2);
 
     const response = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
@@ -45,29 +43,26 @@ async function performLiveOCR(imageBase64) {
     }
 
     const text = result.ParsedResults[0].ParsedText;
-    console.log("Live OCR Extracted Text:\n", text); // Helpful for debugging
+    console.log("Live OCR Extracted Text:\n", text);
 
     let data = {
       idNumber: "", firstName: "", middleName: "", lastName: "",
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    // 1. Extract ID Number (Format: XXXX-XXXX-XXXX-XXXX)
     const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
     if (idMatch) {
-        data.idNumber = idMatch[0].replace(/\s/g, ''); 
+      data.idNumber = idMatch[0].replace(/\s/g, '');
     }
 
-    // 2. Extract Birth Date Globally (Format: October 09, 2005)
     const dobMatch = text.match(/(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2},?\s+\d{4}/i);
     if (dobMatch) {
-        const d = new Date(dobMatch[0].replace(/,/g, ''));
-        if (!isNaN(d.getTime())) {
-            data.birthDate = d.toISOString().split('T')[0];
-        }
+      const d = new Date(dobMatch[0].replace(/,/g, ''));
+      if (!isNaN(d.getTime())) {
+        data.birthDate = d.toISOString().split('T')[0];
+      }
     }
 
-    // 3. Smart Line-by-Line Parsing for Names and Address
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const cleanName = (str) => str.replace(/[^A-Z\sÑñ-]/ig, '').trim();
 
@@ -75,25 +70,24 @@ async function performLiveOCR(imageBase64) {
       const line = lines[i].toUpperCase();
 
       const extractNextValidLine = (startIndex) => {
-          for (let j = startIndex + 1; j < Math.min(startIndex + 4, lines.length); j++) {
-              const nextLine = lines[j].toUpperCase();
-              // Skip if it's another label
-              if (nextLine.match(/NAME|GIVEN|MIDDLE|LAST|DATE|BIRTH|ADDRESS|BLOOD|SEX|MALE|FEMALE|PHILIPPINES|REPUBLIKA|KAPANGANAKAN|TIRAHAN|APELYIDO|PANGALAN|GITNANG/)) continue;
-              if (nextLine.match(/\d{4}-\d{4}/)) continue; // skip ID numbers
-              
-              const cleaned = cleanName(lines[j]);
-              if (cleaned.length > 1) return cleaned;
-          }
-          return "";
+        for (let j = startIndex + 1; j < Math.min(startIndex + 4, lines.length); j++) {
+          const nextLine = lines[j].toUpperCase();
+          if (nextLine.match(/NAME|GIVEN|MIDDLE|LAST|DATE|BIRTH|ADDRESS|BLOOD|SEX|MALE|FEMALE|PHILIPPINES|REPUBLIKA|KAPANGANAKAN|TIRAHAN|APELYIDO|PANGALAN|GITNANG/)) continue;
+          if (nextLine.match(/\d{4}-\d{4}/)) continue;
+
+          const cleaned = cleanName(lines[j]);
+          if (cleaned.length > 1) return cleaned;
+        }
+        return "";
       };
 
       const extractInlineOrNext = (keywordRegex) => {
-          const parts = line.split(keywordRegex);
-          if (parts.length > 1 && parts[parts.length - 1].trim().length > 1) {
-              const inlineVal = cleanName(parts[parts.length - 1]);
-              if (inlineVal) return inlineVal;
-          }
-          return extractNextValidLine(i);
+        const parts = line.split(keywordRegex);
+        if (parts.length > 1 && parts[parts.length - 1].trim().length > 1) {
+          const inlineVal = cleanName(parts[parts.length - 1]);
+          if (inlineVal) return inlineVal;
+        }
+        return extractNextValidLine(i);
       };
 
       if (/(?:LAST\s*NAME|APELYIDO)/i.test(line) && !data.lastName) {
@@ -106,22 +100,21 @@ async function performLiveOCR(imageBase64) {
         data.middleName = extractInlineOrNext(/(?:MIDDLE\s*NAME|GITNANG\s*APELYIDO|GITNANG)/i);
       }
       else if (/(?:ADDRESS|TIRAHAN)/i.test(line) && !data.houseNumber) {
-         let addrLine = line.split(/(?:ADDRESS|TIRAHAN)/i).pop().trim();
-         if (!addrLine && lines[i + 1]) {
-             addrLine = lines[i + 1].trim() + " " + (lines[i + 2] || "").trim();
-         }
-         if (addrLine) {
-             const parts = addrLine.split(',');
-             if (parts.length > 0) {
-                 const firstPart = parts[0].trim().split(' ');
-                 data.houseNumber = firstPart[0].replace(/[^0-9A-Z-]/ig, ''); 
-                 data.street = firstPart.slice(1).join(' ').replace(/[^A-Z0-9\s.-]/ig, '').trim();
-             }
-         }
+        let addrLine = line.split(/(?:ADDRESS|TIRAHAN)/i).pop().trim();
+        if (!addrLine && lines[i + 1]) {
+          addrLine = lines[i + 1].trim() + " " + (lines[i + 2] || "").trim();
+        }
+        if (addrLine) {
+          const parts = addrLine.split(',');
+          if (parts.length > 0) {
+            const firstPart = parts[0].trim().split(' ');
+            data.houseNumber = firstPart[0].replace(/[^0-9A-Z-]/ig, '');
+            data.street = firstPart.slice(1).join(' ').replace(/[^A-Z0-9\s.-]/ig, '').trim();
+          }
+        }
       }
     }
 
-    // Clean up empty keys so they don't overwrite manual typing
     Object.keys(data).forEach(key => { if (!data[key]) delete data[key]; });
 
     return data;
@@ -406,7 +399,7 @@ function CameraError({ error, onUpload, fileRef }) {
 }
 
 // ─── ID Scan Step ─────────────────────────────────────────────────────────────
-function IdScanStep({ onConfirm }) {
+function IdScanStep({ onConfirm, onSkip }) {
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [validationResult, setResult] = useState(null);
@@ -450,10 +443,10 @@ function IdScanStep({ onConfirm }) {
     const result = await validateIsGovernmentId(preview);
     setResult(result);
     if (result.isValid === false || result.isValid === null) { setMode("invalid"); return; }
-    
+
     setMode("processing");
-    const data = await performLiveOCR(preview); // Calls the real API
-    
+    const data = await performLiveOCR(preview);
+
     if (result.idNumber && !data.idNumber) data.idNumber = result.idNumber;
     setMode("done");
     setTimeout(() => onConfirm(preview, data), 700);
@@ -464,7 +457,7 @@ function IdScanStep({ onConfirm }) {
       <div className="reg-section-header">
         <SectionIcon><SvgIdCard size={24} /></SectionIcon>
         <div>
-          <h3>Scan Your ID</h3>
+          <h3>Scan Your ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span></h3>
           <p>Take a photo or upload any valid government-issued ID. Data will be used to autofill your form.</p>
         </div>
       </div>
@@ -476,12 +469,13 @@ function IdScanStep({ onConfirm }) {
             <div className="reg-dropzone-icon-square"><SvgIdCard size={36} /></div>
             <p className="reg-dropzone-title">Position your ID within frame</p>
             <p className="reg-dropzone-subtitle">Accepted: PhilSys, Driver's License, Passport, Voter's ID, SSS, GSIS, PRC ID</p>
-            <div className="reg-btn-group">
-              <button className="reg-btn-primary" onClick={startCamera}
+
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0.75rem", marginTop: "1rem" }}>
+              <button type="button" className="reg-btn-primary" onClick={startCamera}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <SvgCamera /> Use Camera
               </button>
-              <button className="reg-btn-ghost" onClick={() => fileRef.current?.click()}
+              <button type="button" className="reg-btn-ghost" onClick={() => fileRef.current?.click()}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <SvgUpload /> Upload Image
               </button>
@@ -489,6 +483,31 @@ function IdScanStep({ onConfirm }) {
             </div>
             <UploadErrorMsg msg={uploadError} />
           </div>
+
+          {/* Prominent Direct Skip Card Button */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "0.5rem" }}>
+            <button
+              type="button"
+              onClick={onSkip}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.75rem 1.75rem",
+                background: "#ffffff",
+                border: "2px solid #317D89",
+                borderRadius: "8px",
+                color: "#317D89",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
+              }}
+            >
+              Skip ID Upload &amp; Continue <SvgArrowRight />
+            </button>
+          </div>
+
           <div className="reg-info-box">
             <span style={{ color: "#317D89", flexShrink: 0 }}><SvgInfo size={17} /></span>
             <p>Your ID image is used only for identity verification and will be submitted as part of your registration for Barangay review.</p>
@@ -588,7 +607,7 @@ function IdScanStep({ onConfirm }) {
               </div>
             )}
           </div>
-          <div className="reg-btn-group">
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
             {validationResult.isValid === null && (
               <button className="reg-btn-ghost" onClick={reverify}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
@@ -598,6 +617,10 @@ function IdScanStep({ onConfirm }) {
             <button className="reg-btn-primary" onClick={retake}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
               <SvgRefresh /> Try Different Image
+            </button>
+            <button className="reg-btn-ghost" onClick={onSkip}
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
+              Skip ID Upload →
             </button>
           </div>
         </div>
@@ -774,14 +797,14 @@ export default function Registration({ onBack }) {
       birthDate: "birthDate", idNumber: "idNumber",
       houseNumber: "houseNumber", street: "street", province: "province",
     };
-    
+
     const filled = new Set();
     const updates = {};
-    
+
     Object.entries(mapping).forEach(([ocrKey, formKey]) => {
-      if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { 
-          updates[formKey] = data[ocrKey]; 
-          filled.add(formKey); 
+      if (data[ocrKey] && !manuallyEdited.current.has(formKey)) {
+        updates[formKey] = data[ocrKey];
+        filled.add(formKey);
       }
     });
 
@@ -817,7 +840,6 @@ export default function Registration({ onBack }) {
 
   const validateStep = () => {
     const missing = [];
-    if (step === 0 && !idImage) { setErrorMsg("Please scan or upload your ID to continue."); return false; }
     if (step === 1 && !selfieImage) { setErrorMsg("A selfie is required before proceeding."); return false; }
     if (step === 2) {
       if (!form.firstName.trim()) missing.push("First Name");
@@ -867,13 +889,12 @@ export default function Registration({ onBack }) {
     try {
       await submitRegistration({ ...form, idImage, selfieImage });
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
-      setRefNumber(ref); 
+      setRefNumber(ref);
       setSubmitted(true);
-      
-      // SENSE-52: Clear images from device memory immediately after successful submission
+
       setIdImage(null);
       setSelfieImage(null);
-      
+
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("Submission error:", err);
@@ -938,8 +959,6 @@ export default function Registration({ onBack }) {
 
         {/* STEPPER */}
         <div className="reg-stepper-wrap">
-
-          {/* Desktop stepper — hidden on mobile via CSS */}
           <div className="reg-stepper">
             <div className="reg-stepper-line">
               <div className="reg-stepper-line-fill" style={{ width: `${progress}%` }} />
@@ -959,7 +978,6 @@ export default function Registration({ onBack }) {
             })}
           </div>
 
-          {/* Mobile stepper — compact progress bar, hidden on desktop via CSS */}
           <div className="reg-mobile-stepper">
             <div className="reg-mobile-stepper-top">
               <div className="reg-mobile-stepper-left">
@@ -989,7 +1007,6 @@ export default function Registration({ onBack }) {
               })}
             </div>
           </div>
-
         </div>
 
         {/* CARD */}
@@ -1014,7 +1031,10 @@ export default function Registration({ onBack }) {
             <>
               {/* STEP 0 — ID Scan */}
               {step === 0 && (
-                <IdScanStep onConfirm={(img, data) => { setIdImage(img); applyOcr(data); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                <IdScanStep
+                  onConfirm={(img, data) => { setIdImage(img); applyOcr(data); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onSkip={() => { setIdImage(null); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                />
               )}
 
               {/* STEP 1 — Selfie */}
@@ -1036,7 +1056,7 @@ export default function Registration({ onBack }) {
                     </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-                    <Field label="ID Number" hint="Extracted from your scanned ID. You may correct this if needed.">
+                    <Field label="ID Number" hint="Optional or extracted from scanned ID. You may type it manually or update it.">
                       <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
                     </Field>
                     <div className="reg-form-grid cols-3">
@@ -1266,12 +1286,16 @@ export default function Registration({ onBack }) {
                     <div><h3>Review &amp; Submit</h3><p>Please verify all information before submitting.</p></div>
                   </div>
                   <div className="reg-review-thumbnails">
-                    {idImage && (
-                      <div className="reg-review-thumb">
-                        <span className="reg-review-thumb-label">ID Photo</span>
+                    <div className="reg-review-thumb">
+                      <span className="reg-review-thumb-label">ID Photo</span>
+                      {idImage ? (
                         <img src={idImage} alt="ID" className="reg-review-thumb-id" />
-                      </div>
-                    )}
+                      ) : (
+                        <div style={{ padding: "0.8rem", fontSize: "0.75rem", color: "#6b7280", fontStyle: "italic", textAlign: "center" }}>
+                          Skipped (No ID uploaded)
+                        </div>
+                      )}
+                    </div>
                     {selfieImage && (
                       <div className="reg-review-thumb">
                         <span className="reg-review-thumb-label">Selfie</span>
@@ -1364,43 +1388,54 @@ export default function Registration({ onBack }) {
           )}
         </div>
 
-        {/* FOOTER ACTIONS */}
+        {/* FOOTER ACTIONS - Always visible across all steps */}
         {!submitted && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", maxWidth: "800px", margin: "0 auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", maxWidth: "800px", margin: "1.5rem auto 0 auto" }}>
             {errorMsg && (
               <div className="reg-footer-error">
                 <SvgAlert size={16} /> {errorMsg}
               </div>
             )}
-            {step >= 2 && (
-              <div className="reg-footer-actions">
-                <button className="reg-btn-cancel" onClick={handleCancel}>Cancel</button>
-                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                  <button className="reg-btn-ghost" onClick={goBack}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+              <button type="button" className="reg-btn-cancel" onClick={handleCancel}>Cancel</button>
+
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                {step > 0 && (
+                  <button type="button" className="reg-btn-ghost" onClick={goBack}
                     style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
                     <SvgArrowLeft /> Back
                   </button>
-                  {step < total - 1 ? (
-                    <button className="reg-btn-primary" onClick={goNext}
-                      style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                      Continue <SvgArrowRight />
-                    </button>
-                  ) : (
-                    <button className="reg-btn-success" onClick={goNext}
-                      disabled={!privacyAgreed || isSubmitting}
-                      style={{
-                        opacity: (privacyAgreed && !isSubmitting) ? 1 : 0.5,
-                        cursor: (privacyAgreed && !isSubmitting) ? "pointer" : "not-allowed",
-                        display: "inline-flex", alignItems: "center", gap: "0.5rem",
-                      }}>
-                      {isSubmitting
-                        ? <><SvgLoader size={16} /> Submitting…</>
-                        : <><SvgSend size={16} /> Confirm &amp; Submit</>}
-                    </button>
-                  )}
-                </div>
+                )}
+
+                {step === 0 && (
+                  <button type="button" className="reg-btn-primary" onClick={() => { setIdImage(null); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", background: "#317D89", color: "#ffffff", padding: "0.6rem 1.25rem", borderRadius: "8px", fontWeight: 600 }}>
+                    Skip ID Step <SvgArrowRight />
+                  </button>
+                )}
+
+                {step > 0 && step < total - 1 && (
+                  <button type="button" className="reg-btn-primary" onClick={goNext}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
+                    Continue <SvgArrowRight />
+                  </button>
+                )}
+
+                {step === total - 1 && (
+                  <button type="button" className="reg-btn-success" onClick={goNext}
+                    disabled={!privacyAgreed || isSubmitting}
+                    style={{
+                      opacity: (privacyAgreed && !isSubmitting) ? 1 : 0.5,
+                      cursor: (privacyAgreed && !isSubmitting) ? "pointer" : "not-allowed",
+                      display: "inline-flex", alignItems: "center", gap: "0.5rem",
+                    }}>
+                    {isSubmitting
+                      ? <><SvgLoader size={16} /> Submitting…</>
+                      : <><SvgSend size={16} /> Confirm &amp; Submit</>}
+                  </button>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
