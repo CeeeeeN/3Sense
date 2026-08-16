@@ -9,19 +9,17 @@ import { logTransaction } from "../services/logger";
 export default function Reports() {
 
   // ── State ────────────────────────────────────────────────────────────────────
-  const [reportType, setReportType] = useState("demographics"); // Default changed to demographics
+  const [reportType, setReportType] = useState("demographics");
   const [residentData, setResidentData] = useState([]);
   const [householdData, setHouseholdData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [sexFilter, setSexFilter] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [demoPage, setDemoPage] = useState(1);
   const [rbiAPage, setRbiAPage] = useState(1);
-  const ITEMS_PER_PAGE = 20; // change to whatever fits best for performance and readability
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     setDemoPage(1);
@@ -104,8 +102,8 @@ export default function Reports() {
             householdAddress: [d.houseNumber, d.street, d.barangay].filter(Boolean).join(", "),
             totalMembers: d.totalMembers || 0,
             householdClassification: d.householdClassification || "",
-            barangay: d.barangay || "",
-            city: d.city || "",
+            barangay: d.barangay || "Malanday",
+            city: d.city || "Valenzuela City",
           };
         });
         setHouseholdData(data);
@@ -138,9 +136,10 @@ export default function Reports() {
     return counts;
   }, [residentData]);
 
-  // ── RBI Form C age brackets ──────────────────────────────────────────────────
+  // ── RBI Form C age brackets (Updated: 0–1 Infant & 2–5 Toddler) ──────────────
   const AGE_BRACKETS = [
-    { label: "Under 5 years old", min: 0, max: 4 },
+    { label: "0–1 yrs old (Infant)", min: 0, max: 1 },
+    { label: "2–5 yrs old (Toddler)", min: 2, max: 5 },
     { label: "5–9 years old", min: 5, max: 9 },
     { label: "10–14 years old", min: 10, max: 14 },
     { label: "15–19 years old", min: 15, max: 19 },
@@ -268,6 +267,8 @@ export default function Reports() {
       const checkPage = () => { if (y > pageH - 20) { doc.addPage(); y = 20; } };
 
       doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+      doc.text("BARANGAY 3S+ MALANDAY", 14, y); y += 6;
+      doc.setFontSize(12);
       doc.text("Resident Demographics Report", 14, y); y += 8;
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
       doc.text(`Filter: ${sexFilter === "all" ? "All Residents" : sexFilter} | Total: ${filteredResidents.length} | Generated: ${new Date().toLocaleDateString("en-PH")}`, 14, y);
@@ -295,6 +296,26 @@ export default function Reports() {
         doc.text(r.householdID, cols.hhid, y);
         y += 6;
       });
+
+      // Signatories
+      if (y + 25 > pageH) { doc.addPage(); y = 20; }
+      y += 10;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text("Prepared By:", 14, y);
+      doc.setFont("helvetica", "bold");
+      doc.text((adminName || "ADMIN").toUpperCase(), 14, y + 12);
+      doc.line(14, y + 13, 75, y + 13);
+      doc.setFont("helvetica", "normal");
+      doc.text(adminRole || "Barangay Staff", 14, y + 17);
+
+      doc.text("Noted By:", pageW - 75, y);
+      doc.setFont("helvetica", "bold");
+      doc.text("HON. PUNONG BARANGAY", pageW - 75, y + 12);
+      doc.line(pageW - 75, y + 13, pageW - 14, y + 13);
+      doc.setFont("helvetica", "normal");
+      doc.text("Barangay Captain", pageW - 75, y + 17);
+
       doc.save(`resident_demographics_${sexFilter}.pdf`);
       logTransaction(adminName, adminRole, "Exported Demographics PDF", `Filter: ${sexFilter}. Total: ${filteredResidents.length}.`);
     } catch (err) {
@@ -304,44 +325,47 @@ export default function Reports() {
     setExportLoading(false);
   };
 
-  // ── RBI Form A PDF Export ────────────────────────────────────────────────────
+  // ── RBI Form A PDF Export (Single Masterlist PDF with ALL Members Included) ─
   const handleExportRBIFormA = async () => {
     setExportLoading(true);
     try {
       const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "landscape" });
+      const pageW = doc.internal.pageSize.width;
+      const pageH = doc.internal.pageSize.height;
+      let y = 12;
 
-      for (const hh of rbiFormAData) {
-        const doc = new jsPDF({ orientation: "landscape" });
-        const pageW = doc.internal.pageSize.width;
-        const pageH = doc.internal.pageSize.height;
-        let y = 12;
-
+      // Header renderer
+      const drawHeader = () => {
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-        doc.text("RBI FORM A (Revised 2024)", 14, y);
+        doc.text("BARANGAY 3S+ MALANDAY", 14, 12);
+        doc.setFontSize(9);
+        doc.text("RBI FORM A (Revised 2024)", 14, 17);
+
         doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
-        doc.text("RECORDS OF BARANGAY INHABITANTS BY HOUSEHOLD", pageW / 2, y, { align: "center" });
-        y += 7;
-
+        doc.text("RECORDS OF BARANGAY INHABITANTS MASTERLIST", pageW / 2, 14, { align: "center" });
         doc.setFontSize(8);
-        doc.text(`HOUSEHOLD ADDRESS: ${hh.householdAddress || "—"}`, 14, y);
-        doc.text(`NO. OF HOUSEHOLD MEMBERS: ${hh.members.length || hh.totalMembers}`, 175, y);
-        y += 8;
+        doc.text(`Total Households: ${householdData.length} | Total Inhabitants: ${residentData.length}`, pageW - 14, 14, { align: "right" });
+      };
 
-        const colDefs = [
-          { label: "LAST NAME", x: 14, w: 33 },
-          { label: "FIRST NAME", x: 47, w: 33 },
-          { label: "MIDDLE NAME", x: 80, w: 26 },
-          { label: "EXT", x: 106, w: 11 },
-          { label: "PLACE OF BIRTH", x: 117, w: 30 },
-          { label: "DATE OF BIRTH", x: 147, w: 22 },
-          { label: "AGE", x: 169, w: 11 },
-          { label: "SEX", x: 180, w: 13 },
-          { label: "CIVIL STATUS", x: 193, w: 20 },
-          { label: "CITIZENSHIP", x: 213, w: 21 },
-          { label: "OCCUPATION", x: 234, w: 22 },
-          { label: "CATEGORY", x: 256, w: pageW - 256 - 14 },
-        ];
+      // Table Column Definitions
+      const colDefs = [
+        { label: "HOUSEHOLD ID", x: 14, w: 32 },
+        { label: "LAST NAME", x: 46, w: 27 },
+        { label: "FIRST NAME", x: 73, w: 27 },
+        { label: "MIDDLE NAME", x: 100, w: 24 },
+        { label: "EXT", x: 124, w: 10 },
+        { label: "PLACE OF BIRTH", x: 134, w: 26 },
+        { label: "DATE OF BIRTH", x: 160, w: 22 },
+        { label: "AGE", x: 182, w: 10 },
+        { label: "SEX", x: 192, w: 12 },
+        { label: "CIVIL STATUS", x: 204, w: 20 },
+        { label: "CITIZENSHIP", x: 224, w: 20 },
+        { label: "OCCUPATION", x: 244, w: 20 },
+        { label: "CATEGORY", x: 264, w: pageW - 264 - 14 },
+      ];
 
+      const drawTableHeader = () => {
         doc.setFillColor(230, 236, 245);
         doc.rect(14, y, pageW - 28, 8, "F");
         doc.setFont("helvetica", "bold"); doc.setFontSize(6);
@@ -350,62 +374,104 @@ export default function Reports() {
           doc.text(col.label, col.x + 1, y + 5.2);
         });
         y += 8;
+      };
 
-        doc.setFont("helvetica", "normal"); doc.setFontSize(7);
-        const minRows = Math.max(8, hh.members.length);
-        for (let i = 0; i < minRows; i++) {
-          if (y > pageH - 38) { doc.addPage(); y = 14; }
-          const m = hh.members[i] || null;
-          const rowH = 7;
-          colDefs.forEach((col) => doc.rect(col.x, y, col.w, rowH));
-          if (m) {
-            const cats = [];
-            if (m.categories?.isPWD) cats.push("PWD");
-            if (m.categories?.isOFW) cats.push("OFW");
-            if (m.categories?.isSoloParent) cats.push("Solo Parent");
-            if (m.categories?.isIP) cats.push("IP");
-            if (m.employmentStatus === "Unemployed") cats.push("Unemployed");
-            if (m.educationStatus === "Out of School" && m.age >= 6 && m.age <= 14) cats.push("OSC");
-            if (m.educationStatus === "Out of School" && m.age >= 15 && m.age <= 24) cats.push("OSY");
-            const catStr = cats.join(", ") || "—";
+      drawHeader();
+      y = 24;
+      drawTableHeader();
 
-            doc.text((m.lastName || "").substring(0, 15), colDefs[0].x + 1, y + 5);
-            doc.text((m.firstName || "").substring(0, 15), colDefs[1].x + 1, y + 5);
-            doc.text((m.middleName || "").substring(0, 11), colDefs[2].x + 1, y + 5);
-            doc.text((m.suffix || ""), colDefs[3].x + 1, y + 5);
-            doc.text((m.birthPlace || "").substring(0, 13), colDefs[4].x + 1, y + 5);
-            doc.text((m.birthDate || ""), colDefs[5].x + 1, y + 5);
-            doc.text(m.age !== null ? String(m.age) : "", colDefs[6].x + 1, y + 5);
-            doc.text((m.sex || "").substring(0, 6), colDefs[7].x + 1, y + 5);
-            doc.text((m.civilStatus || "").substring(0, 9), colDefs[8].x + 1, y + 5);
-            doc.text((m.citizenship || "Filipino").substring(0, 9), colDefs[9].x + 1, y + 5);
-            doc.text((m.occupation || "").substring(0, 10), colDefs[10].x + 1, y + 5);
-            doc.text(catStr.substring(0, 12), colDefs[11].x + 1, y + 5);
-          }
-          y += rowH;
+      // Collect ALL members across every household
+      const allMasterlistRows = [];
+
+      householdData.forEach((hh) => {
+        const members = residentData.filter((r) => r.householdID === hh.householdID);
+
+        if (members && members.length > 0) {
+          members.forEach((m) => {
+            allMasterlistRows.push({ ...m, hhid: hh.householdID });
+          });
+        } else {
+          // Household with no registered members yet
+          allMasterlistRows.push({
+            hhid: hh.householdID,
+            lastName: "— No Members —",
+          });
+        }
+      });
+
+      // Render all members continuously
+      doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
+      allMasterlistRows.forEach((m) => {
+        if (y > pageH - 35) {
+          doc.addPage();
+          drawHeader();
+          y = 24;
+          drawTableHeader();
+          doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
         }
 
+        const rowH = 7;
+        colDefs.forEach((col) => doc.rect(col.x, y, col.w, rowH));
+
+        const cats = [];
+        if (m.categories?.isPWD) cats.push("PWD");
+        if (m.categories?.isOFW) cats.push("OFW");
+        if (m.categories?.isSoloParent) cats.push("Solo Parent");
+        if (m.categories?.isIP) cats.push("IP");
+        if (m.employmentStatus === "Unemployed") cats.push("Unemployed");
+        if (m.educationStatus === "Out of School" && m.age >= 6 && m.age <= 14) cats.push("OSC");
+        if (m.educationStatus === "Out of School" && m.age >= 15 && m.age <= 24) cats.push("OSY");
+        const catStr = cats.join(", ") || "—";
+
+        doc.text(String(m.hhid || ""), colDefs[0].x + 1, y + 5);
+        doc.text((m.lastName || "").substring(0, 15), colDefs[1].x + 1, y + 5);
+        doc.text((m.firstName || "").substring(0, 15), colDefs[2].x + 1, y + 5);
+        doc.text((m.middleName || "").substring(0, 11), colDefs[3].x + 1, y + 5);
+        doc.text((m.suffix || ""), colDefs[4].x + 1, y + 5);
+        doc.text((m.birthPlace || "").substring(0, 13), colDefs[5].x + 1, y + 5);
+        doc.text((m.birthDate || ""), colDefs[6].x + 1, y + 5);
+        doc.text(m.age !== null && m.age !== undefined ? String(m.age) : "", colDefs[7].x + 1, y + 5);
+        doc.text((m.sex || "").substring(0, 6), colDefs[8].x + 1, y + 5);
+        doc.text((m.civilStatus || "").substring(0, 9), colDefs[9].x + 1, y + 5);
+        doc.text((m.citizenship || "Filipino").substring(0, 9), colDefs[10].x + 1, y + 5);
+        doc.text((m.occupation || "").substring(0, 10), colDefs[11].x + 1, y + 5);
+        doc.text(catStr.substring(0, 12), colDefs[12].x + 1, y + 5);
+
+        y += rowH;
+      });
+
+      // Signatories Section at the bottom of the last page
+      if (y + 30 > pageH) {
+        doc.addPage();
+        y = 20;
+      } else {
         y += 10;
-        doc.setFontSize(7.5);
-        doc.text("Prepared by:", 14, y); y += 5;
-        doc.line(14, y, 75, y);
-        doc.text("Name of Household/Head Member", 14, y + 4);
-        doc.text("(Signature over Printed Name)", 14, y + 8);
-
-        doc.text("Certified Correct:", pageW / 2 - 25, y - 5);
-        doc.line(pageW / 2 - 25, y, pageW / 2 + 30, y);
-        doc.text("Barangay Secretary", pageW / 2 - 25, y + 4);
-        doc.text("(Signature over Printed Name)", pageW / 2 - 25, y + 8);
-
-        doc.text("Validated by:", pageW - 78, y - 5);
-        doc.line(pageW - 78, y, pageW - 14, y);
-        doc.text("Punong Barangay", pageW - 78, y + 4);
-        doc.text("(Signature over Printed Name)", pageW - 78, y + 8);
-
-        doc.save(`RBI_Form_A_${hh.householdID}.pdf`);
       }
 
-      logTransaction(adminName, adminRole, "Exported RBI Form A", `${rbiFormAData.length} household PDFs generated.`);
+      doc.setFontSize(7.5);
+      doc.text("Prepared by:", 14, y); y += 5;
+      doc.setFont("helvetica", "bold");
+      doc.text((adminName || "ADMIN STAFF").toUpperCase(), 14, y + 3);
+      doc.line(14, y + 4, 75, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text("(Signature over Printed Name)", 14, y + 8);
+
+      doc.text("Certified Correct:", pageW / 2 - 25, y - 5);
+      doc.setFont("helvetica", "bold");
+      doc.text("BARANGAY SECRETARY", pageW / 2 - 25, y + 3);
+      doc.line(pageW / 2 - 25, y + 4, pageW / 2 + 30, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text("Barangay Secretary", pageW / 2 - 25, y + 8);
+
+      doc.text("Noted by:", pageW - 78, y - 5);
+      doc.setFont("helvetica", "bold");
+      doc.text("HON. PUNONG BARANGAY", pageW - 78, y + 3);
+      doc.line(pageW - 78, y + 4, pageW - 14, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text("Punong Barangay", pageW - 78, y + 8);
+
+      doc.save(`RBI_Form_A_Masterlist_${new Date().toISOString().split("T")[0]}.pdf`);
+      logTransaction(adminName, adminRole, "Exported RBI Form A Masterlist", `${householdData.length} households in 1 Masterlist PDF.`);
     } catch (err) {
       console.error("RBI Form A export failed:", err);
       alert("PDF export failed. Make sure jsPDF is installed:\nnpm install jspdf");
@@ -425,12 +491,14 @@ export default function Reports() {
 
       const checkPage = () => { if (y > pageH - 28) { doc.addPage(); y = 14; } };
 
-      doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-      doc.text("RBI FORM C (Revised 2024)", 14, y);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.text("BARANGAY 3S+ MALANDAY", 14, y);
+      doc.setFontSize(11);
+      doc.text("RBI FORM C (Revised 2024)", 14, y + 5);
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
-      doc.text("MONITORING REPORT", pageW / 2, y, { align: "center" });
-      doc.text(`Generated: ${new Date().toLocaleDateString("en-PH")}`, pageW - 14, y, { align: "right" });
-      y += 8;
+      doc.text("MONITORING REPORT", pageW / 2, y + 2, { align: "center" });
+      doc.text(`Generated: ${new Date().toLocaleDateString("en-PH")}`, pageW - 14, y + 2, { align: "right" });
+      y += 14;
 
       doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
       doc.text(`Total No. of Barangay Inhabitants: ${residentData.length}`, 14, y); y += 5;
@@ -506,13 +574,18 @@ export default function Reports() {
       checkPage();
       doc.setFont("helvetica", "normal"); doc.setFontSize(8);
       doc.text("Prepared by:", 14, y); y += 5;
-      doc.line(14, y, 80, y);
-      doc.text("Barangay Secretary", 14, y + 4);
-      doc.text("(Signature over Printed Name)", 14, y + 8);
-      doc.text("Submitted by:", pageW - 80, y - 5);
-      doc.line(pageW - 80, y, pageW - 14, y);
-      doc.text("Punong Barangay", pageW - 80, y + 4);
-      doc.text("(Signature over Printed Name)", pageW - 80, y + 8);
+      doc.setFont("helvetica", "bold");
+      doc.text((adminName || "BARANGAY SECRETARY").toUpperCase(), 14, y + 3);
+      doc.line(14, y + 4, 80, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text("Barangay Secretary / Admin", 14, y + 8);
+
+      doc.text("Noted by:", pageW - 80, y - 5);
+      doc.setFont("helvetica", "bold");
+      doc.text("HON. PUNONG BARANGAY", pageW - 80, y + 3);
+      doc.line(pageW - 80, y + 4, pageW - 14, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text("Punong Barangay", pageW - 80, y + 8);
       y += 18;
       doc.text("Date Accomplished: ___________________________", 14, y);
 
@@ -571,7 +644,7 @@ export default function Reports() {
         >
           Prev
         </button>
-        
+
         {startPage > 1 && (
           <>
             <button onClick={() => setPageFn(1)} style={{ ...btnStyle, background: "#fff", color: "#374151" }}>1</button>
@@ -615,7 +688,6 @@ export default function Reports() {
         {/* ── TABS ── */}
         <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
           {[
-            // 👇 The Performance Report tab has been removed from this list
             { key: "demographics", label: "Demographics" },
             { key: "rbi-a", label: "RBI Form A" },
             { key: "rbi-c", label: "RBI Form C" },
@@ -656,41 +728,40 @@ export default function Reports() {
                   </button>
                 </div>
               </div>
-              
+
               {loading ? (
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>Loading resident data…</div>
               ) : filteredResidents.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No residents found.</div>
               ) : (
                 <>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr>{["Full Name", "Sex", "Age", "Civil Status", "Citizenship", "Occupation", "Household ID"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {paginatedResidents.map((r, index) => (
-                        <tr key={`${r.id}-${index}`}>
-                          <td style={tdStyle}>{r.fullName}</td>
-                          <td style={tdStyle}>{r.sex}</td>
-                          <td style={tdStyle}>{r.age !== null ? r.age : "N/A"}</td>
-                          <td style={tdStyle}>{r.civilStatus}</td>
-                          <td style={tdStyle}>{r.citizenship || "Filipino"}</td>
-                          <td style={tdStyle}>{r.occupation || "—"}</td>
-                          <td style={tdStyle}>{r.householdID}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
-                  <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                    Showing {filteredResidents.length > 0 ? (demoPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(demoPage * ITEMS_PER_PAGE, filteredResidents.length)} of {filteredResidents.length} entries
-                  </span>
-                  
-                  {/* Inject the numbered buttons! */}
-                  {renderPaginationControls(demoPage, totalDemoPages, setDemoPage)}
-                </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>{["Full Name", "Sex", "Age", "Civil Status", "Citizenship", "Occupation", "Household ID"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {paginatedResidents.map((r, index) => (
+                          <tr key={`${r.id}-${index}`}>
+                            <td style={tdStyle}>{r.fullName}</td>
+                            <td style={tdStyle}>{r.sex}</td>
+                            <td style={tdStyle}>{r.age !== null ? r.age : "N/A"}</td>
+                            <td style={tdStyle}>{r.civilStatus}</td>
+                            <td style={tdStyle}>{r.citizenship || "Filipino"}</td>
+                            <td style={tdStyle}>{r.occupation || "—"}</td>
+                            <td style={tdStyle}>{r.householdID}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                      Showing {filteredResidents.length > 0 ? (demoPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(demoPage * ITEMS_PER_PAGE, filteredResidents.length)} of {filteredResidents.length} entries
+                    </span>
+
+                    {renderPaginationControls(demoPage, totalDemoPages, setDemoPage)}
+                  </div>
                 </>
               )}
             </div>
@@ -708,57 +779,56 @@ export default function Reports() {
             </div>
             <div className="section">
               <div className="report-header">
-                <h2>RBI Form A — Records of Barangay Inhabitants by Household</h2>
+                <h2>RBI Form A — Records of Barangay Inhabitants Masterlist</h2>
                 <div className="report-controls">
                   <button className="export-btn" onClick={handleExportRBIFormA}
                     disabled={rbiFormAData.length === 0 || exportLoading}>
-                    {exportLoading ? "Generating…" : `Export PDF (${rbiFormAData.length} households)`}
+                    {exportLoading ? "Generating…" : "Export Masterlist PDF"}
                   </button>
                 </div>
               </div>
 
               <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", fontSize: "13px", color: "#1e40af" }}>
-                <strong>Note:</strong> Exports one PDF per household matching RBI Form A (Revised 2024). The table includes: Last Name, First Name, Middle Name, Suffix, Place of Birth, Date of Birth, Age, Sex, Civil Status, Citizenship, Occupation, and Category (PWD/OFW/Solo Parent/IP/OSC/OSY). Region/Province/City/Municipality/Barangay fields are filled in manually by the Barangay Secretary on the physical form.
+                <strong>Note:</strong> Exports 1 Masterlist PDF file containing all households matching RBI Form A (Revised 2024) in a single continuous table structure.
               </div>
 
               {rbiFormAData.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No household data found.</div>
               ) : (
                 <>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr>{["Household ID", "Household Address", "No. of Members", "Head of Household", "Members Preview"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {paginatedRbiA.map((hh) => {
-                        const head = hh.members.find((m) => m.role === "head");
-                        return (
-                          <tr key={hh.id}>
-                            <td style={tdStyle}><strong>{hh.householdID}</strong></td>
-                            <td style={tdStyle}>{hh.householdAddress || "—"}</td>
-                            <td style={{ ...tdStyle, textAlign: "center" }}>{hh.members.length}</td>
-                            <td style={tdStyle}>{head ? head.fullName : "—"}</td>
-                            <td style={tdStyle}>
-                              <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                                {hh.members.slice(0, 3).map((m) => m.fullName).join(", ")}
-                                {hh.members.length > 3 && ` +${hh.members.length - 3} more`}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
-                  <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                    Showing {rbiFormAData.length > 0 ? (rbiAPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(rbiAPage * ITEMS_PER_PAGE, rbiFormAData.length)} of {rbiFormAData.length} entries
-                  </span>
-                  
-                  {/* Inject the numbered buttons! */}
-                  {renderPaginationControls(rbiAPage, totalRbiAPages, setRbiAPage)}
-                </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>{["Household ID", "Household Address", "No. of Members", "Head of Household", "Members Preview"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {paginatedRbiA.map((hh) => {
+                          const head = hh.members.find((m) => m.role === "head");
+                          return (
+                            <tr key={hh.id}>
+                              <td style={tdStyle}><strong>{hh.householdID}</strong></td>
+                              <td style={tdStyle}>{hh.householdAddress || "—"}</td>
+                              <td style={{ ...tdStyle, textAlign: "center" }}>{hh.members.length}</td>
+                              <td style={tdStyle}>{head ? head.fullName : "—"}</td>
+                              <td style={tdStyle}>
+                                <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                                  {hh.members.slice(0, 3).map((m) => m.fullName).join(", ")}
+                                  {hh.members.length > 3 && ` +${hh.members.length - 3} more`}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                      Showing {rbiFormAData.length > 0 ? (rbiAPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(rbiAPage * ITEMS_PER_PAGE, rbiFormAData.length)} of {rbiFormAData.length} entries
+                    </span>
+
+                    {renderPaginationControls(rbiAPage, totalRbiAPages, setRbiAPage)}
+                  </div>
                 </>
               )}
             </div>
@@ -846,8 +916,8 @@ export default function Reports() {
               </div>
 
               {/* C & D side by side */}
-                <div className="rbi-bottom-grid">
-                  <div className="report-card">
+              <div className="rbi-bottom-grid">
+                <div className="report-card">
                   <h3 style={{ marginBottom: "12px" }}>Civil Status</h3>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
