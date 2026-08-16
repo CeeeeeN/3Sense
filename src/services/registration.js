@@ -3,8 +3,8 @@ import { db } from "../firebase/firebase";
 
 // ─── Cloudinary Upload Helper ────────────────────────────────────────────────
 const uploadToCloudinary = async (base64String, folder) => {
-    const cloudName = "dfnqeiksu"; 
-    const uploadPreset = "3Sense+_ID"; 
+    const cloudName = "dfnqeiksu";
+    const uploadPreset = "3Sense+_ID";
 
     const formData = new FormData();
     formData.append("file", base64String);
@@ -23,29 +23,33 @@ const uploadToCloudinary = async (base64String, folder) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const submitRegistration = async (formData) => {
-    // 1. Hard Validation Requirement (SENSE-52)
-    if (!formData.idImage || !formData.selfieImage) {
-        throw new Error("Selfie image and ID are REQUIRED before submission succeeds.");
+    // 1. Hard Validation Requirement: Only Selfie Image is mandatory
+    if (!formData.selfieImage) {
+        throw new Error("Selfie image is REQUIRED before submission succeeds.");
     }
 
     // 2. Generate the ID first so we can organize the Cloudinary folders cleanly
     const pendingRef = doc(collection(db, "pending_registrations"));
     const registrationID = pendingRef.id;
 
-    // 3. Upload Images to Cloudinary
-    const idImageUrl = await uploadToCloudinary(
-        formData.idImage, 
-        `3Sense/pending_registrations/${registrationID}`
-    );
-    
+    // 3. Upload Images to Cloudinary (Upload ID image conditionally)
+    let idImageUrl = null;
+    if (formData.idImage) {
+        idImageUrl = await uploadToCloudinary(
+            formData.idImage,
+            `3Sense/pending_registrations/${registrationID}`
+        );
+    }
+
     const selfieImageUrl = await uploadToCloudinary(
-        formData.selfieImage, 
+        formData.selfieImage,
         `3Sense/pending_registrations/${registrationID}`
     );
 
-    // 4. Save to Firestore with the new Cloudinary URLs
+    // 4. Save to Firestore with the Cloudinary URLs
     await setDoc(pendingRef, {
         // Personal Info
+        idNumber: formData.idNumber || "",
         firstName: formData.firstName || "",
         middleName: formData.middleName || "",
         lastName: formData.lastName || "",
@@ -85,8 +89,8 @@ export const submitRegistration = async (formData) => {
         totalMembers: formData.totalMembers ? Number(formData.totalMembers) : null,
         householdClassification: formData.householdClassification || "",
 
-        // Meta & New Cloudinary Images (SENSE-52)
-        idImageUrl,
+        // Meta & Cloudinary Images
+        idImageUrl: idImageUrl || "",
         selfieImageUrl,
         status: "pending",
         createdAt: serverTimestamp(),
