@@ -1407,13 +1407,6 @@ export default function Registration({ onBack }) {
                   </button>
                 )}
 
-                {step === 0 && (
-                  <button type="button" className="reg-btn-primary" onClick={() => { setIdImage(null); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", background: "#317D89", color: "#ffffff", padding: "0.6rem 1.25rem", borderRadius: "8px", fontWeight: 600 }}>
-                    Skip ID Step <SvgArrowRight />
-                  </button>
-                )}
-
                 {step > 0 && step < total - 1 && (
                   <button type="button" className="reg-btn-primary" onClick={goNext}
                     style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
