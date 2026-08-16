@@ -33,10 +33,12 @@ export const createBranch = async (householdID, branchName) => {
         if (!isNaN(num) && num > maxBranchNum) maxBranchNum = num;
     });
 
-    const newBranchID = `BR-${String(maxBranchNum + 1).padStart(3, "0")}`;
+    const newBranchNum = maxBranchNum + 1;
+    const newBranchID = `BR-${String(newBranchNum).padStart(3, "0")}`;
     await setDoc(doc(db, "households", householdID, "branches", newBranchID), {
         branchName: branchName.trim(),
-        residentID: null, 
+        familyNumber: `${householdID}-${newBranchNum}`,
+        residentID: null,
         createdAt: serverTimestamp(),
     });
 

@@ -43,6 +43,7 @@ function formatNotifTime(timestamp) {
 export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [memberNotifs, setMemberNotifs] = useState([]);
   const [householdNotifs, setHouseholdNotifs] = useState([]);
 
@@ -84,11 +85,26 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
   }, []);
 
   useEffect(() => {
-    if (window.innerWidth <= 768) {
-      document.body.style.overflow = (notifOpen || userOpen) ? "hidden" : "";
+    if (!showLogoutModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setShowLogoutModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showLogoutModal]);
+
+  useEffect(() => {
+    if (showLogoutModal) {
+      document.body.style.overflow = "hidden";
+    } else if (window.innerWidth <= 768 && (notifOpen || userOpen)) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
-  }, [notifOpen, userOpen]);
+  }, [showLogoutModal, notifOpen, userOpen]);
 
   const clearAll = () => markAllNotificationsAsRead(notifications);
   const markRead = (id) => markNotificationAsRead(id);
@@ -105,6 +121,11 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
     }
   };
   const nav = (page) => { if (onNavigate) onNavigate(page); };
+
+  const handleLogoutConfirm = () => {
+    setShowLogoutModal(false);
+    nav("logout");
+  };
 
   return (
     <>
@@ -210,7 +231,15 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                   </div>
                   <button className="nb-dd-item" onClick={() => { nav("profile"); setUserOpen(false); }}><IconProfile2 /> My Profile</button>
                   <div className="nb-dd-divider" />
-                  <button className="nb-dd-item danger" onClick={() => nav("logout")}><IconLogout /> Logout</button>
+                  <button
+                    className="nb-dd-item danger"
+                    onClick={() => {
+                      setUserOpen(false);
+                      setShowLogoutModal(true);
+                    }}
+                  >
+                    <IconLogout /> Logout
+                  </button>
                 </div>
               )}
             </div>
@@ -231,6 +260,55 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
             </button>
           ))}
         </div>
+
+        {showLogoutModal && (
+          <div
+            className="nb-logout-modal-overlay"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowLogoutModal(false);
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-dialog-title"
+          >
+            <div className="nb-logout-modal">
+              <button
+                type="button"
+                className="nb-logout-modal-close"
+                onClick={() => setShowLogoutModal(false)}
+                aria-label="Close"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+              <div className="nb-logout-modal-icon">
+                <IconLogout />
+              </div>
+              <h3 id="logout-dialog-title" className="nb-logout-modal-title">Confirm Logout</h3>
+              <p className="nb-logout-modal-desc">
+                Are you sure you want to log out?
+              </p>
+              <div className="nb-logout-modal-actions">
+                <button
+                  type="button"
+                  className="nb-logout-btn-cancel"
+                  onClick={() => setShowLogoutModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="nb-logout-btn-confirm"
+                  onClick={handleLogoutConfirm}
+                >
+                  Log Out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </>

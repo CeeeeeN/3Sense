@@ -454,20 +454,60 @@ export default function AdminLayout({ children }) {
         {children}
       </div>
 
-      {/* LOGOUT MODAL */}
       {showLogoutModal && (
-        <div className="modal-overlay">
-          <div className="modal">
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowLogoutModal(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="modal" style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => setShowLogoutModal(false)}
+              aria-label="Close"
+              style={{
+                position: "absolute",
+                top: "12px",
+                right: "12px",
+                width: "28px",
+                height: "28px",
+                borderRadius: "50%",
+                border: "none",
+                background: "#f1f5f9",
+                color: "#64748b",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
             <h3 className="modal-title">Confirm Logout</h3>
+            <p style={{ textAlign: "center", color: "#5e7a99", fontSize: "0.9rem", margin: "0 0 1.25rem 0" }}>
+              Are you sure you want to log out?
+            </p>
             <div className="btn-group modal-actions">
-              <button className="reject-btn" onClick={handleLogout}>
-                Logout
-              </button>
               <button
+                type="button"
                 className="approve-btn"
                 onClick={() => setShowLogoutModal(false)}
+                style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1" }}
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                className="reject-btn"
+                onClick={handleLogout}
+              >
+                Log Out
               </button>
             </div>
           </div>

@@ -415,6 +415,11 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           <div className="pf-hero-identity">
             <div className="pf-hero-name">{fullName || "Your Full Name"}</div>
             <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {userRole || "Member"}</div>
+            {data.familyNumber && (
+              <div className="pf-hero-family-number">
+                Family Number: {data.familyNumber}
+              </div>
+            )}
             <div className="pf-hero-verified"><span className="pf-hero-dot" /> Verified Resident</div>
             <div className="pf-hero-divider" />
             <div className="pf-hero-meta">
@@ -528,7 +533,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         {/* 6. HOUSEHOLD */}
         <Card icon={IconHome2} title="Household Information">
           <div className="pf-info-grid c3">
-            <InfoItem label="Household ID" value={householdID} />
+            <InfoItem label="Household Number" value={householdID} />
+            {data.familyNumber && <InfoItem label="Family Number" value={data.familyNumber} />}
             <InfoItem label="Total Members" value={data.totalMembers} />
             <InfoItem label="Classification" value={data.householdClassification} />
           </div>

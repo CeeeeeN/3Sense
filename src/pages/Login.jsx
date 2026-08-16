@@ -410,6 +410,12 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                           <div className="branch-title-group">
                             <div className="branch-name">{branch.branchName}</div>
                             <div className="branch-member-count">
+                              {branch.familyNumber || (() => {
+                                const num = parseInt((branch.id || "").replace("BR-", ""), 10);
+                                return !isNaN(num) ? `${hhNumber.trim()}-${num}` : "";
+                              })()}
+                            </div>
+                            <div className="branch-member-sub">
                               {branchProfiles.length} {branchProfiles.length === 1 ? "Member" : "Members"}
                             </div>
                           </div>
