@@ -16,6 +16,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { Search } from "lucide-react";
+import { formatDisplayEmail } from "../utils/maskEmail";
 
 export default function AdminManagement() {
   // ================= STATE =================
@@ -130,16 +131,20 @@ export default function AdminManagement() {
     const unsubRequests = onSnapshot(
       collection(db, "pendingAdmins"),
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          docId: doc.id,
-          ...doc.data(),
-          dateSubmitted:
-            doc.data().createdAt?.toDate().toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            }) || "N/A",
-        }));
+        const data = snapshot.docs.map((doc) => {
+          const docData = doc.data();
+          return {
+            docId: doc.id,
+            ...docData,
+            email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
+            dateSubmitted:
+              docData.createdAt?.toDate().toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }) || "N/A",
+          };
+        });
         setRequests(data);
       },
     );
@@ -147,10 +152,14 @@ export default function AdminManagement() {
     const unsubAdmins = onSnapshot(
       collection(db, "approvedAdmins"),
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          docId: doc.id,
-          ...doc.data(),
-        }));
+        const data = snapshot.docs.map((doc) => {
+          const docData = doc.data();
+          return {
+            docId: doc.id,
+            ...docData,
+            email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
+          };
+        });
         setAdmins(data);
       },
     );
@@ -159,7 +168,7 @@ export default function AdminManagement() {
       unsubRequests();
       unsubAdmins();
     };
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, adminRole, currentUser]);
 
   // ================= STEP 3: APPROVE =================
   const handleApprove = async () => {
@@ -491,7 +500,7 @@ export default function AdminManagement() {
                     paginatedRequests.map((req) => (
                       <tr key={req.docId}>
                         <td>{req.fullName}</td>
-                        <td>{req.email}</td>
+                        <td>{formatDisplayEmail(req.email, adminRole, currentUser?.uid === req.uid)}</td>
                         <td>{req.contact}</td>
                         <td>{req.position}</td>
                         <td>{req.username}</td>
@@ -870,7 +879,7 @@ export default function AdminManagement() {
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
               <div className="admin-details">
                 <p><strong>Full Name:</strong> {selectedAdmin.fullName}</p>
-                <p><strong>Email:</strong> {selectedAdmin.email}</p>
+                <p><strong>Email:</strong> {formatDisplayEmail(selectedAdmin.email, adminRole, currentUser?.uid === selectedAdmin.uid)}</p>
                 <p><strong>Contact:</strong> {selectedAdmin.contact}</p>
                 <p><strong>Position:</strong> {selectedAdmin.position}</p>
                 <p><strong>Username:</strong> {selectedAdmin.username}</p>

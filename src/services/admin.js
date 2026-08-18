@@ -10,13 +10,13 @@ import {
 import { db } from "../firebase/firebase";
 
 export const generateHouseholdID = async () => {
+  const currentYear = String(new Date().getFullYear());
   const snapshot = await getDocs(collection(db, "households"));
   let maxCount = 0;
 
   snapshot.forEach(doc => {
     const parts = doc.id.split('-');
-    // Expected format: MAL-YYYY-NNNNN
-    if (parts.length === 3) {
+    if (parts.length === 3 && parts[1] === currentYear) {
       const num = parseInt(parts[2], 10);
       if (!isNaN(num) && num > maxCount) {
         maxCount = num;
@@ -25,9 +25,8 @@ export const generateHouseholdID = async () => {
   });
 
   const count = maxCount + 1;
-  const year = new Date().getFullYear();
   const padded = String(count).padStart(5, "0");
-  return `MAL-${year}-${padded}`;
+  return `MAL-${currentYear}-${padded}`;
 };
 
 export const approveRegistration = async (docID) => {

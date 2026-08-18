@@ -20,6 +20,8 @@ import {
 import { approveRegistration } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
+import { formatDisplayEmail } from "../utils/maskEmail";
+import { getFamilyNumber } from "../utils/householdNumbers";
 
 export default function HouseholdManagement() {
 
@@ -107,7 +109,6 @@ export default function HouseholdManagement() {
     fetchAdmin();
   }, []);
 
-  // Fetch Pending Registrations
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "pending_registrations"), (snapshot) => {
       const requests = snapshot.docs.map(docSnap => {
@@ -120,20 +121,20 @@ export default function HouseholdManagement() {
           address: `${data.houseNumber || ""} ${data.street || ""}, ${data.barangay || ""}`.trim(),
           dateSubmitted: data.createdAt ? data.createdAt.toDate().toLocaleDateString() : "N/A",
           status: data.status || "pending",
-          ...data
+          ...data,
+          email: formatDisplayEmail(data.email, adminRole)
         };
       });
       setHhRequests(requests);
     });
     return () => unsub();
-  }, []);
+  }, [adminRole]);
 
   useEffect(() => {
     let latestActive = [];
     let latestPending = [];
 
     const merge = () => {
-
       const seen = new Set();
       const deduped = latestActive.filter(r => {
         const key = `${r.householdId}__${r.id}`;
@@ -141,21 +142,21 @@ export default function HouseholdManagement() {
         seen.add(key);
         return true;
       });
-      // pendingHeads only exist when activated===false, so they
-      // cannot overlap with any active resident doc. Just append.
       setResidents([...deduped, ...latestPending]);
     };
 
-    // Listener 1: all activated residents (households/{id}/residents/*)
     const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (snap) => {
       latestActive = snap.docs.map(docSnap => {
         const data = docSnap.data();
         const householdId = docSnap.ref.parent.parent?.id || "Unknown";
+        const effectiveBranchID = data.branchID || "BR-001";
         return {
           ...data,
           id: docSnap.id,
           householdId,
+          familyNumber: getFamilyNumber(householdId, effectiveBranchID),
           fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+          email: formatDisplayEmail(data.email, adminRole),
           category: Array.isArray(data.categories) ? data.categories
             : Array.isArray(data.category) ? data.category
               : typeof data.category === "string" && data.category ? [data.category]
@@ -172,7 +173,6 @@ export default function HouseholdManagement() {
       merge();
     });
 
-    // Listener 2: households not yet activated (pending heads)
     const unsubHouseholds = onSnapshot(collection(db, "households"), (snap) => {
       latestPending = [];
       snap.docs.forEach(hhDoc => {
@@ -184,6 +184,7 @@ export default function HouseholdManagement() {
             id: `unactivated-${hhDoc.id}`,
             householdId: hhDoc.id,
             fullName: `${head.firstName || ""} ${head.lastName || ""}`.trim(),
+            email: formatDisplayEmail(head.email, adminRole),
             category: Array.isArray(head.categories) ? head.categories
               : Array.isArray(head.category) ? head.category
                 : typeof head.category === "string" && head.category ? [head.category]
@@ -204,7 +205,7 @@ export default function HouseholdManagement() {
       unsubResidents();
       unsubHouseholds();
     };
-  }, []);
+  }, [adminRole]);
 
 
   // ================= HH REQUEST FILTERS =================
@@ -553,8 +554,8 @@ export default function HouseholdManagement() {
                 <thead style={{ background: '#f9fafb' }}>
                   <tr>
                     <th>Full Name</th>
-                    <th>Household ID</th>
-                    <th>Branch ID</th>
+                    <th>Household Number</th>
+                    <th>Family Number</th>
                     <th>Category</th>
                     <th>Date Submitted</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -565,8 +566,8 @@ export default function HouseholdManagement() {
                     paginatedHhRequests.map((req) => (
                       <tr key={req.id}>
                         <td style={{ fontWeight: 500 }}>{req.fullName}</td>
-                        <td style={{ color: '#4b5563' }}>{req.householdId}</td>
-                        <td style={{ color: '#4b5563' }}>{req.branchId || "Pending"}</td>
+                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{req.householdId}</td>
+                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{req.branchId ? getFamilyNumber(req.householdId, req.branchId) : "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {req.category && req.category.map((c, i) => (
@@ -745,8 +746,8 @@ export default function HouseholdManagement() {
                 <thead style={{ background: '#f9fafb' }}>
                   <tr>
                     <th>Full Name</th>
-                    <th>Household ID</th>
-                    <th>Branch ID</th>
+                    <th>Household Number</th>
+                    <th>Family Number</th>
                     <th>Category</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
@@ -757,8 +758,8 @@ export default function HouseholdManagement() {
                     paginatedResidents.map((res) => (
                       <tr key={`${res.householdId}__${res.id}`}>
                         <td style={{ fontWeight: 500 }}>{res.fullName}</td>
-                        <td style={{ color: '#4b5563' }}>{res.householdId}</td>
-                        <td style={{ color: '#4b5563' }}>{res.branchID || "Pending"}</td>
+                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{res.householdId}</td>
+                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{res.familyNumber || getFamilyNumber(res.householdId, res.branchID)}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {res.category && res.category.map((c, i) => (
@@ -883,15 +884,15 @@ export default function HouseholdManagement() {
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
                 <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
                   <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
-                    <strong>Household ID:</strong> {selectedResident.householdId}<br />
-                    <strong>Family ID:</strong> {selectedResident.familyId || "Pending"} <br />
+                    <strong>Household Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedResident.householdId}</span><br />
+                    <strong>Family Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
                     <div style={{ marginTop: '8px' }}>
                       <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
                     </div>
                   </div>
                   <div><strong>Full Name:</strong><br />{selectedResident.fullName}</div>
                   <div><strong>Contact No:</strong><br />{selectedResident.contactNumber || "N/A"}</div>
-                  <div><strong>Email:</strong><br />{selectedResident.email || "N/A"}</div>
+                  <div><strong>Email:</strong><br />{formatDisplayEmail(selectedResident.email, adminRole)}</div>
                   <div><strong>Birth Date:</strong><br />{selectedResident.birthDate} {selectedResident.age ? `(${selectedResident.age} yrs)` : ""}</div>
                   <div><strong>Birth Place:</strong><br />{selectedResident.birthPlace || "N/A"}</div>
                   <div><strong>Sex:</strong><br />{selectedResident.sex}</div>
@@ -950,7 +951,8 @@ export default function HouseholdManagement() {
 
                 <div className="admin-details">
                   <p><strong>Full Name:</strong> {statusData.fullName}</p>
-                  <p><strong>Household ID:</strong> {statusData.householdId}</p>
+                  <p><strong>Household Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{statusData.householdId}</span></p>
+                  <p><strong>Family Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{statusData.familyNumber || getFamilyNumber(statusData.householdId, statusData.branchID)}</span></p>
                   <p style={{ fontSize: "0.8rem", color: "#888" }}>
                     Setting as: <strong>{adminProfile.fullName}</strong>
                     {adminProfile.position ? ` · ${adminProfile.position}` : ""}
@@ -1040,7 +1042,7 @@ export default function HouseholdManagement() {
                   </div>
                   <div><strong>Full Name:</strong><br />{selectedHhRequest.fullName}</div>
                   <div><strong>Contact No:</strong><br />{selectedHhRequest.contactNumber || "N/A"}</div>
-                  <div><strong>Email:</strong><br />{selectedHhRequest.email || "N/A"}</div>
+                  <div><strong>Email:</strong><br />{formatDisplayEmail(selectedHhRequest.email, adminRole)}</div>
                   <div><strong>Birth Date:</strong><br />{selectedHhRequest.birthDate} {selectedHhRequest.age ? `(${selectedHhRequest.age} yrs)` : ""}</div>
                   <div><strong>Birth Place:</strong><br />{selectedHhRequest.birthPlace || "N/A"}</div>
                   <div><strong>Sex:</strong><br />{selectedHhRequest.sex}</div>
