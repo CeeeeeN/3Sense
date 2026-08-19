@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 // Replace with your actual Hugging Face Access Token
-const HF_ACCESS_TOKEN = import.meta.env.HuggingFaceToken;
+const HF_ACCESS_TOKEN = import.meta.env.VITE_HUGGINGFACE_TOKEN;
 
 // Using the NEW Hugging Face Router endpoint
 const MODEL_URL = "https://router.huggingface.co/v1/chat/completions";
