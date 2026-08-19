@@ -40,7 +40,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "HuggingFaceH4/zephyr-7b-beta",
+            model: "google/gemma-2-2b-it",
             messages: [
               {
                 role: "system",
