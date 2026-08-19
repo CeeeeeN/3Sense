@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
+// Import Firebase functions and your db instance
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase/firebase"; 
 
-// Replace with your actual Hugging Face Access Token
-const HF_ACCESS_TOKEN = import.meta.env.VITE_HUGGINGFACE_TOKEN;
-
-// Using the NEW Hugging Face Router endpoint
+// Using the VITE prefixed environment variable
+const HF_ACCESS_TOKEN = import.meta.env.VITE_HUGGINGFACE_TOKEN; 
 const MODEL_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export default function AIInsightsCard({ documentData, facilityData, dateRange }) {
@@ -12,18 +13,49 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 1. Check for insufficient data
     if (!documentData?.length && !facilityData?.length) {
       setInsight("Insufficient data available for the selected date range to generate insights.");
       return;
     }
 
     const generateAIInsight = async () => {
+      // Create a unique Dynamic Cache Key
+      // If a new request is added, the length changes, and the cache invalidates automatically!
+      const safeDateRange = dateRange.replace(/\s+/g, ''); // Removes spaces
+      const cacheKey = `insight_${safeDateRange}_doc${documentData.length}_fac${facilityData.length}`;
+
+      // ==========================================
+      // TIER 1: Check Browser Session Storage
+      // ==========================================
+      const localCache = sessionStorage.getItem(cacheKey);
+      if (localCache) {
+        setInsight(localCache);
+        return; // Stop here! Instant load.
+      }
+
       setLoading(true);
       setError(null);
-      
+
       try {
-        // 2. Aggregate the data securely (Numbers only, NO PII/Names)
+        // ==========================================
+        // TIER 2: Check Firestore Global Cache
+        // ==========================================
+        const insightRef = doc(db, "ai_insights", cacheKey);
+        const insightSnap = await getDoc(insightRef);
+
+        if (insightSnap.exists()) {
+          const firestoreInsight = insightSnap.data().text;
+          
+          // Save it locally so we don't query Firebase again this session
+          sessionStorage.setItem(cacheKey, firestoreInsight); 
+          setInsight(firestoreInsight);
+          setLoading(false);
+          return; // Stop here! Prevent AI API call.
+        }
+
+        // ==========================================
+        // TIER 3: Call Hugging Face AI API
+        // ==========================================
         const rawData = {
           dateRange: dateRange,
           totalDocumentRequests: documentData.reduce((acc, curr) => acc + curr.count, 0),
@@ -32,7 +64,6 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
           facilityDailyBreakdown: facilityData, 
         };
 
-        // 3. Send the request to the new Hugging Face Router
         const response = await fetch(MODEL_URL, {
           method: "POST",
           headers: {
@@ -40,7 +71,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "Qwen/Qwen2.5-7B-Instruct",
+            model: "Qwen/Qwen2.5-7B-Instruct", 
             messages: [
               {
                 role: "system",
@@ -62,8 +93,21 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
           throw new Error(result.error?.message || "Failed to fetch from Hugging Face API");
         }
 
-        // 4. Extract the cleanly formatted response
         const generatedText = result.choices[0].message.content.trim();
+
+        // ==========================================
+        // SAVE CACHE FOR FUTURE USERS
+        // ==========================================
+        
+        // Save to Firebase (for other admins)
+        await setDoc(insightRef, {
+          text: generatedText,
+          createdAt: serverTimestamp() // Tracks when the insight was generated
+        });
+
+        // Save to Session Storage (for this admin)
+        sessionStorage.setItem(cacheKey, generatedText);
+
         setInsight(generatedText);
 
       } catch (err) {
