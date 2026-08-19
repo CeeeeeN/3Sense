@@ -1,34 +1,15 @@
 import React, { useState, useEffect } from "react";
 
-// Hugging Face Access Token
+// Replace with your actual Hugging Face Access Token
 const HF_ACCESS_TOKEN = import.meta.env.HuggingFaceToken;
 
-// Using Mistral because it doesn't require a gated license like Llama-3 does
-const MODEL_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3";
+// Using the NEW Hugging Face Router endpoint
+const MODEL_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export default function AIInsightsCard({ documentData, facilityData, dateRange }) {
   const [insight, setInsight] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Helper function to handle Hugging Face's "503 Model is Loading" error
-  const fetchWithRetry = async (url, options, retries = 6, delay = 5000) => {
-    for (let i = 0; i < retries; i++) {
-      const response = await fetch(url, options);
-      const result = await response.json();
-
-      // If the model is sleeping, it returns a 503 or an "estimated_time" error
-      if (response.status === 503 || result.error?.includes("currently loading")) {
-        console.log(`Model is sleeping. Waking it up... Retrying in ${delay / 1000}s`);
-        await new Promise(res => setTimeout(res, delay));
-        continue; // Try the loop again
-      }
-
-      if (!response.ok) throw new Error(result.error || "Failed to fetch from Hugging Face");
-      return result;
-    }
-    throw new Error("The AI model took too long to wake up. Please try again.");
-  };
 
   useEffect(() => {
     // 1. Check for insufficient data
@@ -51,37 +32,39 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
           facilityDailyBreakdown: facilityData, 
         };
 
-        // 3. Format the Prompt for Mistral (Using [INST] tags)
-        const prompt = `[INST] You are an expert data analyst for Barangay Malanday. Analyze the following aggregated JSON data representing Document and Facility requests.
-        
-        Data: ${JSON.stringify(rawData)}
-        
-        Provide a concise, professional 3-sentence summary highlighting:
-        1. The overall request volume and notable trends.
-        2. The peak request dates.
-        3. A brief conclusion on service engagement.
-        
-        Do not use bold text, asterisks, or markdown formatting. Output plain text only. Do not include introductory phrases like 'Here is the summary'. [/INST]`;
-
-        // 4. Send the request to Hugging Face
-        const response = await fetchWithRetry(MODEL_URL, {
+        // 3. Send the request to the new Hugging Face Router
+        const response = await fetch(MODEL_URL, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${HF_ACCESS_TOKEN}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 150, // Limits the output length
-              return_full_text: false, // Prevents returning our original prompt
-              temperature: 0.2 // Keeps the AI factual and less "creative"
-            }
+            // You can use Mistral, Llama, or any supported model here
+            model: "mistralai/Mistral-7B-Instruct-v0.3",
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert data analyst for Barangay Malanday. Provide a concise, professional 3-sentence summary highlighting the overall request volume, peak dates, and a brief conclusion. Do not use bold text, asterisks, or markdown. Output plain text only."
+              },
+              {
+                role: "user",
+                content: `Here is the data: ${JSON.stringify(rawData)}`
+              }
+            ],
+            max_tokens: 150,
+            temperature: 0.2
           })
         });
 
-        // 5. Clean up the response
-        let generatedText = response[0].generated_text.trim();
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error?.message || "Failed to fetch from Hugging Face API");
+        }
+
+        // 4. Extract the cleanly formatted response
+        const generatedText = result.choices[0].message.content.trim();
         setInsight(generatedText);
 
       } catch (err) {
@@ -119,7 +102,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
       {loading ? (
         <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#64748b", fontSize: "0.9rem" }}>
           <span className="loader" style={{ width: "16px", height: "16px", border: "2px solid #cbd5e1", borderTopColor: "#0d9488", borderRadius: "50%", animation: "spin 1s linear infinite" }}></span>
-          Waking up AI model and analyzing trends...
+          Analyzing trends and patterns...
         </div>
       ) : error ? (
         <p style={{ color: "#ef4444", fontSize: "0.9rem", margin: 0 }}>{error}</p>
@@ -129,7 +112,6 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
         </p>
       )}
       
-      {/* CSS for the spinning loader */}
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
