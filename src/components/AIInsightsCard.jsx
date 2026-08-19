@@ -40,8 +40,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            // You can use Mistral, Llama, or any supported model here
-            model: "mistralai/Mistral-7B-Instruct-v0.3",
+            model: "HuggingFaceH4/zephyr-7b-beta",
             messages: [
               {
                 role: "system",
