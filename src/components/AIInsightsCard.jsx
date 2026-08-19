@@ -40,7 +40,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemma-2-2b-it",
+            model: "Qwen/Qwen2.5-7B-Instruct",
             messages: [
               {
                 role: "system",
