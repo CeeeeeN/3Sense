@@ -29,13 +29,20 @@ export default function PeaceAndOrderAIInsights() {
 
         // 3. Acceptance Criteria: Strip PII and anonymous reporter info
         // We only pass the exact fields the AI needs to find spatial/temporal patterns
-        const safeData = rawReports.map(r => ({
-          type: r.incidentType,
-          location: r.location,
-          date: r.date,
-          time: r.time,
-          urgency: r.urgency
-        }));
+        const safeData = rawReports.map(r => {
+          let loc = (r.location || "").trim();
+          
+          // Identify gibberish: 2 characters or less, or strings of mostly consonants
+          const isGibberish = loc.length <= 2 || /^[bcdfghjklmnpqrstvwxyz]{4,}$/i.test(loc.replace(/\s/g, ''));
+          
+          return {
+            type: r.incidentType || "Unspecified",
+            location: isGibberish ? "Unspecified Zone" : loc,
+            date: r.date,
+            time: r.time,
+            urgency: r.urgency
+          };
+        });
 
         // 4. Acceptance Criteria: Analytics update when new reports are added
         const cacheKey = `po_insight_count_${safeData.length}`;
@@ -71,7 +78,7 @@ export default function PeaceAndOrderAIInsights() {
             messages: [
               {
                 role: "system",
-                content: "You are an expert crime and incident analyst for a local Barangay. Based ONLY on the provided JSON data, provide a concise summary identifying trends. You MUST format your output exactly like this (do not use markdown asterisks or extra text):\n\nIncreasing Trend: [Your observation]\nPeak Period: [Your observation]\nNotable Pattern: [Your observation]"
+                content: "You are an expert crime and incident analyst for a local Barangay. Based ONLY on the provided JSON data, provide a concise summary identifying trends. IMPORTANT: Ignore locations that appear to be test data or gibberish (e.g., 'Unspecified Zone', 'test'). You MUST format your output exactly like this (do not use markdown asterisks or extra text):\n\nIncreasing Trend: [Your observation]\nPeak Period: [Your observation]\nNotable Pattern: [Your observation]"
               },
               {
                 role: "user",
@@ -133,7 +140,7 @@ export default function PeaceAndOrderAIInsights() {
       {loading ? (
         <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#64748b", fontSize: "0.9rem" }}>
           <span style={{ width: "16px", height: "16px", border: "2px solid #cbd5e1", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite" }}></span>
-          Analyzing spatial and temporal incident patterns...
+          Analyzing Peace & Order incident patterns...
         </div>
       ) : error ? (
         <p style={{ color: "#ef4444", fontSize: "0.9rem", margin: 0 }}>{error}</p>

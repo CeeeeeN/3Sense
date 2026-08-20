@@ -101,9 +101,20 @@ export default function PeaceAndOrderAnalytics({ data }) {
       urgencyCounts[urgency] = (urgencyCounts[urgency] || 0) + 1;
 
       if (incident.location) {
-        const rawLoc = incident.location.trim().toLowerCase();
-        const cleanLoc = rawLoc.replace(/\b\w/g, char => char.toUpperCase());
-        locCounts[cleanLoc] = (locCounts[cleanLoc] || 0) + 1;
+        const rawLoc = incident.location.trim();
+        const noSpaceLoc = rawLoc.replace(/\s/g, '');
+        
+        // Identify gibberish: <= 2 chars, consecutive consonants, or the word "test"
+        const isGibberish = 
+          noSpaceLoc.length <= 2 || 
+          /^[bcdfghjklmnpqrstvwxyz]{4,}$/i.test(noSpaceLoc) ||
+          /test/i.test(noSpaceLoc);
+
+        // Only tally the location if it is a real word
+        if (!isGibberish) {
+          const cleanLoc = rawLoc.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+          locCounts[cleanLoc] = (locCounts[cleanLoc] || 0) + 1;
+        }
       }
     });
 
