@@ -41,6 +41,14 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       where("status", "==", "Completed")
     );
 
+    // 👇 NEW QUERY: Listen for Returned Equipment Rentals
+    const qEq = query(
+      collection(db, "equipment_rentals"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      where("status", "==", "Returned")
+    );
+
     const qProg = query(
       collection(db, "livelihoodRegistrations"),
       where("householdID", "==", householdID),
@@ -70,10 +78,12 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       where("status", "==", "resolved")
     );
 
-    let docsData = [], resData = [], progData = [], genProgData = [], incData = [], bswdData = [];
+    // Added eqData to the arrays
+    let docsData = [], resData = [], eqData = [], progData = [], genProgData = [], incData = [], bswdData = [];
 
     const updatePending = () => {
-      const combined = [...docsData, ...resData, ...progData, ...genProgData, ...incData, ...bswdData];
+      // Include eqData in the combined array
+      const combined = [...docsData, ...resData, ...eqData, ...progData, ...genProgData, ...incData, ...bswdData];
 
       const requiresFeedback = combined.filter(item => item.feedbackSubmitted !== true);
 
@@ -94,6 +104,12 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
 
     const unsubRes = onSnapshot(qRes, (snap) => {
       resData = snap.docs.map(doc => ({ id: doc.id, _type: "FACILITY", title: doc.data().purpose || "Reservation", ...doc.data() }));
+      updatePending();
+    });
+
+    // 👇 NEW LISTENER: Process Equipment data
+    const unsubEq = onSnapshot(qEq, (snap) => {
+      eqData = snap.docs.map(doc => ({ id: doc.id, _type: "EQUIPMENT", title: doc.data().equipmentName || "Equipment Rental", ...doc.data() }));
       updatePending();
     });
 
@@ -125,6 +141,7 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
     return () => {
       unsubDocs();
       unsubRes();
+      unsubEq(); // 👇 Clean up the equipment listener
       unsubProg();
       unsubGenProg();
       unsubInc();
