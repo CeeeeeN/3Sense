@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Manage_IconLocation, IconAdd } from "../../components/Icons";
-import { auth } from "../../firebase/firebase";
+import { auth, db } from "../../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
-import { query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import {
   subscribeToAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement
 } from "../../services/announcements";
+import EmailBlastModal from "../../components/EmailBlastModal";
+import { buildAnnouncementEmail } from "../../utils/emailTemplates";
 
 const PREVIEW_LIMIT = 120;
 
@@ -46,6 +48,10 @@ export default function ManageAnnouncements() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dateError, setDateError] = useState("");
 
+  // Email blast state
+  const [showEmailBlast, setShowEmailBlast] = useState(false);
+  const [emailBlastTarget, setEmailBlastTarget] = useState(null);
+
   // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -60,27 +66,27 @@ export default function ManageAnnouncements() {
     time: ""
   });
 
-    useEffect(() => {
-      // Listen for the currently logged-in user
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          // Find their document in the approvedAdmins collection
-          const q = query(
-            collection(db, "approvedAdmins"),
-            where("uid", "==", user.uid),
-          );
-          const snapshot = await getDocs(q);
-  
-          if (!snapshot.empty) {
-            const data = snapshot.docs[0].data();
-            setAdminName(data.fullName || "Admin");
-            setAdminRole(data.role || "Standard Admin");
-          }
+  useEffect(() => {
+    // Listen for the currently logged-in user
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Find their document in the approvedAdmins collection
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid),
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
         }
-      });
-  
-      return () => unsubscribe();
-    }, []);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToAnnouncements((data) => {
@@ -110,6 +116,11 @@ export default function ManageAnnouncements() {
     });
     setEditingAnnId(ann.id);
     setShowAddModal(true);
+  };
+
+  const handleEmailBlast = (ann) => {
+    setEmailBlastTarget(ann);
+    setShowEmailBlast(true);
   };
 
   const handleDelete = async (id) => {
@@ -149,7 +160,7 @@ export default function ManageAnnouncements() {
     }
     setDateError("");
     setIsSubmitting(true);
-    
+
     try {
       if (editingAnnId) {
         await updateAnnouncement(editingAnnId, newAnnouncement);
@@ -171,7 +182,7 @@ export default function ManageAnnouncements() {
           `Added new announcement: ${newAnnouncement.title}`,
         );
       }
-      
+
       setNewAnnouncement({
         title: "", description: "", category: "All Residents", announcementCategory: "General", requirements: [""], location: "", time: ""
       });
@@ -280,9 +291,17 @@ export default function ManageAnnouncements() {
               <li><strong>Date Posted:</strong> {ann.date}</li>
               <li><strong>Posted By:</strong> {ann.postedBy}</li>
             </ul>
-            <div className="as-card-footer" style={{ gap: '10px', display: 'flex' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(ann)}>Edit</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(ann.id)}>Delete</button>
+            <div className="as-card-footer" style={{ gap: '8px', display: 'flex' }}>
+              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1 }} onClick={() => handleEdit(ann)}>Edit</button>
+              <button
+                className="as-btn-ghost"
+                style={{ padding: '8px 12px', flex: 1, color: '#0369a1', borderColor: '#bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                onClick={() => handleEmailBlast(ann)}
+                title="Send email notification to eligible residents"
+              >
+                Email
+              </button>
+              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(ann.id)}>Delete</button>
             </div>
           </div>
         ))}
@@ -317,13 +336,13 @@ export default function ManageAnnouncements() {
               <h2>{editingAnnId ? "Edit Announcement" : "Create Announcement"}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
             </div>
-            
+
             <div className="as-modal-body" style={{ alignItems: 'stretch' }}>
               <form className="as-form" onSubmit={handleAddAnnouncement}>
                 <div className="as-form-group">
                   <label className="as-form-label">Title</label>
                   <input type="text" className="as-form-input" required
-                    value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})} 
+                    value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
                   />
                 </div>
 
@@ -331,7 +350,7 @@ export default function ManageAnnouncements() {
                   <div className="as-form-group">
                     <label className="as-form-label">Category (Target Audience)</label>
                     <select className="as-form-select" required
-                      value={newAnnouncement.category} onChange={(e) => setNewAnnouncement({...newAnnouncement, category: e.target.value})}
+                      value={newAnnouncement.category} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, category: e.target.value })}
                     >
                       <option value="All Residents">All Residents</option>
                       <option value="Student">Student</option>
@@ -346,7 +365,7 @@ export default function ManageAnnouncements() {
                   <div className="as-form-group">
                     <label className="as-form-label">Announcement Category</label>
                     <select className="as-form-select" required
-                      value={newAnnouncement.announcementCategory} onChange={(e) => setNewAnnouncement({...newAnnouncement, announcementCategory: e.target.value})}
+                      value={newAnnouncement.announcementCategory} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, announcementCategory: e.target.value })}
                     >
                       <option value="General">General</option>
                       <option value="Documents">Documents</option>
@@ -362,7 +381,7 @@ export default function ManageAnnouncements() {
                 <div className="as-form-group">
                   <label className="as-form-label">Description</label>
                   <textarea className="as-form-textarea" required
-                    value={newAnnouncement.description} onChange={(e) => setNewAnnouncement({...newAnnouncement, description: e.target.value})} 
+                    value={newAnnouncement.description} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, description: e.target.value })}
                     style={{ minHeight: '100px' }}
                   />
                 </div>
@@ -385,12 +404,12 @@ export default function ManageAnnouncements() {
                     + Add Requirement
                   </button>
                 </div>
-                
+
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Location (Optional)</label>
                     <input type="text" className="as-form-input" placeholder="e.g., Barangay Hall"
-                      value={newAnnouncement.location} onChange={(e) => setNewAnnouncement({...newAnnouncement, location: e.target.value})} 
+                      value={newAnnouncement.location} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, location: e.target.value })}
                     />
                   </div>
                   <div className="as-form-group">
@@ -423,6 +442,26 @@ export default function ManageAnnouncements() {
             </div>
           </div>
         </div>
+      )}
+
+      {showEmailBlast && emailBlastTarget && (
+        <EmailBlastModal
+          sourceType="announcement"
+          sourceId={emailBlastTarget.id}
+          subject={`[3S+ Sense] ${emailBlastTarget.title}`}
+          html={buildAnnouncementEmail(emailBlastTarget)}
+          label={
+            !emailBlastTarget.category || emailBlastTarget.category.trim().toLowerCase() === 'all residents'
+              ? 'All Residents'
+              : `Category: ${emailBlastTarget.category}`
+          }
+          announcement={emailBlastTarget}
+          onClose={() => {
+            setShowEmailBlast(false);
+            setEmailBlastTarget(null);
+            logTransaction(adminName, adminRole, "EMAILED_ANNOUNCEMENT", `Email blast sent for announcement: ${emailBlastTarget?.title}`);
+          }}
+        />
       )}
     </div>
   );
