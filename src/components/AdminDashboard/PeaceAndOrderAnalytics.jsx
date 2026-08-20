@@ -2,6 +2,9 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { MapPin, AlertTriangle } from 'lucide-react';
 
+// 👇 1. Import the new AI component (adjust the path if it is in a different folder)
+import PeaceAndOrderAIInsights from './PeaceAndOrderAIInsights'; 
+
 const URGENCY_COLORS = {
   "emergency": "#ef4444",
   "urgent": "#f59e0b",
@@ -128,126 +131,93 @@ export default function PeaceAndOrderAnalytics({ data }) {
   const yAxisWidth = isMobile ? 100 : 150;
   const labelMaxWidth = yAxisWidth - 8;
   const barSize = isMobile ? 16 : 20;
-  // Taller bar slot to fit two-line labels
   const barChartHeight = Math.min(Math.max(typeData.length * (barSize + 20) + 50, 180), isMobile ? 340 : 420);
-  // Pie sizing
   const pieInner = isMobile ? 36 : 50;
   const pieOuter = isMobile ? 60 : 80;
   const pieChartHeight = isMobile ? 200 : 250;
 
   return (
-    <div ref={containerRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+    // Wrapped the entire return inside a flex-column container
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      
+      {/* Existing Grid Container */}
+      <div ref={containerRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
 
-      {/* CHART 1: INCIDENT TYPES */}
-      <div style={{ background: '#f8fafc', padding: isMobile ? '12px' : '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-        <h3 style={{ margin: '0 0 12px 0', fontSize: isMobile ? '0.9rem' : '1rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <AlertTriangle size={isMobile ? 15 : 18} color="#ef4444" /> Incidents by Type
-        </h3>
-        {typeData.length > 0 ? (
-          <div style={{ height: barChartHeight }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={typeData} layout="vertical" margin={{ top: 0, right: isMobile ? 12 : 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#cbd5e1" />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: isMobile ? 10 : 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  width={yAxisWidth}
-                  tick={(props) => <WrappingTick {...props} isMobile={isMobile} maxWidth={labelMaxWidth} />}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: '#e2e8f0' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '0.8rem', maxWidth: '180px' }}
-                  formatter={(value, name, props) => [value, props.payload.name]}
-                  labelFormatter={() => ''}
-                />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={barSize}>
-                  {typeData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill="#ef4444" />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', paddingTop: '30px' }}>No incident type data.</p>
-        )}
+        {/* CHART 1: INCIDENT TYPES */}
+        <div style={{ background: '#f8fafc', padding: isMobile ? '12px' : '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: isMobile ? '0.9rem' : '1rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={isMobile ? 15 : 18} color="#ef4444" /> Incidents by Type
+          </h3>
+          {typeData.length > 0 ? (
+            <div style={{ height: barChartHeight }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={typeData} layout="vertical" margin={{ top: 0, right: isMobile ? 12 : 20, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#cbd5e1" />
+                  <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" width={yAxisWidth} tick={(props) => <WrappingTick {...props} isMobile={isMobile} maxWidth={labelMaxWidth} />} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: '#e2e8f0' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '0.8rem', maxWidth: '180px' }} formatter={(value, name, props) => [value, props.payload.name]} labelFormatter={() => ''} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={barSize}>
+                    {typeData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill="#ef4444" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', paddingTop: '30px' }}>No incident type data.</p>
+          )}
+        </div>
+
+        {/* CHART 2: URGENCY LEVELS */}
+        <div style={{ background: '#f8fafc', padding: isMobile ? '12px' : '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: isMobile ? '0.9rem' : '1rem', color: '#334155' }}>Urgency Breakdown</h3>
+          {urgencyData.length > 0 ? (
+            <div style={{ height: pieChartHeight }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={urgencyData} cx="50%" cy={isMobile ? '45%' : '50%'} innerRadius={pieInner} outerRadius={pieOuter} paddingAngle={4} dataKey="value">
+                    {urgencyData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={URGENCY_COLORS[entry.name] || URGENCY_COLORS["Unknown"]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '0.8rem' }} />
+                  <Legend content={(props) => <CustomPieLegend {...props} isMobile={isMobile} />} verticalAlign="bottom" />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', paddingTop: '30px' }}>No urgency data.</p>
+          )}
+        </div>
+
+        {/* LIST: TOP HOTSPOTS */}
+        <div style={{ background: '#f8fafc', padding: isMobile ? '12px' : '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: isMobile ? '0.9rem' : '1rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={isMobile ? 15 : 18} color="#f59e0b" /> Top Incident Hotspots
+          </h3>
+          {topLocations.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {topLocations.map((loc, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isMobile ? '8px 10px' : '10px 12px', background: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0', gap: '8px' }}>
+                  <span style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', color: '#1e293b', fontWeight: 500, minWidth: 0, wordBreak: 'break-word' }}>
+                    <span style={{ color: '#94a3b8', marginRight: '6px' }}>#{idx + 1}</span>{loc.name}
+                  </span>
+                  <span style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 'bold', color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '999px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {loc.count} {loc.count === 1 ? 'case' : 'cases'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: '#64748b', fontSize: '0.9rem', textAlign: 'center', marginTop: '40px' }}>No location data reported.</p>
+          )}
+        </div>
+
       </div>
 
-      {/* CHART 2: URGENCY LEVELS */}
-      <div style={{ background: '#f8fafc', padding: isMobile ? '12px' : '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-        <h3 style={{ margin: '0 0 8px 0', fontSize: isMobile ? '0.9rem' : '1rem', color: '#334155' }}>Urgency Breakdown</h3>
-        {urgencyData.length > 0 ? (
-          <div style={{ height: pieChartHeight }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={urgencyData}
-                  cx="50%"
-                  cy={isMobile ? '45%' : '50%'}
-                  innerRadius={pieInner}
-                  outerRadius={pieOuter}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {urgencyData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={URGENCY_COLORS[entry.name] || URGENCY_COLORS["Unknown"]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '0.8rem' }}
-                />
-                <Legend
-                  content={(props) => <CustomPieLegend {...props} isMobile={isMobile} />}
-                  verticalAlign="bottom"
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', paddingTop: '30px' }}>No urgency data.</p>
-        )}
-      </div>
-
-      {/* LIST: TOP HOTSPOTS */}
-      <div style={{ background: '#f8fafc', padding: isMobile ? '12px' : '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-        <h3 style={{ margin: '0 0 12px 0', fontSize: isMobile ? '0.9rem' : '1rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <MapPin size={isMobile ? 15 : 18} color="#f59e0b" /> Top Incident Hotspots
-        </h3>
-        {topLocations.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {topLocations.map((loc, idx) => (
-              <div key={idx} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: isMobile ? '8px 10px' : '10px 12px',
-                background: '#fff',
-                borderRadius: '6px',
-                border: '1px solid #e2e8f0',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', color: '#1e293b', fontWeight: 500, minWidth: 0, wordBreak: 'break-word' }}>
-                  <span style={{ color: '#94a3b8', marginRight: '6px' }}>#{idx + 1}</span>{loc.name}
-                </span>
-                <span style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 'bold', color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '999px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {loc.count} {loc.count === 1 ? 'case' : 'cases'}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#64748b', fontSize: '0.9rem', textAlign: 'center', marginTop: '40px' }}>No location data reported.</p>
-        )}
-      </div>
+      {/* Render the AI Insights Card below the graphs */}
+      <PeaceAndOrderAIInsights />
 
     </div>
   );
