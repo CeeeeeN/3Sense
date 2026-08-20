@@ -71,7 +71,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "Qwen/Qwen2.5-7B-Instruct", 
+            model: "deepseek-ai/DeepSeek-V3-0324", 
             messages: [
               {
                 role: "system",
