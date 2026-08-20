@@ -3,7 +3,7 @@ import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Eye, CheckCircle, XCircle, X, Calendar, FileText, User, Info, Clock } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, increment } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth";
 import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
@@ -15,7 +15,6 @@ const getSaved = (key, fallback) => {
   catch { return fallback; }
 };
 
-
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +24,7 @@ export default function AdminRequests() {
   const [adminRole, setAdminRole] = useState("");
 
   // --- STATE MANAGEMENT ---
-  const [activeTab, setActiveTab] = useState('Facility'); // 'Facility' or 'Document'
+  const [activeTab, setActiveTab] = useState('Facility'); // 'Facility', 'Document', or 'Equipment'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,6 +34,7 @@ export default function AdminRequests() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
   // --- FIREBASE HELPER FUNCTIONS ---
   const formatTime = (time24) => {
@@ -50,6 +50,11 @@ export default function AdminRequests() {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
+    // If it's a string like YYYY-MM-DD
+    if (typeof timestamp === 'string' && timestamp.includes('-')) {
+      const d = new Date(timestamp);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
     if (typeof timestamp.toDate === 'function') {
       return timestamp.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
@@ -61,38 +66,46 @@ export default function AdminRequests() {
     return `${firstName || ''} ${mName}${lastName || ''}`.trim() || 'Unknown Resident';
   };
   
-    useEffect(() => {
-      // Listen for the currently logged-in user
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          // Find their document in the approvedAdmins collection
-          const q = query(
-            collection(db, "approvedAdmins"), 
-            where("uid", "==", user.uid)
-          );
-          const snapshot = await getDocs(q);
-  
-          if (!snapshot.empty) {
-            const data = snapshot.docs[0].data();
-            setAdminName(data.fullName || "Admin");
-            setAdminRole(data.role || "Standard Admin");
-          }
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
         }
-      });
-  
-      return () => unsubscribe();
-    }, []);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
-    const unsubscribeDocs = onSnapshot(collection(db, 'document_requests'), (snapshot) => {
-      const docData = snapshot.docs.map(doc => {
+    // Run listeners in parallel to prevent memory leaks
+    let docList = [];
+    let facList = [];
+    let eqList = [];
+
+    const updateCombined = () => {
+      const combined = [...docList, ...facList, ...eqList].sort((a, b) => {
+        const dateA = a.rawDate?.toDate ? a.rawDate.toDate().getTime() : (a.rawDate ? new Date(a.rawDate).getTime() : 0);
+        const dateB = b.rawDate?.toDate ? b.rawDate.toDate().getTime() : (b.rawDate ? new Date(b.rawDate).getTime() : 0);
+        return dateB - dateA;
+      });
+      setRequests(combined);
+      setLoading(false);
+    };
+
+    const unsubDocs = onSnapshot(collection(db, 'document_requests'), (snapshot) => {
+      docList = snapshot.docs.map(doc => {
         const data = doc.data();
         let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
         const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
         return {
           docId: doc.id,
           collectionName: 'document_requests',
-          id: data.requestID || data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
+          id: data.requestID || data.refNum || doc.id.substring(0, 8).toUpperCase(),
           residentName: data.fullName || data.residentName || formatName(data.firstName, data.middleName, data.lastName),
           contact: sanitizedEmail,
           category: 'Document',
@@ -102,58 +115,71 @@ export default function AdminRequests() {
           rawDate: rawDate,
           dateNeeded: formatDate(data.dateNeeded),
           status: data.status || 'Pending',
-          allData: {
-            ...data,
-            email: sanitizedEmail
-          }
+          allData: { ...data, email: sanitizedEmail }
         };
       });
-
-      const unsubscribeFacilities = onSnapshot(collection(db, 'facility_reservations'), (facSnapshot) => {
-        const facData = facSnapshot.docs.map(doc => {
-          const data = doc.data();
-          const time = data.timeSlot ? ` (${data.timeSlot})` : '';
-          let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
-          const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
-          return {
-            docId: doc.id,
-            collectionName: 'facility_reservations',
-            id: data.reservationID || data.refNum || data.referenceNumber || doc.id.substring(0, 8).toUpperCase(),
-            residentName: data.requesterName || data.fullName || 'Unknown Resident',
-            contact: sanitizedEmail,
-            category: 'Facility',
-            type: data.facilityName || data.facility || 'Unknown Facility',
-            purpose: data.purpose || 'No purpose stated',
-            dateRequested: formatDate(rawDate),
-            rawDate: rawDate,
-            dateNeeded: data.date ? `${data.date} (${formatTime(data.startTime)} - ${formatTime(data.endTime)})` : (formatDate(data.reservationDate) + time),
-            status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
-            allData: {
-              ...data,
-              email: sanitizedEmail
-            }
-          };
-        });
-
-        const combined = [...docData, ...facData].sort((a, b) => {
-          const dateA = a.rawDate?.toDate ? a.rawDate.toDate().getTime() : (a.rawDate ? new Date(a.rawDate).getTime() : 0);
-          const dateB = b.rawDate?.toDate ? b.rawDate.toDate().getTime() : (b.rawDate ? new Date(b.rawDate).getTime() : 0);
-          return dateB - dateA;
-        });
-        setRequests(combined);
-        setLoading(false);
-      });
-
-      return () => unsubscribeFacilities();
+      updateCombined();
     });
 
-    return () => unsubscribeDocs();
+    const unsubFacs = onSnapshot(collection(db, 'facility_reservations'), (snapshot) => {
+      facList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const time = data.timeSlot ? ` (${data.timeSlot})` : '';
+        let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
+        const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
+        return {
+          docId: doc.id,
+          collectionName: 'facility_reservations',
+          id: data.reservationID || data.refNum || doc.id.substring(0, 8).toUpperCase(),
+          residentName: data.requesterName || data.fullName || 'Unknown Resident',
+          contact: sanitizedEmail,
+          category: 'Facility',
+          type: data.facilityName || data.facility || 'Unknown Facility',
+          purpose: data.purpose || 'No purpose stated',
+          dateRequested: formatDate(rawDate),
+          rawDate: rawDate,
+          dateNeeded: data.date ? `${formatDate(data.date)} (${formatTime(data.startTime)} - ${formatTime(data.endTime)})` : (formatDate(data.reservationDate) + time),
+          status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
+          allData: { ...data, email: sanitizedEmail }
+        };
+      });
+      updateCombined();
+    });
+
+    const unsubEqs = onSnapshot(collection(db, 'equipment_rentals'), (snapshot) => {
+      eqList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let rawDate = data.submittedAt || data.createdAt || null;
+        const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
+        return {
+          docId: doc.id,
+          collectionName: 'equipment_rentals',
+          id: data.rentalID || data.refNum || doc.id.substring(0, 8).toUpperCase(),
+          residentName: data.fullName || 'Unknown Resident',
+          contact: sanitizedEmail,
+          category: 'Equipment',
+          type: data.equipmentName || 'Unknown Equipment',
+          purpose: data.purpose || 'No purpose stated',
+          dateRequested: formatDate(rawDate),
+          rawDate: rawDate,
+          dateNeeded: `Pick-up: ${formatDate(data.pickUpDate)}`,
+          status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
+          allData: { ...data, email: sanitizedEmail }
+        };
+      });
+      updateCombined();
+    });
+
+    return () => {
+      unsubDocs();
+      unsubFacs();
+      unsubEqs();
+    };
   }, [adminRole]);
 
-  // --- FILTERING LOGIC (FIXED) ---
+  // --- FILTERING LOGIC ---
   const filteredRequests = requests.filter(req => {
     const matchesTab = req.category === activeTab;
-    
     const safeSearchTerm = String(searchTerm || "").toLowerCase();
     const safeResidentName = String(req.residentName || "").toLowerCase();
     const safeType = String(req.type || "").toLowerCase();
@@ -215,8 +241,6 @@ export default function AdminRequests() {
     ));
   };
 
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-
   const openViewModal = (request) => {
     setSelectedRequest(request);
     setIsModalOpen(true);
@@ -238,19 +262,14 @@ export default function AdminRequests() {
     const target = req || selectedRequest;
     if (!target) return;
 
-    // Check for overlap before approving Facility Reservations
+    // Optional: Overlap check for Facility Reservations
     if (target.category === 'Facility') {
       const hasOverlap = requests.some(r => {
-        if (r.category !== 'Facility') return false;
-        if (r.docId === target.docId) return false;
-        if (String(r.status || "").toLowerCase() !== 'approved') return false;
-
+        if (r.category !== 'Facility' || r.docId === target.docId || String(r.status || "").toLowerCase() !== 'approved') return false;
         const targetData = target.allData;
         const rData = r.allData;
-
         if (String(rData.facilityId) !== String(targetData.facilityId)) return false;
         if (rData.date !== targetData.date) return false;
-
         return targetData.startTime < rData.endTime && rData.startTime < targetData.endTime;
       });
 
@@ -266,29 +285,27 @@ export default function AdminRequests() {
         status: 'Approved',
         processedBy: adminName,
         processedRole: adminRole,
-        processedAt: new Date()});
+        processedAt: new Date()
+      });
 
-      logTransaction(
-        adminName,
-        adminRole,
-        "APPROVED_REQUEST",
-        `Approved ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
-      );
+      logTransaction(adminName, adminRole, "APPROVED_REQUEST", `Approved ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`);
 
-      // Notify the resident — filter by both householdID + residentID so heads
-      // in different households don't share the same notification stream.
       const residentID = target.allData?.residentID || target.allData?.userID || "";
       const hhID       = target.allData?.householdID || "";
       const refNum     = target.id || "";
+      
       if (residentID && hhID) {
-        const label = target.category === 'Document' ? target.type : target.type;
+        const label = target.type;
+        // Dynamically select the correct notification type based on category
+        let notifType = 'document_update';
+        if (target.category === 'Facility') notifType = 'facility_update';
+        if (target.category === 'Equipment') notifType = 'equipment_update';
+
         await createUserNotification(
-          hhID,
-          residentID,
+          hhID, residentID,
           `${target.category} Request Approved`,
           `Your request for "${label}" has been approved.`,
-          target.category === 'Document' ? 'document_update' : 'facility_update',
-          refNum
+          notifType, refNum
         );
       }
 
@@ -312,24 +329,19 @@ export default function AdminRequests() {
         processedAt: new Date()
       });
 
-      logTransaction(
-        adminName,
-        adminRole,
-        "READY_FOR_PICKUP",
-        `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`
-      );
+      logTransaction(adminName, adminRole, "READY_FOR_PICKUP", `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
       const hhID       = target.allData?.householdID || "";
       const refNum     = target.id || "";
+      
       if (residentID && hhID) {
+        const notifType = target.category === 'Equipment' ? 'equipment_update' : 'document_update';
         await createUserNotification(
-          hhID,
-          residentID,
-          "Document Ready for Pickup",
-          `Your document "${target.type}" is now ready for pickup at the Barangay Hall.`,
-          'document_update',
-          refNum
+          hhID, residentID,
+          `${target.category} Ready for Pickup`,
+          `Your ${target.category.toLowerCase()} "${target.type}" is now ready for pickup at the Barangay Hall.`,
+          notifType, refNum
         );
       }
 
@@ -353,28 +365,84 @@ export default function AdminRequests() {
         processedAt: new Date()
       });
 
-      logTransaction(
-        adminName,
-        adminRole,
-        "CLAIMED_REQUEST",
-        `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`
-      );
+      if (target.category === 'Equipment') {
+        const eqId = target.allData?.equipmentID;
+        const requestedQty = Number(target.allData?.quantity || 0);
+        
+        if (eqId && requestedQty > 0) {
+          const eqRef = doc(db, 'equipment', eqId);
+          // Use a negative increment to subtract the quantity
+          await updateDoc(eqRef, {
+            quantity: increment(-requestedQty)
+          });
+        }
+      }
+
+      logTransaction(adminName, adminRole, "CLAIMED_REQUEST", `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
       const hhID       = target.allData?.householdID || "";
       const refNum     = target.id || "";
+      
       if (residentID && hhID) {
+        const notifType = target.category === 'Equipment' ? 'equipment_update' : 'document_update';
         await createUserNotification(
-          hhID,
-          residentID,
-          "Document Claimed",
-          `Your document "${target.type}" has been marked as claimed. Thank you!`,
-          'document_update',
-          refNum
+          hhID, residentID,
+          `${target.category} Claimed`,
+          `Your ${target.category.toLowerCase()} "${target.type}" has been marked as claimed. Thank you!`,
+          notifType, refNum
         );
       }
 
       alert("Request Marked as Claimed.");
+      closeModal();
+    } catch (error) {
+      console.error("Error updating request: ", error);
+      alert("Failed to update request.");
+    }
+  };
+
+  const handleReturned = async (req) => {
+    const target = req || selectedRequest;
+    if (!target) return;
+    try {
+      const requestRef = doc(db, target.collectionName, target.docId);
+      await updateDoc(requestRef, { 
+        status: 'Returned',
+        returnedProcessedBy: adminName,
+        returnedProcessedRole: adminRole,
+        returnedAt: new Date()
+      });
+
+      if (target.category === 'Equipment') {
+        const eqId = target.allData?.equipmentID;
+        const requestedQty = Number(target.allData?.quantity || 0);
+        
+        if (eqId && requestedQty > 0) {
+          const eqRef = doc(db, 'equipment', eqId);
+          // Use a positive increment to restore the quantity
+          await updateDoc(eqRef, {
+            quantity: increment(requestedQty)
+          });
+        }
+      }
+
+      logTransaction(adminName, adminRole, "RETURNED_EQUIPMENT", `Marked ${target.category} request (Ref: ${target.docId}) as returned for ${target.residentName}`);
+
+      const residentID = target.allData?.residentID || target.allData?.userID || "";
+      const hhID       = target.allData?.householdID || "";
+      const refNum     = target.id || "";
+      
+      if (residentID && hhID) {
+        await createUserNotification(
+          hhID, residentID,
+          `${target.category} Returned`,
+          `Your ${target.category.toLowerCase()} "${target.type}" has been successfully returned and logged by the admin. Thank you!`,
+          'equipment_update', refNum
+        );
+      }
+
+      alert("Equipment Marked as Returned.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
@@ -398,25 +466,23 @@ export default function AdminRequests() {
         processedAt: new Date()
       });
 
-      logTransaction(
-        adminName,
-        adminRole,
-        "REJECT_REQUEST",
-        `Rejected ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`
-      );
+      logTransaction(adminName, adminRole, "REJECT_REQUEST", `Rejected ${selectedRequest.category} request (Ref: ${selectedRequest.docId}) for ${selectedRequest.residentName}`);
 
       const residentID = selectedRequest.allData?.residentID || selectedRequest.allData?.userID || "";
       const hhID       = selectedRequest.allData?.householdID || "";
       const refNum     = selectedRequest.id || "";
+      
       if (residentID && hhID) {
         const label = selectedRequest.type || 'Request';
+        let notifType = 'document_update';
+        if (selectedRequest.category === 'Facility') notifType = 'facility_update';
+        if (selectedRequest.category === 'Equipment') notifType = 'equipment_update';
+
         await createUserNotification(
-          hhID,
-          residentID,
+          hhID, residentID,
           `${selectedRequest.category} Request Rejected`,
           `Your request for "${label}" has been rejected. Reason: ${rejectReason}`,
-          selectedRequest.category === 'Document' ? 'document_update' : 'facility_update',
-          refNum
+          notifType, refNum
         );
       }
 
@@ -434,7 +500,7 @@ export default function AdminRequests() {
 
         <div className="requests-header">
           <h1 className="requests-title">Requests Management</h1>
-          <p className="requests-subtitle">Efficiently manage and respond to resident applications and reservations.</p>
+          <p className="requests-subtitle">Efficiently manage and respond to resident applications, reservations, and rentals.</p>
         </div>
 
         {/* TABS */}
@@ -451,6 +517,12 @@ export default function AdminRequests() {
           >
             Document Requests
           </button>
+          <button
+            className={`req-tab ${activeTab === 'Equipment' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Equipment')}
+          >
+            Equipment Rentals
+          </button>
         </div>
 
         {/* FILTERS */}
@@ -459,7 +531,7 @@ export default function AdminRequests() {
             <Search className="search-icon" size={20} />
             <input
               type="text"
-              placeholder={`Search by Name, ${activeTab === 'Facility' ? 'Facility' : 'Document'} or Ref #...`}
+              placeholder={`Search by Name, ${activeTab} or Ref #...`}
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -475,11 +547,15 @@ export default function AdminRequests() {
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
-              {activeTab === 'Document' && (
+              {/* Document and Equipment specific statuses */}
+              {(activeTab === 'Document' || activeTab === 'Equipment') && (
                 <>
                   <option value="Ready for Pickup">Ready for Pickup</option>
                   <option value="Claimed">Claimed</option>
                 </>
+              )}
+              {activeTab === 'Equipment' && (
+                <option value="Returned">Returned</option>
               )}
               <option value="Rejected">Rejected</option>
             </select>
@@ -506,7 +582,7 @@ export default function AdminRequests() {
                   <th>Ref Number</th>
                   <th>Requester</th>
                   <th>Type</th>
-                  <th>Scheduled Date</th>
+                  <th>{activeTab === 'Equipment' ? 'Pick-up / Date Needed' : 'Scheduled Date'}</th>
                   <th>Date Submitted</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
                   <th style={{ textAlign: 'center' }}>Actions</th>
@@ -529,7 +605,7 @@ export default function AdminRequests() {
                     </td>
                     <td>
                       <div className="req-date-cell">
-                        <strong>{activeTab === 'Facility' ? req.dateNeeded : req.dateRequested}</strong>
+                        <strong>{activeTab === 'Document' ? req.dateRequested : req.dateNeeded}</strong>
                       </div>
                     </td>
                     <td>
@@ -552,14 +628,19 @@ export default function AdminRequests() {
                             </button>
                           </>
                         )}
-                        {String(req.status || "").toLowerCase() === 'approved' && req.category === 'Document' && (
+                        {String(req.status || "").toLowerCase() === 'approved' && (req.category === 'Document' || req.category === 'Equipment') && (
                           <button className="btn-approve" title="Ready for Pickup" onClick={(e) => { e.stopPropagation(); handleReadyForPickup(req); }}>
                             <CheckCircle size={16} /> Mark Ready
                           </button>
                         )}
-                        {String(req.status || "").toLowerCase() === 'ready for pickup' && req.category === 'Document' && (
+                        {String(req.status || "").toLowerCase() === 'ready for pickup' && (req.category === 'Document' || req.category === 'Equipment') && (
                           <button className="btn-approve" title="Claimed" onClick={(e) => { e.stopPropagation(); handleClaimed(req); }}>
                             <CheckCircle size={16} /> Mark Claimed
+                          </button>
+                        )}
+                        {String(req.status || "").toLowerCase() === 'claimed' && req.category === 'Equipment' && (
+                          <button className="btn-approve" title="Returned" onClick={(e) => { e.stopPropagation(); handleReturned(req); }}>
+                            <CheckCircle size={16} /> Mark Returned
                           </button>
                         )}
                         <button className="btn-view" title="View Details" onClick={(e) => { e.stopPropagation(); openViewModal(req); }}>
@@ -572,7 +653,6 @@ export default function AdminRequests() {
               </tbody>
             </table>
           )}
-          
         </div>
 
         {!loading && filteredRequests.length > 0 && totalPages > 1 && (
@@ -585,9 +665,7 @@ export default function AdminRequests() {
             >
               Previous
             </button>
-            
             {renderPageNumbers()}
-            
             <button 
               className="af-page-btn" 
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
@@ -604,14 +682,16 @@ export default function AdminRequests() {
           <div className="as-modal-overlay" onClick={closeModal}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>{activeTab === 'Facility' ? 'Reservation' : 'Request'} Details</h2>
+                <h2>{activeTab === 'Facility' ? 'Reservation' : activeTab === 'Equipment' ? 'Rental' : 'Request'} Details</h2>
                 <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
               </div>
 
               <div className="modal-body">
                 {/* Section 1: Information */}
                 <div className="modal-section">
-                  <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>Section 1: {activeTab === 'Facility' ? 'Reservation' : 'Document'} Information</h3>
+                  <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>
+                    Section 1: {activeTab === 'Facility' ? 'Reservation' : activeTab === 'Equipment' ? 'Equipment' : 'Document'} Information
+                  </h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Reference Number</label>
@@ -630,7 +710,9 @@ export default function AdminRequests() {
                       </p>
                     </div>
                     <div className="detail-item">
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{activeTab === 'Facility' ? 'Facility' : 'Document Type'}</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>
+                        {activeTab === 'Facility' ? 'Facility' : activeTab === 'Equipment' ? 'Equipment Item' : 'Document Type'}
+                      </label>
                       <p className="detail-value" style={{ fontWeight: 500 }}>{selectedRequest.type}</p>
                     </div>
                     <div className="detail-item">
@@ -648,11 +730,14 @@ export default function AdminRequests() {
                   </div>
                 </div>
 
-                {/* Section 2: Personal Information */}
+                {/* Section 2: Request Details */}
                 <div className="modal-section" style={{ marginTop: '1.5rem' }}>
-                  <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>Section 2: {activeTab === 'Facility' ? 'Reservation Details' : 'Personal Information'}</h3>
+                  <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>
+                    Section 2: {activeTab === 'Document' ? 'Personal Information' : 'Request Details'}
+                  </h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
 
+                    {/* Facility Specific Layout */}
                     {activeTab === 'Facility' && (
                       <>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
@@ -669,10 +754,10 @@ export default function AdminRequests() {
                         </div>
                         <div className="detail-item">
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Reservation Date</label>
-                          <p className="detail-value">{selectedRequest.allData?.date || 'N/A'}</p>
+                          <p className="detail-value">{formatDate(selectedRequest.allData?.date) || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Estimated Number of Pax</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Estimated Pax</label>
                           <p className="detail-value">{selectedRequest.allData?.attendees || selectedRequest.allData?.paxCount || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
@@ -694,6 +779,45 @@ export default function AdminRequests() {
                       </>
                     )}
 
+                    {/* Equipment Specific Layout */}
+                    {activeTab === 'Equipment' && (
+                      <>
+                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Full Name</label>
+                          <p className="detail-value">{selectedRequest.allData?.fullName || selectedRequest.residentName || 'N/A'}</p>
+                        </div>
+                        <div className="detail-item">
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Contact Number</label>
+                          <p className="detail-value">{selectedRequest.allData?.contactNumber || 'N/A'}</p>
+                        </div>
+                        <div className="detail-item">
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Email Address</label>
+                          <p className="detail-value">{formatDisplayEmail(selectedRequest.allData?.email, adminRole)}</p>
+                        </div>
+                        <div className="detail-item">
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Pick-up Date</label>
+                          <p className="detail-value">{formatDate(selectedRequest.allData?.pickUpDate) || 'N/A'}</p>
+                        </div>
+                        <div className="detail-item">
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Return Date</label>
+                          <p className="detail-value">{formatDate(selectedRequest.allData?.returnDate) || 'N/A'}</p>
+                        </div>
+                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Quantity Requested</label>
+                          <p className="detail-value" style={{ fontWeight: 600 }}>{selectedRequest.allData?.quantity || 'N/A'} units</p>
+                        </div>
+                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Purpose</label>
+                          <p className="detail-value">{selectedRequest.purpose || 'N/A'}</p>
+                        </div>
+                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Additional Notes</label>
+                          <p className="detail-value">{selectedRequest.allData?.notes || 'None'}</p>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Document Specific Layout */}
                     {activeTab === 'Document' && (
                       <>
                         <div className="detail-item">
@@ -737,7 +861,7 @@ export default function AdminRequests() {
                           <p className="detail-value">{selectedRequest.purpose || 'N/A'}</p>
                         </div>
                         {selectedRequest.allData?.validIdUrl && (
-                          <div style={{ marginTop: '16px' }}>
+                          <div style={{ marginTop: '16px', gridColumn: 'span 2' }}>
                             <label style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>Attached Valid ID Verification</label>
                             <div style={{ marginTop: '8px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc', display: 'flex', justifyContent: 'center' }}>
                               <a href={selectedRequest.allData.validIdUrl} target="_blank" rel="noopener noreferrer">
@@ -748,9 +872,9 @@ export default function AdminRequests() {
                                 />
                               </a>
                             </div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>Click to view full size</div>
-                        </div>
-                      )}
+                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>Click to view full size</div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -784,6 +908,7 @@ export default function AdminRequests() {
                   </div>
                 </div>
               </div>
+              
               <div className="modal-footer">
                 <button className="btn-view" onClick={closeModal}>Close</button>
                 {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
@@ -796,14 +921,19 @@ export default function AdminRequests() {
                     </button>
                   </>
                 )}
-                {String(selectedRequest.status || "").toLowerCase() === 'approved' && selectedRequest.category === 'Document' && (
+                {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
                   <button className="btn-approve" onClick={() => handleReadyForPickup()}>
                     <CheckCircle size={16} /> Mark Ready for Pickup
                   </button>
                 )}
-                {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && selectedRequest.category === 'Document' && (
+                {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
                   <button className="btn-approve" onClick={() => handleClaimed()}>
                     <CheckCircle size={16} /> Mark Claimed
+                  </button>
+                )}
+                {String(selectedRequest.status || "").toLowerCase() === 'claimed' && selectedRequest.category === 'Equipment' && (
+                  <button className="btn-approve" onClick={() => handleReturned()}>
+                    <CheckCircle size={16} /> Mark Returned
                   </button>
                 )}
               </div>
@@ -830,15 +960,9 @@ export default function AdminRequests() {
                     rows="4"
                     placeholder="E.g., Incomplete documentation, Missing field information, Under maintenance..."
                     style={{
-                      width: '100%',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1.5px solid #e2e8f0',
-                      fontFamily: 'inherit',
-                      fontSize: '0.9rem',
-                      marginTop: '0.5rem',
-                      resize: 'none',
-                      outline: 'none'
+                      width: '100%', padding: '1rem', borderRadius: '8px',
+                      border: '1.5px solid #e2e8f0', fontFamily: 'inherit',
+                      fontSize: '0.9rem', marginTop: '0.5rem', resize: 'none', outline: 'none'
                     }}
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}

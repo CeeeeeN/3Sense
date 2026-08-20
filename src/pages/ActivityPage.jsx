@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
 import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
-import { ActivityIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
+import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
@@ -28,8 +28,9 @@ const STATUS = {
   resolved: { label: "Resolved", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
   claimed: { label: "Claimed", color: "#c125d6", bg: "rgba(45,177,123,0.1)" },
   processing: { label: "Processing", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  returned: { label: "Returned", color: "#4f46e5", bg: "rgba(79,70,229,0.1)" },
   ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
-  new: { label: "New", color: "#317D89", bg: "rgba(49,125,137,0.1)" }, // Added for BSWD default
+  new: { label: "New", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
 };
 
 // ── Reusable Components ──
@@ -62,14 +63,16 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const [programs, setPrograms] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [reservations, setReservations] = useState([]);
-  const [services, setServices] = useState([]); // 🆕 Added for Services Tab
+  const [equipment, setEquipment] = useState([]); // 🆕 Added for Equipment Tab
+  const [services, setServices] = useState([]);
   const [feedback, setFeedback] = useState([]);
 
   // Limits for "Load More" functionality
   const [progLimit, setProgLimit] = useState(5);
   const [docLimit, setDocLimit] = useState(5);
   const [resLimit, setResLimit] = useState(5);
-  const [servicesLimit, setServicesLimit] = useState(5); // 🆕 Limit for Services
+  const [eqLimit, setEqLimit] = useState(5); // 🆕 Limit for Equipment
+  const [servicesLimit, setServicesLimit] = useState(5);
   const [feedbackLimit, setFeedbackLimit] = useState(5);
 
   // SECURE IDS: Get both residentID and householdID from props or session
@@ -134,11 +137,26 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return () => unsubReservations();
   }, [residentID, householdID, resLimit]);
 
-  // 🆕 D. Fetch Services (Combined: Peace & Order and BSWD)
+  // 🆕 D. Fetch Equipment Rentals
+  useEffect(() => {
+    if (!residentID || !householdID) return;
+    const qEquipment = query(
+      collection(db, "equipment_rentals"),
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID),
+      orderBy("submittedAt", "desc"),
+      limit(eqLimit)
+    );
+    const unsubEquipment = onSnapshot(qEquipment, (snapshot) => {
+      setEquipment(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubEquipment();
+  }, [residentID, householdID, eqLimit]);
+
+  // E. Fetch Services (Combined: Peace & Order and BSWD)
   useEffect(() => {
     if (!residentID || !householdID) return;
 
-    // 1. Setup the two individual queries
     const qIncidents = query(
       collection(db, "incidentReports"),
       where("householdID", "==", householdID),
@@ -147,7 +165,6 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       limit(servicesLimit)
     );
     
-    // Query the single consolidated BSWD collection
     const qBswd = query(
       collection(db, "bswdReports"),
       where("householdID", "==", householdID),
@@ -156,11 +173,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       limit(servicesLimit)
     );
 
-    // 2. Arrays to hold data from each snapshot
     let incData = [];
     let bswdData = [];
 
-    // 3. Helper function to combine and sort them all together whenever one updates
     const updateCombined = () => {
       const combined = [...incData, ...bswdData];
       combined.sort((a, b) => {
@@ -171,7 +186,6 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setServices(combined);
     };
 
-    // 4. Attach the listeners
     const unsubInc = onSnapshot(qIncidents, (snap) => {
       incData = snap.docs.map(doc => ({ 
         id: doc.id, 
@@ -186,7 +200,6 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         const data = doc.data();
         return {
           id: doc.id,
-          // Dynamically set the category badge based on the 'type' field
           _serviceCategory: data.type === "tip" ? "BSWD Tip" : "BSWD Report",
           ...data
         };
@@ -197,7 +210,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return () => { unsubInc(); unsubBswd(); };
   }, [residentID, householdID, servicesLimit]);
 
-  // E. Fetch Feedback
+  // F. Fetch Feedback
   useEffect(() => {
     if (!residentID || !householdID) return;
     const qFeedback = query(
@@ -216,6 +229,8 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
     if (!timestamp) return "Unknown Date";
+    // Check if it's already a string like "2026-08-25"
+    if (typeof timestamp === 'string') return timestamp;
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   };
@@ -239,13 +254,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             </div>
           </div>
         ))}
-        {/* LOAD MORE BUTTON */}
         {programs.length >= progLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button
-              onClick={() => setProgLimit(prev => prev + 5)}
-              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
-            >
+            <button onClick={() => setProgLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
               Load More
             </button>
           </div>
@@ -269,7 +280,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> - Reason: <strong>{item.rejectionReason}</strong></span>
+                    <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`}</span>
                   </div>
                 )}
               </div>
@@ -277,13 +288,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             </div>
           </div>
         ))}
-        {/* LOAD MORE BUTTON */}
         {documents.length >= docLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button
-              onClick={() => setDocLimit(prev => prev + 5)}
-              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
-            >
+            <button onClick={() => setDocLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
               Load More
             </button>
           </div>
@@ -307,7 +314,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> - Reason: <strong>{item.rejectionReason}</strong> </span>
+                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
                   </div>
                 )}
               </div>
@@ -323,13 +330,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             )}
           </div>
         ))}
-        {/* LOAD MORE BUTTON */}
         {reservations.length >= resLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button
-              onClick={() => setResLimit(prev => prev + 5)}
-              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
-            >
+            <button onClick={() => setResLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
               Load More
             </button>
           </div>
@@ -338,7 +341,51 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   };
 
-  // 🆕 6.4 Services Tab
+  // 🆕 6.4 Equipment Tab ──
+  const EquipmentTab = () => {
+    if (equipment.length === 0) return <EmptyState message="You have no equipment rentals yet." />;
+    return (
+      <div className="act2-list">
+        {equipment.map((item) => (
+          <div key={item.id} className="act2-card">
+            <div className="act2-card__row">
+              <div className="act2-card__main">
+                <div className="act2-card__title">{item.equipmentName || "Equipment Rental"}</div>
+                <div className="act2-card__subtitle">Quantity: {item.quantity} units · {item.purpose}</div>
+                <div className="act2-card__meta">
+                  Ref: {item.rentalID || item.id} · Pick-up: {formatDate(item.pickUpDate)} · Return: {formatDate(item.returnDate)}
+                </div>
+                {item.processedBy && (
+                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheckIcon />
+                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
+                  </div>
+                )}
+              </div>
+              <StatusBadge status={item.status} />
+            </div>
+            {item.status?.toLowerCase() === "rejected" && item.remarks && (
+              <div className="act2-card__remarks">
+                <div className="act2-card__remarks-header">
+                  <AlertCircleIcon /> Remarks
+                </div>
+                <p className="act2-card__remarks-body">{item.remarks}</p>
+              </div>
+            )}
+          </div>
+        ))}
+        {equipment.length >= eqLimit && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
+            <button onClick={() => setEqLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
+              Load More
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── 6.5 Services Tab
   const ServicesTab = () => {
     if (services.length === 0) return <EmptyState message="You have not submitted any service reports yet." />;
     return (
@@ -349,7 +396,6 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item._serviceCategory}</span>
                 <div className="act2-card__title">
-                  {/* Handle different title fields for Incidents, BSWD Reports, and BSWD Tips */}
                   {item.incidentType || item.about || item.name || "Service Report"}
                 </div>
                 <div className="act2-card__subtitle" style={{ marginTop: '4px', color: '#64748b', fontSize: '0.85rem' }}>
@@ -360,18 +406,13 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
                 </div>
                 <div className="act2-card__ref">Ref: {item.refNum || item.id}</div>
               </div>
-              {/* Uses the "new" or "received" status badge initially depending on the system */}
               <StatusBadge status={item.status || "received"} />
             </div>
           </div>
         ))}
-        {/* LOAD MORE BUTTON */}
         {services.length >= servicesLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button
-              onClick={() => setServicesLimit(prev => prev + 5)}
-              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
-            >
+            <button onClick={() => setServicesLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
               Load More
             </button>
           </div>
@@ -380,7 +421,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   };
 
-  // ── 6.5 Feedback Tab
+  // ── 6.6 Feedback Tab
   const FeedbackTab = () => {
     if (feedback.length === 0) return <EmptyState message="You have not submitted any feedback yet." />;
     return (
@@ -406,13 +447,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             </div>
           </div>
         ))}
-        {/* LOAD MORE BUTTON */}
         {feedback.length >= feedbackLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
-            <button
-              onClick={() => setFeedbackLimit(prev => prev + 5)}
-              style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}
-            >
+            <button onClick={() => setFeedbackLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
               Load More
             </button>
           </div>
@@ -425,7 +462,8 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const TABS = [
     { key: "programs", label: "Programs", icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
     { key: "documents", label: "Documents", icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
-    { key: "reservations", label: "Facility Reservations", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "reservations", label: "Facilities", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "equipment", label: "Equipment", icon: <EquipmentIcon />, count: equipment.length, component: <EquipmentTab /> },
     { key: "services", label: "Services", icon: <AlertCircleIcon />, count: services.length, component: <ServicesTab /> },
     { key: "feedback", label: "Feedback", icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
   ];
@@ -459,7 +497,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             Activity <span>History</span>
           </h1>
           <p className="act2-banner__sub">
-            Track all your barangay transactions, feedback, reservations, and QR scan history in one place.
+            Track all your barangay transactions, feedback, reservations, rentals, and QR scan history in one place.
           </p>
         </div>
       </div>

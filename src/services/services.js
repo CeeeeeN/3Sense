@@ -97,6 +97,41 @@ export async function submitFacilityReservation(householdID, residentID, userNam
 }
 
 // ══════════════════════════════
+// 🛠️ EQUIPMENT RENTALS
+// ══════════════════════════════
+/**
+ * @param {string} householdID
+ * @param {string} residentID  - Firestore doc ID of the resident
+ * @param {string} userName
+ * @param {object} equipment
+ * @param {object} form
+ * @param {object} customData
+ */
+export async function submitEquipmentRental(householdID, residentID, userName, equipment, form, customData = {}) {
+  const rentalID = generateRef();
+  await addDoc(collection(db, "equipment_rentals"), {
+    rentalID,
+    householdID,
+    residentID,                                    // Firestore doc ID of the resident
+    equipmentID:   equipment?.id || "",            
+    equipmentName: equipment?.equipmentName || equipment?.name || "Equipment",
+    fullName:      form.fullName || userName,
+    email:         form.email || "",
+    contactNumber: form.contactNumber || "",
+    purpose:       form.purpose,
+    quantity:      Number(form.quantity),          // Ensures quantity is saved as a number
+    pickUpDate:    form.pickUpDate,
+    returnDate:    form.returnDate,
+    notes:         form.notes || "",
+    status:        "Pending",
+    customFields:  customData,
+    submittedAt:   serverTimestamp(),
+  });
+  return rentalID;
+}
+
+
+// ══════════════════════════════
 // 🚔 INCIDENT REPORTS
 // ══════════════════════════════
 /**
@@ -229,10 +264,7 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
   };
 
   // Fetch document requests by householdID
-  const docQ = query(
-    collection(db, "document_requests"),
-    where("householdID", "==", householdID)
-  );
+  const docQ = query(collection(db, "document_requests"), where("householdID", "==", householdID));
   const docSnap = await getDocs(docQ);
   const docs = docSnap.docs.map(d => ({
     id: d.id,
@@ -245,10 +277,7 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
   })).filter(isMyRecord);
 
   // Fetch facility reservations by householdID
-  const facQ = query(
-    collection(db, "facility_reservations"),
-    where("householdID", "==", householdID)
-  );
+  const facQ = query(collection(db, "facility_reservations"), where("householdID", "==", householdID));
   const facSnap = await getDocs(facQ);
   const facs = facSnap.docs.map(d => ({
     id: d.id,
@@ -260,8 +289,21 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   })).filter(isMyRecord);
 
-  // Merge and sort by date descending
-  const all = [...docs, ...facs];
+  // Fetch equipment rentals by householdID
+  const eqQ = query(collection(db, "equipment_rentals"), where("householdID", "==", householdID));
+  const eqSnap = await getDocs(eqQ);
+  const eqs = eqSnap.docs.map(d => ({
+    id: d.id,
+    category: "Equipment",
+    serviceName: d.data().equipmentName || "Equipment Rental",
+    refNum: d.data().rentalID || d.data().refNum || "",
+    status: d.data().status || "Pending",
+    date: d.data().submittedAt,
+    ...d.data(),
+  })).filter(isMyRecord);
+
+  // Merge all three arrays and sort by date descending
+  const all = [...docs, ...facs, ...eqs];
   all.sort((a, b) => {
     const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
     const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);

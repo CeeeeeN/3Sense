@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { getMemberProfile } from "../services/profile";
-import { ProgramsIcon, FacilitiesIcon, DocumentsIcon, ServicesMenuIcon } from "../components/Icons";
+import { ProgramsIcon, EquipmentIcon, FacilitiesIcon, DocumentsIcon, ServicesMenuIcon } from "../components/Icons";
 
 import ProgramsTab from "../components/services/ProgramsTab";
 import FacilitiesTab from "../components/services/FacilitiesTab";
 import DocumentsTab from "../components/services/DocumentsTab";
 import ServicesTab from "../components/services/ServicesTab";
+import EquipmentTab from "../components/services/EquipmentTab";
 
 // ── Main Tabs ──
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
   { key: "programs",   label: "Programs",   icon: <ProgramsIcon />     },
   { key: "facilities", label: "Facilities", icon: <FacilitiesIcon />   },
   { key: "documents",  label: "Documents",  icon: <DocumentsIcon />    },
+  { key: "equipment",  label: "Equipment",  icon: <EquipmentIcon />   },
 ];
 
 export default function ServicesPage({ onNavigate, householdID, memberID, userName, userID }) {
@@ -42,7 +44,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
           <div className="db-welcome-left">
             <div className="db-welcome-eyebrow">Barangay Services</div>
             <h1 className="db-welcome-heading">What can we <span>help you with?</span></h1>
-            <p className="db-welcome-sub">Access services, programs, facilities, and documents all in one place.</p>
+            <p className="db-welcome-sub">Access services, programs, facilities, equipment, and documents all in one place.</p>
           </div>
         </div>
       </div>
@@ -96,6 +98,18 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
                 </div>
               </div>
               <DocumentsTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
+            </>
+          )}
+
+          {activeTab === "equipment" && (
+            <>
+              <div className="sc-card-header">
+                <div className="sc-card-header-left">
+                  <div className="sc-card-icon-wrap"><EquipmentIcon /></div>
+                  <div><div className="sc-card-title">Barangay Equipment</div><div className="sc-card-subtitle">Check availability and rent equipment</div></div>
+                </div>
+              </div>
+              <EquipmentTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
             </>
           )}
 

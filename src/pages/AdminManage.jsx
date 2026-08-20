@@ -6,6 +6,7 @@ import ManagePrograms from "./ManageTabs/ManagePrograms";
 import ManageServices from "./ManageTabs/ManageServices";
 import ManageDocuments from "./ManageTabs/ManageDocuments";
 import ManageFacilities from "./ManageTabs/ManageFacilities";
+import ManageEquipment from "./ManageTabs/ManageEquipment";
 import ManageAnnouncements from "./ManageTabs/ManageAnnouncements";
 
 export default function AdminManage() {
@@ -16,6 +17,7 @@ export default function AdminManage() {
     { id: "services", label: "Services" },
     { id: "documents", label: "Documents" },
     { id: "facilities", label: "Facilities" },
+    { id: "equipment", label: "Equipment" },
     { id: "announcements", label: "Announcements" },
   ];
 
@@ -55,6 +57,7 @@ export default function AdminManage() {
           {activeTab === "services" && <ManageServices />}
           {activeTab === "documents" && <ManageDocuments />}
           {activeTab === "facilities" && <ManageFacilities />}
+          {activeTab === "equipment" && <ManageEquipment />}
           {activeTab === "announcements" && <ManageAnnouncements />}
         </div>
         
