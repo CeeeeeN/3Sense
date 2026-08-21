@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import AIInsightsWidget from "../components/AIInsightsWidget";
@@ -10,145 +10,126 @@ import GenderOrientationAnalytics from '../components/AdminDashboard/GenderOrien
 import ProgramAnalytics from '../components/AdminDashboard/ProgramAnalytics';
 import PeaceAndOrderAnalytics from '../components/AdminDashboard/PeaceAndOrderAnalytics';
 import BSWDAnalytics from '../components/AdminDashboard/BSWDAnalytics';
-
-// ── EXTRACTED COMPONENTS ────────────────────────────────────────────────
 import DashboardSummaryCards from '../components/AdminDashboard/DashboardSummaryCards';
 import SentimentSummaryCard from '../components/AdminDashboard/SentimentSummaryCard';
 import ServiceFacilityAnalytics from '../components/AdminDashboard/ServiceFacilityAnalytics';
-// ────────────────────────────────────────────────────────────────────────
 
+import { useQuery } from '@tanstack/react-query';
 import { db } from "../firebase/firebase";
 import {
   collection,
   collectionGroup,
-  onSnapshot,
   query,
-  orderBy
+  orderBy,
+  getDocs,
+  getCountFromServer,
+  limit
 } from "firebase/firestore";
 
 export default function AdminDashboard() {
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [residentsData, setResidentsData] = useState([]);
-  const [docRequestsData, setDocRequestsData] = useState([]);
-  const [facilityRequestsData, setFacilityRequestsData] = useState([]);
-  const [generalAttendees, setGeneralAttendees] = useState([]);
-  const [livelihoodAttendees, setLivelihoodAttendees] = useState([]);
-  const [incidentData, setIncidentData] = useState([]);
-  const [bswdData, setBswdData] = useState([]);
 
-  const [stats, setStats] = useState({
-    households: 0,
-    residents: 0,
-    docRequests: 0,
-    facilityRequests: 0,
-    pendingApprovals: 0
+  // ── REACT QUERY: The centralized data fetcher ──
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['adminDashboardAnalytics'],
+    queryFn: async () => {
+      // 1. ULTRA-OPTIMIZED COUNTS: Get totals without downloading the actual documents (1 read each!)
+      const [hhCount, resCount, pendingCount] = await Promise.all([
+        getCountFromServer(collection(db, "households")),
+        getCountFromServer(collectionGroup(db, "residents")),
+        getCountFromServer(collection(db, "pending_registrations"))
+      ]);
+
+      // 2. PARALLEL BOUNDED FETCHES: Download the data for charts (capped to prevent read spikes)
+      const [
+        fbSnap, resSnap, docSnap, facSnap, attSnap, livSnap, incSnap, bswdSnap
+      ] = await Promise.all([
+        getDocs(query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"), limit(300))),
+        getDocs(query(collectionGroup(db, "residents"), limit(500))), // For demographic charts
+        getDocs(query(collection(db, "document_requests"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collection(db, "facility_reservations"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collectionGroup(db, "attendees"), limit(400))),
+        getDocs(query(collection(db, "livelihoodRegistrations"), limit(400))),
+        getDocs(query(collection(db, "incidentReports"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(300)))
+      ]);
+
+      // 3. MAP DATA
+      const feedbacks = fbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const residentsData = resSnap.docs.map(doc => doc.data());
+      
+      const docRequestsData = docSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const facilityRequestsData = facSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const generalAttendees = attSnap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, programName: d.programName || d.eventName || doc.ref.parent.parent?.id || "General Program", ...d };
+      });
+      
+      const livelihoodAttendees = livSnap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, programName: d.programName || d.eventName || "Livelihood Program", ...d };
+      });
+      
+      const incidentData = incSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const bswdData = bswdSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // 4. CALCULATE PENDING STATS
+      const docPending = docRequestsData.filter(d => d.status === "Pending").length;
+      const facPending = facilityRequestsData.filter(d => d.status === "Pending").length;
+
+      // 5. RETURN ALL STATE TO REACT QUERY
+      return {
+        feedbacks,
+        residentsData,
+        docRequestsData,
+        facilityRequestsData,
+        generalAttendees,
+        livelihoodAttendees,
+        incidentData,
+        bswdData,
+        stats: {
+          households: hhCount.data().count,
+          residents: resCount.data().count,
+          pendingApprovals: pendingCount.data().count,
+          docRequests: docPending,
+          facilityRequests: facPending
+        }
+      };
+    },
+    // Keep data fresh in memory for 10 minutes before checking Firebase again
+    staleTime: 1000 * 60 * 10,
+    // Keep inactive data cached for 30 minutes
+    gcTime: 1000 * 60 * 30,
   });
 
-  useEffect(() => {
-    const qFeedbacks = query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"));
-    const unsubFeedbacks = onSnapshot(qFeedbacks, (snapshot) => {
-      const liveData = [];
-      snapshot.forEach((doc) => liveData.push({ id: doc.id, ...doc.data() }));
-      setFeedbacks(liveData);
-      setLoading(false);
-    });
-
-    const unsubHouseholds = onSnapshot(collection(db, "households"), (snapshot) => {
-      setStats(prev => ({ ...prev, households: snapshot.size }));
-    });
-
-    const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (snapshot) => {
-      setStats(prev => ({ ...prev, residents: snapshot.size }));
-      const resData = [];
-      snapshot.forEach(doc => resData.push(doc.data()));
-      setResidentsData(resData);
-    });
-
-    const unsubDocRequests = onSnapshot(collection(db, "document_requests"), (snapshot) => {
-      const docs = [];
-      let pendingCount = 0;
-      snapshot.forEach((doc) => {
-        const d = doc.data();
-        docs.push({ id: doc.id, ...d });
-        if (d.status === "Pending") pendingCount++;
-      });
-      setDocRequestsData(docs);
-      setStats(prev => ({ ...prev, docRequests: pendingCount }));
-    });
-
-    const unsubFacilityRequests = onSnapshot(collection(db, "facility_reservations"), (snapshot) => {
-      const facs = [];
-      let pendingCount = 0;
-      snapshot.forEach((doc) => {
-        const d = doc.data();
-        facs.push({ id: doc.id, ...d });
-        if (d.status === "Pending") pendingCount++;
-      });
-      setFacilityRequestsData(facs);
-      setStats(prev => ({ ...prev, facilityRequests: pendingCount }));
-    });
-
-    const unsubApprovals = onSnapshot(collection(db, "pending_registrations"), (snapshot) => {
-      setStats(prev => ({ ...prev, pendingApprovals: snapshot.size }));
-    });
-
-    const unsubAttendees = onSnapshot(collectionGroup(db, "attendees"), (snapshot) => {
-      const atts = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const parentId = doc.ref.parent.parent?.id; 
-        const name = data.programName || data.eventName || parentId || "General Program";
-        atts.push({ id: doc.id, programName: name, ...data });
-      });
-      setGeneralAttendees(atts);
-    });
-
-    const unsubLivelihood = onSnapshot(collection(db, "livelihoodRegistrations"), (snapshot) => {
-      const lives = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const name = data.programName || data.eventName || "Livelihood Program";
-        lives.push({ id: doc.id, programName: name, ...data });
-      });
-      setLivelihoodAttendees(lives);
-    });
-
-    const unsubIncidents = onSnapshot(collection(db, "incidentReports"), (snapshot) => {
-      const incidents = [];
-      snapshot.forEach(doc => incidents.push({ id: doc.id, ...doc.data() }));
-      setIncidentData(incidents);
-    });
-
-    const unsubBSWD = onSnapshot(collection(db, "bswdReports"), (snapshot) => {
-      const reports = [];
-      snapshot.forEach(doc => reports.push({ id: doc.id, ...doc.data() }));
-      setBswdData(reports);
-    });
-
-    return () => {
-      unsubFeedbacks();
-      unsubHouseholds();
-      unsubResidents();
-      unsubDocRequests();
-      unsubFacilityRequests();
-      unsubApprovals();
-      unsubAttendees();
-      unsubLivelihood();
-      unsubIncidents();
-      unsubBSWD();
-    };
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center" }}>
-          <h2>Loading Analytics...</h2>
+          <h2>Loading Analytics... (This may take a moment)</h2>
         </div>
       </AdminLayout>
     );
   }
+
+  if (isError) {
+    return (
+      <AdminLayout>
+        <div className="main-content" style={{ padding: "40px", textAlign: "center", color: "#b91c1c" }}>
+          <h2>Analytics failed to load.</h2>
+          <p style={{ background: "#fee2e2", padding: "16px", borderRadius: "8px", display: "inline-block" }}>
+            {error.message}
+          </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  // Destructure the data provided by React Query
+  const { 
+    feedbacks, residentsData, docRequestsData, facilityRequestsData, 
+    generalAttendees, livelihoodAttendees, incidentData, bswdData, stats 
+  } = data;
 
   return (
     <AdminLayout>
