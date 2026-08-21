@@ -3,7 +3,7 @@ import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Eye, CheckCircle, XCircle, X, Calendar, FileText, User, Info, Clock } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, increment, orderBy, limit } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth";
 import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
@@ -82,7 +82,12 @@ export default function AdminRequests() {
   }, []);
 
   useEffect(() => {
-    // Run listeners in parallel to prevent memory leaks
+    // Run listeners in parallel and BOUND the queries to prevent read spikes
+    // We only fetch the 150 most recent documents per collection
+    const docQuery = query(collection(db, 'document_requests'), orderBy('submittedAt', 'desc'), limit(150));
+    const facQuery = query(collection(db, 'facility_reservations'), orderBy('submittedAt', 'desc'), limit(150));
+    const eqQuery = query(collection(db, 'equipment_rentals'), orderBy('submittedAt', 'desc'), limit(150));
+
     let docList = [];
     let facList = [];
     let eqList = [];
@@ -97,7 +102,7 @@ export default function AdminRequests() {
       setLoading(false);
     };
 
-    const unsubDocs = onSnapshot(collection(db, 'document_requests'), (snapshot) => {
+    const unsubDocs = onSnapshot(docQuery, (snapshot) => {
       docList = snapshot.docs.map(doc => {
         const data = doc.data();
         let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
@@ -121,7 +126,7 @@ export default function AdminRequests() {
       updateCombined();
     });
 
-    const unsubFacs = onSnapshot(collection(db, 'facility_reservations'), (snapshot) => {
+    const unsubFacs = onSnapshot(facQuery, (snapshot) => {
       facList = snapshot.docs.map(doc => {
         const data = doc.data();
         const time = data.timeSlot ? ` (${data.timeSlot})` : '';
@@ -146,7 +151,7 @@ export default function AdminRequests() {
       updateCombined();
     });
 
-    const unsubEqs = onSnapshot(collection(db, 'equipment_rentals'), (snapshot) => {
+    const unsubEqs = onSnapshot(eqQuery, (snapshot) => {
       eqList = snapshot.docs.map(doc => {
         const data = doc.data();
         let rawDate = data.submittedAt || data.createdAt || null;

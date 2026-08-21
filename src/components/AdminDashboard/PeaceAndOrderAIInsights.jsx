@@ -23,7 +23,7 @@ export default function PeaceAndOrderAIInsights() {
         const rawReports = querySnapshot.docs.map(doc => doc.data());
 
         if (rawReports.length < 5) {
-          setInsight("Insufficient data to identify a reliable trend. More incident reports are required.");
+          setInsight("Insufficient data to identify a reliable trend.");
           setLoading(false);
           return;
         }
@@ -42,7 +42,7 @@ export default function PeaceAndOrderAIInsights() {
           };
         });
 
-        // 3. QA Requirement: Generate Chronological Data for Line Chart
+        // 3. Generate Chronological Data for Line Chart
         const timelineCounts = {};
         safeData.forEach(incident => {
           if (incident.date) {
