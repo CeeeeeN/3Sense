@@ -27,6 +27,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 import { runStatusMaintenance } from "../../services/statusUpdater";
 import { createUserNotification } from "../../services/userNotifications";
+import EmailBlastModal from "../../components/EmailBlastModal";
+import { buildProgramEmail } from "../../utils/emailTemplates";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PREVIEW_LIMIT = 120;
@@ -118,6 +120,9 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   const [removeTarget, setRemoveTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Email blast state
+  const [showEmailBlast, setShowEmailBlast] = useState(false);
 
   // Real-time attendees from subcollection
   useEffect(() => {
@@ -277,214 +282,246 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   };
 
   return (
-    <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
-      <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-        &larr; Back to Programs
-      </button>
+    <>
+      <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
+        <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
+          &larr; Back to Programs
+        </button>
 
-      {/* ── Program Header ── */}
-      <div className="as-header-section">
-        <div className="as-title-wrap">
-          <h1>{program.title}</h1>
-          <p className="as-subtitle">
-            {program.date && (
-              <>
-                {program.date}
-                {program.endDate && program.endDate !== program.date ? ` → ${program.endDate}` : ""}
-              </>
-            )}
-            {program.location && <> · <span style={{ color: "#ef4444" }}>📍</span> {program.location}</>}
-            {program.time && <> · <span>🕐</span> {program.time}</>}
-          </p>
+        {/* ── Program Header ── */}
+        <div className="as-header-section">
+          <div className="as-title-wrap">
+            <h1>{program.title}</h1>
+            <p className="as-subtitle">
+              {program.date && (
+                <>
+                  {program.date}
+                  {program.endDate && program.endDate !== program.date ? ` → ${program.endDate}` : ""}
+                </>
+              )}
+              {program.location && <> · {program.location}</>}
+              {program.time && <> · {program.time}</>}
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowEmailBlast(true)}
+            style={{
+              padding: "9px 18px", background: "linear-gradient(135deg,#0ea5e9,#0369a1)",
+              border: "none", borderRadius: "8px", cursor: "pointer",
+              fontWeight: 700, color: "#fff", fontSize: "13px",
+              display: "flex", alignItems: "center", gap: "6px",
+              alignSelf: "center", flexShrink: 0,
+            }}
+            title="Send email to all approved registrants"
+          >
+            Email Registrants
+          </button>
+
+          {/* Slot indicator */}
+          {totalSlots > 0 && (
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center",
+              padding: "12px 20px", borderRadius: "12px",
+              background: isFull ? "#fff1f2" : "#f0fdf4",
+              border: `1px solid ${isFull ? "#fecdd3" : "#bbf7d0"}`,
+              minWidth: "100px",
+            }}>
+              <div style={{ fontSize: "1.8rem", fontWeight: 700, color: isFull ? "#be123c" : "#15803d" }}>
+                {isFull ? "Full" : slotsLeft}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                {isFull ? `0 / ${totalSlots} slots` : `of ${totalSlots} slots left`}
+              </div>
+              <div style={{ marginTop: "8px", width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.min((getApprovedCount() / totalSlots) * 100, 100)}%`,
+                  background: isFull ? "#ef4444" : "#2DB17B",
+                  borderRadius: "4px", transition: "width 0.3s",
+                }} />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Slot indicator */}
-        {totalSlots > 0 && (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            padding: "12px 20px", borderRadius: "12px",
-            background: isFull ? "#fff1f2" : "#f0fdf4",
-            border: `1px solid ${isFull ? "#fecdd3" : "#bbf7d0"}`,
-            minWidth: "100px",
-          }}>
-            <div style={{ fontSize: "1.8rem", fontWeight: 700, color: isFull ? "#be123c" : "#15803d" }}>
-              {isFull ? "Full" : slotsLeft}
+        {/* ── Stats row ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px", marginBottom: "24px" }}>
+          {[
+            { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
+            { label: "Approved", value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: "Pending", value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: "Rejected", value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
+            { label: "Registered", value: stats.registered, bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af" },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.bg, padding: "18px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
+              <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
+              <div style={{ fontSize: "1.8rem", fontWeight: 700, color: s.color }}>{s.value}</div>
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-              {isFull ? `0 / ${totalSlots} slots` : `of ${totalSlots} slots left`}
+          ))}
+        </div>
+
+        {/* ── Table ── */}
+        {loading ? (
+          <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
+        ) : (
+          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+              <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                <tr>
+                  {["User ID", "Name", "Contact", "Date Registered", "Slots Left", "Status", "Actions"].map((h) => (
+                    <th key={h} style={{
+                      padding: "14px 16px", fontWeight: 600, color: "#4b5563",
+                      fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {attendees.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: "40px", color: "#9ca3af", textAlign: "center" }}>
+                      No one has registered for this program yet.
+                    </td>
+                  </tr>
+                ) : (
+                  attendees.map((a) => {
+                    const status = (a.status || "pending").toLowerCase();
+                    const left = getSlotsLeft();
+                    const slotsFull = left !== null && left <= 0 && status === "pending";
+
+                    return (
+                      <tr key={a.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                        <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>
+                          {a.userID || a.id.slice(0, 8)}
+                        </td>
+                        <td style={{ padding: "14px 16px", fontWeight: 500 }}>
+                          {a.userName || a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim() || "—"}
+                        </td>
+                        <td style={{ padding: "14px 16px", color: "#6b7280" }}>
+                          {a.contact || a.contactNumber || "—"}
+                        </td>
+                        <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>
+                          {a.createdAt ? formatTs(a.createdAt) : "—"}
+                        </td>
+                        <td style={{ padding: "14px 16px" }}>
+                          {left !== null ? (
+                            <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166634" }}>
+                              {left <= 0 ? "Full" : `${left} left`}
+                            </span>
+                          ) : <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>}
+                        </td>
+                        <td style={{ padding: "14px 16px" }}>
+                          <StatusBadge status={a.status || "pending"} />
+                        </td>
+                        <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                          {status === "pending" || status === "registered" ? (
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                              <button
+                                style={{ padding: "5px 12px", background: slotsFull ? "#e5e7eb" : "#2DB17B", color: slotsFull ? "#9ca3af" : "#fff", border: "none", borderRadius: "6px", cursor: slotsFull ? "not-allowed" : "pointer", fontSize: "0.8rem" }}
+                                onClick={() => !slotsFull && handleApprove(a)}
+                                disabled={slotsFull}
+                                title={slotsFull ? "No slots available" : "Approve"}
+                              >Approve</button>
+                              <button
+                                style={{ padding: "5px 12px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
+                                onClick={() => { setRejectTarget(a.id); setRejectReason(""); setShowRejectModal(true); }}
+                              >Reject</button>
+                            </div>
+                          ) : status === "approved" ? (
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
+                              <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Approved</span>
+                              <button
+                                style={{ padding: "5px 12px", background: "#fff", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
+                                onClick={() => { setRemoveTarget(a.id); setShowRemoveModal(true); }}
+                              >Remove</button>
+                            </div>
+                          ) : status === "rejected" ? (
+                            <div style={{ textAlign: "right" }}>
+                              <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Rejected</span>
+                              {a.rejectReason && (
+                                <div style={{ color: "#ef4444", fontSize: "0.75rem", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "2px" }} title={a.rejectReason}>
+                                  "{a.rejectReason}"
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ── Reject Modal ── */}
+        {showRejectModal && (
+          <div className="as-modal-overlay">
+            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
+              <div className="as-modal-header">
+                <h2>Reject Registration</h2>
+                <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
+              </div>
+              <div className="as-modal-body">
+                <form onSubmit={handleConfirmReject}>
+                  <label className="as-form-label">Reason for Rejection <span style={{ color: "red" }}>*</span></label>
+                  <textarea className="as-form-textarea" rows="3" required placeholder="Provide a brief explanation…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+                  <div className="as-modal-actions" style={{ marginTop: "15px" }}>
+                    <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>Cancel</button>
+                    <button type="submit" style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} disabled={saving}>
+                      {saving ? "Processing…" : "Confirm Rejection"}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-            <div style={{ marginTop: "8px", width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                width: `${Math.min((getApprovedCount() / totalSlots) * 100, 100)}%`,
-                background: isFull ? "#ef4444" : "#2DB17B",
-                borderRadius: "4px", transition: "width 0.3s",
-              }} />
+          </div>
+        )}
+
+        {/* ── Remove Modal ── */}
+        {showRemoveModal && (
+          <div className="as-modal-overlay">
+            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
+              <div className="as-modal-header">
+                <h2>Remove Approval</h2>
+                <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>&times;</button>
+              </div>
+              <div className="as-modal-body">
+                <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
+                  This will move the registration back to <strong>Pending</strong>, freeing up the slot.
+                </p>
+                <div className="as-modal-actions">
+                  <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>Cancel</button>
+                  <button style={{ padding: "8px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} onClick={handleConfirmRemove} disabled={saving}>
+                    {saving ? "Processing…" : "Yes, Remove Approval"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Stats row ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px", marginBottom: "24px" }}>
-        {[
-          { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
-          { label: "Approved", value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-          { label: "Pending", value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-          { label: "Rejected", value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
-          { label: "Registered", value: stats.registered, bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af" },
-        ].map((s) => (
-          <div key={s.label} style={{ background: s.bg, padding: "18px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
-            <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
-            <div style={{ fontSize: "1.8rem", fontWeight: 700, color: s.color }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Table ── */}
-      {loading ? (
-        <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
-      ) : (
-        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              <tr>
-                {["User ID", "Name", "Contact", "Date Registered", "Slots Left", "Status", "Actions"].map((h) => (
-                  <th key={h} style={{
-                    padding: "14px 16px", fontWeight: 600, color: "#4b5563",
-                    fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left",
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {attendees.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: "40px", color: "#9ca3af", textAlign: "center" }}>
-                    No one has registered for this program yet.
-                  </td>
-                </tr>
-              ) : (
-                attendees.map((a) => {
-                  const status = (a.status || "pending").toLowerCase();
-                  const left = getSlotsLeft();
-                  const slotsFull = left !== null && left <= 0 && status === "pending";
-
-                  return (
-                    <tr key={a.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                      <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>
-                        {a.userID || a.id.slice(0, 8)}
-                      </td>
-                      <td style={{ padding: "14px 16px", fontWeight: 500 }}>
-                        {a.userName || a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim() || "—"}
-                      </td>
-                      <td style={{ padding: "14px 16px", color: "#6b7280" }}>
-                        {a.contact || a.contactNumber || "—"}
-                      </td>
-                      <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>
-                        {a.createdAt ? formatTs(a.createdAt) : "—"}
-                      </td>
-                      <td style={{ padding: "14px 16px" }}>
-                        {left !== null ? (
-                          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166634" }}>
-                            {left <= 0 ? "Full" : `${left} left`}
-                          </span>
-                        ) : <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>}
-                      </td>
-                      <td style={{ padding: "14px 16px" }}>
-                        <StatusBadge status={a.status || "pending"} />
-                      </td>
-                      <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                        {status === "pending" || status === "registered" ? (
-                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                            <button
-                              style={{ padding: "5px 12px", background: slotsFull ? "#e5e7eb" : "#2DB17B", color: slotsFull ? "#9ca3af" : "#fff", border: "none", borderRadius: "6px", cursor: slotsFull ? "not-allowed" : "pointer", fontSize: "0.8rem" }}
-                              onClick={() => !slotsFull && handleApprove(a)}
-                              disabled={slotsFull}
-                              title={slotsFull ? "No slots available" : "Approve"}
-                            >Approve</button>
-                            <button
-                              style={{ padding: "5px 12px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
-                              onClick={() => { setRejectTarget(a.id); setRejectReason(""); setShowRejectModal(true); }}
-                            >Reject</button>
-                          </div>
-                        ) : status === "approved" ? (
-                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
-                            <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Approved</span>
-                            <button
-                              style={{ padding: "5px 12px", background: "#fff", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
-                              onClick={() => { setRemoveTarget(a.id); setShowRemoveModal(true); }}
-                            >Remove</button>
-                          </div>
-                        ) : status === "rejected" ? (
-                          <div style={{ textAlign: "right" }}>
-                            <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Rejected</span>
-                            {a.rejectReason && (
-                              <div style={{ color: "#ef4444", fontSize: "0.75rem", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "2px" }} title={a.rejectReason}>
-                                "{a.rejectReason}"
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      {showEmailBlast && (
+        <EmailBlastModal
+          sourceType="program"
+          sourceId={program.id}
+          subject={`[3S+ Sense] Program Update: ${program.title}`}
+          html={buildProgramEmail(program)}
+          label="Approved Registrants"
+          program={program}
+          onClose={() => {
+            setShowEmailBlast(false);
+            logTransaction(adminName, adminRole, "EMAILED_PROGRAM", `Email blast sent for program: ${program.title}`);
+          }}
+        />
       )}
-
-      {/* ── Reject Modal ── */}
-      {showRejectModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "400px" }}>
-            <div className="as-modal-header">
-              <h2>Reject Registration</h2>
-              <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
-            </div>
-            <div className="as-modal-body">
-              <form onSubmit={handleConfirmReject}>
-                <label className="as-form-label">Reason for Rejection <span style={{ color: "red" }}>*</span></label>
-                <textarea className="as-form-textarea" rows="3" required placeholder="Provide a brief explanation…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
-                <div className="as-modal-actions" style={{ marginTop: "15px" }}>
-                  <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>Cancel</button>
-                  <button type="submit" style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} disabled={saving}>
-                    {saving ? "Processing…" : "Confirm Rejection"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Remove Modal ── */}
-      {showRemoveModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "400px" }}>
-            <div className="as-modal-header">
-              <h2>Remove Approval</h2>
-              <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>&times;</button>
-            </div>
-            <div className="as-modal-body">
-              <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
-                This will move the registration back to <strong>Pending</strong>, freeing up the slot.
-              </p>
-              <div className="as-modal-actions">
-                <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>Cancel</button>
-                <button style={{ padding: "8px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} onClick={handleConfirmRemove} disabled={saving}>
-                  {saving ? "Processing…" : "Yes, Remove Approval"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
+
 
 // ── Empty form state ──────────────────────────────────────────────────────────
 const EMPTY_PROGRAM = {
