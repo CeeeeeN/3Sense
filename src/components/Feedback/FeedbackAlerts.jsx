@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, collectionGroup } from "firebase/firestore";
+import { collection, query, where, onSnapshot, collectionGroup, orderBy, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import FeedbackModal from "./FeedbackModal";
 import { AlertCircleIcon } from "../Icons";
@@ -31,51 +31,62 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       collection(db, "document_requests"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "Claimed")
+      where("status", "==", "Claimed"),
+      orderBy("submittedAt", "desc"),
+      limit(10)
     );
 
     const qRes = query(
       collection(db, "facility_reservations"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "Completed")
+      where("status", "==", "Completed"),
+      orderBy("submittedAt", "desc"),
+      limit(10)
     );
 
-    // 👇 NEW QUERY: Listen for Returned Equipment Rentals
     const qEq = query(
       collection(db, "equipment_rentals"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "Returned")
+      where("status", "==", "Returned"),
+      orderBy("submittedAt", "desc"),
+      limit(10)
     );
 
     const qProg = query(
       collection(db, "livelihoodRegistrations"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "Completed")
+      where("status", "==", "Completed"),
+      orderBy("submittedAt", "desc"),
+      limit(10)
     );
 
-    // Search ALL "attendees" subcollections globally
     const qGenProg = query(
       collectionGroup(db, "attendees"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "Completed")
+      where("status", "==", "Completed"),
+      limit(10) 
     );
 
     const qInc = query(
       collection(db, "incidentReports"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "resolved")
+      where("status", "==", "resolved"),
+      orderBy("submittedAt", "desc"),
+      limit(10)
     );
 
     const qBswd = query(
       collection(db, "bswdReports"),
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
-      where("status", "==", "resolved")
+      where("status", "==", "resolved"),
+      orderBy("submittedAt", "desc"),
+      limit(10)
     );
 
     // Added eqData to the arrays

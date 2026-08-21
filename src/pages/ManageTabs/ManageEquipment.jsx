@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 
@@ -75,10 +75,18 @@ export default function ManageEquipment() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "equipment"), (snapshot) => {
+    // BOUNDED QUERY: Cap the inventory fetch to 100 items to prevent unbounded read growth
+    const eqQuery = query(
+      collection(db, "equipment"),
+      orderBy("createdAt", "desc"), // Show newly added equipment at the top
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(eqQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setEquipmentList(data);
     });
+    
     return () => unsubscribe();
   }, []);
 
@@ -175,7 +183,7 @@ export default function ManageEquipment() {
 
   const handleGenerateGlobalQR = () => {
     const residentAppUrl = "https://3-sense.vercel.app/";
-    const encodedUrl = `${residentAppUrl}?serviceId=equipment_global&serviceName=${encodeURIComponent("All Equipment")}&category=Equipment`;
+    const encodedUrl = `${residentAppUrl}?serviceId=equipment_global&serviceName=${encodeURIComponent("Equipment Rental")}&category=Equipment`;
     setSelectedQR({ name: "Equipment Rental Portal", qrValue: encodedUrl });
   };
 

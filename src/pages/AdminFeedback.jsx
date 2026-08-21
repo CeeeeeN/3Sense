@@ -3,7 +3,7 @@ import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, AlertTriangle, Clock, BarChart2, List } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs, limit } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { logTransaction } from '../services/logger';
 
@@ -59,7 +59,13 @@ export default function AdminFeedback() {
 
   // --- FETCH FIREBASE DATA ---
   useEffect(() => {
-    const q = query(collection(db, "feedback"), orderBy("createdAt", "desc"));
+    // BOUNDED QUERY: Cap to the 200 most recent feedback entries. 
+    // This keeps the Word Cloud and Heatmap relevant to current events while preventing read spikes.
+    const q = query(
+      collection(db, "feedback"), 
+      orderBy("createdAt", "desc"),
+      limit(200)
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fbData = snapshot.docs.map(doc => {
@@ -94,7 +100,6 @@ export default function AdminFeedback() {
 
     return () => unsubscribe();
   }, []);
-
   // --- ANALYTICS ENGINE ---
   const generateAnalytics = (data) => {
     if (data.length === 0) return;

@@ -263,8 +263,13 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     return false;
   };
 
-  // Fetch document requests by householdID
-  const docQ = query(collection(db, "document_requests"), where("householdID", "==", householdID));
+  // BOUNDED QUERIES: Limit to 50 most recent records to prevent massive read spikes
+  const docQ = query(
+    collection(db, "document_requests"), 
+    where("householdID", "==", householdID),
+    orderBy("submittedAt", "desc"),
+    limit(50)
+  );
   const docSnap = await getDocs(docQ);
   const docs = docSnap.docs.map(d => ({
     id: d.id,
@@ -276,8 +281,12 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   })).filter(isMyRecord);
 
-  // Fetch facility reservations by householdID
-  const facQ = query(collection(db, "facility_reservations"), where("householdID", "==", householdID));
+  const facQ = query(
+    collection(db, "facility_reservations"), 
+    where("householdID", "==", householdID),
+    orderBy("submittedAt", "desc"),
+    limit(50)
+  );
   const facSnap = await getDocs(facQ);
   const facs = facSnap.docs.map(d => ({
     id: d.id,
@@ -289,8 +298,12 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   })).filter(isMyRecord);
 
-  // Fetch equipment rentals by householdID
-  const eqQ = query(collection(db, "equipment_rentals"), where("householdID", "==", householdID));
+  const eqQ = query(
+    collection(db, "equipment_rentals"), 
+    where("householdID", "==", householdID),
+    orderBy("submittedAt", "desc"),
+    limit(50)
+  );
   const eqSnap = await getDocs(eqQ);
   const eqs = eqSnap.docs.map(d => ({
     id: d.id,

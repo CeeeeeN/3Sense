@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { auth, db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, query, where, getDocs, addDoc, deleteDoc, orderBy
+  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, query, where, getDocs, addDoc, deleteDoc, orderBy, limit
 } from "firebase/firestore";
 import { ServiceAlertTriangleIcon } from "../../components/Icons";
 import { createUserNotification } from "../../services/userNotifications";
@@ -93,17 +93,20 @@ export default function ServicePeaceOrder({ onBack }) {
 
   // ── Real-time listener for Reports ────────────────────────────────
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "incidentReports"), (snap) => {
+    // BOUNDED QUERY: Force Firestore to sort and limit the payload before sending it
+    const reportsQuery = query(
+      collection(db, "incidentReports"),
+      orderBy("submittedAt", "desc"),
+      limit(150)
+    );
+
+    const unsub = onSnapshot(reportsQuery, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort newest first
-      data.sort((a, b) => {
-        const ta = a.submittedAt?.toDate?.() ?? new Date(0);
-        const tb = b.submittedAt?.toDate?.() ?? new Date(0);
-        return tb - ta;
-      });
+      
       setReports(data);
       setLoading(false);
-      // Keep selected report in sync
+      
+      // Keep selected report in sync if another admin updates it
       setSelectedReport(prev => prev ? (data.find(r => r.id === prev.id) || prev) : null);
     });
     return () => unsub();
@@ -111,7 +114,12 @@ export default function ServicePeaceOrder({ onBack }) {
 
   // ── Real-time listener for Tanod Groups ───────────────────────────
   useEffect(() => {
-    const q = query(collection(db, "tanodGroups"), orderBy("createdAt", "asc"));
+    // BOUNDED QUERY: Cap groups to prevent unexpected unbounded reads
+    const q = query(
+      collection(db, "tanodGroups"), 
+      orderBy("createdAt", "asc"),
+      limit(50)
+    );
     const unsub = onSnapshot(q, (snap) => {
       setTanodGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });

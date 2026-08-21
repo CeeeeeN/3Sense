@@ -22,6 +22,7 @@ import {
   where,
   getDocs,
   orderBy,
+  limit
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
@@ -126,7 +127,12 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
 
   // Real-time attendees from subcollection
   useEffect(() => {
-    const attendeesRef = collection(db, "Programs", program.id, "attendees");
+    // BOUNDED QUERY: Cap attendees to the 150 most recent to prevent massive read spikes on popular events
+    const attendeesRef = query(
+      collection(db, "Programs", program.id, "attendees"),
+      orderBy("createdAt", "desc"),
+      limit(150)
+    );
     const unsub = onSnapshot(
       attendeesRef,
       (snap) => {
@@ -566,17 +572,25 @@ export default function ManagePrograms() {
   }, []);
 
   // ── Real-time Programs (general only, exclude livelihood) ─────────
+  // ── Real-time Programs (general only, exclude livelihood) ─────────
   useEffect(() => {
     // Maintenance: auto-update program statuses based on current date
     runStatusMaintenance();
 
-    const unsubscribe = onSnapshot(
+    // BOUNDED QUERY: Cap to 100 most recent programs
+    const progQuery = query(
       collection(db, "Programs"),
+      orderBy("createdAt", "desc"),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(
+      progQuery,
       (snapshot) => {
         setPrograms(
           snapshot.docs
             .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((p) => p.programType !== "livelihood")
+            .filter((p) => p.programType !== "livelihood") // Filter kept client-side
         );
         setLoadingPrograms(false);
       },
@@ -590,7 +604,13 @@ export default function ManagePrograms() {
   useEffect(() => {
     if (programs.length === 0) return;
     const unsubs = programs.map((prog) => {
-      const attendeesRef = collection(db, "Programs", prog.id, "attendees");
+      // BOUNDED QUERY: Prevent the "multiplier effect" by capping stat reads
+      const attendeesRef = query(
+        collection(db, "Programs", prog.id, "attendees"),
+        orderBy("createdAt", "desc"),
+        limit(150)
+      );
+      
       return onSnapshot(attendeesRef, (snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         const byStatus = {};

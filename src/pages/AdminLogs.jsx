@@ -3,7 +3,7 @@ import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Clock, ShieldAlert, Activity, FilterX } from 'lucide-react';
 import { db } from '../firebase/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 
 export default function AdminLogs() {
   const [logs, setLogs] = useState([]);
@@ -20,7 +20,12 @@ export default function AdminLogs() {
 
   // --- FETCH LOGS FROM FIREBASE ---
   useEffect(() => {
-    const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'));
+    // BOUNDED QUERY: Audit logs grow exponentially. Cap to the 300 most recent actions.
+    const q = query(
+      collection(db, 'audit_logs'), 
+      orderBy('timestamp', 'desc'),
+      limit(300)
+    );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const logData = snapshot.docs.map(doc => {

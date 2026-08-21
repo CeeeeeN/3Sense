@@ -14,6 +14,8 @@ import {
   query,
   where,
   onSnapshot,
+  orderBy,
+  limit
 } from "firebase/firestore";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
@@ -128,8 +130,15 @@ export default function AdminManagement() {
   useEffect(() => {
     if (!isSuperAdmin) return;
 
-    const unsubRequests = onSnapshot(
+    // BOUNDED QUERY: Defend against registration spam by capping pending requests to the 100 most recent
+    const pendingQuery = query(
       collection(db, "pendingAdmins"),
+      orderBy("createdAt", "desc"),
+      limit(100)
+    );
+
+    const unsubRequests = onSnapshot(
+      pendingQuery,
       (snapshot) => {
         const data = snapshot.docs.map((doc) => {
           const docData = doc.data();
@@ -149,8 +158,14 @@ export default function AdminManagement() {
       },
     );
 
-    const unsubAdmins = onSnapshot(
+    // BOUNDED QUERY: Hard ceiling on approved admins to prevent read spikes
+    const approvedQuery = query(
       collection(db, "approvedAdmins"),
+      limit(100)
+    );
+
+    const unsubAdmins = onSnapshot(
+      approvedQuery,
       (snapshot) => {
         const data = snapshot.docs.map((doc) => {
           const docData = doc.data();

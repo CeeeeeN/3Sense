@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
-  serverTimestamp, query, orderBy,
+  serverTimestamp, query, orderBy, limit
 } from "firebase/firestore";
 import FormBuilder from "../../components/FormBuilder";
 import { createUserNotification } from "../../services/userNotifications";
@@ -100,7 +100,13 @@ export default function ServiceLivelihood({ onBack }) {
   useEffect(() => {
     runStatusMaintenance();
 
-    const q = query(collection(db, "Programs"), orderBy("updatedAt", "desc"));
+    // BOUNDED QUERY: Cap to the 100 most recent programs
+    const q = query(
+      collection(db, "Programs"), 
+      orderBy("updatedAt", "desc"),
+      limit(100)
+    );
+    
     const unsub = onSnapshot(q, (snap) => {
       setPrograms(snap.docs.map(d => {
         const r = d.data();
@@ -126,7 +132,13 @@ export default function ServiceLivelihood({ onBack }) {
 
   // ── Real-time: Registrations ──────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db, "livelihoodRegistrations"), orderBy("submittedAt", "desc"));
+    // BOUNDED QUERY: Cap to 150 most recent registrations to prevent massive read spikes
+    const q = query(
+      collection(db, "livelihoodRegistrations"), 
+      orderBy("submittedAt", "desc"),
+      limit(150)
+    );
+    
     const unsub = onSnapshot(q, (snap) => {
       setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingParts(false);

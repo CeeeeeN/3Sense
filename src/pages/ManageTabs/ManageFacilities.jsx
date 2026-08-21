@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 
@@ -84,10 +84,18 @@ export default function ManageFacilities() {
     }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "facilities"), (snapshot) => {
+    // BOUNDED QUERY: Cap the facility fetch to 100 items to prevent unbounded read growth
+    const facQuery = query(
+      collection(db, "facilities"),
+      orderBy("createdAt", "desc"), // Show newly added facilities at the top
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(facQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFacilities(data);
     });
+    
     return () => unsubscribe();
   }, []);
 

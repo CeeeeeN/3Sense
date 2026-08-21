@@ -16,6 +16,8 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
+  limit
 } from "firebase/firestore";
 import { approveRegistration } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
@@ -110,7 +112,14 @@ export default function HouseholdManagement() {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "pending_registrations"), (snapshot) => {
+    // BOUNDED QUERY: Cap pending requests to the 100 most recent
+    const pendingQuery = query(
+      collection(db, "pending_registrations"),
+      orderBy("createdAt", "desc"),
+      limit(100)
+    );
+
+    const unsub = onSnapshot(pendingQuery, (snapshot) => {
       const requests = snapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
@@ -145,7 +154,13 @@ export default function HouseholdManagement() {
       setResidents([...deduped, ...latestPending]);
     };
 
-    const unsubResidents = onSnapshot(collectionGroup(db, "residents"), (snap) => {
+    // BOUNDED QUERY: Prevent the catastrophic collectionGroup read spike
+    const residentsQuery = query(
+      collectionGroup(db, "residents"),
+      limit(300) 
+    );
+
+    const unsubResidents = onSnapshot(residentsQuery, (snap) => {
       latestActive = snap.docs.map(docSnap => {
         const data = docSnap.data();
         const householdId = docSnap.ref.parent.parent?.id || "Unknown";
@@ -173,7 +188,13 @@ export default function HouseholdManagement() {
       merge();
     });
 
-    const unsubHouseholds = onSnapshot(collection(db, "households"), (snap) => {
+    // BOUNDED QUERY: Prevent massive household document reads
+    const householdsQuery = query(
+      collection(db, "households"),
+      limit(300)
+    );
+
+    const unsubHouseholds = onSnapshot(householdsQuery, (snap) => {
       latestPending = [];
       snap.docs.forEach(hhDoc => {
         const hhData = hhDoc.data();

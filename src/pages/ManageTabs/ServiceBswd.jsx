@@ -3,7 +3,7 @@ import { auth, db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, doc, updateDoc,
   serverTimestamp, query, orderBy,
-  where, getDocs
+  where, getDocs, limit
 } from "firebase/firestore";
 import { createUserNotification } from "../../services/userNotifications";
 import { logTransaction } from '../../services/logger';
@@ -91,7 +91,13 @@ export default function ServiceBswd({ onBack }) {
 
   // ── Real-time listener ───────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"));
+    // BOUNDED QUERY: Cap fetches to the 150 most recent reports
+    const q = query(
+      collection(db, "bswdReports"), 
+      orderBy("submittedAt", "desc"),
+      limit(150)
+    );
+    
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setReports(data);

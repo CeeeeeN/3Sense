@@ -20,6 +20,8 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
+  limit
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
@@ -76,10 +78,18 @@ export default function ManageDocuments() {
   const [purposeFormError, setPurposeFormError] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
+    // BOUNDED QUERY: Cap the document types fetch to 100 items to prevent unbounded read growth
+    const docsQuery = query(
+      collection(db, "documents"),
+      orderBy("createdAt", "desc"), // Show newly added document types at the top
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(docsQuery, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setDocuments(data);
     });
+    
     return () => unsubscribe();
   }, []);
 
