@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 // Make sure to create this matching function in your services file!
 import { submitEquipmentRental } from "../../services/services"; 
@@ -61,9 +61,18 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
   const [rentalEquipment, setRentalEquipment] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "equipment"), snapshot => {
+    // BOUNDED QUERY: Cap the inventory fetch to prevent unbounded read spikes 
+    // when hundreds of residents open the tab simultaneously.
+    const q = query(
+      collection(db, "equipment"),
+      // We cap it at 100 items for now. If you have more than 100 equipment items, consider implementing pagination or a "Load More" button.
+      limit(100) 
+    );
+
+    const unsub = onSnapshot(q, snapshot => {
       setEquipmentList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+    
     return () => unsub();
   }, []);
 

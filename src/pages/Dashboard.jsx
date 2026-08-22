@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, getCountFromServer } from "firebase/firestore";
 import { subscribeToAnnouncements } from "../services/announcements";
 import FeedbackAlerts from "../components/Feedback/FeedbackAlerts";
 import {
@@ -290,16 +290,19 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         setRealUserName(firstName);
         setUserCategories(uCats);
 
-        const frSnap = await getDocs(query(collection(db, "facility_reservations"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)));
-        const drSnap = await getDocs(query(collection(db, "document_requests"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)));
-        const fbSnap = await getDocs(query(collection(db, "feedback"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)));
+        const [frCount, drCount, fbCount] = await Promise.all([
+          getCountFromServer(query(collection(db, "facility_reservations"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch))),
+          getCountFromServer(query(collection(db, "document_requests"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch))),
+          getCountFromServer(query(collection(db, "feedback"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch)))
+        ]);
 
         setWidgets([
-          { icon: <VerifiedVisitIcon />, color: "teal", value: frSnap.size.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
-          { icon: <DocumentIcon />, color: "amber", value: drSnap.size.toString(), label: "Document Requests", sub: "currently active", badge: "Updated", badgeIcon: <ClockIcon /> },
-          { icon: <FeedbackIcon />, color: "green", value: fbSnap.size.toString(), label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
+          { icon: <VerifiedVisitIcon />, color: "teal", value: frCount.data().count.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
+          { icon: <DocumentIcon />, color: "amber", value: drCount.data().count.toString(), label: "Document Requests", sub: "currently active", badge: "Updated", badgeIcon: <ClockIcon /> },
+          { icon: <FeedbackIcon />, color: "green", value: fbCount.data().count.toString(), label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
           { icon: <BarangayStatusIcon />, color: "purple", value: adminStatus, label: "Barangay Status", sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
         ]);
+        
       } catch (err) {
         console.error(err);
       } finally {

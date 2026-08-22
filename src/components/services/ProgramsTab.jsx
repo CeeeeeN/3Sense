@@ -8,6 +8,7 @@ import {
   query,
   where,
   serverTimestamp,
+  limit
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { createNotification } from "../../services/notifications";
@@ -141,10 +142,17 @@ export default function ProgramsTab({ userData, householdID, userName }) {
 
   // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "Programs"), (snapshot) => {
+    // BOUNDED QUERY: Cap the programs fetch to prevent downloading years of historical data
+    const q = query(
+      collection(db, "Programs"),
+      limit(100)
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
       setPrograms(
         snapshot.docs
           .map((d) => ({ id: d.id, ...d.data() }))
+          // Client-side filtering remains intact
           .filter((p) => p.programType !== "livelihood" && p.status !== "Completed")
       );
       setLoadingPrograms(false);
@@ -154,14 +162,22 @@ export default function ProgramsTab({ userData, householdID, userName }) {
 
   useEffect(() => {
     if (programs.length === 0) return;
-    const unsubs = programs.map((prog) =>
-      onSnapshot(collection(db, "Programs", prog.id, "attendees"), (snap) => {
+    
+    const unsubs = programs.map((prog) => {
+      // BOUNDED QUERY: Prevent the N+1 read multiplier from crashing the app
+      const attendeesQuery = query(
+        collection(db, "Programs", prog.id, "attendees"),
+        limit(300)
+      );
+
+      return onSnapshot(attendeesQuery, (snap) => {
         const approved = snap.docs.filter(
           (d) => (d.data().status || "").toLowerCase() === "approved"
         ).length;
         setProgramApprovedCounts((prev) => ({ ...prev, [prog.id]: approved }));
-      })
-    );
+      });
+    });
+    
     return () => unsubs.forEach((u) => u());
   }, [programs]);
 

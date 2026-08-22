@@ -3,7 +3,7 @@ import { BriefcaseIcon } from "../../Icons";
 import { db } from "../../../firebase/firebase";
 import {
   collection, onSnapshot, query, where,
-  addDoc, serverTimestamp, orderBy,
+  addDoc, serverTimestamp, orderBy, limit
 } from "firebase/firestore";
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
   // ── All registrations (to count approved slots per program) ──────
-  const [allRegs, setAllRegs] = useState([]);
+  const [programApprovedCounts, setProgramApprovedCounts] = useState({});
 
   // ── My registrations ─────────────────────────────────────────────
   const [myRegs, setMyRegs] = useState([]);
@@ -88,12 +88,13 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   }, [userData]);
 
   // ── Real-time: Livelihood Programs ONLY ─────────────────────────
-  // FIX: filter by programType === "livelihood" so general programs don't show here
   useEffect(() => {
+    // BOUNDED QUERY: Cap to the 50 most recent active livelihood programs
     const q = query(
       collection(db, "Programs"),
       where("programType", "==", "livelihood"),
-      orderBy("updatedAt", "desc")
+      orderBy("updatedAt", "desc"),
+      limit(50)
     );
     const unsub = onSnapshot(q, (snap) => {
       setPrograms(snap.docs.map(d => {
@@ -119,13 +120,29 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     return () => unsub();
   }, []);
 
-  // ── Real-time: ALL registrations (for approved slot count) ───────
+  // ── Real-time: Approved Slot Counts (Scoped & Bounded) ──────────
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "livelihoodRegistrations"), (snap) => {
-      setAllRegs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    if (programs.length === 0) return;
+    
+    const unsubs = programs.map((prog) => {
+      // BOUNDED QUERY: Only fetch registrations for THIS specific program, capped at 300.
+      // This stops the app from downloading the entire barangay's registration history!
+      const q = query(
+        collection(db, "livelihoodRegistrations"),
+        where("programId", "==", prog.id),
+        limit(300)
+      );
+
+      return onSnapshot(q, (snap) => {
+        const approved = snap.docs.filter(
+          (d) => (d.data().status || "").toLowerCase() === "approved"
+        ).length;
+        setProgramApprovedCounts((prev) => ({ ...prev, [prog.id]: approved }));
+      });
     });
-    return () => unsub();
-  }, []);
+
+    return () => unsubs.forEach((u) => u());
+  }, [programs]);
 
   // ── Real-time: MY registrations ──────────────────────────────────
   useEffect(() => {
@@ -149,9 +166,8 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   }, [householdID]);
 
   // ── Slot helpers ─────────────────────────────────────────────────
-  const getApprovedCount = (programId) =>
-    allRegs.filter(r => r.programId === programId && (r.status || "").toLowerCase() === "approved").length;
-
+  const getApprovedCount = (programId) => programApprovedCounts[programId] || 0;
+  
   const getSlotsLeft = (prog) => {
     if (!prog.slots) return null;
     return prog.slots - getApprovedCount(prog.id);

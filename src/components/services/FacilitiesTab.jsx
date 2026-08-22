@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, limit, where } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitFacilityReservation } from "../../services/services";
 import { createNotification } from "../../services/notifications";
@@ -97,7 +97,13 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
   const [reservationFacility, setReservationFacility] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "facilities"), snapshot => {
+    // BOUNDED QUERY: Cap the static facilities fetch
+    const q = query(
+      collection(db, "facilities"),
+      limit(50)
+    );
+
+    const unsub = onSnapshot(q, snapshot => {
       setFacilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
@@ -271,12 +277,22 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
   useEffect(() => {
     if (!facility) return;
-    const unsub = onSnapshot(collection(db, "facility_reservations"), (snapshot) => {
+    
+    // Only fetch reservations for the specific facility, 
+    // rather than the entire barangay's booking history
+    const q = query(
+      collection(db, "facility_reservations"),
+      where("facilityId", "==", String(facility.id))
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
       const approved = [];
       const allActive = [];
+      
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (String(data.facilityId) === String(facility.id) && data.date) {
+        
+        if (data.date) { 
           const stat = (data.status || "").toLowerCase();
           if (stat === "rejected") return;
           const entry = { id: doc.id, date: data.date, startTime: data.startTime, endTime: data.endTime, status: stat };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
@@ -389,7 +389,14 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
+    // BOUNDED QUERY: Cap the document types fetch. 
+    // A barangay will rarely have more than 20-30 document templates.
+    const q = query(
+      collection(db, "documents"),
+      limit(50) 
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       setDocTypes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
