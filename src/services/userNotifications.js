@@ -4,25 +4,11 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-/**
- * Create a personal notification for a specific resident.
- * Stores both householdID and residentID so the subscription query can
- * filter by both, preventing cross-household notification leakage
- * (e.g. all heads share residentID="head" across households).
- *
- * @param {string} householdID – The household's Firestore document ID
- * @param {string} residentID  – The resident's doc ID within that household
- *                               (use "household" for household-wide notifs like announcements)
- * @param {string} title       – Notification title
- * @param {string} message     – Notification message body
- * @param {string} type        – "document_update" | "facility_update" | "announcement" | "general"
- * @param {string} [refNum]    – Optional reference number / deep-link ID
- */
 export async function createUserNotification(householdID, residentID, title, message, type, refNum = "") {
   try {
     const ref = await addDoc(collection(db, "user_notifications"), {
-      householdID,  // for compound filtering — prevents cross-household leakage
-      residentID,   // the resident doc ID ("head", "member_xxx", or "household" for announcements)
+      householdID: (householdID || "").trim(),
+      residentID: (residentID || "").trim(),
       title,
       message,
       type,
@@ -43,35 +29,40 @@ export async function createUserNotification(householdID, residentID, title, mes
   }
 }
 
-/**
- * Subscribe to real-time notifications for a specific resident within a household.
- * Filters by BOTH householdID and residentID so residents with the same
- * doc name (e.g. "head") across different households stay isolated.
- *
- * @param {string}   householdID – The household's Firestore document ID
- * @param {string}   residentID  – The resident's doc ID (or "household" for announcements)
- * @param {function} callback    – Called with array of notification objects
- * @returns {function} unsubscribe function
- */
-export function subscribeToUserNotifications(householdID, residentID, callback) {
-  if (!householdID || !residentID) {
+export function subscribeToUserNotifications(householdID, residentID, userRole, callback) {
+  if (!householdID) {
     callback([]);
     return () => {};
   }
 
-  const q = query(
-    collection(db, "user_notifications"),
-    where("householdID", "==", householdID), // SECURE: isolates to this household
-    where("residentID",  "==", residentID),  // SECURE: isolates to this specific resident
-  );
+  const isHead =
+    userRole === "Household Head" ||
+    userRole === "head" ||
+    residentID === "head";
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const q = isHead
+    ? query(
+        collection(db, "user_notifications"),
+        where("householdID", "==", householdID.trim())
+      )
+    : query(
+        collection(db, "user_notifications"),
+        where("householdID", "==", householdID.trim()),
+        where("residentID", "in", [residentID.trim(), "household", "all"])
+      );
 
   return onSnapshot(q, (snapshot) => {
-    const notifications = snapshot.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-    }));
+    const notifications = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(item => {
+        if (!item.createdAt) return false;
+        const itemDate = item.createdAt.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
+        return itemDate >= thirtyDaysAgo;
+      });
 
-    // Sort newest-first in memory (avoids needing a composite Firestore index)
     notifications.sort((a, b) => {
       const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
       const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
@@ -85,10 +76,6 @@ export function subscribeToUserNotifications(householdID, residentID, callback) 
   });
 }
 
-/**
- * Mark a single notification as read.
- * @param {string} notifId – Firestore document ID
- */
 export async function markNotificationAsRead(notifId) {
   try {
     await updateDoc(doc(db, "user_notifications", notifId), { isRead: true });
@@ -97,10 +84,6 @@ export async function markNotificationAsRead(notifId) {
   }
 }
 
-/**
- * Mark all notifications for a resident as read.
- * @param {Array} notifications – Array of notification objects with id field
- */
 export async function markAllNotificationsAsRead(notifications) {
   try {
     const unread = notifications.filter(n => !n.isRead);
@@ -112,10 +95,6 @@ export async function markAllNotificationsAsRead(notifications) {
   }
 }
 
-/**
- * Delete a single notification.
- * @param {string} notifId – Firestore document ID
- */
 export async function deleteUserNotification(notifId) {
   try {
     await deleteDoc(doc(db, "user_notifications", notifId));
