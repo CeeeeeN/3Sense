@@ -1,26 +1,33 @@
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-// ─── Cloudinary Upload Helper ────────────────────────────────────────────────
+// Cloudinary Upload Helper (gracefully skips if given a remote URL or empty payload)
 const uploadToCloudinary = async (base64String, folder) => {
-    const cloudName = "dfnqeiksu"; 
-    const uploadPreset = "3Sense+_ID"; 
+    if (!base64String || base64String.startsWith("http://") || base64String.startsWith("https://")) {
+        return base64String || "";
+    }
+    try {
+        const cloudName = "dfnqeiksu"; 
+        const uploadPreset = "3Sense+_ID"; 
 
-    const formData = new FormData();
-    formData.append("file", base64String);
-    formData.append("upload_preset", uploadPreset);
-    formData.append("folder", folder);
+        const formData = new FormData();
+        formData.append("file", base64String);
+        formData.append("upload_preset", uploadPreset);
+        formData.append("folder", folder);
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: "POST",
-        body: formData,
-    });
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: "POST",
+            body: formData,
+        });
 
-    if (!res.ok) throw new Error("Failed to upload image to Cloudinary");
-    const data = await res.json();
-    return data.secure_url;
+        if (!res.ok) throw new Error("Failed to upload image to Cloudinary");
+        const data = await res.json();
+        return data.secure_url;
+    } catch (e) {
+        console.warn("Cloudinary upload fallback:", e.message);
+        return "";
+    }
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const createBranch = async (householdID, branchName) => {
     if (!householdID) throw new Error("Household ID is required.");
@@ -48,61 +55,70 @@ export const createBranch = async (householdID, branchName) => {
 export const addHouseholdMember = async (householdID, memberData) => {
     if (!householdID) throw new Error("Household ID is required.");
     
-    if (!memberData.idImage || !memberData.selfieImage) {
-        throw new Error("Selfie image and ID are REQUIRED before submission succeeds.");
+    // Selfie is required, but ID is completely OPTIONAL (matches mobile)
+    if (!memberData.selfieImage && !memberData.selfieImageUrl) {
+        throw new Error("Selfie image is REQUIRED before submission succeeds.");
     }
 
-    const hhSnap = await getDoc(doc(db, "households", householdID));
+    const cleanID = householdID.trim();
+    const hhSnap = await getDoc(doc(db, "households", cleanID));
     const hhUserID = hhSnap.data()?.userID || "";
 
-    const residentsRef = collection(db, "households", householdID, "residents");
+    const residentsRef = collection(db, "households", cleanID, "residents");
     const newMemberRef = doc(residentsRef);
-    const branchID = memberData.branchID || null;
+    const branchID = memberData.branchID || "BR-001";
     const residentID = newMemberRef.id;
 
     if (memberData.isBranchHead && branchID && branchID !== "BR-001") {
-        await updateDoc(doc(db, "households", householdID, "branches", branchID), {
+        await updateDoc(doc(db, "households", cleanID, "branches", branchID), {
             residentID: residentID,
         });
     }
 
-    // Upload Images to Cloudinary
-    const idImageUrl = await uploadToCloudinary(
-        memberData.idImage, 
-        `3Sense/residents/${residentID}`
-    );
+    // Upload images conditionally
+    let idImageUrl = "";
+    if (memberData.idImage || memberData.idImageUrl) {
+        idImageUrl = await uploadToCloudinary(
+            memberData.idImage || memberData.idImageUrl, 
+            `3Sense/residents/${residentID}`
+        );
+    }
     
     const selfieImageUrl = await uploadToCloudinary(
-        memberData.selfieImage, 
+        memberData.selfieImage || memberData.selfieImageUrl, 
         `3Sense/residents/${residentID}`
     );
 
+    const genderResolved = memberData.gender === "Others"
+        ? (memberData.genderOther || "Others")
+        : (memberData.gender || memberData.genderOrientation || "");
+
     const resident = {
         residentID: residentID,
-        householdID,
-        role: memberData.isBranchHead && branchID && branchID !== "BR-001" ? "Branch Head" : "Member",
+        householdID: cleanID,
+        role: memberData.isBranchHead && branchID !== "BR-001" ? "Branch Head" : (memberData.role || "Member"),
         userID: hhUserID,
+        idNumber: memberData.idNumber || "",
 
         firstName: memberData.firstName || "",
         middleName: memberData.middleName || "",
         lastName: memberData.lastName || "",
-        suffix: memberData.suffix || "",
+        suffix: memberData.suffix === "None" ? "" : (memberData.suffix || ""),
 
         birthDate: memberData.birthDate || "",
         age: memberData.age ? Number(memberData.age) : null,
         birthPlace: memberData.birthPlace || "",
         sex: memberData.sex || "",
-        genderOrientation: memberData.gender === "Others"
-            ? (memberData.genderOther || "Others")
-            : (memberData.gender || ""),
+        gender: genderResolved,
+        genderOrientation: genderResolved,
         civilStatus: memberData.civilStatus || "",
         religion: memberData.religion || "",
-        citizenship: memberData.citizenship || "",
+        citizenship: memberData.citizenship || "Filipino",
         residingSinceYear: memberData.residingSinceYear ? Number(memberData.residingSinceYear) : null,
         contactNumber: memberData.contactNumber
             ? Number(String(memberData.contactNumber).replace(/\D/g, ""))
             : null,
-        email: memberData.email || "",
+        email: (memberData.email || "").trim().toLowerCase(),
 
         categories: Array.isArray(memberData.categories)
             ? memberData.categories
@@ -113,6 +129,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
         disabilityType: memberData.disabilityType === "Others"
             ? (memberData.disabilityTypeOther || "Others")
             : (memberData.disabilityType || ""),
+        disabilityTypeOther: memberData.disabilityTypeOther || "",
 
         educationAttainment: memberData.educationAttainment || "",
         educationStatus: memberData.educationStatus || "",
@@ -122,9 +139,10 @@ export const addHouseholdMember = async (householdID, memberData) => {
         sameAddress: memberData.sameAddress !== undefined ? !!memberData.sameAddress : true,
         branchID,
 
-        // Meta & New Cloudinary Images (SENSE-52)
-        idImageUrl,
-        selfieImageUrl,
+        idImageUrl: idImageUrl || "",
+        selfieImageUrl: selfieImageUrl || "",
+        idImage: idImageUrl || "",
+        selfieImage: selfieImageUrl || "",
         pinHash: null,
         createdAt: serverTimestamp(),
         addedAt: serverTimestamp(),
@@ -134,10 +152,10 @@ export const addHouseholdMember = async (householdID, memberData) => {
     if (!memberData.sameAddress) {
         resident.houseNumber = memberData.houseNumber || "";
         resident.street = memberData.street || "";
-        resident.barangay = memberData.barangay || "";
-        resident.city = memberData.city || "";
+        resident.barangay = memberData.barangay || "Malanday";
+        resident.city = memberData.city || "Valenzuela City";
         resident.province = memberData.province || "";
-        resident.region = memberData.region || "";
+        resident.region = memberData.region || "NCR";
     }
 
     await setDoc(newMemberRef, resident);
