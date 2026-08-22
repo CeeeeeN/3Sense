@@ -16,6 +16,7 @@ export const generateHouseholdID = async () => {
 
   snapshot.forEach(doc => {
     const parts = doc.id.split('-');
+    // Support both MAL and legacy HH numbering parsing
     if (parts.length === 3 && parts[1] === currentYear) {
       const num = parseInt(parts[2], 10);
       if (!isNaN(num) && num > maxCount) {
@@ -33,71 +34,80 @@ export const approveRegistration = async (docID) => {
   const pendingRef = doc(db, "pending_registrations", docID);
   const snapshot = await getDoc(pendingRef);
 
-  // Idempotency guard: bail out if the record was already processed
   if (!snapshot.exists()) {
     throw new Error("Registration not found or already processed.");
   }
 
   const data = snapshot.data();
 
-  // Extra guard: if the record was somehow already marked approved, stop here
   if (data.status === "approved") {
     throw new Error("This registration has already been approved.");
   }
+
   const householdID = await generateHouseholdID();
   const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
+  const genderResolved = data.gender === "Others" 
+    ? (data.genderOther || "Others") 
+    : (data.gender || data.genderOrientation || "");
 
   const householdRef = doc(db, "households", householdID);
   await setDoc(householdRef, {
     householdID,
-    email: data.email || "",
+    email: (data.email || "").trim().toLowerCase(),
 
     houseNumber: data.houseNumber || "",
     street: data.street || "",
-    barangay: data.barangay || "",
-    city: data.city || "",
+    barangay: data.barangay || "Malanday",
+    city: data.city || "Valenzuela City",
     province: data.province || "",
-    region: data.region || "",
-    totalMembers: data.totalMembers ?? null,
+    region: data.region || "NCR",
+    totalMembers: data.totalMembers ? Number(data.totalMembers) : 1,
     householdClassification: data.householdClassification || "",
     createdAt: serverTimestamp(),
     activated: false,
     activatedAt: null,
 
     _pendingHeadData: {
+      idNumber: data.idNumber || "",
       firstName: data.firstName || "",
       middleName: data.middleName || "",
       lastName: data.lastName || "",
-      suffix: data.suffix || "",
+      suffix: data.suffix === "None" ? "" : data.suffix || "",
       birthDate: data.birthDate || "",
       age: data.age ?? null,
       birthPlace: data.birthPlace || "",
       sex: data.sex || "",
-      genderOrientation: data.genderOrientation || "",
+      gender: genderResolved,
+      genderOrientation: genderResolved,
       civilStatus: data.civilStatus || "",
       religion: data.religion || "",
-      citizenship: data.citizenship || "",
+      citizenship: data.citizenship || "Filipino",
       contactNumber: data.contactNumber ?? null,
-      email: data.email || "",
+      email: (data.email || "").trim().toLowerCase(),
       residingSinceYear: data.residingSinceYear ? Number(data.residingSinceYear) : null,
-      categories: data.categories || [],
+      categories: Array.isArray(data.categories) ? data.categories : (data.category ? [data.category] : []),
       pwdStatus: data.pwdStatus || "",
       disabilityType: data.disabilityType || "",
+      disabilityTypeOther: data.disabilityTypeOther || "",
       educationAttainment: data.educationAttainment || "",
       educationStatus: data.educationStatus || "",
       occupation: data.occupation || "",
       employmentStatus: data.employmentStatus || "",
       
-      // SENSE-52: Cascade image URLs to the household record
-      idImageUrl: data.idImageUrl || "",
-      selfieImageUrl: data.selfieImageUrl || "",
+      idImageUrl: data.idImageUrl || data.idImage || "",
+      selfieImageUrl: data.selfieImageUrl || data.selfieImage || "",
+      idImage: data.idImage || data.idImageUrl || "",
+      selfieImage: data.selfieImage || data.selfieImageUrl || "",
     },
   });
 
-  // Email is fire-and-forget — a failure must NOT block the approval
-  sendApprovalEmail(householdID, fullName, data.email).catch(err =>
-    console.warn("Approval email failed (non-blocking):", err)
-  );
+  // Non-blocking email trigger
+  if (data.email) {
+    sendApprovalEmail(householdID, fullName, data.email.trim().toLowerCase()).catch(err =>
+      console.warn("Approval email failed (non-blocking):", err)
+    );
+  }
+
   await deleteDoc(pendingRef);
 
   return { householdID, registrationID: docID, email: data.email, name: fullName };
@@ -123,12 +133,11 @@ const sendApprovalEmail = async (householdID, name, toEmail) => {
       try {
         const errBody = await response.json();
         errMsg = errBody.message || errMsg;
-      } catch (_) { /* empty or non-JSON body — ignore */ }
-      throw new Error(`Failed to send email: ${errMsg}`);
+      } catch (_) {}
+      console.warn(`Approval email note: ${errMsg}`);
     }
   } catch (error) {
-    console.error("Email sending error:", error);
-    throw error;
+    console.warn("Email endpoint skipped or unavailable:", error.message);
   }
 };
 
@@ -166,10 +175,10 @@ const buildApprovalEmail = (householdID, name) => `
               </div>
               <p style="margin:0 0 8px;color:#4a5e5a;font-size:14px;font-weight:600;">Next Steps:</p>
               <ol style="margin:0 0 24px;padding-left:20px;color:#4a5e5a;font-size:14px;line-height:2.2;">
-                <li>Go to the 3S Sense portal and click <strong>Activate Account</strong>.</li>
-                <li>Enter your Household ID above and create a secure password.</li>
+                <li>Go to the 3S Sense Mobile App or Web Portal and click <strong>Activate Account</strong>.</li>
+                <li>Enter your Household ID (<strong>${householdID}</strong>) and create your password.</li>
                 <li>After activation, add your household members.</li>
-                <li>Everyone in your household logs in using the <strong>same Household ID and password</strong>, then selects their own profile.</li>
+                <li>Everyone in your household logs in using the <strong>same Household ID and password</strong>, then selects their profile.</li>
               </ol>
               <p style="margin:0;color:#4a5e5a;font-size:13px;background:#fffbea;border-left:4px solid #e8a020;padding:12px 16px;border-radius:0 6px 6px 0;line-height:1.6;">
                 ⚠️ Keep your Household ID private. Do not share it with anyone outside your household.
