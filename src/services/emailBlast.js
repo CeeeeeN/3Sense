@@ -104,7 +104,7 @@ export async function sendEmailBlast({
 }) {
   const from =
     (typeof process !== "undefined" && process.env?.RESEND_FROM_EMAIL) ||
-    "3Sense Barangay <noreply@resend.dev>";
+    "Barangay 3S+ Malanday <noreply@3s-sense.site>";
 
   const response = await fetch("/api/email-blast", {
     method: "POST",
