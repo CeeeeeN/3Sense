@@ -790,6 +790,7 @@ export default function Registration({ onBack }) {
   const total = STEPS.length;
   const progress = submitted ? 100 : (step / (total - 1)) * 100;
   const isPwd = form.categories.includes("PWD");
+  const showEmail = form.age === "" || Number(form.age) >= 15; 
 
   const applyOcr = useCallback((data) => {
     const mapping = {
@@ -852,8 +853,10 @@ export default function Registration({ onBack }) {
       if (!form.residingSinceYear) missing.push("Residing Since Year");
       if (!form.contactNumber.trim()) missing.push("Contact Number");
       else if (form.contactNumber.length < 10) missing.push("Valid Contact Number");
+      if (showEmail) {
       if (!form.email.trim()) missing.push("Email Address");
       else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+     }
     }
     if (step === 3) {
       if (!form.houseNumber.trim()) missing.push("House / Unit Number");
@@ -1117,10 +1120,19 @@ export default function Registration({ onBack }) {
                       <Field label="Citizenship" required><InputField icon={IconFlag} type="text" placeholder="Filipino" value={form.citizenship} onChange={set("citizenship")} /></Field>
                       <Field label="Residing Since (Year)" required><InputField icon={RegisIconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                     </div>
-                    <div className="reg-form-grid cols-2">
+                    <div className={`reg-form-grid ${showEmail ? "cols-2" : "cols-1"}`}>
                       <Field label="Contact Number" required><InputField icon={RegisIconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
-                      <Field label="Email Address" required hint="We'll send your approval notification here."><InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} /></Field>
+                      {showEmail && (
+                        <Field label="Email Address" required hint="We'll send your approval notification here.">
+                          <InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} />
+                        </Field>
+                      )}
                     </div>
+                    {!showEmail && (
+                      <p style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "-0.6rem" }}>
+                        Email is not required for residents under 15 years old.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1317,7 +1329,7 @@ export default function Registration({ onBack }) {
                     <ReviewField label="Citizenship" value={rv(form.citizenship)} />
                     <ReviewField label="Residing Since" value={rv(form.residingSinceYear)} />
                     <ReviewField label="Contact Number" value={rv(form.contactNumber)} />
-                    <ReviewField label="Email Address" value={rv(form.email)} full />
+                    {showEmail && <ReviewField label="Email Address" value={rv(form.email)} full />}
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgMapPin size={18} />} title="Address">
