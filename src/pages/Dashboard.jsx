@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc, getCountFromServer } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, getCountFromServer } from "firebase/firestore";
 import { subscribeToAnnouncements } from "../services/announcements";
 import FeedbackAlerts from "../components/Feedback/FeedbackAlerts";
 import {
@@ -241,6 +241,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   }, [pendingAnnID, announcementsData]);
 
   useEffect(() => {
+    let unsubResident = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) { setDataLoading(false); return; }
       try {
@@ -251,10 +253,6 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         const hhDoc = hhSnap.docs[0];
         const householdID = hhDoc.id;
 
-        let firstName = userName;
-        let adminStatus = "Clear";
-        let uCats = [];
-
         const residentIdToFetch = memberID;
         if (!residentIdToFetch) {
           console.warn("[Dashboard] No memberID provided, skipping category fetch.");
@@ -263,32 +261,38 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         }
 
         const headRef = doc(db, "households", householdID, "residents", residentIdToFetch);
-        const headSnap = await getDoc(headRef);
-        console.log("[Dashboard] residentIdToFetch", residentIdToFetch, "exists", headSnap.exists());
-        if (headSnap.exists()) {
-          const d = headSnap.data();
-          firstName = d.firstName || userName;
-          adminStatus = d.adminStatus || "Clear";
-          // categories may be an array or a comma‑separated string
-          let rawCats = d.categories || d.category;
-          console.log("[Dashboard] rawCats raw", rawCats);
-          let normalizedCategories = [];
-          if (Array.isArray(rawCats)) {
-            normalizedCategories = rawCats;
-          } else if (typeof rawCats === "string") {
-            normalizedCategories = rawCats.split(",").map(c => c.trim());
-          }
-          // Strip emojis and special chars
-          uCats = normalizedCategories.map(c => {
-            let cln = typeof c === "string" ? c.replace(/[^\w\s-]/gi, '').trim() : String(c).trim();
-            if (cln === "Indigenous") cln = "Indigenous People";
-            return cln;
-          });
-          console.log("[Dashboard] parsed uCats", uCats);
-        }
+        if (unsubResident) unsubResident();
+        unsubResident = onSnapshot(headRef, (headSnap) => {
+          let firstName = userName;
+          let adminStatus = "Clear";
+          let uCats = [];
 
-        setRealUserName(firstName);
-        setUserCategories(uCats);
+          if (headSnap.exists()) {
+            const d = headSnap.data();
+            firstName = d.firstName || userName;
+            adminStatus = d.adminStatus || "Clear";
+            let rawCats = d.categories || d.category;
+            let normalizedCategories = [];
+            if (Array.isArray(rawCats)) {
+              normalizedCategories = rawCats;
+            } else if (typeof rawCats === "string") {
+              normalizedCategories = rawCats.split(",").map(c => c.trim());
+            }
+            uCats = normalizedCategories
+              .map(c => (typeof c === "string" ? c.trim() : String(c).trim()))
+              .filter(Boolean);
+          }
+
+          setRealUserName(firstName);
+          setUserCategories(uCats);
+
+          setWidgets([
+            { icon: <VerifiedVisitIcon />, color: "teal", value: "...", label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
+            { icon: <DocumentIcon />, color: "amber", value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
+            { icon: <FeedbackIcon />, color: "green", value: "...", label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
+            { icon: <BarangayStatusIcon />, color: "purple", value: adminStatus, label: "Barangay Status", sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
+          ]);
+        });
 
         const [frCount, drCount, fbCount] = await Promise.all([
           getCountFromServer(query(collection(db, "facility_reservations"), where("householdID", "==", householdID), where("residentID", "==", residentIdToFetch))),
@@ -300,7 +304,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           { icon: <VerifiedVisitIcon />, color: "teal", value: frCount.data().count.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
           { icon: <DocumentIcon />, color: "amber", value: drCount.data().count.toString(), label: "Document Requests", sub: "currently active", badge: "Updated", badgeIcon: <ClockIcon /> },
           { icon: <FeedbackIcon />, color: "green", value: fbCount.data().count.toString(), label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
-          { icon: <BarangayStatusIcon />, color: "purple", value: adminStatus, label: "Barangay Status", sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
+          { icon: <BarangayStatusIcon />, color: "purple", value: "...", label: "Barangay Status", sub: "current standing", badge: "Active", badgeIcon: <TrendUpIcon /> },
         ]);
         
       } catch (err) {
@@ -309,8 +313,11 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         setDataLoading(false);
       }
     });
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribe();
+      if (unsubResident) unsubResident();
+    };
+  }, [memberID]);
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -356,7 +363,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   const processedAnns = mapAnnouncements(announcementsData);
   // Already ordered newest-first by Firestore (orderBy createdAt desc)
   const smartAlertsList = processedAnns.filter(a => a.isSmartAlert);
-  const generalAnnsList = processedAnns.filter(a => !a.isSmartAlert);
+  const generalAnnsList = processedAnns.filter(a => {
+    const cat = (a.category || "").trim().toLowerCase();
+    return cat === "all residents" || cat === "";
+  });
   const combinedAnns = [...smartAlertsList, ...generalAnnsList];
 
   // Pagination derived values
