@@ -234,6 +234,10 @@ const SvgHashtag = ({ size = 17 }) => (
 
 // ─── Family Branch Step (with inline Create Branch modal) ────────────────────
 function AmFamilyBranchStep({ onConfirm, householdID }) {
+  const branchDisplayID = (branchID) => {
+    const num = parseInt((branchID || "").replace("BR-", ""), 10);
+    return isNaN(num) ? branchID : `${householdID}-${num}`;
+  };
   const [branches, setBranches] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -323,7 +327,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
                   <span style={{
                     fontSize: "0.68rem", color: "var(--muted)",
                     fontFamily: "'JetBrains Mono', monospace"
-                  }}>{branch.id}</span>
+                  }}>{branchDisplayID(branch.id)}</span>
                 </div>
               </label>
             );
@@ -1010,7 +1014,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                   <div key={branch} className="am-branch-group">
                     <div className="am-branch-group-header">
                       <span className="am-branch-group-icon"><SvgBranch size={14} /></span>
-                      <span className="am-branch-group-title">{branch}</span>
+                      <span className="am-branch-group-title">{branchMembers[0]?.branchDisplayName || branch}</span>
                       <span className="am-branch-group-count">{branchMembers.length} {branchMembers.length === 1 ? "member" : "members"}</span>
                     </div>
                     <div className="am-branch-group-body">
@@ -1267,7 +1271,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                           background: "rgba(13,122,85,0.07)", border: "1px solid rgba(13,122,85,0.18)",
                           fontSize: "0.82rem", color: "#0d7a55", fontFamily: "'Poppins',sans-serif"
                         }}>
-                          ⭐ <strong>Original Branch</strong> — The branch head of BR-001 is permanently the registered household head.
+                          ⭐ <strong>Original Branch</strong> — The branch head of the original branch is permanently the registered household head.
                         </div>
                       </div>
                     ) : needsHead ? (
