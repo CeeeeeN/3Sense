@@ -716,7 +716,7 @@ nav {
 /* ===================================================== */
 .as-container {
   @apply bg-slate-50 min-h-screen p-6;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: Poppins, sans-serif;
 }
 
 /* Header */
