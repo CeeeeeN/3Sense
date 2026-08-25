@@ -580,7 +580,7 @@ nav {
 /* ===================================================== */
 .af-container {
   @apply bg-slate-50 min-h-screen p-6;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Poppins', sans-serif;
 }
 
 /* Header */
@@ -716,7 +716,7 @@ nav {
 /* ===================================================== */
 .as-container {
   @apply bg-slate-50 min-h-screen p-6;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Poppins', sans-serif;
 }
 
 /* Header */
@@ -1049,7 +1049,7 @@ nav {
    ========================================= */
 .requests-container {
   @apply bg-gray-50 min-h-[calc(100vh_-_64px)] w-full box-border p-8 w-full;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+  font-family: 'Poppins', BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
 }
 .requests-header {
