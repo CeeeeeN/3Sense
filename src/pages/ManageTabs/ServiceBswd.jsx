@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, doc, updateDoc,
@@ -28,7 +28,6 @@ const StatusBadge = ({ status }) => {
   return <span style={style}>{status || "pending"}</span>;
 };
 
-// ── Pagination Component ──────────────────────────────────────────────────────
 const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
     <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
@@ -60,29 +59,19 @@ export default function ServiceBswd({ onBack }) {
   const [reports, setReports]         = useState([]);
   const [loadingReports, setLoadingReports] = useState(true);
   
-  // ── Pagination State ──────────────────────────────────────────────
+  // ── Pagination & Filter State ─────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, loc_asc
   
-  // Reset pagination when tab switches
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab]);
+  }, [activeTab, filterStatus, sortOrder]);
 
   // ── Modal State ──────────────────────────────────────────────────
   const [selectedItem, setSelectedItem] = useState(null);
 
-  // We treat "homeless_report" type as Displacement Reports and
-  // "community_tip" / all others without a specific type as Community Tips.
-  const displacementReports = reports.filter(r => (r.type || "") === "homeless_report");
-  const communityTips       = reports.filter(r => (r.type || "") !== "homeless_report");
-
-  // ── Pagination Calculation ────────────────────────────────────────
-  const currentData = activeTab === "reports" ? displacementReports : communityTips;
-  const totalPages = Math.ceil(currentData.length / itemsPerPage);
-  const paginatedData = currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  // ── Saving state ─────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
 
   // For logging purposes
@@ -91,7 +80,6 @@ export default function ServiceBswd({ onBack }) {
 
   // ── Real-time listener ───────────────────────────────────────────
   useEffect(() => {
-    // BOUNDED QUERY: Cap fetches to the 150 most recent reports
     const q = query(
       collection(db, "bswdReports"), 
       orderBy("submittedAt", "desc"),
@@ -99,7 +87,15 @@ export default function ServiceBswd({ onBack }) {
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = snap.docs.map(d => {
+        const docData = d.data();
+        const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
+        return {
+          id: d.id,
+          rawDate,
+          ...docData
+        };
+      });
       setReports(data);
       setLoadingReports(false);
     }, (err) => {
@@ -110,26 +106,24 @@ export default function ServiceBswd({ onBack }) {
   }, []);
 
   useEffect(() => {
-        // Listen for the currently logged-in user
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            // Find their document in the approvedAdmins collection
-            const q = query(
-              collection(db, "approvedAdmins"),
-              where("uid", "==", user.uid),
-            );
-            const snapshot = await getDocs(q);
-    
-            if (!snapshot.empty) {
-              const data = snapshot.docs[0].data();
-              setAdminName(data.fullName || "Admin");
-              setAdminRole(data.role || "Standard Admin");
-            }
-          }
-        });
-    
-        return () => unsubscribe();
-      }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid),
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // ── Update status ────────────────────────────────────────────────
   const updateStatus = async (id, newStatus) => {
@@ -145,7 +139,7 @@ export default function ServiceBswd({ onBack }) {
         adminRole,
         "UPDATED_BSWD_REPORT_STATUS",
         `Updated status of ${reports.find(r => r.id === id)?.type || "report"} ID ${id} to ${newStatus}`,
-       );
+      );
 
       if (newStatus === "responded" || newStatus === "resolved") {
         const p = reports.find(r => r.id === id);
@@ -164,7 +158,6 @@ export default function ServiceBswd({ onBack }) {
         }
       }
 
-      // Update local selected item status if modal is open
       if (selectedItem && selectedItem.id === id) {
         setSelectedItem(prev => ({ ...prev, status: newStatus }));
       }
@@ -175,12 +168,49 @@ export default function ServiceBswd({ onBack }) {
         adminRole,
         "ERROR_UPDATING_BSWD_REPORT_STATUS",
         `Error updating status of report ID ${id} to ${newStatus} - ${err.message}`,
-       );
+      );
     }
     setSaving(false);
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────
+  const displacementReports = useMemo(() => reports.filter(r => (r.type || "") === "homeless_report"), [reports]);
+  const communityTips       = useMemo(() => reports.filter(r => (r.type || "") !== "homeless_report"), [reports]);
+
+  // ── Filtered & Sorted Tab Data ────────────────────────────────────
+  const currentData = useMemo(() => {
+    const rawList = activeTab === "reports" ? displacementReports : communityTips;
+    return rawList
+      .filter(item => {
+        const s = (item.status || "pending").toLowerCase();
+        if (filterStatus === "All") return true;
+        if (filterStatus === "resolved") return s.includes("resolved") || s.includes("handled");
+        return s === filterStatus.toLowerCase();
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") {
+          const nameA = a.reporterName || a.contact || "Anonymous";
+          const nameB = b.reporterName || b.contact || "Anonymous";
+          return nameA.localeCompare(nameB);
+        }
+        if (sortOrder === "name_desc") {
+          const nameA = a.reporterName || a.contact || "Anonymous";
+          const nameB = b.reporterName || b.contact || "Anonymous";
+          return nameB.localeCompare(nameA);
+        }
+        if (sortOrder === "loc_asc") {
+          const locA = a.location || a.about || "";
+          const locB = b.location || b.about || "";
+          return locA.localeCompare(locB);
+        }
+        return 0;
+      });
+  }, [activeTab, displacementReports, communityTips, filterStatus, sortOrder]);
+
+  const totalPages = Math.ceil(currentData.length / itemsPerPage);
+  const paginatedData = currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const reportsStats = {
     total:    displacementReports.length,
     pending:  displacementReports.filter(r => (r.status || "").toLowerCase() === "pending" || (r.status || "").toLowerCase() === "received").length,
@@ -214,7 +244,7 @@ export default function ServiceBswd({ onBack }) {
         ].map(tab => (
           <button key={tab.key}
             style={{ padding: "8px 16px", background: activeTab === tab.key ? "#111827" : "transparent", color: activeTab === tab.key ? "#fff" : "#6b7280", borderRadius: "6px", border: "none", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); setFilterStatus("All"); }}
           >
             {tab.label}
           </button>
@@ -252,6 +282,33 @@ export default function ServiceBswd({ onBack }) {
         </div>
       )}
 
+      {/* FILTER & SORT TOOLBAR */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "16px" }}>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+        >
+          <option value="All">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="received">Received</option>
+          <option value="responded">Responded</option>
+          <option value="resolved">Resolved / Handled</option>
+        </select>
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+        >
+          <option value="date_desc">Date: Newest First</option>
+          <option value="date_asc">Date: Oldest First</option>
+          <option value="name_asc">Reporter: A to Z</option>
+          <option value="name_desc">Reporter: Z to A</option>
+          <option value="loc_asc">{activeTab === "reports" ? "Location: A to Z" : "Subject: A to Z"}</option>
+        </select>
+      </div>
+
       {loadingReports ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>Loading…</div>
       ) : activeTab === "reports" ? (
@@ -267,8 +324,8 @@ export default function ServiceBswd({ onBack }) {
               </tr>
             </thead>
             <tbody>
-              {displacementReports.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No displacement reports yet.</td></tr>
+              {currentData.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No displacement reports match your criteria.</td></tr>
               )}
               {paginatedData.map(r => {
                 const hasPhoto = r.photoFileName && r.photoFileName !== "None" && r.photoFileName !== "";
@@ -278,10 +335,7 @@ export default function ServiceBswd({ onBack }) {
                     <td style={{ padding: "14px 16px", fontWeight: 500 }}>{r.reporterName || "Anonymous"}</td>
                     <td style={{ padding: "14px 16px", color: "#111827", maxWidth: "150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.location || "—"}</td>
                     <td style={{ padding: "14px 16px", color: "#4b5563", maxWidth: "220px" }}>
-                      {/* Truncated description for clean table */}
                       <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.description || "—"}</div>
-                      
-                      {/* Clean Photo Badge instead of URL */}
                       {hasPhoto && (
                         <span style={{ fontSize: "0.75rem", color: "#317D89", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px", marginTop: "6px", display: "inline-block", fontWeight: 500 }}>
                           📸 Photo Attached
@@ -302,7 +356,7 @@ export default function ServiceBswd({ onBack }) {
               })}
             </tbody>
           </table>
-          {displacementReports.length > 0 && (
+          {currentData.length > 0 && (
             <PaginationControls 
               currentPage={currentPage} 
               totalPages={totalPages} 
@@ -324,8 +378,8 @@ export default function ServiceBswd({ onBack }) {
               </tr>
             </thead>
             <tbody>
-              {communityTips.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No community tips yet.</td></tr>
+              {currentData.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No community tips match your criteria.</td></tr>
               )}
               {paginatedData.map(t => (
                 <tr key={t.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
@@ -348,7 +402,7 @@ export default function ServiceBswd({ onBack }) {
               ))}
             </tbody>
           </table>
-          {communityTips.length > 0 && (
+          {currentData.length > 0 && (
             <PaginationControls 
               currentPage={currentPage} 
               totalPages={totalPages} 
@@ -366,9 +420,8 @@ export default function ServiceBswd({ onBack }) {
         >
           <div 
             style={{ background: "#fff", padding: "0", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }} 
-            onClick={e => e.stopPropagation()} // Prevent clicks inside modal from closing it
+            onClick={e => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
               <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>
                 {selectedItem.type === "tip" ? "Community Tip Details" : "Displacement Report Details"}
@@ -379,9 +432,7 @@ export default function ServiceBswd({ onBack }) {
               >&times;</button>
             </div>
 
-            {/* Modal Body (Scrollable) */}
             <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
-              
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
                 <div>
                   <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Reported By</div>
@@ -411,7 +462,6 @@ export default function ServiceBswd({ onBack }) {
                 </p>
               </div>
 
-              {/* Conditionally Render Photo if it's a valid URL */}
               {selectedItem.photoFileName && selectedItem.photoFileName.startsWith('http') && (
                 <div>
                   <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "12px" }}>
@@ -428,7 +478,6 @@ export default function ServiceBswd({ onBack }) {
               )}
             </div>
 
-            {/* Modal Footer / Actions */}
             <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>Update Status:</span>

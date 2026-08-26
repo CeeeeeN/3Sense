@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, query, where, getDocs, addDoc, deleteDoc, orderBy, limit
@@ -36,7 +36,6 @@ const formatTime = (ts) => {
   return d.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
 };
 
-// ── Pagination Component ──────────────────────────────────────────────────────
 const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
     <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
@@ -62,38 +61,37 @@ const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
 );
 
 export default function ServicePeaceOrder({ onBack }) {
-  const [reports, setReports]         = useState([]);
-  const [loading, setLoading]         = useState(true);
+  const [reports, setReports]               = useState([]);
+  const [loading, setLoading]               = useState(true);
   const [selectedReport, setSelectedReport] = useState(null);
   const [assignedTanod, setAssignedTanod]   = useState("Unassigned");
-  const [saving, setSaving]           = useState(false);
+  const [saving, setSaving]                 = useState(false);
 
   // ── Tanod Groups State ────────────────────────────────────────────
-  const [tanodGroups, setTanodGroups] = useState([]);
+  const [tanodGroups, setTanodGroups]       = useState([]);
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupName, setNewGroupName]     = useState("");
   const [newMemberInputs, setNewMemberInputs] = useState({});
 
   // ── Pagination & Filter State ─────────────────────────────────────
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 7; 
+  const [currentPage, setCurrentPage]       = useState(1);
+  const itemsPerPage                        = 7; 
   
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [filterUrgency, setFilterUrgency] = useState("All");
-  const [filterType, setFilterType] = useState("All");
+  const [filterStatus, setFilterStatus]     = useState("All");
+  const [filterUrgency, setFilterUrgency]   = useState("All");
+  const [filterType, setFilterType]         = useState("All");
+  const [sortOrder, setSortOrder]           = useState("date_desc"); // date_desc, date_asc, type_asc, type_desc, status_asc
 
   // For logging purposes
-  const [adminName, setAdminName] = useState("");
-  const [adminRole, setAdminRole] = useState("");
+  const [adminName, setAdminName]           = useState("");
+  const [adminRole, setAdminRole]           = useState("");
 
-  // ── Reset to page 1 whenever a filter changes ─────────────────────
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus, filterUrgency, filterType]);
+  }, [filterStatus, filterUrgency, filterType, sortOrder]);
 
   // ── Real-time listener for Reports ────────────────────────────────
   useEffect(() => {
-    // BOUNDED QUERY: Force Firestore to sort and limit the payload before sending it
     const reportsQuery = query(
       collection(db, "incidentReports"),
       orderBy("submittedAt", "desc"),
@@ -101,20 +99,25 @@ export default function ServicePeaceOrder({ onBack }) {
     );
 
     const unsub = onSnapshot(reportsQuery, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = snap.docs.map(d => {
+        const docData = d.data();
+        const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
+        return {
+          id: d.id,
+          rawDate,
+          ...docData
+        };
+      });
       
       setReports(data);
       setLoading(false);
       
-      // Keep selected report in sync if another admin updates it
       setSelectedReport(prev => prev ? (data.find(r => r.id === prev.id) || prev) : null);
     });
     return () => unsub();
   }, []);
 
-  // ── Real-time listener for Tanod Groups ───────────────────────────
   useEffect(() => {
-    // BOUNDED QUERY: Cap groups to prevent unexpected unbounded reads
     const q = query(
       collection(db, "tanodGroups"), 
       orderBy("createdAt", "asc"),
@@ -126,7 +129,6 @@ export default function ServicePeaceOrder({ onBack }) {
     return () => unsub();
   }, []);
 
-  // ── Get Current Admin Info ────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -144,12 +146,10 @@ export default function ServicePeaceOrder({ onBack }) {
     return () => unsubscribe();
   }, []);
 
-  // Sync tanod select when a new report is selected
   useEffect(() => {
     if (selectedReport) setAssignedTanod(selectedReport.tanod || "Unassigned");
   }, [selectedReport?.id]);
 
-  // ── Manage Tanod Groups Functions ─────────────────────────────────
   const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!newGroupName.trim()) return;
@@ -198,7 +198,6 @@ export default function ServicePeaceOrder({ onBack }) {
     }
   };
 
-  // ── Update status + append to updates array ─────────────────────
   const updateStatus = async (newStatus) => {
     if (!selectedReport) return;
     setSaving(true);
@@ -212,12 +211,12 @@ export default function ServicePeaceOrder({ onBack }) {
         updatedAt: serverTimestamp(),
       });
 
-        logTransaction(
-          adminName,
-          adminRole,
-          "UPDATED_REPORT_STATUS",
-          `Updated report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} and assigned tanod ${assignedTanod}`,
-        );
+      logTransaction(
+        adminName,
+        adminRole,
+        "UPDATED_REPORT_STATUS",
+        `Updated report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} and assigned tanod ${assignedTanod}`,
+      );
 
       const residentID = selectedReport.residentID || selectedReport.userID;
       const hhID       = selectedReport.householdID;
@@ -233,17 +232,16 @@ export default function ServicePeaceOrder({ onBack }) {
       }
     } catch (err) {
       console.error("Error updating status:", err);
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_UPDATING_REPORT_STATUS",
-          `Error updating report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} - ${err.message}`,
-         );
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_UPDATING_REPORT_STATUS",
+        `Error updating report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} - ${err.message}`,
+      );
     }
     setSaving(false);
   };
 
-  // ── Save tanod assignment separately ───────────────────────────
   const saveTanod = async (tanodName) => {
     if (!selectedReport) return;
     setAssignedTanod(tanodName);
@@ -252,42 +250,50 @@ export default function ServicePeaceOrder({ onBack }) {
         tanod: tanodName,
         updatedAt: serverTimestamp(),
       });
-        logTransaction(
-          adminName,
-          adminRole,
-          "UPDATED_REPORT_TANOD",
-          `Updated report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName}`,
-        );
+      logTransaction(
+        adminName,
+        adminRole,
+        "UPDATED_REPORT_TANOD",
+        `Updated report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName}`,
+      );
     } catch (err) {
       console.error("Error assigning tanod:", err);
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_UPDATING_REPORT_TANOD",
-          `Error updating report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName} - ${err.message}`,
-         );
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_UPDATING_REPORT_TANOD",
+        `Error updating report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName} - ${err.message}`,
+      );
     }
   };
 
-  // ── Filtering & Pagination Calculation ────────────────────────────
   const uniqueIncidentTypes = [...new Set(reports.map(r => r.incidentType).filter(Boolean))].sort();
 
-  const filteredReports = reports.filter(r => {
-    // Add .trim() to catch any weird database spaces!
-    const rStatus = (r.status || "received").trim().toLowerCase();
-    const rUrgency = getUrgency(r.incidentType).trim().toLowerCase();
+  const filteredReports = useMemo(() => {
+    return reports
+      .filter(r => {
+        const rStatus = (r.status || "received").trim().toLowerCase();
+        const rUrgency = getUrgency(r.incidentType).trim().toLowerCase();
 
-    const matchesStatus = filterStatus === "All" || rStatus === filterStatus.toLowerCase();
-    const matchesUrgency = filterUrgency === "All" || rUrgency === filterUrgency.toLowerCase();
-    const matchesType = filterType === "All" || r.incidentType === filterType;
+        const matchesStatus = filterStatus === "All" || rStatus === filterStatus.toLowerCase();
+        const matchesUrgency = filterUrgency === "All" || rUrgency === filterUrgency.toLowerCase();
+        const matchesType = filterType === "All" || r.incidentType === filterType;
 
-    return matchesStatus && matchesUrgency && matchesType;
-  });
+        return matchesStatus && matchesUrgency && matchesType;
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "type_asc") return (a.incidentType || "").localeCompare(b.incidentType || "");
+        if (sortOrder === "type_desc") return (b.incidentType || "").localeCompare(a.incidentType || "");
+        if (sortOrder === "status_asc") return (a.status || "").localeCompare(b.status || "");
+        return 0;
+      });
+  }, [reports, filterStatus, filterUrgency, filterType, sortOrder]);
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // ── Stat counters ───────────────────────────────────────────────
   const counts = {
     total:     reports.length,
     pending:   reports.filter(r => (r.status || "").toLowerCase() === "received" || (r.status || "").toLowerCase() === "pending").length,
@@ -308,7 +314,6 @@ export default function ServicePeaceOrder({ onBack }) {
         </div>
       </div>
 
-      {/* Stat row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
         {[
           { label: "Total Reports", value: counts.total,     bg: "#fff",     border: "#e5e7eb", color: "#111827" },
@@ -326,7 +331,7 @@ export default function ServicePeaceOrder({ onBack }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>Loading reports…</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(350px, 1fr) 2fr", gap: "20px", minHeight: "60vh" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(380px, 1.1fr) 1.9fr", gap: "20px", minHeight: "60vh" }}>
 
           {/* ── Inbox list ── */}
           <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -334,8 +339,8 @@ export default function ServicePeaceOrder({ onBack }) {
               Incoming Reports ({filteredReports.length})
             </div>
 
-            {/* NEW FILTER PANEL */}
-            <div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "10px" }}>
+            {/* FILTER & SORT PANEL - HORIZONTALLY SCATTERED */}
+            <div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", gap: "8px" }}>
                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
                   <option value="All">All Statuses</option>
@@ -352,14 +357,24 @@ export default function ServicePeaceOrder({ onBack }) {
                   <option value="docs">Docs / Normal</option>
                 </select>
               </div>
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                <option value="All">All Incident Types</option>
-                {uniqueIncidentTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                  <option value="All">All Types</option>
+                  {uniqueIncidentTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+
+                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                  <option value="date_desc">Date: Newest</option>
+                  <option value="date_asc">Date: Oldest</option>
+                  <option value="type_asc">Type: A to Z</option>
+                  <option value="type_desc">Type: Z to A</option>
+                  <option value="status_asc">Status Order</option>
+                </select>
+              </div>
             </div>
-            {/* END FILTER PANEL */}
 
             <div style={{ overflowY: "auto", flex: 1 }}>
               {filteredReports.length === 0 && (
@@ -401,7 +416,6 @@ export default function ServicePeaceOrder({ onBack }) {
               })}
             </div>
             
-            {/* Pagination Controls for List View */}
             {filteredReports.length > 0 && (
               <PaginationControls 
                 currentPage={currentPage} 
@@ -447,7 +461,6 @@ export default function ServicePeaceOrder({ onBack }) {
                     </div>
                   </div>
 
-                  {/* Photo Evidence */}
                   {(selectedReport.photoURL || selectedReport.photoFileName || selectedReport.photo) && (
                     <div style={{ gridColumn: "1 / -1", marginTop: "8px" }}>
                       <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 8px 0" }}>Attached Photo Evidence</p>
@@ -471,7 +484,6 @@ export default function ServicePeaceOrder({ onBack }) {
                   )}
                 </div>
 
-                {/* Reporter info */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginBottom: "24px" }}>
                   <h3 style={{ margin: "0 0 14px 0", fontSize: "1rem" }}>Reporter Information</h3>
                   {selectedReport.isAnonymous || !selectedReport.reporterName ? (
@@ -498,7 +510,6 @@ export default function ServicePeaceOrder({ onBack }) {
                   )}
                 </div>
 
-                {/* Updates log */}
                 {selectedReport.updates?.length > 0 && (
                   <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "16px", marginBottom: "24px" }}>
                     <h3 style={{ margin: "0 0 10px 0", fontSize: "1rem" }}>Updates Log</h3>
@@ -508,7 +519,6 @@ export default function ServicePeaceOrder({ onBack }) {
                   </div>
                 )}
 
-                {/* Admin action panel with Dynamic Tanod Groups */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginTop: "auto" }}>
                   <h3 style={{ margin: "0 0 16px 0", fontSize: "1rem" }}>Admin Action Panel</h3>
                   <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
@@ -583,7 +593,6 @@ export default function ServicePeaceOrder({ onBack }) {
 
             <div style={{ padding: "24px", overflowY: "auto", flex: 1, background: "#f9fafb" }}>
               
-              {/* Create New Group Form */}
               <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#fff", padding: "16px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: "block", fontSize: "0.8rem", color: "#6b7280", marginBottom: "6px", fontWeight: 600 }}>Create New Group</label>
@@ -600,7 +609,6 @@ export default function ServicePeaceOrder({ onBack }) {
                 </button>
               </form>
 
-              {/* List of Existing Groups */}
               {tanodGroups.length === 0 ? (
                 <p style={{ textAlign: "center", color: "#9ca3af", margin: "20px 0" }}>No Tanod groups created yet.</p>
               ) : (
@@ -613,7 +621,6 @@ export default function ServicePeaceOrder({ onBack }) {
                       </div>
                       
                       <div style={{ padding: "16px" }}>
-                        {/* Member List */}
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
                           {group.members && group.members.length > 0 ? (
                             group.members.map((member, i) => (
@@ -627,7 +634,6 @@ export default function ServicePeaceOrder({ onBack }) {
                           )}
                         </div>
 
-                        {/* Add Member Input */}
                         <div style={{ display: "flex", gap: "8px" }}>
                           <input 
                             type="text" 

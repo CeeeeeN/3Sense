@@ -34,6 +34,7 @@ export default function HouseholdManagement() {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [sortResident, setSortResident] = useState("name_asc");
 
   const [selectedResident, setSelectedResident] = useState(null);
   const [showResidentModal, setShowResidentModal] = useState(false);
@@ -57,6 +58,7 @@ export default function HouseholdManagement() {
   const [hhRequestPage, setHhRequestPage] = useState(1);
   const [searchHhRequest, setSearchHhRequest] = useState("");
   const [filterHhStatus, setFilterHhStatus] = useState("All");
+  const [sortHhRequest, setSortHhRequest] = useState("date_desc");
   const [selectedHhRequest, setSelectedHhRequest] = useState(null);
   const [showHhViewModal, setShowHhViewModal] = useState(false);
   const [showHhApproveModal, setShowHhApproveModal] = useState(false);
@@ -71,10 +73,8 @@ export default function HouseholdManagement() {
   const [adminProfile, setAdminProfile] = useState({ fullName: "Admin", position: "" });
 
   useEffect(() => {
-    // Listen for the currently logged-in user
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Find their document in the approvedAdmins collection
         const q = query(
           collection(db, "approvedAdmins"),
           where("uid", "==", user.uid)
@@ -92,7 +92,6 @@ export default function HouseholdManagement() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch current admin's display name from Firestore
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -112,7 +111,6 @@ export default function HouseholdManagement() {
   }, []);
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap pending requests to the 100 most recent
     const pendingQuery = query(
       collection(db, "pending_registrations"),
       orderBy("createdAt", "desc"),
@@ -129,6 +127,7 @@ export default function HouseholdManagement() {
           category: data.categories || (data.category ? [data.category] : []),
           address: `${data.houseNumber || ""} ${data.street || ""}, ${data.barangay || ""}`.trim(),
           dateSubmitted: data.createdAt ? data.createdAt.toDate().toLocaleDateString() : "N/A",
+          rawDate: data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0,
           status: data.status || "pending",
           ...data,
           email: formatDisplayEmail(data.email, adminRole)
@@ -154,7 +153,6 @@ export default function HouseholdManagement() {
       setResidents([...deduped, ...latestPending]);
     };
 
-    // BOUNDED QUERY: Prevent the catastrophic collectionGroup read spike
     const residentsQuery = query(
       collectionGroup(db, "residents"),
       limit(300) 
@@ -183,12 +181,12 @@ export default function HouseholdManagement() {
           remarks: data.adminRemarks || "",
           incident: data.adminIncident || "",
           statusHistory: data.statusHistory || [],
+          rawDate: data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0,
         };
       });
       merge();
     });
 
-    // BOUNDED QUERY: Prevent massive household document reads
     const householdsQuery = query(
       collection(db, "households"),
       limit(300)
@@ -216,6 +214,7 @@ export default function HouseholdManagement() {
             status: "Pending Activation",
             isPendingActivation: true,
             statusHistory: [],
+            rawDate: hhData.createdAt?.toDate ? hhData.createdAt.toDate().getTime() : 0,
           });
         }
       });
@@ -228,24 +227,35 @@ export default function HouseholdManagement() {
     };
   }, [adminRole]);
 
-
-  // ================= HH REQUEST FILTERS =================
-  const filteredHhRequests = hhRequests
-    .filter((req) => {
-      const searchText = searchHhRequest.toLowerCase();
-      const matchesSearch =
-        req.fullName.toLowerCase().includes(searchText) ||
-        (req.householdId || "").toLowerCase().includes(searchText) ||
-        (req.familyId || "").toLowerCase().includes(searchText);
-      const matchesStatus =
-        filterHhStatus === "All" || req.status === filterHhStatus;
-      return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      if (a.status === "pending" && b.status !== "pending") return -1;
-      if (a.status !== "pending" && b.status === "pending") return 1;
-      return 0;
-    });
+  // ================= HH REQUEST FILTERS & SORTING =================
+  const filteredHhRequests = useMemo(() => {
+    return hhRequests
+      .filter((req) => {
+        const searchText = searchHhRequest.toLowerCase();
+        const matchesSearch =
+          req.fullName.toLowerCase().includes(searchText) ||
+          (req.householdId || "").toLowerCase().includes(searchText) ||
+          (req.familyId || "").toLowerCase().includes(searchText);
+        const matchesStatus =
+          filterHhStatus === "All" || req.status === filterHhStatus;
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (sortHhRequest === "date_desc") {
+          return (b.rawDate || 0) - (a.rawDate || 0);
+        }
+        if (sortHhRequest === "date_asc") {
+          return (a.rawDate || 0) - (b.rawDate || 0);
+        }
+        if (sortHhRequest === "name_asc") {
+          return a.fullName.localeCompare(b.fullName);
+        }
+        if (sortHhRequest === "name_desc") {
+          return b.fullName.localeCompare(a.fullName);
+        }
+        return 0;
+      });
+  }, [hhRequests, searchHhRequest, filterHhStatus, sortHhRequest]);
 
   const paginatedHhRequests =
     hhViewMode === "default"
@@ -264,12 +274,11 @@ export default function HouseholdManagement() {
 
   useEffect(() => {
     setHhRequestPage(1);
-  }, [searchHhRequest, filterHhStatus, hhRowsPerPage]);
+  }, [searchHhRequest, filterHhStatus, sortHhRequest, hhRowsPerPage]);
 
-  // ================= HH REQUEST ACTIONS =================
   const handleHhApprove = async () => {
     if (!selectedHhRequest) return;
-    if (isApproving) return; // Prevent duplicate clicks
+    if (isApproving) return;
     setIsApproving(true);
     try {
       await approveRegistration(selectedHhRequest.id);
@@ -332,7 +341,6 @@ export default function HouseholdManagement() {
           `Deleted unactivated household with ID: ${residentToDelete.householdId} (Head: ${residentToDelete.fullName})`
         );
       } else {
-        // Pre-check remainder BEFORE deletion to avoid Firestore cache race conditions
         const residentsQuery = query(collection(db, "households", residentToDelete.householdId, "residents"));
         const residentsSnapshot = await getDocs(residentsQuery);
 
@@ -344,7 +352,6 @@ export default function HouseholdManagement() {
           "Deleted Resident",
           `Deleted resident ${residentToDelete.fullName} (ID: ${residentToDelete.id}) from household ${residentToDelete.householdId}`
         );
-        // Auto-cleanup: If it was the last resident standing, obliterate the root Household Document
         if (residentsSnapshot.size <= 1) {
           await deleteDoc(doc(db, "households", residentToDelete.householdId));
         }
@@ -364,7 +371,7 @@ export default function HouseholdManagement() {
     }
   };
 
-  // ================= RESIDENT FILTERS =================
+  // ================= RESIDENT FILTERS & SORTING =================
   const filteredResidents = useMemo(() => {
     const seenKeys = new Set();
     const unique = residents.filter(r => {
@@ -394,8 +401,22 @@ export default function HouseholdManagement() {
         (r.status || "").toLowerCase() === filterStatus.toLowerCase();
 
       return matchesSearch && matchesCategory && matchesStatus;
+    }).sort((a, b) => {
+      if (sortResident === "name_asc") {
+        return a.fullName.localeCompare(b.fullName);
+      }
+      if (sortResident === "name_desc") {
+        return b.fullName.localeCompare(a.fullName);
+      }
+      if (sortResident === "id_asc") {
+        return (a.householdId || "").localeCompare(b.householdId || "");
+      }
+      if (sortResident === "id_desc") {
+        return (b.householdId || "").localeCompare(a.householdId || "");
+      }
+      return 0;
     });
-  }, [residents, search, filterCategory, filterStatus]);
+  }, [residents, search, filterCategory, filterStatus, sortResident]);
 
   const paginatedResidents = residentViewMode === "default"
     ? filteredResidents.slice(0, defaultRows)
@@ -412,7 +433,7 @@ export default function HouseholdManagement() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterCategory, filterStatus]);
+  }, [search, filterCategory, filterStatus, sortResident]);
 
   const renderPageNumbers = (currentPage, totalPages, setPage) => {
     const pages = [];
@@ -447,7 +468,6 @@ export default function HouseholdManagement() {
     ));
   };
 
-  // ================= SAVE RESIDENT STATUS =================
   const handleSaveStatus = async () => {
     if (!statusData) return;
 
@@ -459,14 +479,13 @@ export default function HouseholdManagement() {
     try {
       const residentRef = doc(db, "households", statusData.householdId, "residents", statusData.id);
 
-      // Build the history log entry
       const historyEntry = {
         status: statusData.status,
         remarks: statusData.remarks || "",
         incident: statusData.incident || "",
         setBy: adminProfile.fullName,
         setByPosition: adminProfile.position,
-        setAt: new Date().toISOString(), // ISO string so it's readable client-side without Firestore conversion
+        setAt: new Date().toISOString(),
       };
 
       await updateDoc(residentRef, {
@@ -476,11 +495,9 @@ export default function HouseholdManagement() {
         adminLastUpdatedBy: adminProfile.fullName,
         adminLastUpdatedByPosition: adminProfile.position,
         adminLastUpdatedAt: serverTimestamp(),
-        // Append to history array (Firestore arrayUnion won't deduplicate objects, use array append instead)
         statusHistory: arrayUnion(historyEntry),
       });
 
-      // 🆕 Notify Resident
       const notifMsg = statusData.status === "Clear Case"
         ? "Your barangay status is now Clear."
         : `Your barangay status has been updated to: ${statusData.status}.`;
@@ -528,10 +545,11 @@ export default function HouseholdManagement() {
                 {hhViewMode === "default" ? (
                   <button className="view-btn" onClick={() => setHhViewMode("requests")}>See All Requests </button>
                 ) : (
-                  <button className="view-btn" onClick={() => { setHhViewMode("default"); setSearchHhRequest(""); setFilterHhStatus("All"); setHhRequestPage(1); }}>Return</button>
+                  <button className="view-btn" onClick={() => { setHhViewMode("default"); setSearchHhRequest(""); setFilterHhStatus("All"); setSortHhRequest("date_desc"); setHhRequestPage(1); }}>Return</button>
                 )}
               </div>
 
+              {/* REQUEST CONTROLS - ALIGNED HORIZONTALLY */}
               <div className="requests-controls">
                 <div className="search-wrapper" style={{ position: "relative" }}>
                   <Search
@@ -552,10 +570,20 @@ export default function HouseholdManagement() {
                     className="search-input"
                     value={searchHhRequest}
                     onChange={(e) => setSearchHhRequest(e.target.value)}
+                    style={{ paddingLeft: "36px" }}
                   />
                 </div>
 
-                <div className="filter-group">
+                <div
+                  className="filter-group"
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: "12px",
+                    alignItems: "center",
+                    flexWrap: "nowrap"
+                  }}
+                >
                   <select
                     className="filter-select"
                     value={filterHhStatus}
@@ -565,6 +593,17 @@ export default function HouseholdManagement() {
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
+                  </select>
+
+                  <select
+                    className="filter-select"
+                    value={sortHhRequest}
+                    onChange={(e) => setSortHhRequest(e.target.value)}
+                  >
+                    <option value="date_desc">Date: Newest First</option>
+                    <option value="date_asc">Date: Oldest First</option>
+                    <option value="name_asc">Name: A to Z</option>
+                    <option value="name_desc">Name: Z to A</option>
                   </select>
                 </div>
               </div>
@@ -628,7 +667,6 @@ export default function HouseholdManagement() {
                   gap: "16px"
                 }}>
 
-                  {/* Rows per page */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                     <span>Rows per page:</span>
                     <select
@@ -652,7 +690,6 @@ export default function HouseholdManagement() {
                     </select>
                   </div>
 
-                  {/* Pagination */}
                   {totalHhRequestPages > 1 && (
                     <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
                       <button
@@ -675,7 +712,6 @@ export default function HouseholdManagement() {
                     </div>
                   )}
 
-                  {/* Showing text */}
                   <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                     Showing {hhStartIndex + 1} to{" "}
                     {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
@@ -698,7 +734,7 @@ export default function HouseholdManagement() {
                 {residentViewMode === "default" ? (
                   <button className="view-btn" onClick={() => setResidentViewMode("residents")}>See All Residents</button>
                 ) : (
-                  <button className="view-btn" onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); setPage(1); }}>Return</button>
+                  <button className="view-btn" onClick={() => { setResidentViewMode("default"); setSearch(""); setFilterCategory("All"); setFilterStatus("All"); setSortResident("name_asc"); setPage(1); }}>Return</button>
                 )}
               </div>
             </div>
@@ -730,8 +766,9 @@ export default function HouseholdManagement() {
                 style={{
                   display: "flex",
                   flexDirection: "row",
-                  gap: "15px",
-                  alignItems: "center"
+                  gap: "12px",
+                  alignItems: "center",
+                  flexWrap: "nowrap"
                 }}>
                 <select
                   className="filter-select"
@@ -758,6 +795,17 @@ export default function HouseholdManagement() {
                   <option value="Pending Case">Pending Case</option>
                   <option value="Violation">Violation</option>
                   <option value="Pending Activation">Pending Activation</option>
+                </select>
+
+                <select
+                  className="filter-select"
+                  value={sortResident}
+                  onChange={(e) => setSortResident(e.target.value)}
+                >
+                  <option value="name_asc">Name: A to Z</option>
+                  <option value="name_desc">Name: Z to A</option>
+                  <option value="id_asc">Household ID: Ascending</option>
+                  <option value="id_desc">Household ID: Descending</option>
                 </select>
               </div>
             </div>
@@ -809,7 +857,7 @@ export default function HouseholdManagement() {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No results found.</td></tr>
+                    <tr><td colSpan={6} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No results found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -826,7 +874,6 @@ export default function HouseholdManagement() {
                   gap: "16px"
                 }}>
 
-                  {/* Rows per page */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                     <span>Rows per page:</span>
                     <select
@@ -850,7 +897,6 @@ export default function HouseholdManagement() {
                     </select>
                   </div>
 
-                  {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
                       <button
@@ -873,7 +919,6 @@ export default function HouseholdManagement() {
                     </div>
                   )}
 
-                  {/* Showing text */}
                   <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                     Showing {startIndex + 1} to{" "}
                     {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}

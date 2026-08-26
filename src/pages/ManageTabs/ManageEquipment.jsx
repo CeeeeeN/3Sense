@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
@@ -34,6 +34,8 @@ function DescriptionPreview({ text }) {
 export default function ManageEquipment() {
   const [equipmentList, setEquipmentList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterAvailability, setFilterAvailability] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, qty_desc, qty_asc
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,7 +51,6 @@ export default function ManageEquipment() {
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // Mock calendar state
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -75,20 +76,31 @@ export default function ManageEquipment() {
   }, []);
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the inventory fetch to 100 items to prevent unbounded read growth
     const eqQuery = query(
       collection(db, "equipment"),
-      orderBy("createdAt", "desc"), // Show newly added equipment at the top
+      orderBy("createdAt", "desc"),
       limit(100)
     );
 
     const unsubscribe = onSnapshot(eqQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => {
+        const docData = doc.data();
+        const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+        return {
+          id: doc.id,
+          rawDate,
+          ...docData
+        };
+      });
       setEquipmentList(data);
     });
     
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAvailability, sortOrder]);
 
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
@@ -203,7 +215,37 @@ export default function ManageEquipment() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  const filteredEqs = equipmentList.filter(e => (e.equipmentName || e.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredEqs = useMemo(() => {
+    return equipmentList
+      .filter(e => {
+        const name = (e.equipmentName || e.name || "").toLowerCase();
+        const matchesSearch = name.includes(searchTerm.toLowerCase());
+        const isAvail = e.available !== false;
+        const matchesAvail = 
+          filterAvailability === "All" ||
+          (filterAvailability === "Available" && isAvail) ||
+          (filterAvailability === "Unavailable" && !isAvail);
+
+        return matchesSearch && matchesAvail;
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") {
+          const nameA = a.equipmentName || a.name || "";
+          const nameB = b.equipmentName || b.name || "";
+          return nameA.localeCompare(nameB);
+        }
+        if (sortOrder === "name_desc") {
+          const nameA = a.equipmentName || a.name || "";
+          const nameB = b.equipmentName || b.name || "";
+          return nameB.localeCompare(nameA);
+        }
+        if (sortOrder === "qty_desc") return Number(b.quantity || 0) - Number(a.quantity || 0);
+        if (sortOrder === "qty_asc") return Number(a.quantity || 0) - Number(b.quantity || 0);
+        return 0;
+      });
+  }, [equipmentList, searchTerm, filterAvailability, sortOrder]);
 
   const totalPages = Math.ceil(filteredEqs.length / ITEMS_PER_PAGE);
   const paginatedEqs = filteredEqs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -261,10 +303,36 @@ export default function ManageEquipment() {
         </div>
       </div>
 
-      <div className="as-controls">
-        <div className="as-search-box">
+      {/* FILTER & SORT CONTROLS - ALIGNED */}
+      <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input type="text" placeholder="Search equipment..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <select
+            value={filterAvailability}
+            onChange={(e) => setFilterAvailability(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+          >
+            <option value="All">All Statuses</option>
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+          >
+            <option value="date_desc">Added: Newest First</option>
+            <option value="date_asc">Added: Oldest First</option>
+            <option value="name_asc">Name: A to Z</option>
+            <option value="name_desc">Name: Z to A</option>
+            <option value="qty_desc">Quantity: High to Low</option>
+            <option value="qty_asc">Quantity: Low to High</option>
+          </select>
         </div>
       </div>
 
@@ -356,7 +424,6 @@ export default function ManageEquipment() {
                   </div>
                 </div>
 
-                {/* ── Purpose Options Manager ── */}
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>

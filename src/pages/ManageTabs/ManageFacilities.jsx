@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
@@ -34,6 +34,8 @@ function DescriptionPreview({ text }) {
 export default function ManageFacilities() {
   const [facilities, setFacilities] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterAvailability, setFilterAvailability] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, cap_desc, cap_asc
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -47,11 +49,9 @@ export default function ManageFacilities() {
   const [editingPurposeIdx, setEditingPurposeIdx] = useState(null);
   const [purposeFormError, setPurposeFormError] = useState("");
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // Mock calendar state
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -61,43 +61,52 @@ export default function ManageFacilities() {
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-    useEffect(() => {
-      // Listen for the currently logged-in user
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          // Find their document in the approvedAdmins collection
-          const q = query(
-            collection(db, "approvedAdmins"),
-            where("uid", "==", user.uid),
-          );
-          const snapshot = await getDocs(q);
-  
-          if (!snapshot.empty) {
-            const data = snapshot.docs[0].data();
-            setAdminName(data.fullName || "Admin");
-            setAdminRole(data.role || "Standard Admin");
-          }
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const q = query(
+          collection(db, "approvedAdmins"),
+          where("uid", "==", user.uid),
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          setAdminName(data.fullName || "Admin");
+          setAdminRole(data.role || "Standard Admin");
         }
-      });
-  
-      return () => unsubscribe();
-    }, []);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the facility fetch to 100 items to prevent unbounded read growth
     const facQuery = query(
       collection(db, "facilities"),
-      orderBy("createdAt", "desc"), // Show newly added facilities at the top
+      orderBy("createdAt", "desc"),
       limit(100)
     );
 
     const unsubscribe = onSnapshot(facQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => {
+        const docData = doc.data();
+        const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+        return {
+          id: doc.id,
+          rawDate,
+          ...docData
+        };
+      });
       setFacilities(data);
     });
     
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAvailability, sortOrder]);
 
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
@@ -109,10 +118,8 @@ export default function ManageFacilities() {
     if (current.includes(dateStr)) newBlocked = current.filter(d => d !== dateStr);
     else newBlocked = [...current, dateStr];
     
-    // Update local state for immediate feedback
     setSelectedFacility(prev => ({...prev, blockedDates: newBlocked}));
     
-    // Update firestore asynchronously
     try {
       await updateDoc(doc(db, "facilities", selectedFacility.id), { blockedDates: newBlocked });
     } catch(err) {
@@ -160,7 +167,6 @@ export default function ManageFacilities() {
           "ERROR_DELETING_FACILITY",
           `Error deleting facility with ID: ${id} - ${error.message}`,
         );
-
       }
     }
   };
@@ -178,7 +184,6 @@ export default function ManageFacilities() {
         logTransaction(adminName, adminRole, "EDITED_FACILITY", `Edited facility: ${newFacility.facilityName} (ID: ${editingFacilityId})`);
       } else {
         const newRef = await addDoc(collection(db, "facilities"), { ...newFacility, createdAt: serverTimestamp() });
-        // Write facilityID back so it's a queryable field
         await updateDoc(newRef, { facilityID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_FACILITY", `Added new facility: ${newFacility.facilityName} (ID: ${newRef.id})`);
       }
@@ -201,8 +206,6 @@ export default function ManageFacilities() {
     setPurposeFormError("");
     setShowAddModal(true);
   };
-
-
 
   const openCalendar = (fac) => {
     setSelectedFacility(fac);
@@ -231,7 +234,37 @@ export default function ManageFacilities() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  const filteredFacs = facilities.filter(f => (f.facilityName || f.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredFacs = useMemo(() => {
+    return facilities
+      .filter(f => {
+        const name = (f.facilityName || f.name || "").toLowerCase();
+        const matchesSearch = name.includes(searchTerm.toLowerCase());
+        const isAvail = f.available !== false;
+        const matchesAvail = 
+          filterAvailability === "All" ||
+          (filterAvailability === "Available" && isAvail) ||
+          (filterAvailability === "Unavailable" && !isAvail);
+
+        return matchesSearch && matchesAvail;
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") {
+          const nameA = a.facilityName || a.name || "";
+          const nameB = b.facilityName || b.name || "";
+          return nameA.localeCompare(nameB);
+        }
+        if (sortOrder === "name_desc") {
+          const nameA = a.facilityName || a.name || "";
+          const nameB = b.facilityName || b.name || "";
+          return nameB.localeCompare(nameA);
+        }
+        if (sortOrder === "cap_desc") return Number(b.capacity || 0) - Number(a.capacity || 0);
+        if (sortOrder === "cap_asc") return Number(a.capacity || 0) - Number(b.capacity || 0);
+        return 0;
+      });
+  }, [facilities, searchTerm, filterAvailability, sortOrder]);
 
   const totalPages = Math.ceil(filteredFacs.length / ITEMS_PER_PAGE);
   const paginatedFacs = filteredFacs.slice(
@@ -292,10 +325,36 @@ export default function ManageFacilities() {
         </div>
       </div>
 
-      <div className="as-controls">
-        <div className="as-search-box">
+      {/* FILTER & SORT CONTROLS - ALIGNED */}
+      <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input type="text" placeholder="Search facilities..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <select
+            value={filterAvailability}
+            onChange={(e) => setFilterAvailability(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+          >
+            <option value="All">All Statuses</option>
+            <option value="Available">Enabled</option>
+            <option value="Unavailable">Disabled</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+          >
+            <option value="date_desc">Added: Newest First</option>
+            <option value="date_asc">Added: Oldest First</option>
+            <option value="name_asc">Name: A to Z</option>
+            <option value="name_desc">Name: Z to A</option>
+            <option value="cap_desc">Capacity: High to Low</option>
+            <option value="cap_asc">Capacity: Low to High</option>
+          </select>
         </div>
       </div>
 
@@ -314,7 +373,7 @@ export default function ManageFacilities() {
               <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>
             </ul>
             <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
-                            <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>Calendar</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>Calendar</button>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>Edit</button>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id)}>Delete</button>
             </div>
@@ -328,7 +387,7 @@ export default function ManageFacilities() {
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: "not-allowed" }}
           >
             Previous
           </button>
@@ -337,14 +396,12 @@ export default function ManageFacilities() {
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: "not-allowed" }}
           >
             Next
           </button>
         </div>
       )}
-
-
 
       {showAddModal && (
         <div className="as-modal-overlay">
@@ -420,7 +477,6 @@ export default function ManageFacilities() {
                   </div>
                 </div>
 
-                {/* ── Purpose Options Manager ── */}
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -519,8 +575,6 @@ export default function ManageFacilities() {
                     <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>No options added yet. Add at least one above.</p>
                   )}
                 </div>
-
-
 
                 <div className="as-modal-actions">
                   <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>

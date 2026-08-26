@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Manage_IconLocation,
   Manage_IconCalendar,
@@ -31,7 +31,6 @@ import { createUserNotification } from "../../services/userNotifications";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildProgramEmail } from "../../utils/emailTemplates";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const PREVIEW_LIMIT = 120;
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
@@ -41,7 +40,6 @@ const formatTs = (ts) => {
   return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
 function DescriptionPreview({ text }) {
   const [expanded, setExpanded] = React.useState(false);
   if (!text) return null;
@@ -81,7 +79,6 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── StatBar (from ManageServices) ─────────────────────────────────────────────
 function StatBar({ stats }) {
   const statusColors = {
     pending: { bg: "#fef3c7", text: "#92400e" },
@@ -111,10 +108,12 @@ function StatBar({ stats }) {
   );
 }
 
-// ── ProgramWorkspace (with approve / reject / remove like ServiceLivelihood) ──
 function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc
+
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
@@ -122,12 +121,9 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Email blast state
   const [showEmailBlast, setShowEmailBlast] = useState(false);
 
-  // Real-time attendees from subcollection
   useEffect(() => {
-    // BOUNDED QUERY: Cap attendees to the 150 most recent to prevent massive read spikes on popular events
     const attendeesRef = query(
       collection(db, "Programs", program.id, "attendees"),
       orderBy("createdAt", "desc"),
@@ -136,7 +132,15 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     const unsub = onSnapshot(
       attendeesRef,
       (snap) => {
-        setAttendees(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setAttendees(snap.docs.map((d) => {
+          const docData = d.data();
+          const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+          return {
+            id: d.id,
+            rawDate,
+            ...docData
+          };
+        }));
         setLoading(false);
       },
       (err) => { console.error("Error loading attendees:", err); setLoading(false); }
@@ -144,7 +148,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     return () => unsub();
   }, [program.id]);
 
-  // ── Slot logic (only APPROVED count against slots, mirroring ServiceLivelihood) ──
   const totalSlots = parseInt(program.slots || "0", 10);
   const getApprovedCount = () =>
     attendees.filter((a) => (a.status || "").toLowerCase() === "approved").length;
@@ -155,7 +158,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   const slotsLeft = getSlotsLeft();
   const isFull = slotsLeft !== null && slotsLeft <= 0;
 
-  // ── Stats ──────────────────────────────────────────────────────────
   const stats = {
     total: attendees.length,
     approved: attendees.filter((a) => (a.status || "").toLowerCase() === "approved").length,
@@ -164,7 +166,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     registered: attendees.filter((a) => (a.status || "").toLowerCase() === "registered").length,
   };
 
-  // ── Approve ────────────────────────────────────────────────────────
   const handleApprove = async (a) => {
     if (totalSlots > 0) {
       const left = getSlotsLeft();
@@ -179,7 +180,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
         updatedAt: serverTimestamp(),
       });
 
-      // sync flat collection
       const regQ = query(
         collection(db, "programRegistrations"),
         where("programId", "==", program.id),
@@ -208,7 +208,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     } catch (err) { console.error(err); }
   };
 
-  // ── Reject ─────────────────────────────────────────────────────────
   const handleConfirmReject = async (e) => {
     e.preventDefault();
     if (!rejectTarget || !rejectReason.trim()) return;
@@ -221,7 +220,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
         updatedAt: serverTimestamp(),
       });
 
-      // sync flat collection
       const regQ = query(
         collection(db, "programRegistrations"),
         where("programId", "==", program.id),
@@ -253,7 +251,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     setSaving(false);
   };
 
-  // ── Remove approval → back to pending ─────────────────────────────
   const handleConfirmRemove = async () => {
     if (!removeTarget) return;
     setSaving(true);
@@ -264,7 +261,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
         updatedAt: serverTimestamp(),
       });
 
-      // get attendee
       const attendee = attendees.find((x) => x.id === removeTarget);
 
       const regQ = query(
@@ -287,6 +283,30 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     setSaving(false);
   };
 
+  const filteredAttendees = useMemo(() => {
+    return attendees
+      .filter((a) => {
+        const s = (a.status || "pending").toLowerCase();
+        if (filterStatus === "All") return true;
+        return s === filterStatus.toLowerCase();
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") {
+          const nameA = a.userName || a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = b.userName || b.fullName || `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameA.localeCompare(nameB);
+        }
+        if (sortOrder === "name_desc") {
+          const nameA = a.userName || a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = b.userName || b.fullName || `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameB.localeCompare(nameA);
+        }
+        return 0;
+      });
+  }, [attendees, filterStatus, sortOrder]);
+
   return (
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
@@ -294,7 +314,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
           &larr; Back to Programs
         </button>
 
-        {/* ── Program Header ── */}
         <div className="as-header-section">
           <div className="as-title-wrap">
             <h1>{program.title}</h1>
@@ -324,7 +343,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
             Email Registrants
           </button>
 
-          {/* Slot indicator */}
           {totalSlots > 0 && (
             <div style={{
               display: "flex", flexDirection: "column", alignItems: "center",
@@ -351,7 +369,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
           )}
         </div>
 
-        {/* ── Stats row ── */}
+        {/* ── Stats & Controls ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px", marginBottom: "24px" }}>
           {[
             { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
@@ -365,6 +383,32 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
               <div style={{ fontSize: "1.8rem", fontWeight: 700, color: s.color }}>{s.value}</div>
             </div>
           ))}
+        </div>
+
+        {/* FILTER & SORT TOOLBAR */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "16px" }}>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+          >
+            <option value="All">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="registered">Registered</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+          >
+            <option value="date_desc">Date: Newest First</option>
+            <option value="date_asc">Date: Oldest First</option>
+            <option value="name_asc">Participant: A to Z</option>
+            <option value="name_desc">Participant: Z to A</option>
+          </select>
         </div>
 
         {/* ── Table ── */}
@@ -384,14 +428,14 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                 </tr>
               </thead>
               <tbody>
-                {attendees.length === 0 ? (
+                {filteredAttendees.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ padding: "40px", color: "#9ca3af", textAlign: "center" }}>
-                      No one has registered for this program yet.
+                      No registrations match your criteria.
                     </td>
                   </tr>
                 ) : (
-                  attendees.map((a) => {
+                  filteredAttendees.map((a) => {
                     const status = (a.status || "pending").toLowerCase();
                     const left = getSlotsLeft();
                     const slotsFull = left !== null && left <= 0 && status === "pending";
@@ -412,7 +456,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                         </td>
                         <td style={{ padding: "14px 16px" }}>
                           {left !== null ? (
-                            <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166634" }}>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166534" }}>
                               {left <= 0 ? "Full" : `${left} left`}
                             </span>
                           ) : <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>}
@@ -528,21 +572,19 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   );
 }
 
-
-// ── Empty form state ──────────────────────────────────────────────────────────
 const EMPTY_PROGRAM = {
   title: "", description: "", date: "", endDate: "",
   startTime: "", endTime: "", location: "", demographic: "",
   slots: "", requirements: [""], customFields: [],
 };
 
-// ── ManagePrograms (default export) ──────────────────────────────────────────
 export default function ManagePrograms() {
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortCatalog, setSortCatalog] = useState("date_desc"); // date_desc, date_asc, title_asc, title_desc
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [selectedQR, setSelectedQR] = useState(null);
@@ -552,10 +594,8 @@ export default function ManagePrograms() {
   const [newProgram, setNewProgram] = useState(EMPTY_PROGRAM);
   const [activeProgramWorkspace, setActiveProgramWorkspace] = useState(null);
 
-  // Per-program real-time registration stats (mirroring ManageServices StatBar pattern)
-  const [programStats, setProgramStats] = useState({}); // { [programId]: { total, byStatus, latest } }
+  const [programStats, setProgramStats] = useState({});
 
-  // ── Auth ──────────────────────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -571,13 +611,9 @@ export default function ManagePrograms() {
     return () => unsubscribe();
   }, []);
 
-  // ── Real-time Programs (general only, exclude livelihood) ─────────
-  // ── Real-time Programs (general only, exclude livelihood) ─────────
   useEffect(() => {
-    // Maintenance: auto-update program statuses based on current date
     runStatusMaintenance();
 
-    // BOUNDED QUERY: Cap to 100 most recent programs
     const progQuery = query(
       collection(db, "Programs"),
       orderBy("createdAt", "desc"),
@@ -589,8 +625,16 @@ export default function ManagePrograms() {
       (snapshot) => {
         setPrograms(
           snapshot.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((p) => p.programType !== "livelihood") // Filter kept client-side
+            .map((d) => {
+              const docData = d.data();
+              const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+              return {
+                id: d.id,
+                rawDate,
+                ...docData
+              };
+            })
+            .filter((p) => p.programType !== "livelihood")
         );
         setLoadingPrograms(false);
       },
@@ -599,12 +643,9 @@ export default function ManagePrograms() {
     return () => unsubscribe();
   }, []);
 
-  // ── Real-time per-program attendee stats (from subcollections) ────
-  // Subscribe to each program's attendees subcollection for live StatBar data
   useEffect(() => {
     if (programs.length === 0) return;
     const unsubs = programs.map((prog) => {
-      // BOUNDED QUERY: Prevent the "multiplier effect" by capping stat reads
       const attendeesRef = query(
         collection(db, "Programs", prog.id, "attendees"),
         orderBy("createdAt", "desc"),
@@ -637,7 +678,6 @@ export default function ManagePrograms() {
     return () => unsubs.forEach((u) => u());
   }, [programs]);
 
-  // ── QR Generation ─────────────────────────────────────────────────
   const handleGenerateQR = (prog) => {
     const today = getTodayStr();
     const startDate = prog.date || today;
@@ -671,12 +711,10 @@ export default function ManagePrograms() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  // ── Requirements helpers ──────────────────────────────────────────
   const handleReqChange = (index, value) => { const u = [...newProgram.requirements]; u[index] = value; setNewProgram({ ...newProgram, requirements: u }); };
   const addReqField = () => setNewProgram({ ...newProgram, requirements: [...newProgram.requirements, ""] });
   const removeReqField = (index) => setNewProgram({ ...newProgram, requirements: newProgram.requirements.filter((_, i) => i !== index) });
 
-  // ── Edit ──────────────────────────────────────────────────────────
   const handleEdit = (prog) => {
     setNewProgram({
       title: prog.title || "",
@@ -695,7 +733,6 @@ export default function ManagePrograms() {
     setShowAddModal(true);
   };
 
-  // ── Delete ────────────────────────────────────────────────────────
   const handleDelete = async (id, progTitle) => {
     if (!window.confirm("Are you sure you want to delete this program?")) return;
     try {
@@ -708,7 +745,6 @@ export default function ManagePrograms() {
     }
   };
 
-  // ── Save (add / update) ───────────────────────────────────────────
   const handleAddProgram = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -757,8 +793,18 @@ export default function ManagePrograms() {
 
   const openAddModal = () => { setEditingProgramId(null); setNewProgram(EMPTY_PROGRAM); setShowAddModal(true); };
 
-  // ── Pagination ────────────────────────────────────────────────────
-  const filteredPrograms = programs.filter((p) => p.title?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPrograms = useMemo(() => {
+    return programs
+      .filter((p) => p.title?.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => {
+        if (sortCatalog === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortCatalog === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortCatalog === "title_asc") return (a.title || "").localeCompare(b.title || "");
+        if (sortCatalog === "title_desc") return (b.title || "").localeCompare(a.title || "");
+        return 0;
+      });
+  }, [programs, searchTerm, sortCatalog]);
+
   const totalPages = Math.ceil(filteredPrograms.length / ITEMS_PER_PAGE);
   const paginatedPrograms = filteredPrograms.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   const handleSearch = (val) => { setSearchTerm(val); setCurrentPage(1); };
@@ -781,7 +827,6 @@ export default function ManagePrograms() {
     ));
   };
 
-  // ── Route to Workspace ────────────────────────────────────────────
   if (activeProgramWorkspace) {
     return (
       <div className="as-container" style={{ padding: 0 }}>
@@ -795,7 +840,6 @@ export default function ManagePrograms() {
     );
   }
 
-  // ── Render Programs List ──────────────────────────────────────────
   return (
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
@@ -806,8 +850,9 @@ export default function ManagePrograms() {
         <button className="as-btn-aqua" onClick={openAddModal}><IconAdd /> Add New Program</button>
       </div>
 
-      <div className="as-controls">
-        <div className="as-search-box">
+      {/* SEARCH AND SORT TOOLBAR */}
+      <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -818,6 +863,17 @@ export default function ManagePrograms() {
             onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
+
+        <select
+          value={sortCatalog}
+          onChange={(e) => setSortCatalog(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+        >
+          <option value="date_desc">Created: Newest First</option>
+          <option value="date_asc">Created: Oldest First</option>
+          <option value="title_asc">Title: A to Z</option>
+          <option value="title_desc">Title: Z to A</option>
+        </select>
       </div>
 
       {loadingPrograms ? (
@@ -854,7 +910,6 @@ export default function ManagePrograms() {
                     {prog.requirements?.length > 0 ? prog.requirements.join(", ") : "None"}
                   </div>
 
-                  {/* ── Live StatBar per card (from ManageServices) ── */}
                   <StatBar stats={stats} />
 
                   <div className="as-card-footer" style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}>
@@ -912,7 +967,6 @@ export default function ManagePrograms() {
         </>
       )}
 
-      {/* ── Add / Edit Modal ── */}
       {showAddModal && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
@@ -951,7 +1005,6 @@ export default function ManagePrograms() {
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">Start Date</label>
-                    {/* ── FIX: min=today prevents selecting past dates ── */}
                     <input
                       type="date"
                       className="as-form-input"
@@ -960,7 +1013,6 @@ export default function ManagePrograms() {
                       value={newProgram.date}
                       onChange={(e) => {
                         const newDate = e.target.value;
-                        // If end date is now before the new start date, reset it
                         setNewProgram((prev) => ({
                           ...prev,
                           date: newDate,
@@ -974,7 +1026,6 @@ export default function ManagePrograms() {
                       End Date
                       <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
                     </label>
-                    {/* ── FIX: min is the later of today or the chosen start date ── */}
                     <input
                       type="date"
                       className="as-form-input"
@@ -1055,7 +1106,6 @@ export default function ManagePrograms() {
         </div>
       )}
 
-      {/* ── QR Modal ── */}
       {selectedQR && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "450px" }}>

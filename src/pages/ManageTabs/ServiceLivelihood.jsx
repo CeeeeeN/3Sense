@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
@@ -10,7 +10,6 @@ import { runStatusMaintenance } from "../../services/statusUpdater";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildLivelihoodEmail } from "../../utils/emailTemplates";
 
-// ── Helper: returns today's date string "YYYY-MM-DD" ──────────────────────────
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 const formatTs = (ts) => {
@@ -34,7 +33,6 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// ── Pagination Component ──────────────────────────────────────────────────────
 const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
     <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
@@ -59,26 +57,23 @@ const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
   </div>
 );
 
-// ── Blank form state ──────────────────────────────────────────────────────────
 const BLANK = {
   title: "", description: "", date: "", startTime: "", endTime: "",
   location: "", slots: "", demographic: "", customFields: [],
 };
 
 export default function ServiceLivelihood({ onBack }) {
-  // ── Programs ─────────────────────────────────────────────────────
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
-  // ── Registrations ─────────────────────────────────────────────────
   const [participants, setParticipants] = useState([]);
   const [loadingParts, setLoadingParts] = useState(true);
 
-  // ── Pagination State ──────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, prog_asc
 
-  // ── Modals ────────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -87,20 +82,13 @@ export default function ServiceLivelihood({ onBack }) {
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // ── Edit state (ported from ManagePrograms) ───────────────────────
   const [editingProgramId, setEditingProgramId] = useState(null);
-
-  // Email blast state
   const [emailBlastTarget, setEmailBlastTarget] = useState(null);
-
-  // ── New / edit program form ───────────────────────────────────────
   const [newProgram, setNewProgram] = useState(BLANK);
 
-  // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
     runStatusMaintenance();
 
-    // BOUNDED QUERY: Cap to the 100 most recent programs
     const q = query(
       collection(db, "Programs"), 
       orderBy("updatedAt", "desc"),
@@ -130,9 +118,7 @@ export default function ServiceLivelihood({ onBack }) {
     return () => unsub();
   }, []);
 
-  // ── Real-time: Registrations ──────────────────────────────────────
   useEffect(() => {
-    // BOUNDED QUERY: Cap to 150 most recent registrations to prevent massive read spikes
     const q = query(
       collection(db, "livelihoodRegistrations"), 
       orderBy("submittedAt", "desc"),
@@ -140,13 +126,24 @@ export default function ServiceLivelihood({ onBack }) {
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setParticipants(snap.docs.map(d => {
+        const docData = d.data();
+        const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
+        return {
+          id: d.id,
+          rawDate,
+          ...docData
+        };
+      }));
       setLoadingParts(false);
     });
     return () => unsub();
   }, []);
 
-  // ── Slot logic: only APPROVED count ──────────────────────────────
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, sortOrder]);
+
   const getApprovedCount = (programId) =>
     participants.filter(p => p.programId === programId && (p.status || "").toLowerCase() === "approved").length;
 
@@ -155,14 +152,12 @@ export default function ServiceLivelihood({ onBack }) {
     return prog.slots - getApprovedCount(prog.id);
   };
 
-  // ── Open "Add" modal (clean slate) ───────────────────────────────
   const openAddModal = () => {
     setEditingProgramId(null);
     setNewProgram(BLANK);
     setShowAddModal(true);
   };
 
-  // ── Edit (ported from ManagePrograms) ────────────────────────────
   const handleEdit = (prog) => {
     setNewProgram({
       title: prog.title || "",
@@ -180,7 +175,6 @@ export default function ServiceLivelihood({ onBack }) {
     setShowAddModal(true);
   };
 
-  // ── Delete (ported from ManagePrograms) ──────────────────────────
   const handleDelete = async (id, progTitle) => {
     if (!window.confirm(`Are you sure you want to delete "${progTitle}"?`)) return;
     try {
@@ -191,7 +185,6 @@ export default function ServiceLivelihood({ onBack }) {
     }
   };
 
-  // ── Save: add OR update (ported from ManagePrograms) ─────────────
   const handleAddProgram = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -214,13 +207,11 @@ export default function ServiceLivelihood({ onBack }) {
 
     try {
       if (editingProgramId) {
-        // ── Update existing program ──
         await updateDoc(doc(db, "Programs", editingProgramId), {
           ...programData,
           updatedAt: serverTimestamp(),
         });
       } else {
-        // ── Create new program ──
         await addDoc(collection(db, "Programs"), {
           ...programData,
           programType: "livelihood",
@@ -240,7 +231,6 @@ export default function ServiceLivelihood({ onBack }) {
     setSaving(false);
   };
 
-  // ── Approve ───────────────────────────────────────────────────────
   const handleApprove = async (p) => {
     const prog = programs.find(pr => pr.id === p.programId);
     if (prog && prog.slots > 0) {
@@ -269,7 +259,6 @@ export default function ServiceLivelihood({ onBack }) {
     } catch (err) { console.error(err); }
   };
 
-  // ── Reject ────────────────────────────────────────────────────────
   const handleConfirmReject = async (e) => {
     e.preventDefault();
     if (!rejectTarget || !rejectReason.trim()) return;
@@ -296,7 +285,6 @@ export default function ServiceLivelihood({ onBack }) {
     setSaving(false);
   };
 
-  // ── Remove approval → back to pending ────────────────────────────
   const handleConfirmRemove = async () => {
     if (!removeTarget) return;
     setSaving(true);
@@ -309,7 +297,6 @@ export default function ServiceLivelihood({ onBack }) {
     setSaving(false);
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────
   const stats = {
     total: participants.length,
     approved: participants.filter(p => (p.status || "").toLowerCase() === "approved").length,
@@ -317,14 +304,40 @@ export default function ServiceLivelihood({ onBack }) {
     rejected: participants.filter(p => (p.status || "").toLowerCase() === "rejected").length,
   };
 
-  // ── Pagination Calculation ────────────────────────────────────────
-  const totalPages = Math.ceil(participants.length / itemsPerPage);
-  const paginatedParticipants = participants.slice(
+  // ── Filtered & Sorted Registrations ────────────────────────────────
+  const filteredParticipants = useMemo(() => {
+    return participants
+      .filter(p => {
+        const s = (p.status || "pending").toLowerCase();
+        if (filterStatus === "All") return true;
+        return s === filterStatus.toLowerCase();
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") {
+          const nameA = a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = b.fullName || `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameA.localeCompare(nameB);
+        }
+        if (sortOrder === "name_desc") {
+          const nameA = a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = b.fullName || `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameB.localeCompare(nameA);
+        }
+        if (sortOrder === "prog_asc") {
+          return (a.programName || "").localeCompare(b.programName || "");
+        }
+        return 0;
+      });
+  }, [participants, filterStatus, sortOrder]);
+
+  const totalPages = Math.ceil(filteredParticipants.length / itemsPerPage);
+  const paginatedParticipants = filteredParticipants.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // ─────────────────────────────────────────────────────────────────
   return (
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
@@ -342,7 +355,7 @@ export default function ServiceLivelihood({ onBack }) {
           </button>
         </div>
 
-        {/* ── Programs ── */}
+        {/* ── Active Programs Grid ── */}
         <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: "20px", paddingBottom: "20px" }}>
           <h3 style={{ marginBottom: "10px" }}>Active Programs</h3>
           {loadingPrograms ? (
@@ -440,7 +453,36 @@ export default function ServiceLivelihood({ onBack }) {
         </div>
 
         {/* ── Stats row ── */}
-        <h3 style={{ marginBottom: "10px" }}>Participant Registrations</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+          <h3 style={{ margin: 0 }}>Participant Registrations</h3>
+
+          {/* FILTER & SORT TOOLBAR */}
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+            >
+              <option value="All">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+            >
+              <option value="date_desc">Date: Newest First</option>
+              <option value="date_asc">Date: Oldest First</option>
+              <option value="name_asc">Participant: A to Z</option>
+              <option value="name_desc">Participant: Z to A</option>
+              <option value="prog_asc">Program: A to Z</option>
+            </select>
+          </div>
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
           {[
             { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
@@ -471,10 +513,10 @@ export default function ServiceLivelihood({ onBack }) {
                 </tr>
               </thead>
               <tbody>
-                {participants.length === 0 && (
+                {filteredParticipants.length === 0 && (
                   <tr>
                     <td colSpan={8} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>
-                      No registrations yet.
+                      No registrations match your criteria.
                     </td>
                   </tr>
                 )}
@@ -558,8 +600,7 @@ export default function ServiceLivelihood({ onBack }) {
                 })}
               </tbody>
             </table>
-            {/* Pagination Controls */}
-            {participants.length > 0 && (
+            {filteredParticipants.length > 0 && (
               <PaginationControls
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -574,7 +615,6 @@ export default function ServiceLivelihood({ onBack }) {
           <div className="as-modal-overlay">
             <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
               <div className="as-modal-header">
-                {/* Title changes between Add and Edit (ported from ManagePrograms) */}
                 <h2>{editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}</h2>
                 <button className="as-modal-close" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
               </div>
@@ -594,7 +634,6 @@ export default function ServiceLivelihood({ onBack }) {
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
                     <div>
-                      {/* ── Start Date: min=today prevents past dates (ported from ManagePrograms) ── */}
                       <label className="as-form-label">Start Date <span style={{ color: "red" }}>*</span></label>
                       <input
                         type="date"
@@ -607,14 +646,12 @@ export default function ServiceLivelihood({ onBack }) {
                           setNewProgram(prev => ({
                             ...prev,
                             date: newDate,
-                            // Reset end date if it falls before the new start date
                             endDate: prev.endDate && prev.endDate < newDate ? newDate : prev.endDate,
                           }));
                         }}
                       />
                     </div>
                     <div>
-                      {/* ── End Date: min is the later of today or start date (ported from ManagePrograms) ── */}
                       <label className="as-form-label">
                         End Date
                         <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
@@ -816,4 +853,3 @@ export default function ServiceLivelihood({ onBack }) {
     </>
   );
 }
-

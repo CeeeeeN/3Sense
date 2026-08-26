@@ -15,6 +15,8 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [sexFilter, setSexFilter] = useState("all");
+  const [sortDemographics, setSortDemographics] = useState("name_asc"); // name_asc, name_desc, age_asc, age_desc, hhid_asc, hhid_desc
+  const [sortRbiA, setSortRbiA] = useState("hhid_asc"); // hhid_asc, hhid_desc, members_desc, members_asc, head_asc, head_desc
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [demoPage, setDemoPage] = useState(1);
@@ -23,7 +25,11 @@ export default function Reports() {
 
   useEffect(() => {
     setDemoPage(1);
-  }, [sexFilter]);
+  }, [sexFilter, sortDemographics]);
+
+  useEffect(() => {
+    setRbiAPage(1);
+  }, [sortRbiA]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -112,11 +118,22 @@ export default function Reports() {
     fetchHouseholds();
   }, []);
 
-  // ── Demographics filter ──────────────────────────────────────────────────────
+  // ── Demographics filter & sort ───────────────────────────────────────────────
   const filteredResidents = useMemo(() => {
-    if (sexFilter === "all") return residentData;
-    return residentData.filter((r) => (r.sex || "").toLowerCase() === sexFilter.toLowerCase());
-  }, [residentData, sexFilter]);
+    let result = residentData;
+    if (sexFilter !== "all") {
+      result = result.filter((r) => (r.sex || "").toLowerCase() === sexFilter.toLowerCase());
+    }
+    return result.slice().sort((a, b) => {
+      if (sortDemographics === "name_asc") return a.fullName.localeCompare(b.fullName);
+      if (sortDemographics === "name_desc") return b.fullName.localeCompare(a.fullName);
+      if (sortDemographics === "age_asc") return (a.age ?? 0) - (b.age ?? 0);
+      if (sortDemographics === "age_desc") return (b.age ?? 0) - (a.age ?? 0);
+      if (sortDemographics === "hhid_asc") return (a.householdID || "").localeCompare(b.householdID || "");
+      if (sortDemographics === "hhid_desc") return (b.householdID || "").localeCompare(a.householdID || "");
+      return 0;
+    });
+  }, [residentData, sexFilter, sortDemographics]);
 
   const filteredStats = useMemo(() => {
     const counts = { Male: 0, Female: 0 };
@@ -136,7 +153,7 @@ export default function Reports() {
     return counts;
   }, [residentData]);
 
-  // ── RBI Form C age brackets (Updated: 0–1 Infant & 2–5 Toddler) ──────────────
+  // ── RBI Form C age brackets ─────────────────────────────────────────────────
   const AGE_BRACKETS = [
     { label: "0–1 yrs old (Infant)", min: 0, max: 1 },
     { label: "2–5 yrs old (Toddler)", min: 2, max: 5 },
@@ -231,15 +248,29 @@ export default function Reports() {
     return { ageBrackets, sectors, civilStatuses, citizenshipRows };
   }, [residentData]);
 
-  // ── RBI Form A household data ─────────────────────────────────────────────────
+  // ── RBI Form A household data & sorting ───────────────────────────────────────
   const rbiFormAData = useMemo(() => {
-    return householdData.map((hh) => ({
-      ...hh,
-      members: residentData.filter((r) => r.householdID === hh.householdID),
-    }));
-  }, [householdData, residentData]);
+    return householdData
+      .map((hh) => {
+        const members = residentData.filter((r) => r.householdID === hh.householdID);
+        const head = members.find((m) => m.role === "head");
+        return {
+          ...hh,
+          members,
+          headName: head ? head.fullName : "",
+        };
+      })
+      .sort((a, b) => {
+        if (sortRbiA === "hhid_asc") return (a.householdID || "").localeCompare(b.householdID || "");
+        if (sortRbiA === "hhid_desc") return (b.householdID || "").localeCompare(a.householdID || "");
+        if (sortRbiA === "members_desc") return b.members.length - a.members.length;
+        if (sortRbiA === "members_asc") return a.members.length - b.members.length;
+        if (sortRbiA === "head_asc") return (a.headName || "").localeCompare(b.headName || "");
+        if (sortRbiA === "head_desc") return (b.headName || "").localeCompare(a.headName || "");
+        return 0;
+      });
+  }, [householdData, residentData, sortRbiA]);
 
-  // ── Demographics CSV Export ──────────────────────────────────────────────────
   const handleExportDemographicsCSV = () => {
     const headers = ["Full Name", "Sex", "Age", "Birth Date", "Civil Status", "Citizenship", "Occupation", "Household ID"];
     const rows = filteredResidents.map((r) => [
@@ -255,7 +286,6 @@ export default function Reports() {
     logTransaction(adminName, adminRole, "Exported Demographics CSV", `Filter: ${sexFilter}. Total: ${filteredResidents.length}.`);
   };
 
-  // ── Demographics PDF Export ──────────────────────────────────────────────────
   const handleExportDemographicsPDF = async () => {
     setExportLoading(true);
     try {
@@ -297,7 +327,6 @@ export default function Reports() {
         y += 6;
       });
 
-      // Signatories
       if (y + 25 > pageH) { doc.addPage(); y = 20; }
       y += 10;
       doc.setFontSize(8);
@@ -325,7 +354,6 @@ export default function Reports() {
     setExportLoading(false);
   };
 
-  // ── RBI Form A PDF Export (Single Masterlist PDF with ALL Members Included) ─
   const handleExportRBIFormA = async () => {
     setExportLoading(true);
     try {
@@ -335,7 +363,6 @@ export default function Reports() {
       const pageH = doc.internal.pageSize.height;
       let y = 12;
 
-      // Header renderer
       const drawHeader = () => {
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
         doc.text("BARANGAY 3S+ MALANDAY", 14, 12);
@@ -348,7 +375,6 @@ export default function Reports() {
         doc.text(`Total Households: ${householdData.length} | Total Inhabitants: ${residentData.length}`, pageW - 14, 14, { align: "right" });
       };
 
-      // Table Column Definitions
       const colDefs = [
         { label: "HOUSEHOLD ID", x: 14, w: 32 },
         { label: "LAST NAME", x: 46, w: 27 },
@@ -380,7 +406,6 @@ export default function Reports() {
       y = 24;
       drawTableHeader();
 
-      // Collect ALL members across every household
       const allMasterlistRows = [];
 
       householdData.forEach((hh) => {
@@ -391,7 +416,6 @@ export default function Reports() {
             allMasterlistRows.push({ ...m, hhid: hh.householdID });
           });
         } else {
-          // Household with no registered members yet
           allMasterlistRows.push({
             hhid: hh.householdID,
             lastName: "— No Members —",
@@ -399,7 +423,6 @@ export default function Reports() {
         }
       });
 
-      // Render all members continuously
       doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
       allMasterlistRows.forEach((m) => {
         if (y > pageH - 35) {
@@ -440,7 +463,6 @@ export default function Reports() {
         y += rowH;
       });
 
-      // Signatories Section at the bottom of the last page
       if (y + 30 > pageH) {
         doc.addPage();
         y = 20;
@@ -479,7 +501,6 @@ export default function Reports() {
     setExportLoading(false);
   };
 
-  // ── RBI Form C PDF Export ─────────────────────────────────────────────────────
   const handleExportRBIFormC = async () => {
     setExportLoading(true);
     try {
@@ -598,7 +619,6 @@ export default function Reports() {
     setExportLoading(false);
   };
 
-  // ── Shared table styles ──────────────────────────────────────────────────────
   const thStyle = { padding: "10px 12px", fontWeight: "600", fontSize: "13px", color: "#374151", borderBottom: "2px solid #e5e7eb", background: "#f3f4f6", textAlign: "left" };
   const tdStyle = { padding: "8px 12px", color: "#4b5563", fontSize: "13px", borderBottom: "1px solid #f3f4f6" };
   const tdNum = { ...tdStyle, textAlign: "right", fontWeight: "600" };
@@ -616,7 +636,6 @@ export default function Reports() {
     rbiAPage * ITEMS_PER_PAGE
   );
 
-  // ── Pagination Helper ────────────────────────────────────────────────────────
   const renderPaginationControls = (currentPage, totalPages, setPageFn) => {
     if (totalPages <= 1) return null;
 
@@ -680,7 +699,6 @@ export default function Reports() {
     );
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <AdminLayout>
       <div className="main-content">
@@ -712,14 +730,29 @@ export default function Reports() {
             <div className="section">
               <div className="report-header">
                 <h2>Resident Demographics</h2>
-                <div className="report-controls">
-                  <div className="filter-group">
-                    <label>Filter by Sex</label>
-                    <select value={sexFilter} onChange={(e) => setSexFilter(e.target.value)}
-                      style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}>
-                      <option value="all">All</option>
+                <div className="report-controls" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div className="filter-group" style={{ display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", flexWrap: "nowrap" }}>
+                    <select
+                      value={sexFilter}
+                      onChange={(e) => setSexFilter(e.target.value)}
+                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
+                    >
+                      <option value="all">All Sexes</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
+                    </select>
+
+                    <select
+                      value={sortDemographics}
+                      onChange={(e) => setSortDemographics(e.target.value)}
+                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
+                    >
+                      <option value="name_asc">Name: A to Z</option>
+                      <option value="name_desc">Name: Z to A</option>
+                      <option value="age_asc">Age: Lowest First</option>
+                      <option value="age_desc">Age: Highest First</option>
+                      <option value="hhid_asc">Household ID: Ascending</option>
+                      <option value="hhid_desc">Household ID: Descending</option>
                     </select>
                   </div>
                   <button className="export-btn" onClick={handleExportDemographicsCSV} disabled={filteredResidents.length === 0 || exportLoading}>Export CSV</button>
@@ -743,13 +776,13 @@ export default function Reports() {
                       <tbody>
                         {paginatedResidents.map((r, index) => (
                           <tr key={`${r.id}-${index}`}>
-                            <td style={tdStyle}>{r.fullName}</td>
+                            <td style={{ ...tdStyle, fontWeight: 500 }}>{r.fullName}</td>
                             <td style={tdStyle}>{r.sex}</td>
                             <td style={tdStyle}>{r.age !== null ? r.age : "N/A"}</td>
                             <td style={tdStyle}>{r.civilStatus}</td>
                             <td style={tdStyle}>{r.citizenship || "Filipino"}</td>
                             <td style={tdStyle}>{r.occupation || "—"}</td>
-                            <td style={tdStyle}>{r.householdID}</td>
+                            <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.82rem" }}>{r.householdID}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -780,7 +813,21 @@ export default function Reports() {
             <div className="section">
               <div className="report-header">
                 <h2>RBI Form A — Records of Barangay Inhabitants Masterlist</h2>
-                <div className="report-controls">
+                <div className="report-controls" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <div className="filter-group" style={{ display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", flexWrap: "nowrap" }}>
+                    <select
+                      value={sortRbiA}
+                      onChange={(e) => setSortRbiA(e.target.value)}
+                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
+                    >
+                      <option value="hhid_asc">Household ID: Ascending</option>
+                      <option value="hhid_desc">Household ID: Descending</option>
+                      <option value="members_desc">Members: Highest First</option>
+                      <option value="members_asc">Members: Lowest First</option>
+                      <option value="head_asc">Head Name: A to Z</option>
+                      <option value="head_desc">Head Name: Z to A</option>
+                    </select>
+                  </div>
                   <button className="export-btn" onClick={handleExportRBIFormA}
                     disabled={rbiFormAData.length === 0 || exportLoading}>
                     {exportLoading ? "Generating…" : "Export Masterlist PDF"}
@@ -806,10 +853,10 @@ export default function Reports() {
                           const head = hh.members.find((m) => m.role === "head");
                           return (
                             <tr key={hh.id}>
-                              <td style={tdStyle}><strong>{hh.householdID}</strong></td>
+                              <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace" }}><strong>{hh.householdID}</strong></td>
                               <td style={tdStyle}>{hh.householdAddress || "—"}</td>
-                              <td style={{ ...tdStyle, textAlign: "center" }}>{hh.members.length}</td>
-                              <td style={tdStyle}>{head ? head.fullName : "—"}</td>
+                              <td style={{ ...tdStyle, textAlign: "center", fontWeight: 600 }}>{hh.members.length}</td>
+                              <td style={{ ...tdStyle, fontWeight: 500 }}>{head ? head.fullName : "—"}</td>
                               <td style={tdStyle}>
                                 <div style={{ fontSize: "12px", color: "#6b7280" }}>
                                   {hh.members.slice(0, 3).map((m) => m.fullName).join(", ")}
