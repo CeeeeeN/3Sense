@@ -252,7 +252,7 @@ export default function AdminLogs() {
         </div>
 
         {/* DATA TABLE */}
-        <div className="req-table-wrapper">
+        <div className="req-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {loading ? (
             <div className="empty-state">
               <Clock className="animate-spin mb-2" size={32} />
@@ -265,13 +265,13 @@ export default function AdminLogs() {
               <p>No system actions match your current search and date filters.</p>
             </div>
           ) : (
-            <table className="req-table">
+            <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
                 <tr>
-                  <th style={{ width: '15%' }}>Date & Time</th>
-                  <th style={{ width: '20%' }}>Admin</th>
-                  <th style={{ width: '15%' }}>Action Type</th>
-                  <th style={{ width: '50%' }}>Details</th>
+                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Date & Time</th>
+                  <th style={{ width: '20%', whiteSpace: 'nowrap' }}>Admin</th>
+                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Action Type</th>
+                  <th style={{ width: '50%', minWidth: '250px' }}>Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -296,7 +296,8 @@ export default function AdminLogs() {
                           fontWeight: 700, 
                           background: badge.bg, 
                           color: badge.text,
-                          display: 'inline-block'
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap'
                         }}>
                           {log.actionType.replace(/_/g, ' ')}
                         </span>

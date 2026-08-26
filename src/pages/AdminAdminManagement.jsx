@@ -21,12 +21,10 @@ import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 
 export default function AdminManagement() {
-  // ================= STATE =================
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
@@ -36,13 +34,13 @@ export default function AdminManagement() {
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  const [viewMode, setViewMode] = useState("default");
+  const [activeTab, setActiveTab] = useState("requests");
 
   const [searchAdmin, setSearchAdmin] = useState("");
   const [searchRequest, setSearchRequest] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [sortRequest, setSortRequest] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc
-  const [sortAdmin, setSortAdmin] = useState("name_asc"); // name_asc, name_desc, role_asc, role_desc
+  const [sortRequest, setSortRequest] = useState("date_desc");
+  const [sortAdmin, setSortAdmin] = useState("name_asc");
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -55,8 +53,6 @@ export default function AdminManagement() {
   const [adminPage, setAdminPage] = useState(1);
   const [requestRowsPerPage, setRequestRowsPerPage] = useState(10);
   const [adminRowsPerPage, setAdminRowsPerPage] = useState(10);
-
-  const defaultRows = 3;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -306,7 +302,6 @@ export default function AdminManagement() {
     }
   };
 
-  // ================= FILTERED & SORTED DATA =================
   const filteredAdmins = useMemo(() => {
     return admins
       .filter((admin) => {
@@ -346,25 +341,11 @@ export default function AdminManagement() {
 
   const totalRequestPages = Math.ceil(filteredRequests.length / requestRowsPerPage);
   const requestStartIndex = (requestPage - 1) * requestRowsPerPage;
-
-  const paginatedRequests =
-    viewMode === "default"
-      ? filteredRequests.slice(0, defaultRows)
-      : filteredRequests.slice(
-        requestStartIndex,
-        requestStartIndex + requestRowsPerPage
-      );
+  const paginatedRequests = filteredRequests.slice(requestStartIndex, requestStartIndex + requestRowsPerPage);
 
   const totalAdminPages = Math.ceil(filteredAdmins.length / adminRowsPerPage);
   const adminStartIndex = (adminPage - 1) * adminRowsPerPage;
-
-  const paginatedAdmins =
-    viewMode === "default"
-      ? filteredAdmins.slice(0, defaultRows)
-      : filteredAdmins.slice(
-        adminStartIndex,
-        adminStartIndex + adminRowsPerPage
-      );
+  const paginatedAdmins = filteredAdmins.slice(adminStartIndex, adminStartIndex + adminRowsPerPage);
 
   useEffect(() => {
     setRequestPage(1);
@@ -373,13 +354,6 @@ export default function AdminManagement() {
   useEffect(() => {
     setAdminPage(1);
   }, [searchAdmin, sortAdmin, adminRowsPerPage]);
-
-  useEffect(() => {
-    if (viewMode === "default") {
-      setRequestPage(1);
-      setAdminPage(1);
-    }
-  }, [viewMode]);
 
   const renderPageNumbers = (currentPage, totalPages, setPage) => {
     const pages = [];
@@ -439,25 +413,29 @@ export default function AdminManagement() {
 
   return (
     <AdminLayout>
-      <div className="main-content">
-        {/* ================= REGISTRATION REQUESTS ================= */}
-        {(viewMode === "default" || viewMode === "requests") && (
-          <div className="section" style={{ marginBottom: "40px" }}>
-            <div className="section-header">
-              <div>
-                <h2 className="requests-title">
-                  Admin Registration Requests
-                </h2>
-                <p className="af-subtitle">Pending approval (
-                  {filteredRequests.filter((r) => r.status === "pending").length})</p>
-              </div>
+      <div className="requests-container">
+        <div className="requests-header">
+          <h1 className="requests-title">Admin Management</h1>
+          <p className="requests-subtitle">Manage system administrative privileges, registrations, and accounts.</p>
+        </div>
 
-              {viewMode === "default" ? (
-                <button className="view-btn" onClick={() => setViewMode("requests")}> See All Requests </button>
-              ) : (
-                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchRequest(""); setFilterStatus("All"); setSortRequest("date_desc"); setRequestPage(1); }}> Return </button>
-              )}
-            </div>
+        <div className="req-tabs">
+          <button
+            className={`req-tab ${activeTab === "requests" ? "active" : ""}`}
+            onClick={() => setActiveTab("requests")}
+          >
+            Registration Requests
+          </button>
+          <button
+            className={`req-tab ${activeTab === "admins" ? "active" : ""}`}
+            onClick={() => setActiveTab("admins")}
+          >
+            Admin Accounts
+          </button>
+        </div>
+
+        {activeTab === "requests" && (
+          <>
             <div className="requests-controls">
               <div className="search-wrapper" style={{ position: "relative" }}>
                 <Search
@@ -471,7 +449,6 @@ export default function AdminManagement() {
                     pointerEvents: "none",
                   }}
                 />
-
                 <input
                   type="text"
                   placeholder="Search requests..."
@@ -515,8 +492,9 @@ export default function AdminManagement() {
                 </select>
               </div>
             </div>
-            <div className="req-table-wrapper">
-              <table className="req-table">
+
+            <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr>
                     <th>Full Name</th>
@@ -589,7 +567,7 @@ export default function AdminManagement() {
               </table>
             </div>
 
-            {viewMode === "requests" && filteredRequests.length > 0 && (
+            {filteredRequests.length > 0 && (
               <div style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -600,7 +578,6 @@ export default function AdminManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                   <span>Rows per page:</span>
                   <select
@@ -631,9 +608,7 @@ export default function AdminManagement() {
                     >
                       Previous
                     </button>
-
                     {renderPageNumbers(requestPage, totalRequestPages, setRequestPage)}
-
                     <button
                       className="af-page-btn"
                       onClick={() => setRequestPage(prev => Math.min(prev + 1, totalRequestPages))}
@@ -651,20 +626,11 @@ export default function AdminManagement() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {/* ================= ADMIN ACCOUNT MANAGEMENT ================= */}
-        {(viewMode === "default" || viewMode === "admins") && (
-          <div className="section">
-            <div className="section-header">
-              <h2 className="requests-title"> Admin Account Management</h2>
-              {viewMode === "default" ? (
-                <button className="view-btn" onClick={() => setViewMode("admins")}> See All Admins </button>
-              ) : (
-                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchAdmin(""); setSortAdmin("name_asc"); setAdminPage(1); }}> Return </button>
-              )}
-            </div>
+        {activeTab === "admins" && (
+          <>
             <div className="requests-controls">
               <div className="search-wrapper" style={{ position: "relative" }}>
                 <Search
@@ -678,7 +644,6 @@ export default function AdminManagement() {
                     pointerEvents: "none",
                   }}
                 />
-
                 <input
                   type="text"
                   placeholder="Search admin..."
@@ -711,8 +676,9 @@ export default function AdminManagement() {
                 </select>
               </div>
             </div>
-            <div className="req-table-wrapper">
-              <table className="req-table">
+
+            <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr>
                     <th>Full Name</th>
@@ -783,7 +749,7 @@ export default function AdminManagement() {
               </table>
             </div>
 
-            {viewMode === "admins" && filteredAdmins.length > 0 && (
+            {filteredAdmins.length > 0 && (
               <div style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -794,7 +760,6 @@ export default function AdminManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                   <span>Rows per page:</span>
                   <select
@@ -825,9 +790,7 @@ export default function AdminManagement() {
                     >
                       Previous
                     </button>
-
                     {renderPageNumbers(adminPage, totalAdminPages, setAdminPage)}
-
                     <button
                       className="af-page-btn"
                       onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
@@ -845,11 +808,10 @@ export default function AdminManagement() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      {/* Approve Modal */}
       {showApproveModal && (
         <div className="as-modal-overlay">
           <div className="modal">
@@ -876,7 +838,6 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* Reject Modal */}
       {showRejectModal && (
         <div className="as-modal-overlay">
           <div className="modal">
@@ -902,7 +863,6 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* Delete Modal */}
       {showDeleteModal && (
         <div className="as-modal-overlay">
           <div className="modal">
@@ -928,11 +888,9 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* View Admin Details Modal */}
       {showViewModal && selectedAdmin && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "420px" }}>
-
             <div className="as-modal-header">
               <h2>Admin Details</h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
@@ -993,7 +951,6 @@ export default function AdminManagement() {
                   <button className="approve-btn" onClick={handleSaveRole}>Save Role Changes</button>
                 </div>
               )}
-
             </div>
           </div>
         </div>

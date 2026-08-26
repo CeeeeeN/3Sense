@@ -6,6 +6,26 @@ import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../services/logger";
 
+import barangayLogo from "./barangay-logo.jpg";
+
+const loadImage = (src) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      console.error("Barangay logo failed to load:", src);
+      resolve(null);
+    };
+    img.src = src;
+  });
+
+const getImageFormat = (src) => {
+  const ext = (src.split("?")[0].split(".").pop() || "").toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "JPEG";
+  if (ext === "webp") return "WEBP";
+  return "PNG";
+};
+
 export default function Reports() {
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -21,15 +41,16 @@ export default function Reports() {
   const [adminRole, setAdminRole] = useState("");
   const [demoPage, setDemoPage] = useState(1);
   const [rbiAPage, setRbiAPage] = useState(1);
-  const ITEMS_PER_PAGE = 20;
+  const [demoRowsPerPage, setDemoRowsPerPage] = useState(10);
+  const [rbiARowsPerPage, setRbiARowsPerPage] = useState(10);
 
   useEffect(() => {
     setDemoPage(1);
-  }, [sexFilter, sortDemographics]);
+  }, [sexFilter, sortDemographics, demoRowsPerPage]);
 
   useEffect(() => {
     setRbiAPage(1);
-  }, [sortRbiA]);
+  }, [sortRbiA, rbiARowsPerPage]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -363,11 +384,21 @@ export default function Reports() {
       const pageH = doc.internal.pageSize.height;
       let y = 12;
 
+      const logoImg = await loadImage(barangayLogo);
+      const logoFormat = getImageFormat(barangayLogo);
+      const LOGO_SIZE = 14;
+      const LOGO_X = 14;
+      const LOGO_Y = 5;
+      const textX = logoImg ? LOGO_X + LOGO_SIZE + 4 : 14; 
+
       const drawHeader = () => {
+        if (logoImg) {
+          doc.addImage(logoImg, logoFormat, LOGO_X, LOGO_Y, LOGO_SIZE, LOGO_SIZE);
+        }
         doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-        doc.text("BARANGAY 3S+ MALANDAY", 14, 12);
+        doc.text("BARANGAY 3S+ MALANDAY", textX, 12);
         doc.setFontSize(9);
-        doc.text("RBI FORM A (Revised 2024)", 14, 17);
+        doc.text("RBI FORM A (Revised 2024)", textX, 17);
 
         doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
         doc.text("RECORDS OF BARANGAY INHABITANTS MASTERLIST", pageW / 2, 14, { align: "center" });
@@ -512,10 +543,21 @@ export default function Reports() {
 
       const checkPage = () => { if (y > pageH - 28) { doc.addPage(); y = 14; } };
 
+      const logoImg = await loadImage(barangayLogo);
+      const logoFormat = getImageFormat(barangayLogo);
+      const LOGO_SIZE = 14;
+      const LOGO_X = 14;
+      const LOGO_Y = 4;
+      const textX = logoImg ? LOGO_X + LOGO_SIZE + 4 : 14;
+
+      if (logoImg) {
+        doc.addImage(logoImg, logoFormat, LOGO_X, LOGO_Y, LOGO_SIZE, LOGO_SIZE);
+      }
+
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-      doc.text("BARANGAY 3S+ MALANDAY", 14, y);
+      doc.text("BARANGAY 3S+ MALANDAY", textX, y);
       doc.setFontSize(11);
-      doc.text("RBI FORM C (Revised 2024)", 14, y + 5);
+      doc.text("RBI FORM C (Revised 2024)", textX, y + 5);
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
       doc.text("MONITORING REPORT", pageW / 2, y + 2, { align: "center" });
       doc.text(`Generated: ${new Date().toLocaleDateString("en-PH")}`, pageW - 14, y + 2, { align: "right" });
@@ -619,104 +661,86 @@ export default function Reports() {
     setExportLoading(false);
   };
 
-  const thStyle = { padding: "10px 12px", fontWeight: "600", fontSize: "13px", color: "#374151", borderBottom: "2px solid #e5e7eb", background: "#f3f4f6", textAlign: "left" };
+  const thStyle = { padding: "10px 12px", fontWeight: "600", fontSize: "13px", color: "#374151", borderBottom: "2px solid #e5e7eb", background: "#f3f4f6", textAlign: "left", whiteSpace: "nowrap" };
   const tdStyle = { padding: "8px 12px", color: "#4b5563", fontSize: "13px", borderBottom: "1px solid #f3f4f6" };
   const tdNum = { ...tdStyle, textAlign: "right", fontWeight: "600" };
   const thNum = { ...thStyle, textAlign: "right" };
 
-  const totalDemoPages = Math.ceil(filteredResidents.length / ITEMS_PER_PAGE);
+  const totalDemoPages = Math.ceil(filteredResidents.length / demoRowsPerPage);
+  const demoStartIndex = (demoPage - 1) * demoRowsPerPage;
   const paginatedResidents = filteredResidents.slice(
-    (demoPage - 1) * ITEMS_PER_PAGE,
-    demoPage * ITEMS_PER_PAGE
+    demoStartIndex,
+    demoStartIndex + demoRowsPerPage
   );
 
-  const totalRbiAPages = Math.ceil(rbiFormAData.length / ITEMS_PER_PAGE);
+  const totalRbiAPages = Math.ceil(rbiFormAData.length / rbiARowsPerPage);
+  const rbiAStartIndex = (rbiAPage - 1) * rbiARowsPerPage;
   const paginatedRbiA = rbiFormAData.slice(
-    (rbiAPage - 1) * ITEMS_PER_PAGE,
-    rbiAPage * ITEMS_PER_PAGE
+    rbiAStartIndex,
+    rbiAStartIndex + rbiARowsPerPage
   );
 
-  const renderPaginationControls = (currentPage, totalPages, setPageFn) => {
-    if (totalPages <= 1) return null;
-
-    const maxVisible = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-
-    if (endPage - startPage + 1 < maxVisible) {
-      startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-
+  const renderPageNumbers = (currentPage, totalPages, setPage) => {
     const pages = [];
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
     }
 
-    const btnStyle = { padding: "6px 12px", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "13px" };
-
-    return (
-      <div style={{ display: "flex", gap: "4px" }}>
-        <button
-          onClick={() => setPageFn(p => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          style={{ ...btnStyle, background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
-        >
-          Prev
-        </button>
-
-        {startPage > 1 && (
-          <>
-            <button onClick={() => setPageFn(1)} style={{ ...btnStyle, background: "#fff", color: "#374151" }}>1</button>
-            {startPage > 2 && <span style={{ padding: "6px 4px", color: "#6b7280" }}>...</span>}
-          </>
-        )}
-
-        {pages.map(i => (
-          <button
-            key={i}
-            onClick={() => setPageFn(i)}
-            style={{ ...btnStyle, background: currentPage === i ? "#2563eb" : "#fff", color: currentPage === i ? "#fff" : "#374151", fontWeight: currentPage === i ? "bold" : "normal" }}
-          >
-            {i}
-          </button>
-        ))}
-
-        {endPage < totalPages && (
-          <>
-            {endPage < totalPages - 1 && <span style={{ padding: "6px 4px", color: "#6b7280" }}>...</span>}
-            <button onClick={() => setPageFn(totalPages)} style={{ ...btnStyle, background: "#fff", color: "#374151" }}>{totalPages}</button>
-          </>
-        )}
-
-        <button
-          onClick={() => setPageFn(p => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          style={{ ...btnStyle, background: currentPage === totalPages ? "#f3f4f6" : "#fff", color: currentPage === totalPages ? "#9ca3af" : "#374151", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
-        >
-          Next
-        </button>
-      </div>
-    );
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => (typeof page === "number" ? setPage(page) : null)}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : "",
+        }}
+      >
+        {page}
+      </button>
+    ));
   };
 
   return (
     <AdminLayout>
-      <div className="main-content">
+      <div className="requests-container">
+        <div className="requests-header">
+          <h1 className="requests-title">Reports & RBI</h1>
+          <p className="requests-subtitle">Generate official barangay demographic reports, RBI Form A, and RBI Form C.</p>
+        </div>
 
         {/* ── TABS ── */}
-        <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
-          {[
-            { key: "demographics", label: "Demographics" },
-            { key: "rbi-a", label: "RBI Form A" },
-            { key: "rbi-c", label: "RBI Form C" },
-          ].map((tab) => (
-            <button key={tab.key} onClick={() => setReportType(tab.key)} style={{
-              padding: "8px 20px", borderRadius: "8px", border: "none", cursor: "pointer",
-              fontWeight: reportType === tab.key ? "bold" : "normal",
-              background: reportType === tab.key ? "#2563eb" : "#e5e7eb",
-              color: reportType === tab.key ? "#fff" : "#374151", transition: "all 0.2s",
-            }}>{tab.label}</button>
-          ))}
+        <div className="req-tabs">
+          <button
+            className={`req-tab ${reportType === "demographics" ? "active" : ""}`}
+            onClick={() => setReportType("demographics")}
+          >
+            Demographics
+          </button>
+          <button
+            className={`req-tab ${reportType === "rbi-a" ? "active" : ""}`}
+            onClick={() => setReportType("rbi-a")}
+          >
+            RBI Form A
+          </button>
+          <button
+            className={`req-tab ${reportType === "rbi-c" ? "active" : ""}`}
+            onClick={() => setReportType("rbi-c")}
+          >
+            RBI Form C
+          </button>
         </div>
 
         {/* ══ DEMOGRAPHICS ════════════════════════════════════════════════════ */}
@@ -733,9 +757,9 @@ export default function Reports() {
                 <div className="report-controls" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="filter-group" style={{ display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", flexWrap: "nowrap" }}>
                     <select
+                      className="filter-select"
                       value={sexFilter}
                       onChange={(e) => setSexFilter(e.target.value)}
-                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
                     >
                       <option value="all">All Sexes</option>
                       <option value="Male">Male</option>
@@ -743,9 +767,9 @@ export default function Reports() {
                     </select>
 
                     <select
+                      className="filter-select"
                       value={sortDemographics}
                       onChange={(e) => setSortDemographics(e.target.value)}
-                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
                     >
                       <option value="name_asc">Name: A to Z</option>
                       <option value="name_desc">Name: Z to A</option>
@@ -768,8 +792,8 @@ export default function Reports() {
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No residents found.</div>
               ) : (
                 <>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table className="req-table" style={{ minWidth: "850px", width: "100%", borderCollapse: "collapse" }}>
                       <thead>
                         <tr>{["Full Name", "Sex", "Age", "Civil Status", "Citizenship", "Occupation", "Household ID"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                       </thead>
@@ -788,12 +812,63 @@ export default function Reports() {
                       </tbody>
                     </table>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
-                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                      Showing {filteredResidents.length > 0 ? (demoPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(demoPage * ITEMS_PER_PAGE, filteredResidents.length)} of {filteredResidents.length} entries
-                    </span>
 
-                    {renderPaginationControls(demoPage, totalDemoPages, setDemoPage)}
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "16px 24px",
+                    borderTop: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    flexWrap: "wrap",
+                    gap: "16px"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                      <span>Rows per page:</span>
+                      <select
+                        value={demoRowsPerPage}
+                        onChange={(e) => setDemoRowsPerPage(Number(e.target.value))}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          background: 'white',
+                          color: '#334155',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={15}>15</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+
+                    {totalDemoPages > 1 && (
+                      <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          className="af-page-btn"
+                          onClick={() => setDemoPage((prev) => Math.max(prev - 1, 1))}
+                          disabled={demoPage === 1}
+                        >
+                          Previous
+                        </button>
+                        {renderPageNumbers(demoPage, totalDemoPages, setDemoPage)}
+                        <button
+                          className="af-page-btn"
+                          onClick={() => setDemoPage((prev) => Math.min(prev + 1, totalDemoPages))}
+                          disabled={demoPage === totalDemoPages}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      Showing {filteredResidents.length > 0 ? demoStartIndex + 1 : 0} to{" "}
+                      {Math.min(demoStartIndex + demoRowsPerPage, filteredResidents.length)} of{" "}
+                      {filteredResidents.length}
+                    </div>
                   </div>
                 </>
               )}
@@ -816,9 +891,9 @@ export default function Reports() {
                 <div className="report-controls" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="filter-group" style={{ display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", flexWrap: "nowrap" }}>
                     <select
+                      className="filter-select"
                       value={sortRbiA}
                       onChange={(e) => setSortRbiA(e.target.value)}
-                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
                     >
                       <option value="hhid_asc">Household ID: Ascending</option>
                       <option value="hhid_desc">Household ID: Descending</option>
@@ -830,7 +905,7 @@ export default function Reports() {
                   </div>
                   <button className="export-btn" onClick={handleExportRBIFormA}
                     disabled={rbiFormAData.length === 0 || exportLoading}>
-                    {exportLoading ? "Generating…" : "Export Masterlist PDF"}
+                    {exportLoading ? "Generating…" : "Export PDF"}
                   </button>
                 </div>
               </div>
@@ -843,8 +918,8 @@ export default function Reports() {
                 <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No household data found.</div>
               ) : (
                 <>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table className="req-table" style={{ minWidth: "850px", width: "100%", borderCollapse: "collapse" }}>
                       <thead>
                         <tr>{["Household ID", "Household Address", "No. of Members", "Head of Household", "Members Preview"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                       </thead>
@@ -869,12 +944,63 @@ export default function Reports() {
                       </tbody>
                     </table>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f9fafb" }}>
-                    <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                      Showing {rbiFormAData.length > 0 ? (rbiAPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(rbiAPage * ITEMS_PER_PAGE, rbiFormAData.length)} of {rbiFormAData.length} entries
-                    </span>
 
-                    {renderPaginationControls(rbiAPage, totalRbiAPages, setRbiAPage)}
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "16px 24px",
+                    borderTop: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    flexWrap: "wrap",
+                    gap: "16px"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                      <span>Rows per page:</span>
+                      <select
+                        value={rbiARowsPerPage}
+                        onChange={(e) => setRbiARowsPerPage(Number(e.target.value))}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          background: 'white',
+                          color: '#334155',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={15}>15</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+
+                    {totalRbiAPages > 1 && (
+                      <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          className="af-page-btn"
+                          onClick={() => setRbiAPage((prev) => Math.max(prev - 1, 1))}
+                          disabled={rbiAPage === 1}
+                        >
+                          Previous
+                        </button>
+                        {renderPageNumbers(rbiAPage, totalRbiAPages, setRbiAPage)}
+                        <button
+                          className="af-page-btn"
+                          onClick={() => setRbiAPage((prev) => Math.min(prev + 1, totalRbiAPages))}
+                          disabled={rbiAPage === totalRbiAPages}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      Showing {rbiFormAData.length > 0 ? rbiAStartIndex + 1 : 0} to{" "}
+                      {Math.min(rbiAStartIndex + rbiARowsPerPage, rbiFormAData.length)} of{" "}
+                      {rbiFormAData.length}
+                    </div>
                   </div>
                 </>
               )}
@@ -905,8 +1031,8 @@ export default function Reports() {
               {/* A. Age Brackets */}
               <div className="report-card" style={{ marginBottom: "20px" }}>
                 <h3 style={{ marginBottom: "12px" }}>A. Population by Age Bracket</h3>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  <table className="req-table" style={{ minWidth: "600px", width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Age Bracket</th>
@@ -938,8 +1064,8 @@ export default function Reports() {
               {/* B. Population by Sector */}
               <div className="report-card" style={{ marginBottom: "20px" }}>
                 <h3 style={{ marginBottom: "12px" }}>B. Population by Sector</h3>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  <table className="req-table" style={{ minWidth: "600px", width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Sector</th>
@@ -966,39 +1092,43 @@ export default function Reports() {
               <div className="rbi-bottom-grid">
                 <div className="report-card">
                   <h3 style={{ marginBottom: "12px" }}>Civil Status</h3>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr><th style={thStyle}>Status</th><th style={thNum}>Male</th><th style={thNum}>Female</th><th style={thNum}>Total</th></tr>
-                    </thead>
-                    <tbody>
-                      {rbiFormCData.civilStatuses.map((s) => (
-                        <tr key={s.label}>
-                          <td style={tdStyle}>{s.label}</td>
-                          <td style={tdNum}>{s.male}</td>
-                          <td style={tdNum}>{s.female}</td>
-                          <td style={{ ...tdNum, fontWeight: "700", color: "#111827" }}>{s.total}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table className="req-table" style={{ minWidth: "400px", width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr><th style={thStyle}>Status</th><th style={thNum}>Male</th><th style={thNum}>Female</th><th style={thNum}>Total</th></tr>
+                      </thead>
+                      <tbody>
+                        {rbiFormCData.civilStatuses.map((s) => (
+                          <tr key={s.label}>
+                            <td style={tdStyle}>{s.label}</td>
+                            <td style={tdNum}>{s.male}</td>
+                            <td style={tdNum}>{s.female}</td>
+                            <td style={{ ...tdNum, fontWeight: "700", color: "#111827" }}>{s.total}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
                 <div className="report-card">
                   <h3 style={{ marginBottom: "12px" }}>Citizenship</h3>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr><th style={thStyle}>Type</th><th style={thNum}>Male</th><th style={thNum}>Female</th><th style={thNum}>Total</th></tr>
-                    </thead>
-                    <tbody>
-                      {rbiFormCData.citizenshipRows.map((s) => (
-                        <tr key={s.label}>
-                          <td style={tdStyle}>{s.label}</td>
-                          <td style={tdNum}>{s.male}</td>
-                          <td style={tdNum}>{s.female}</td>
-                          <td style={{ ...tdNum, fontWeight: "700", color: "#111827" }}>{s.total}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <table className="req-table" style={{ minWidth: "400px", width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr><th style={thStyle}>Type</th><th style={thNum}>Male</th><th style={thNum}>Female</th><th style={thNum}>Total</th></tr>
+                      </thead>
+                      <tbody>
+                        {rbiFormCData.citizenshipRows.map((s) => (
+                          <tr key={s.label}>
+                            <td style={tdStyle}>{s.label}</td>
+                            <td style={tdNum}>{s.male}</td>
+                            <td style={tdNum}>{s.female}</td>
+                            <td style={{ ...tdNum, fontWeight: "700", color: "#111827" }}>{s.total}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 

@@ -36,30 +36,6 @@ const formatTime = (ts) => {
   return d.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
 };
 
-const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
-    <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-      Page <span style={{ fontWeight: 600, color: "#111827" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#111827" }}>{totalPages || 1}</span>
-    </span>
-    <div style={{ display: "flex", gap: "8px" }}>
-      <button
-        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-        disabled={currentPage === 1}
-        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
-      >
-        Previous
-      </button>
-      <button
-        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-        disabled={currentPage === totalPages || totalPages === 0}
-        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === totalPages || totalPages === 0 ? "#f3f4f6" : "#fff", color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
-      >
-        Next
-      </button>
-    </div>
-  </div>
-);
-
 export default function ServicePeaceOrder({ onBack }) {
   const [reports, setReports]               = useState([]);
   const [loading, setLoading]               = useState(true);
@@ -80,7 +56,7 @@ export default function ServicePeaceOrder({ onBack }) {
   const [filterStatus, setFilterStatus]     = useState("All");
   const [filterUrgency, setFilterUrgency]   = useState("All");
   const [filterType, setFilterType]         = useState("All");
-  const [sortOrder, setSortOrder]           = useState("date_desc"); // date_desc, date_asc, type_asc, type_desc, status_asc
+  const [sortOrder, setSortOrder]           = useState("date_desc");
 
   // For logging purposes
   const [adminName, setAdminName]           = useState("");
@@ -292,13 +268,47 @@ export default function ServicePeaceOrder({ onBack }) {
   }, [reports, filterStatus, filterUrgency, filterType, sortOrder]);
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
-  const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedReports = filteredReports.slice(startIndex, startIndex + itemsPerPage);
 
   const counts = {
     total:     reports.length,
     pending:   reports.filter(r => (r.status || "").toLowerCase() === "received" || (r.status || "").toLowerCase() === "pending").length,
     responded: reports.filter(r => (r.status || "").toLowerCase() === "responded").length,
     resolved:  reports.filter(r => (r.status || "").toLowerCase() === "resolved").length,
+  };
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 2) {
+        pages.push(1, 2, 3, "...", totalPages);
+      } else if (currentPage >= totalPages - 1) {
+        pages.push(1, "...", totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage, "...", totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => (typeof page === "number" ? setCurrentPage(page) : null)}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : "",
+        }}
+      >
+        {page}
+      </button>
+    ));
   };
 
   return (
@@ -339,10 +349,10 @@ export default function ServicePeaceOrder({ onBack }) {
               Incoming Reports ({filteredReports.length})
             </div>
 
-            {/* FILTER & SORT PANEL - HORIZONTALLY SCATTERED */}
+            {/* FILTER & SORT PANEL */}
             <div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", gap: "8px" }}>
-                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
                   <option value="All">All Statuses</option>
                   <option value="received">Received</option>
                   <option value="pending">Pending</option>
@@ -350,7 +360,7 @@ export default function ServicePeaceOrder({ onBack }) {
                   <option value="resolved">Resolved</option>
                 </select>
                 
-                <select value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                <select className="filter-select" value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
                   <option value="All">All Urgencies</option>
                   <option value="emergency">Emergency</option>
                   <option value="urgent">Urgent</option>
@@ -359,14 +369,14 @@ export default function ServicePeaceOrder({ onBack }) {
               </div>
 
               <div style={{ display: "flex", gap: "8px" }}>
-                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                <select className="filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
                   <option value="All">All Types</option>
                   {uniqueIncidentTypes.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
 
-                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+                <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
                   <option value="date_desc">Date: Newest</option>
                   <option value="date_asc">Date: Oldest</option>
                   <option value="type_asc">Type: A to Z</option>
@@ -417,11 +427,42 @@ export default function ServicePeaceOrder({ onBack }) {
             </div>
             
             {filteredReports.length > 0 && (
-              <PaginationControls 
-                currentPage={currentPage} 
-                totalPages={totalPages} 
-                setCurrentPage={setCurrentPage} 
-              />
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "12px 16px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                flexWrap: "wrap",
+                gap: "8px"
+              }}>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredReports.length)} of {filteredReports.length}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="af-pagination" style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                    >
+                      Prev
+                    </button>
+                    {renderPageNumbers()}
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -533,6 +574,7 @@ export default function ServicePeaceOrder({ onBack }) {
                         </button>
                       </div>
                       <select
+                        className="filter-select"
                         style={{ width: "100%", padding: "10px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
                         value={assignedTanod}
                         onChange={(e) => saveTanod(e.target.value)}
