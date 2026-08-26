@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../AdminStyle.css";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -18,6 +18,7 @@ import {
 
 export default function AdminLayout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const titles = {
     "/admin/dashboard": "Dashboard",
@@ -40,47 +41,49 @@ export default function AdminLayout({ children }) {
   const [currentUserData, setCurrentUserData] = useState({
     fullName: "Loading...",
     position: "...",
-    role: "...",
+    role: "Standard Admin",
   });
 
-  // 🔥 REAL-TIME NOTIFICATIONS
   const [notifications, setNotifications] = useState([]);
-
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // ─── FETCH USER DATA ─────────────────────────────
+  // ─── 1. FETCH AUTH & USER PROFILE ────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const approvedQ = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const approvedSnapshot = await getDocs(approvedQ);
+        try {
+          const approvedQ = query(
+            collection(db, "approvedAdmins"),
+            where("uid", "==", user.uid)
+          );
+          const approvedSnapshot = await getDocs(approvedQ);
 
-        if (!approvedSnapshot.empty) {
-          const data = approvedSnapshot.docs[0].data();
-          setCurrentUserData({
-            fullName: data.fullName || "Admin",
-            position: data.position || "Admin",
-            role: data.role || "Standard Admin",
-          });
-          return;
-        }
+          if (!approvedSnapshot.empty) {
+            const data = approvedSnapshot.docs[0].data();
+            setCurrentUserData({
+              fullName: data.fullName || data.username || "Admin",
+              position: data.position || "Admin",
+              role: data.role || data.position || "Standard Admin",
+            });
+            return;
+          }
 
-        const pendingQ = query(
-          collection(db, "pendingAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const pendingSnapshot = await getDocs(pendingQ);
+          const pendingQ = query(
+            collection(db, "pendingAdmins"),
+            where("uid", "==", user.uid)
+          );
+          const pendingSnapshot = await getDocs(pendingQ);
 
-        if (!pendingSnapshot.empty) {
-          const data = pendingSnapshot.docs[0].data();
-          setCurrentUserData({
-            fullName: data.fullName || "Admin",
-            position: data.position || "Admin",
-            role: data.role || "Standard Admin",
-          });
+          if (!pendingSnapshot.empty) {
+            const data = pendingSnapshot.docs[0].data();
+            setCurrentUserData({
+              fullName: data.fullName || data.username || "Admin",
+              position: data.position || "Admin",
+              role: data.role || data.position || "Standard Admin",
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching admin profile:", error);
         }
       }
     });
@@ -88,25 +91,30 @@ export default function AdminLayout({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // 🔥 REAL-TIME NOTIFICATION LISTENER
+  // ─── 2. REAL-TIME NOTIFICATION LISTENER ────────────────────────
   useEffect(() => {
     const q = query(
       collection(db, "notifications"),
-      orderBy("createdAt", "desc"),
+      orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setNotifications(data);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setNotifications(data);
+      },
+      (error) => {
+        console.error("Notifications listener error:", error);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e) {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -117,28 +125,145 @@ export default function AdminLayout({ children }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 🔥 MARK SINGLE AS READ
+  // ─── HELPER: RESOLVE ACCURATE NOTIFICATION TITLE ───────────────
+  const getNotificationHeader = (n) => {
+    const text = [
+      n.title || "",
+      n.type || "",
+      n.category || "",
+      n.message || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    if (text.includes("admin registration") || text.includes("new admin")) return "NEW ADMIN";
+    if (text.includes("bswd") || text.includes("homeless") || text.includes("displacement")) return "BSWD REPORT";
+    if (text.includes("incident") || text.includes("tanod") || text.includes("peace") || text.includes("blotter") || text.includes("noise complaint") || text.includes("altercation")) return "PEACE & ORDER";
+    if (text.includes("vawc")) return "VAWC REPORT";
+    if (text.includes("badac") || text.includes("drug")) return "BADAC REPORT";
+    if (text.includes("bosca") || text.includes("senior")) return "BOSCA REPORT";
+    if (text.includes("livelihood") || text.includes("skills training")) return "LIVELIHOOD PROGRAM";
+    if (text.includes("document") || text.includes("clearance") || text.includes("indigency") || text.includes("permit")) return "DOCUMENT REQUEST";
+    if (text.includes("facility") || text.includes("reservation") || text.includes("court") || text.includes("hall")) return "FACILITY RESERVATION";
+    if (text.includes("equipment") || text.includes("rental") || text.includes("chair") || text.includes("tent")) return "EQUIPMENT RENTAL";
+    if (text.includes("household") || text.includes("resident registration")) return "RESIDENT REGISTRATION";
+    if (text.includes("sentiment") || text.includes("feedback") || text.includes("rating")) return "FEEDBACK";
+
+    return (n.title || n.type || "NOTIFICATION").replace(/_/g, " ").toUpperCase();
+  };
+
+  // ─── 3. PRIORITIZED ROLE-BASED NOTIFICATION FILTER (TEST A2) ───
+  const filteredNotifications = useMemo(() => {
+    const cleanRole = (currentUserData.role || "").toLowerCase().replace(/[\s&_-]/g, "");
+    const cleanPos  = (currentUserData.position || "").toLowerCase().replace(/[\s&_-]/g, "");
+
+    const isSuperAdmin =
+      cleanRole.includes("superadmin") ||
+      cleanPos.includes("servicehead") ||
+      cleanRole.includes("servicehead");
+
+    // Super Admins & Service Heads receive all notifications
+    if (isSuperAdmin) return notifications;
+
+    return notifications.filter((n) => {
+      const tag = [
+        n.type || "",
+        n.title || "",
+        n.category || "",
+        n.message || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      // Priority 1: Admin Registrations (Super Admin only)
+      if (tag.includes("new admin") || tag.includes("admin registration") || tag.includes("admin_registration")) {
+        return false;
+      }
+
+      // Priority 2: BSWD (Displacement, Homeless, Tips)
+      if (tag.includes("bswd") || tag.includes("displacement") || tag.includes("homeless") || tag.includes("tip")) {
+        return cleanRole.includes("bswd") || cleanPos.includes("bswd");
+      }
+
+      // Priority 3: Peace & Order (Incidents, Blotters, Tanod, Altercations, Disputes, Noise)
+      if (
+        tag.includes("incident") ||
+        tag.includes("blotter") ||
+        tag.includes("tanod") ||
+        tag.includes("peace") ||
+        tag.includes("altercation") ||
+        tag.includes("dispute") ||
+        tag.includes("vandalism")
+      ) {
+        return cleanRole.includes("peaceorder") || cleanPos.includes("peaceorder");
+      }
+
+      // Priority 4: VAWC
+      if (tag.includes("vawc") || tag.includes("violence against women")) {
+        return cleanRole.includes("vawc") || cleanPos.includes("vawc");
+      }
+
+      // Priority 5: BOSCA
+      if (tag.includes("bosca") || tag.includes("senior citizen")) {
+        return cleanRole.includes("bosca") || cleanPos.includes("bosca");
+      }
+
+      // Priority 6: BADAC
+      if (tag.includes("badac") || tag.includes("drug")) {
+        return cleanRole.includes("badac") || cleanPos.includes("badac");
+      }
+
+      // Priority 7: Livelihood & Programs
+      if (tag.includes("livelihood") || tag.includes("skills training") || tag.includes("program")) {
+        return (
+          cleanRole.includes("livelihood") ||
+          cleanPos.includes("livelihood") ||
+          cleanRole.includes("secretary") ||
+          cleanRole.includes("standardadmin")
+        );
+      }
+
+      // Priority 8: Requests (Documents, Facilities, Equipment)
+      if (
+        tag.includes("document") ||
+        tag.includes("facility") ||
+        tag.includes("equipment") ||
+        tag.includes("reservation") ||
+        tag.includes("rental")
+      ) {
+        return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
+      }
+
+      // Priority 9: Household & Resident Registrations
+      if (tag.includes("household") || tag.includes("resident")) {
+        return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
+      }
+
+      // Priority 10: General Feedback / Ratings
+      if (tag.includes("feedback") || tag.includes("sentiment") || tag.includes("rating")) {
+        return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
+      }
+
+      return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
+    });
+  }, [notifications, currentUserData]);
+
+  // ─── 4. MARK AS READ ───────────────────────────────────────────
   const markAsRead = async (id) => {
     try {
-      await updateDoc(doc(db, "notifications", id), {
-        isRead: true,
-      });
+      await updateDoc(doc(db, "notifications", id), { isRead: true });
     } catch (err) {
-      console.error("Failed to mark as read:", err);
+      console.error("Failed to mark notification as read:", err);
     }
   };
 
-  // 🔥 MARK ALL AS READ (BATCH)
   const markAllAsRead = async () => {
-    const unread = notifications.filter((n) => !n.isRead);
+    const unread = filteredNotifications.filter((n) => !n.isRead);
     if (unread.length === 0) return;
 
     const batch = writeBatch(db);
-
     unread.forEach((n) => {
-      batch.update(doc(db, "notifications", n.id), {
-        isRead: true,
-      });
+      batch.update(doc(db, "notifications", n.id), { isRead: true });
     });
 
     try {
@@ -148,7 +273,63 @@ export default function AdminLayout({ children }) {
     }
   };
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = filteredNotifications.filter((n) => !n.isRead).length;
+
+  // ─── 5. CLICKABLE REDIRECT ROUTING (TEST A3) ───────────────────
+  const handleNotificationClick = async (n) => {
+    if (!n.isRead) {
+      await markAsRead(n.id);
+    }
+    setShowNotif(false);
+
+    const tag = [
+      n.type || "",
+      n.title || "",
+      n.category || "",
+      n.message || "",
+      n.link || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    if (tag.includes("new admin") || tag.includes("admin registration") || tag.includes("admin_registration")) {
+      navigate("/admin/admin-management");
+    } else if (
+      tag.includes("bswd") ||
+      tag.includes("displacement") ||
+      tag.includes("homeless") ||
+      tag.includes("incident") ||
+      tag.includes("blotter") ||
+      tag.includes("tanod") ||
+      tag.includes("peace") ||
+      tag.includes("vawc") ||
+      tag.includes("bosca") ||
+      tag.includes("badac") ||
+      tag.includes("livelihood") ||
+      tag.includes("program") ||
+      tag.includes("manage")
+    ) {
+      navigate("/admin/manage");
+    } else if (
+      tag.includes("document") ||
+      tag.includes("facility") ||
+      tag.includes("equipment") ||
+      tag.includes("reservation") ||
+      tag.includes("rental")
+    ) {
+      navigate("/admin/requests");
+    } else if (tag.includes("household") || tag.includes("resident")) {
+      navigate("/admin/household-management");
+    } else if (tag.includes("feedback") || tag.includes("sentiment")) {
+      navigate("/admin/feedback");
+    } else if (tag.includes("log") || tag.includes("audit")) {
+      navigate("/admin/logs");
+    } else if (tag.includes("report") || tag.includes("rbi")) {
+      navigate("/admin/reports");
+    } else {
+      navigate("/admin/dashboard");
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -169,15 +350,21 @@ export default function AdminLayout({ children }) {
     } else {
       document.body.style.overflow = "";
     }
-
     return () => {
       document.body.style.overflow = "";
     };
   }, [showLogoutModal]);
 
+  const userPages = ROLE_PERMISSIONS[currentUserData.role]?.pages || [
+    "/admin/dashboard",
+    "/admin/manage",
+    "/admin/requests",
+    "/admin/feedback",
+    "/admin/profile"
+  ];
+
   return (
     <div className="admin-layout">
-      {/* Mobile Overlay */}
       {isOpen && (
         <div
           style={{
@@ -204,129 +391,97 @@ export default function AdminLayout({ children }) {
         </div>
 
         <div className="nav-links">
-          {/* Always check if the user's role allows the page before rendering the link */}
+          {userPages.includes("/admin/dashboard") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/dashboard" ? "active" : ""}
+              to="/admin/dashboard"
+            >
+              Dashboard
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/dashboard",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={
-                  location.pathname === "/admin/dashboard" ? "active" : ""
-                }
-                to="/admin/dashboard"
-              >
-                Dashboard
-              </Link>
-            )}
+          {userPages.includes("/admin/manage") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/manage" ? "active" : ""}
+              to="/admin/manage"
+            >
+              Manage
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/manage",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={location.pathname === "/admin/manage" ? "active" : ""}
-                to="/admin/manage"
-              >
-                Manage
-              </Link>
-            )}
+          {userPages.includes("/admin/requests") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/requests" ? "active" : ""}
+              to="/admin/requests"
+            >
+              Requests
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/requests",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={
-                  location.pathname === "/admin/requests" ? "active" : ""
-                }
-                to="/admin/requests"
-              >
-                Requests
-              </Link>
-            )}
-
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/feedback",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={
-                  location.pathname === "/admin/feedback" ? "active" : ""
-                }
-                to="/admin/feedback"
-              >
-                Feedback
-              </Link>
-            )}
+          {userPages.includes("/admin/feedback") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/feedback" ? "active" : ""}
+              to="/admin/feedback"
+            >
+              Feedback
+            </Link>
+          )}
 
           <div className="nav-divider"></div>
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/admin-management",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={
-                  location.pathname === "/admin/admin-management" ? "active" : ""
-                }
-                to="/admin/admin-management"
-              >
-                Admin Management
-              </Link>
-            )}
+          {userPages.includes("/admin/admin-management") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/admin-management" ? "active" : ""}
+              to="/admin/admin-management"
+            >
+              Admin Management
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/household-management",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={
-                  location.pathname === "/admin/household-management"
-                    ? "active"
-                    : ""
-                }
-                to="/admin/household-management"
-              >
-                Household Management
-              </Link>
-            )}
+          {userPages.includes("/admin/household-management") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/household-management" ? "active" : ""}
+              to="/admin/household-management"
+            >
+              Household Management
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/logs",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={location.pathname === "/admin/logs" ? "active" : ""}
-                to="/admin/logs"
-              >
-                Audit Logs
-              </Link>
-            )}
+          {userPages.includes("/admin/logs") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/logs" ? "active" : ""}
+              to="/admin/logs"
+            >
+              Audit Logs
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/reports",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={location.pathname === "/admin/reports" ? "active" : ""}
-                to="/admin/reports"
-              >
-                Reports
-              </Link>
-            )}
+          {userPages.includes("/admin/reports") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/reports" ? "active" : ""}
+              to="/admin/reports"
+            >
+              Reports
+            </Link>
+          )}
 
-          {ROLE_PERMISSIONS[currentUserData.role]?.pages.includes(
-            "/admin/profile",
-          ) && (
-              <Link
-                onClick={handleLinkClick}
-                className={location.pathname === "/admin/profile" ? "active" : ""}
-                to="/admin/profile"
-              >
-                My Profile
-              </Link>
-            )}
+          {userPages.includes("/admin/profile") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/profile" ? "active" : ""}
+              to="/admin/profile"
+            >
+              My Profile
+            </Link>
+          )}
         </div>
 
         <div className="sidebar-bottom">
@@ -353,11 +508,15 @@ export default function AdminLayout({ children }) {
       <div className="right-panel">
         <div className="top-bar">
           <button
-            className="burger-menu" onClick={() => setIsOpen(prev => !prev)}> ☰ </button>
+            className="burger-menu"
+            onClick={() => setIsOpen((prev) => !prev)}
+          >
+            ☰
+          </button>
           <h1>{topBarTitle}</h1>
 
           <div className="top-actions">
-            {/* NOTIFICATIONS */}
+            {/* NOTIFICATIONS DROPDOWN */}
             <div className="notif-wrapper" ref={notifRef}>
               <button
                 className="bell-btn"
@@ -392,46 +551,63 @@ export default function AdminLayout({ children }) {
                   </div>
 
                   <div className="notif-list">
-                    {notifications.length === 0 ? (
-                      <div className="notif-empty">No notifications yet</div>
+                    {filteredNotifications.length === 0 ? (
+                      <div className="notif-empty">No notifications for your role</div>
                     ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          className={`notif-item ${n.isRead ? "read" : ""}`}
-                          onClick={() => !n.isRead && markAsRead(n.id)}
-                        >
+                      filteredNotifications.map((n) => {
+                        const headerLabel = getNotificationHeader(n);
 
-                          <div className="notif-icon">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="18"
-                              height="18"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                            </svg>
+                        return (
+                          <div
+                            key={n.id}
+                            className={`notif-item ${n.isRead ? "read" : ""}`}
+                            onClick={() => handleNotificationClick(n)}
+                            style={{
+                              cursor: "pointer",
+                              transition: "background 0.2s ease",
+                            }}
+                          >
+                            <div className="notif-icon">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                              </svg>
+                            </div>
+
+                            <div className="notif-text">
+                              <strong style={{ color: "#0f172a" }}>
+                                {headerLabel}
+                              </strong>
+                              <p style={{ margin: "2px 0 4px 0", color: "#475569" }}>
+                                {n.message}
+                              </p>
+                              <span className="notif-time">
+                                {n.createdAt?.toDate
+                                  ? n.createdAt.toDate().toLocaleString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                      hour12: true,
+                                    })
+                                  : "Just now"}
+                              </span>
+                            </div>
+
+                            {!n.isRead && <span className="notif-dot"></span>}
                           </div>
-
-                          <div className="notif-text">
-                            <strong>
-                              {n.type?.replace("_", " ").toUpperCase()}
-                            </strong>
-                            <p>{n.message}</p>
-                            <span className="notif-time">
-                              {n.createdAt?.toDate().toLocaleString()}
-                            </span>
-                          </div>
-
-                          {!n.isRead && <span className="notif-dot"></span>}
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -440,13 +616,11 @@ export default function AdminLayout({ children }) {
 
             <div className="top-divider"></div>
 
-            {/* PROFILE */}
+            {/* PROFILE DISPLAY */}
             <div className="profile-wrapper">
               <p className="admin-name">{currentUserData.fullName}</p>
-              <div className="dropdown-role">{currentUserData.position}</div>
+              <div className="dropdown-role">{currentUserData.role || currentUserData.position}</div>
             </div>
-
-            {/* The hamburger button that was here has been removed! */}
           </div>
         </div>
 
@@ -454,6 +628,7 @@ export default function AdminLayout({ children }) {
         {children}
       </div>
 
+      {/* LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (
         <div
           className="modal-overlay"
@@ -490,7 +665,14 @@ export default function AdminLayout({ children }) {
               </svg>
             </button>
             <h3 className="modal-title">Confirm Logout</h3>
-            <p style={{ textAlign: "center", color: "#5e7a99", fontSize: "0.9rem", margin: "0 0 1.25rem 0" }}>
+            <p
+              style={{
+                textAlign: "center",
+                color: "#5e7a99",
+                fontSize: "0.9rem",
+                margin: "0 0 1.25rem 0",
+              }}
+            >
               Are you sure you want to log out?
             </p>
             <div className="btn-group modal-actions">
@@ -498,7 +680,11 @@ export default function AdminLayout({ children }) {
                 type="button"
                 className="approve-btn"
                 onClick={() => setShowLogoutModal(false)}
-                style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1" }}
+                style={{
+                  background: "#f1f5f9",
+                  color: "#475569",
+                  border: "1px solid #cbd5e1",
+                }}
               >
                 Cancel
               </button>
