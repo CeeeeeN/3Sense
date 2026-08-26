@@ -28,30 +28,6 @@ const StatusBadge = ({ status }) => {
   return <span style={style}>{status || "pending"}</span>;
 };
 
-const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
-    <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-      Page <span style={{ fontWeight: 600, color: "#111827" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#111827" }}>{totalPages || 1}</span>
-    </span>
-    <div style={{ display: "flex", gap: "8px" }}>
-      <button
-        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-        disabled={currentPage === 1}
-        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
-      >
-        Previous
-      </button>
-      <button
-        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-        disabled={currentPage === totalPages || totalPages === 0}
-        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === totalPages || totalPages === 0 ? "#f3f4f6" : "#fff", color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
-      >
-        Next
-      </button>
-    </div>
-  </div>
-);
-
 export default function ServiceBswd({ onBack }) {
   const [activeTab, setActiveTab] = useState("reports");
 
@@ -63,7 +39,7 @@ export default function ServiceBswd({ onBack }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [filterStatus, setFilterStatus] = useState("All");
-  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, loc_asc
+  const [sortOrder, setSortOrder] = useState("date_desc");
   
   useEffect(() => {
     setCurrentPage(1);
@@ -71,7 +47,6 @@ export default function ServiceBswd({ onBack }) {
 
   // ── Modal State ──────────────────────────────────────────────────
   const [selectedItem, setSelectedItem] = useState(null);
-
   const [saving, setSaving] = useState(false);
 
   // For logging purposes
@@ -209,7 +184,8 @@ export default function ServiceBswd({ onBack }) {
   }, [activeTab, displacementReports, communityTips, filterStatus, sortOrder]);
 
   const totalPages = Math.ceil(currentData.length / itemsPerPage);
-  const paginatedData = currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = currentData.slice(startIndex, startIndex + itemsPerPage);
 
   const reportsStats = {
     total:    displacementReports.length,
@@ -221,6 +197,39 @@ export default function ServiceBswd({ onBack }) {
     total:   communityTips.length,
     pending: communityTips.filter(t => !(t.status || "").toLowerCase().includes("resolved") && (t.status || "").toLowerCase() !== "responded").length,
     handled: communityTips.filter(t => (t.status || "").toLowerCase().includes("resolved") || (t.status || "").toLowerCase().includes("handled")).length,
+  };
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 2) {
+        pages.push(1, 2, 3, "...", totalPages);
+      } else if (currentPage >= totalPages - 1) {
+        pages.push(1, "...", totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage, "...", totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => (typeof page === "number" ? setCurrentPage(page) : null)}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : "",
+        }}
+      >
+        {page}
+      </button>
+    ));
   };
 
   return (
@@ -236,19 +245,20 @@ export default function ServiceBswd({ onBack }) {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "20px", borderBottom: "1px solid #e5e7eb", paddingBottom: "10px" }}>
-        {[
-          { key: "reports", label: `Displacement Reports (${displacementReports.length})` },
-          { key: "tips",    label: `Community Tips (${communityTips.length})` },
-        ].map(tab => (
-          <button key={tab.key}
-            style={{ padding: "8px 16px", background: activeTab === tab.key ? "#111827" : "transparent", color: activeTab === tab.key ? "#fff" : "#6b7280", borderRadius: "6px", border: "none", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => { setActiveTab(tab.key); setFilterStatus("All"); }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Tab bar consistent with AdminRequests */}
+      <div className="req-tabs" style={{ marginBottom: "20px" }}>
+        <button
+          className={`req-tab ${activeTab === "reports" ? "active" : ""}`}
+          onClick={() => { setActiveTab("reports"); setFilterStatus("All"); }}
+        >
+          Displacement Reports ({displacementReports.length})
+        </button>
+        <button
+          className={`req-tab ${activeTab === "tips" ? "active" : ""}`}
+          onClick={() => { setActiveTab("tips"); setFilterStatus("All"); }}
+        >
+          Community Tips ({communityTips.length})
+        </button>
       </div>
 
       {/* Stat row */}
@@ -285,6 +295,7 @@ export default function ServiceBswd({ onBack }) {
       {/* FILTER & SORT TOOLBAR */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "16px" }}>
         <select
+          className="filter-select"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
@@ -297,6 +308,7 @@ export default function ServiceBswd({ onBack }) {
         </select>
 
         <select
+          className="filter-select"
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
           style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
@@ -314,8 +326,8 @@ export default function ServiceBswd({ onBack }) {
       ) : activeTab === "reports" ? (
 
         /* ── Displacement Reports Table ── */
-        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+        <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+          <table className="req-table" style={{ width: "100%", minWidth: "750px", borderCollapse: "collapse", textAlign: "left" }}>
             <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               <tr>
                 {["Date", "Reporter Name", "Location", "Description", "Status", "Actions"].map(h => (
@@ -356,20 +368,52 @@ export default function ServiceBswd({ onBack }) {
               })}
             </tbody>
           </table>
+
           {currentData.length > 0 && (
-            <PaginationControls 
-              currentPage={currentPage} 
-              totalPages={totalPages} 
-              setCurrentPage={setCurrentPage} 
-            />
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 24px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              flexWrap: "wrap",
+              gap: "16px"
+            }}>
+              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                Showing {startIndex + 1} to{" "}
+                {Math.min(startIndex + itemsPerPage, currentData.length)} of{" "}
+                {currentData.length} entries
+              </div>
+
+              {totalPages > 1 && (
+                <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="af-page-btn"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </button>
+                  {renderPageNumbers()}
+                  <button
+                    className="af-page-btn"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
       ) : (
 
         /* ── Community Tips Table ── */
-        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+        <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+          <table className="req-table" style={{ width: "100%", minWidth: "750px", borderCollapse: "collapse", textAlign: "left" }}>
             <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               <tr>
                 {["Date", "Reporter Name", "Subject", "Tip Info", "Status", "Actions"].map(h => (
@@ -402,12 +446,44 @@ export default function ServiceBswd({ onBack }) {
               ))}
             </tbody>
           </table>
+
           {currentData.length > 0 && (
-            <PaginationControls 
-              currentPage={currentPage} 
-              totalPages={totalPages} 
-              setCurrentPage={setCurrentPage} 
-            />
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 24px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              flexWrap: "wrap",
+              gap: "16px"
+            }}>
+              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                Showing {startIndex + 1} to{" "}
+                {Math.min(startIndex + itemsPerPage, currentData.length)} of{" "}
+                {currentData.length} entries
+              </div>
+
+              {totalPages > 1 && (
+                <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="af-page-btn"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </button>
+                  {renderPageNumbers()}
+                  <button
+                    className="af-page-btn"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -506,5 +582,5 @@ export default function ServiceBswd({ onBack }) {
       )}
 
     </div>
-  );
+  ); 
 }
