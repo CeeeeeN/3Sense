@@ -1,0 +1,916 @@
+import { useState, useEffect, useRef } from "react";
+import barangayLogo from "./barangay-logo.jpg";
+import Navbar from "./Navbar";
+import { getMemberProfile, updateMemberProfile } from "../services/profile";
+import { fetchUserTransactions } from "../services/services";
+import QRCode from "qrcode";
+
+const QR_PAT = [
+  true, true, true, false, true,
+  true, false, true, true, false,
+  true, true, false, true, true,
+  false, true, true, false, true,
+  true, false, true, true, true,
+];
+
+const TABS = ["Personal", "Address", "Category", "Education", "Household"];
+const CATS = ["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"];
+
+const BLANK = {
+  firstName: "", middleName: "", lastName: "", suffix: "",
+  birthDate: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
+  citizenship: "", religion: "", contactNumber: "", email: "", residingSinceYear: "",
+  houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
+  sameAddress: false,
+  categories: [],
+  pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
+  educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
+  totalMembers: "", householdClassification: "",
+};
+
+const STATUS_MAP = {
+  "Clear Case": { label: "Clear Case", cls: "clear", color: "#0d7a55", desc: "This resident has no pending cases or violations on record." },
+  "Pending Case": { label: "Pending Case", cls: "pending", color: "#e8a020", desc: "This resident has a case currently under review." },
+  "Violation": { label: "Violation", cls: "violation", color: "#e03e3e", desc: "This resident has a recorded violation." },
+};
+
+const IconQR = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3" /></svg>;
+const IconCamera = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>;
+const IconUpload = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" /></svg>;
+const IconTrash = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>;
+const IconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
+const ProfileIconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
+const ProfileIconPin = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>;
+const IconTag = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>;
+const IconGrad = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>;
+const IconHome2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>;
+const ProfileIconShield = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
+const IconHistory = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 8 12 12 14 14" /><path d="M3.05 11a9 9 0 1 0 .5-4.08" /><polyline points="3 3 3 9 9 9" /></svg>;
+const IconEdit = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>;
+const IconDl = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
+const ProfileIconX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+const ProfileIconArrow = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>;
+const IconSave = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
+
+
+function InfoItem({ label, value }) {
+  return (
+    <div className="pf-info-item">
+      <div className="pf-info-label">{label}</div>
+      <div className={`pf-info-val${!value ? " empty" : ""}`}>{value || "Not provided"}</div>
+    </div>
+  );
+}
+
+function Card({ icon: Icon, title, tag, children }) {
+  return (
+    <div className="pf-card">
+      <div className="pf-card-header">
+        <div className="pf-card-icon"><Icon /></div>
+        <span className="pf-card-title">{title}</span>
+        {tag && <span className="pf-section-tag">{tag}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, req, children }) {
+  return (
+    <div className="pf-field">
+      <label className="pf-lbl">{label}{req && <span className="req"> *</span>}</label>
+      {children}
+    </div>
+  );
+}
+
+/** Format an ISO date string for display */
+function formatHistoryDate(isoString) {
+  if (!isoString) return "—";
+  try {
+    return new Date(isoString).toLocaleDateString("en-PH", {
+      year: "numeric", month: "short", day: "numeric",
+    });
+  } catch {
+    return isoString;
+  }
+}
+
+export default function Profile({ onBack, onNavigate, householdID, memberID, userRole, userID }) {
+  const [data, setData] = useState({ ...BLANK });
+  const [draft, setDraft] = useState({ ...BLANK });
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const qrCanvasRef = useRef(null);
+  const [transactions, setTransactions] = useState([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txPage, setTxPage] = useState(1);
+  const txPerPage = 8;
+
+  // Profile picture state
+  const [profilePic, setProfilePic] = useState(null); // base64 data URL or null
+  const [picMenuOpen, setPicMenuOpen] = useState(false);
+  const [uploadingPic, setUploadingPic] = useState(false);
+  const picInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+
+  const fullName = [data.firstName, data.middleName, data.lastName, data.suffix].filter(Boolean).join(" ");
+
+  // Load member profile from Firestore on mount
+  useEffect(() => {
+    console.log("[Profile] householdID:", householdID, "memberID:", memberID);
+    if (!householdID || !memberID) {
+      console.warn("[Profile] Missing householdID or memberID — skipping load.");
+      setLoading(false);
+      return;
+    }
+    getMemberProfile(householdID, memberID)
+      .then(profile => {
+        console.log("[Profile] Loaded:", profile);
+        setData(profile);
+        setLoading(false);
+
+        if (profile.profilePhoto) {
+          setProfilePic(profile.profilePhoto);
+        }
+        
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("[Profile] Error:", err);
+        setLoading(false);
+      });
+  }, [householdID, memberID]);
+
+  // Fetch transaction history
+  useEffect(() => {
+    if (!householdID) { setTxLoading(false); return; }
+    fetchUserTransactions(householdID, memberID, userID, userRole)
+      .then(data => {
+        setTransactions(data);
+        setTxLoading(false);
+      })
+      .catch(err => {
+        console.error("[Profile] Transaction fetch error:", err);
+        setTxLoading(false);
+      });
+  }, [householdID, memberID, userID, userRole]);
+
+  // Generate QR code whenever identity data changes
+  useEffect(() => {
+    if (!fullName && !householdID) return;
+    const qrData = JSON.stringify({
+      householdID: householdID,
+      residentID: memberID,
+      name: fullName || "Resident",
+      role: userRole || "Member",
+      branchID: data.branchID || "",
+      branchName: data.branchName || "",
+      barangay: data.barangay || "Malanday",
+    });
+    QRCode.toDataURL(qrData, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
+      .then(url => setQrUrl(url))
+      .catch(console.error);
+  }, [fullName, householdID, memberID, userRole, data.branchID, data.branchName, data.barangay]);
+
+  const openModal = () => { setDraft({ ...data }); setTab(0); setOpen(true); };
+  const closeModal = () => setOpen(false);
+
+  const computeSameAddress = () => {
+    if (userRole !== "Household Head" && data.sameAddress) {
+      const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
+      const isUnchanged = addressFields.every(field => draft[field] === data[field]);
+      return isUnchanged;
+    }
+    return false;
+  };
+
+  const save = async () => {
+    if (!householdID || !memberID) { alert("Missing household or member info."); return; }
+    setSaving(true);
+    try {
+      const payload = { ...draft, sameAddress: computeSameAddress() };
+      await updateMemberProfile(householdID, memberID, payload);
+      setData({ ...payload });
+      setOpen(false);
+    } catch (err) {
+      alert("Failed to save: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const downloadQR = () => {
+    if (!qrUrl) return;
+    const link = document.createElement("a");
+    link.download = `${householdID}-${fullName || "member"}-QR.png`;
+    link.href = qrUrl;
+    link.click();
+  };
+
+  const normalizeCategories = (cats) => {
+    let list = [];
+    if (Array.isArray(cats)) list = cats;
+    else if (typeof cats === "string") list = cats.split(",").map(s => s.trim()).filter(Boolean);
+
+    // strip out emojis to clean up old DB state
+    return list.map(c => {
+      let cln = c.replace(/[^\w\s-]/gi, '').trim();
+      if (cln === "Indigenous") cln = "Indigenous People";
+      return cln;
+    });
+  };
+
+  const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
+
+  const set = f => e => {
+    const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setDraft(d => ({
+      ...d,
+      [f]: value,
+      sameAddress: addressFields.includes(f) ? false : d.sameAddress,
+    }));
+  };
+
+  const toggleCat = cat => setDraft(d => {
+    const current = normalizeCategories(d.categories);
+    return {
+      ...d,
+      categories: current.includes(cat)
+        ? current.filter(c => c !== cat)
+        : [...current, cat],
+    };
+  });
+
+  const normalizedDataCategories = normalizeCategories(data.categories);
+  const normalizedDraftCategories = normalizeCategories(draft.categories);
+  const isPwd = normalizedDataCategories.includes("PWD");
+  const draftPwd = normalizedDraftCategories.includes("PWD");
+
+  // Live record status from Firestore
+  const currentStatus = data.adminStatus || "Clear Case";
+  const sInfo = STATUS_MAP[currentStatus] || STATUS_MAP["Clear Case"];
+  const statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
+
+  const handlePicFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. Show image locally immediately for good UX
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setProfilePic(ev.target.result);
+      setPicMenuOpen(false);
+    };
+    reader.readAsDataURL(file);
+
+    // 2. Start Cloudinary Upload
+    setUploadingPic(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "3Sense+_ProfilePic"); 
+      const cloudName = "dfnqeiksu";
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Failed to upload to Cloudinary");
+      const cloudinaryData = await res.json();
+      const secureUrl = cloudinaryData.secure_url;
+
+      // 3. Save the new URL to Firestore
+      await updateMemberProfile(householdID, memberID, {
+        ...data,
+        profilePhoto: secureUrl });
+      
+      // 4. Update local data state
+      setData(prev => ({ ...prev, profilePhoto: secureUrl }));
+      
+    } catch (err) {
+      console.error("Error saving profile pic:", err);
+      alert("Failed to save profile picture permanently. Please try again.");
+    } finally {
+      setUploadingPic(false);
+      e.target.value = ""; // Reset input
+    }
+  };
+
+  const handleRemovePic = async () => {
+    if (!window.confirm("Are you sure you want to remove your profile picture?")) return;
+    
+    setPicMenuOpen(false);
+    setUploadingPic(true);
+    
+    try {
+      // Remove from Firestore
+      await updateMemberProfile(householdID, memberID, { 
+        ...data,
+        profilePhoto: null });
+      
+      // Update UI
+      setProfilePic(null);
+      setData(prev => ({ ...prev, profilePhoto: null }));
+    } catch (err) {
+      console.error("Error removing profile pic:", err);
+      alert("Failed to remove profile picture.");
+    } finally {
+      setUploadingPic(false);
+    }
+  };
+
+  return (
+    <div className="pf-root" onClick={(e) => { if (picMenuOpen && !e.target.closest('.pf-avatar-wrap')) setPicMenuOpen(false); }}>
+      {/* NAV */}
+      <Navbar activePage="profile" householdID={householdID} onNavigate={onNavigate} userName={[data.firstName, data.lastName].filter(Boolean).join(" ") || ""} userRole={userRole} memberID={memberID} userID={userID} />
+
+      {loading && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "var(--muted)", fontSize: "0.9rem" }}>
+          Loading profile...
+        </div>
+      )}
+
+      {!loading && <div className="pf-page">
+
+        {/* PAGE TITLE HEADER */}
+        <div className="pf-page-header">
+          <div>
+            <h1>My Profile</h1>
+            <p>Manage your personal information and barangay records.</p>
+          </div>
+          <button className="pf-btn-primary" onClick={openModal}>
+            <IconEdit /> Edit Profile
+          </button>
+        </div>
+
+        {/* PROFILE HERO CARD — Avatar + Identity + QR */}
+        <div className="pf-hero-card">
+
+          {/* Left: Profile Picture */}
+          <div className="pf-hero-avatar-col">
+            <div className="pf-avatar-wrap">
+              <div className="pf-avatar-ring">
+                {uploadingPic ? (
+                  <div className="pf-avatar-placeholder" style={{ fontSize: "0.85rem", color: "var(--teal)", fontWeight: "600" }}>Saving...</div>
+                ) : profilePic ? (
+                  <img src={profilePic} alt="Profile" className="pf-avatar-img" />
+                ) : (
+                  <div className="pf-avatar-placeholder"><IconUser /></div>
+                )}
+              </div>
+              {/* Camera button */}
+              <button
+                className="pf-avatar-cam-btn"
+                onClick={() => setPicMenuOpen(v => !v)}
+                aria-label="Change profile picture"
+              >
+                <IconCamera />
+              </button>
+
+              {/* Action menu */}
+              {picMenuOpen && (
+                <div className="pf-pic-menu">
+                  <input
+                    ref={picInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={handlePicFile}
+                  />
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    style={{ display: "none" }}
+                    onChange={handlePicFile}
+                  />
+                  <button className="pf-pic-menu-item" onClick={() => picInputRef.current?.click()}>
+                    <IconUpload /> Upload Photo
+                  </button>
+                  <button className="pf-pic-menu-item" onClick={() => cameraInputRef.current?.click()}>
+                    <IconCamera /> Take Picture
+                  </button>
+                  {profilePic && (
+                    <button className="pf-pic-menu-item danger" onClick={handleRemovePic}>
+                      <IconTrash /> Remove Photo
+                    </button>
+                  )}
+                  <div className="pf-pic-menu-divider" />
+                  <button className="pf-pic-menu-item muted" onClick={() => setPicMenuOpen(false)}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="pf-avatar-hint">Tap camera to change photo</div>
+          </div>
+
+          {/* Center: Identity Info */}
+          <div className="pf-hero-identity">
+            <div className="pf-hero-name">{fullName || "Your Full Name"}</div>
+            <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {userRole || "Member"}</div>
+            {data.familyNumber && (
+              <div className="pf-hero-family-number">
+                Family Number: {data.familyNumber}
+              </div>
+            )}
+            <div className="pf-hero-verified"><span className="pf-hero-dot" /> Verified Resident</div>
+            <div className="pf-hero-divider" />
+            <div className="pf-hero-meta">
+              <div className="pf-hero-meta-item">
+                <div className="pf-hero-ml">Barangay</div>
+                <div className="pf-hero-mv">{data.barangay || "—"}</div>
+              </div>
+              <div className="pf-hero-meta-item">
+                <div className="pf-hero-ml">City</div>
+                <div className="pf-hero-mv">{data.city || "—"}</div>
+              </div>
+              <div className="pf-hero-meta-item">
+                <div className="pf-hero-ml">Record</div>
+                <div className="pf-hero-mv" style={{ color: sInfo.color }}>{sInfo.label}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: QR Code */}
+          <div className="pf-hero-qr-col">
+            <div className="pf-hero-qr-panel">
+              <div className="pf-hero-qr-img-wrap">
+                {qrUrl
+                  ? <img src={qrUrl} alt="Personal QR Code" className="pf-hero-qr-img" />
+                  : <div className="pf-hero-qr-generating">Generating...</div>
+                }
+              </div>
+              <div className="pf-hero-qr-label">Scan to Verify</div>
+              <button className="pf-btn-dl" onClick={downloadQR} disabled={!qrUrl}>
+                <IconDl /> Download QR
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* 2. PERSONAL INFO */}
+        <Card icon={ProfileIconUser} title="Personal Information">
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div className="pf-info-grid c3">
+              <InfoItem label="First Name" value={data.firstName} />
+              <InfoItem label="Middle Name" value={data.middleName} />
+              <InfoItem label="Last Name" value={data.lastName} />
+            </div>
+            <div className="pf-info-grid">
+              <InfoItem label="Date of Birth" value={data.birthDate} />
+              <InfoItem label="Birth Place" value={data.birthPlace} />
+              <InfoItem label="Sex" value={data.sex} />
+              <InfoItem label="Gender" value={data.gender === "Others" ? (data.genderOther || "Others") : data.gender} />
+              <InfoItem label="Civil Status" value={data.civilStatus} />
+              <InfoItem label="Citizenship" value={data.citizenship} />
+              <InfoItem label="Religion" value={data.religion} />
+              <InfoItem label="Residing Since" value={data.residingSinceYear} />
+              <InfoItem label="Contact Number" value={data.contactNumber} />
+              <InfoItem label="Email Address" value={data.email} />
+            </div>
+          </div>
+        </Card>
+
+        {/* 3. ADDRESS */}
+        <Card icon={ProfileIconPin} title="Address Information">
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div className="pf-info-grid">
+              <InfoItem label="House / Unit Number" value={data.houseNumber} />
+              <InfoItem label="Street" value={data.street} />
+              <InfoItem label="Barangay" value={data.barangay} />
+              <InfoItem label="City / Municipality" value={data.city} />
+              <InfoItem label="Province" value={data.province} />
+              <InfoItem label="Region" value={data.region} />
+            </div>
+          </div>
+        </Card>
+
+        {/* 4. CATEGORY */}
+        <Card icon={IconTag} title="Category">
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div className="pf-cat-grid">
+              {data.categories && data.categories.length > 0
+                ? data.categories.map(cat => (
+                  <div key={cat} className="pf-chip on">
+                    {cat}
+                  </div>
+                ))
+                : <div className="pf-chip off">No categories assigned</div>
+              }
+            </div>
+            {isPwd && (
+              <div className="pf-subfields">
+                <div className="pf-subtitle">♿ PWD Details</div>
+                <div className="pf-info-grid">
+                  <InfoItem label="PWD Status" value={data.pwdStatus} />
+                  <InfoItem label="Disability Type" value={data.disabilityType === "Others" ? (data.disabilityTypeOther || "Others") : data.disabilityType} />
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* 5. EDUCATION */}
+        <Card icon={IconGrad} title="Education & Employment">
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div className="pf-info-grid">
+              <InfoItem label="Highest Educational Attainment" value={data.educationAttainment} />
+              <InfoItem label="Education Status" value={data.educationStatus} />
+              <InfoItem label="Occupation" value={data.occupation} />
+              <InfoItem label="Employment Status" value={data.employmentStatus} />
+            </div>
+          </div>
+        </Card>
+
+        {/* 6. HOUSEHOLD */}
+        <Card icon={IconHome2} title="Household Information">
+          <div className="pf-info-grid c3">
+            <InfoItem label="Household Number" value={householdID} />
+            {data.familyNumber && <InfoItem label="Family Number" value={data.familyNumber} />}
+            <InfoItem label="Total Members" value={data.totalMembers} />
+            <InfoItem label="Classification" value={data.householdClassification} />
+          </div>
+        </Card>
+
+        {/* 7. RECORD STATUS — live from Firestore */}
+        <Card icon={ProfileIconShield} title="Barangay Record Status" tag="Circumstances">
+          <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+            <div className={`pf-status-badge ${sInfo.cls}`}>
+              <span className="pf-sdot" />{sInfo.label}
+            </div>
+            <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
+              <strong style={{ color: "var(--text)", fontFamily: "'Poppins',sans-serif", fontSize: "0.82rem" }}>Current Standing: </strong>
+              {sInfo.desc}
+            </div>
+          </div>
+
+          {/* Remarks & Incident (only when set) */}
+          {(data.adminRemarks || data.adminIncident) && (
+            <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "0.9rem 1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {data.adminRemarks && (
+                <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.55 }}>
+                  <strong style={{ fontFamily: "'Poppins',sans-serif" }}>Remarks: </strong>{data.adminRemarks}
+                </div>
+              )}
+              {data.adminIncident && (
+                <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
+                  <strong style={{ fontFamily: "'Poppins',sans-serif", color: "var(--text)" }}>Incident: </strong>{data.adminIncident}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Last updated attribution */}
+          {data.adminLastUpdatedBy && (
+            <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginBottom: "1rem", fontStyle: "italic" }}>
+              Last updated by <strong style={{ fontStyle: "normal" }}>{data.adminLastUpdatedBy}</strong>
+              {data.adminLastUpdatedByPosition ? ` (${data.adminLastUpdatedByPosition})` : ""}
+              {data.adminLastUpdatedAt ? ` · ${data.adminLastUpdatedAt}` : ""}
+            </div>
+          )}
+
+          {/* Status history log */}
+          <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>
+              Case History
+            </div>
+
+            {statusHistory.length > 0 ? (
+              statusHistory.map((entry, i) => {
+                const dotColor = entry.status === "Clear Case"
+                  ? "#0d7a55"
+                  : entry.status === "Pending Case"
+                    ? "#e8a020"
+                    : "#e03e3e";
+                const byLine = [
+                  entry.setBy,
+                  entry.setByPosition ? `(${entry.setByPosition})` : null,
+                ].filter(Boolean).join(" ");
+
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>
+                        Status set to "{entry.status}"
+                        {entry.remarks ? ` — ${entry.remarks}` : ""}
+                      </div>
+                      {entry.incident && (
+                        <div style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: 1 }}>
+                          {entry.incident}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>
+                        {formatHistoryDate(entry.setAt)} · by {byLine}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ fontSize: "0.82rem", color: "var(--muted)", fontStyle: "italic" }}>
+                No status changes recorded yet.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* 8. TRANSACTIONS */}
+        <Card icon={IconHistory} title="Service & Transaction History">
+          <div className="pf-table-wrap">
+            <table className="pf-table">
+              <thead>
+                <tr>
+                  <th>Service Name</th>
+                  <th>Ref #</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Category</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txLoading ? (
+                  <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>Loading transactions...</td></tr>
+                ) : transactions.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>No transactions found.</td></tr>
+                ) : (
+                  transactions.slice((txPage - 1) * txPerPage, txPage * txPerPage).map((tx, i) => {
+                    const dateStr = tx.date?.toDate
+                      ? tx.date.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : tx.date ? new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+                    const statusLower = (tx.status || "pending").toLowerCase().replace(/\s+/g, "-");
+                    return (
+                      <tr key={tx.id || i}>
+                        <td><div className="pf-tx-name">{tx.serviceName}</div></td>
+                        <td><div className="pf-tx-date" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem" }}>{tx.refNum || "—"}</div></td>
+                        <td><div className="pf-tx-date">{dateStr}</div></td>
+                        <td>
+                          <span className={`pf-tx-badge ${statusLower}`}>
+                            <span className="pf-tx-bdot" />
+                            {tx.status}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{tx.category}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination Controls */}
+            {transactions.length > txPerPage && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "1rem", gap: "0.5rem" }}>
+                <button
+                  onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                  disabled={txPage === 1}
+                  style={{
+                    padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
+                    background: txPage === 1 ? "#f1f5f9" : "var(--primary)", color: txPage === 1 ? "#94a3b8" : "#fff",
+                    border: "none", cursor: txPage === 1 ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Prev
+                </button>
+                <div style={{ fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", color: "var(--text)", margin: "0 0.5rem" }}>
+                  Page {txPage} of {Math.ceil(transactions.length / txPerPage)}
+                </div>
+                <button
+                  onClick={() => setTxPage(p => Math.min(Math.ceil(transactions.length / txPerPage), p + 1))}
+                  disabled={txPage === Math.ceil(transactions.length / txPerPage)}
+                  style={{
+                    padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
+                    background: txPage === Math.ceil(transactions.length / txPerPage) ? "#f1f5f9" : "var(--primary)",
+                    color: txPage === Math.ceil(transactions.length / txPerPage) ? "#94a3b8" : "#fff",
+                    border: "none", cursor: txPage === Math.ceil(transactions.length / txPerPage) ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Bottom spacer */}
+        <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
+
+      </div>}
+
+      {/* ── EDIT MODAL ── */}
+      {open && (
+        <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="pf-modal">
+
+            {/* Header */}
+            <div className="pf-modal-head">
+              <div>
+                <h3>Edit Profile</h3>
+                <p>Fill in your personal information</p>
+              </div>
+              <button className="pf-modal-close" onClick={closeModal}><ProfileIconX /></button>
+            </div>
+
+            {/* Tabs */}
+            <div className="pf-modal-tabs">
+              {TABS.map((t, i) => (
+                <div key={i} className={`pf-modal-tab${i === tab ? " active" : i < tab ? " done" : ""}`} onClick={() => setTab(i)}>
+                  <div className="pf-tab-num">{i < tab ? "✓" : i + 1}</div>{t}
+                </div>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div className="pf-modal-body">
+
+              {/* TAB 0 — Personal */}
+              {tab === 0 && <>
+                <div className="fg c3">
+                  <Field label="First Name" req><input className="pf-inp" placeholder="Maria" value={draft.firstName} onChange={set("firstName")} /></Field>
+                  <Field label="Middle Name"><input className="pf-inp" placeholder="Santos" value={draft.middleName} onChange={set("middleName")} /></Field>
+                  <Field label="Last Name" req><input className="pf-inp" placeholder="Dela Cruz" value={draft.lastName} onChange={set("lastName")} /></Field>
+                </div>
+                <div className="fg c3">
+                  <Field label="Suffix">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.suffix} onChange={set("suffix")}><option value="">None</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option></select></div>
+                  </Field>
+                  <Field label="Religion"><input className="pf-inp" placeholder="Roman Catholic" value={draft.religion} onChange={set("religion")} /></Field>
+                  <Field label="Civil Status">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.civilStatus} onChange={set("civilStatus")}><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
+                  </Field>
+                </div>
+                <div className="fg c3">
+                  <Field label="Date of Birth" req><input className="pf-inp" type="date" value={draft.birthDate} onChange={set("birthDate")} /></Field>
+                  <Field label="Birth Place"><input className="pf-inp" placeholder="Valenzuela City" value={draft.birthPlace} onChange={set("birthPlace")} /></Field>
+                  <Field label="Citizenship"><input className="pf-inp" placeholder="Filipino" value={draft.citizenship} onChange={set("citizenship")} /></Field>
+                </div>
+                <div className="fg">
+                  <Field label="Sex" req>
+                    <div className="pf-radio-row">
+                      {["Male", "Female"].map(v => (
+                        <label key={v} className="pf-radio-opt">
+                          <input type="radio" name="sex" value={v} checked={draft.sex === v} onChange={set("sex")} />
+                          <span className="pf-radio-lbl">{v}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
+                  <Field label="Gender">
+                    <div className="pf-sel-wrap">
+                      <select className="pf-sel" value={draft.gender} onChange={set("gender")}>
+                        <option value="">Select gender</option>
+                        <option>Cisgender</option>
+                        <option>Non-binary</option>
+                        <option>Transgender Man</option>
+                        <option>Transgender Woman</option>
+                        <option>Genderqueer</option>
+                        <option>Others</option>
+                        <option>Prefer not to say</option>
+                      </select>
+                    </div>
+                  </Field>
+                </div>
+                {draft.gender === "Others" && (
+                  <div className="fg c1">
+                    <Field label="Please specify gender">
+                      <input className="pf-inp" placeholder="Please specify" value={draft.genderOther || ""} onChange={set("genderOther")} />
+                    </Field>
+                  </div>
+                )}
+                <div className="fg">
+                  <Field label="Contact Number"><input className="pf-inp" type="tel" placeholder="09XX XXX XXXX" value={draft.contactNumber} onChange={set("contactNumber")} /></Field>
+                  <Field label="Email Address"><input className="pf-inp" type="email" placeholder="email@example.com" value={draft.email} onChange={set("email")} /></Field>
+                </div>
+                <div className="fg">
+                  <Field label="Residing Since (Year)" req><input className="pf-inp" type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={draft.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
+                </div>
+              </>}
+
+              {/* TAB 1 — Address */}
+              {tab === 1 && <>
+                <div className="fg">
+                  <Field label="House / Unit Number" req><input className="pf-inp" placeholder="123" value={draft.houseNumber} onChange={set("houseNumber")} /></Field>
+                  <Field label="Street" req><input className="pf-inp" placeholder="Malanday Street" value={draft.street} onChange={set("street")} /></Field>
+                </div>
+                <div className="fg">
+                  <Field label="Region">
+                    <input className="pf-inp" value="NCR" readOnly />
+                  </Field>
+                  <Field label="Province"><input className="pf-inp" placeholder="Metro Manila" value={draft.province} onChange={set("province")} readOnly={draft.sameAddress} /></Field>
+                </div>
+                <div className="fg">
+                  <Field label="City / Municipality"><input className="pf-inp" value="Valenzuela City" readOnly /></Field>
+                  <Field label="Barangay"><input className="pf-inp" value="Malanday" readOnly /></Field>
+                </div>
+              </>}
+
+              {/* TAB 2 — Category */}
+              {tab === 2 && <>
+                {(() => {
+                  const draftCategories = Array.isArray(draft.categories) ? draft.categories : [];
+                  return (
+                    <div className="pf-chk-grid">
+                      {CATS.map(cat => (
+                        <label key={cat} className="pf-chk-opt">
+                          <input type="checkbox" checked={draftCategories.includes(cat)} onChange={() => toggleCat(cat)} />
+                          <span className="pf-chk-lbl">
+                            <span className="pf-chk-box">{draftCategories.includes(cat) ? "✓" : ""}</span>
+                            {cat}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {draftPwd && (
+                  <div className="pf-subfields">
+                    <div className="pf-subtitle">♿ PWD Details</div>
+                    <div className="fg">
+                      <Field label="PWD Status">
+                        <div className="pf-sel-wrap"><select className="pf-sel" value={draft.pwdStatus} onChange={set("pwdStatus")}><option value="">Select</option><option>Children with Disabilities</option><option>Person with Disabilities</option></select></div>
+                      </Field>
+                      <Field label="Disability Type">
+                        <div className="pf-sel-wrap"><select className="pf-sel" value={draft.disabilityType} onChange={set("disabilityType")}>
+                          <option value="">Select</option>
+                          <option>Physical Disability</option>
+                          <option>Visual Disability</option>
+                          <option>Hearing Disability</option>
+                          <option>Speech Impairment</option>
+                          <option>Intellectual Disability</option>
+                          <option>Learning Disability</option>
+                          <option>Psychosocial Disability</option>
+                          <option>Multiple Disabilities</option>
+                          <option>Chronic Illness</option>
+                          <option>Rare Disease</option>
+                          <option>Others</option>
+                        </select></div>
+                      </Field>
+                    </div>
+                    {draft.disabilityType === "Others" && (
+                      <div className="fg c1">
+                        <Field label="Please specify disability type">
+                          <input className="pf-inp" placeholder="Please specify" value={draft.disabilityTypeOther || ""} onChange={set("disabilityTypeOther")} />
+                        </Field>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>}
+
+              {/* TAB 3 — Education */}
+              {tab === 3 && <>
+                <div className="fg">
+                  <Field label="Highest Educational Attainment">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.educationAttainment} onChange={set("educationAttainment")}><option value="">Select</option><option>Elementary</option><option>High School</option><option>College</option><option>Post Graduate</option><option>Vocational</option></select></div>
+                  </Field>
+                  <Field label="Education Status">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.educationStatus} onChange={set("educationStatus")}><option value="">Select</option><option>In School</option><option>Out of School Youth (OSY)</option><option>Graduate</option></select></div>
+                  </Field>
+                </div>
+                <div className="fg">
+                  <Field label="Occupation"><input className="pf-inp" placeholder="e.g. Teacher, Student" value={draft.occupation} onChange={set("occupation")} /></Field>
+                  <Field label="Employment Status">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.employmentStatus} onChange={set("employmentStatus")}><option value="">Select</option><option>Employed</option><option>Unemployed</option><option>Self-employed</option><option>Student</option></select></div>
+                  </Field>
+                </div>
+              </>}
+
+              {/* TAB 4 — Household */}
+              {tab === 4 && <>
+                <div className="fg">
+                  <Field label="Total Members"><input className="pf-inp" type="number" min="1" placeholder="e.g. 4" value={draft.totalMembers} onChange={set("totalMembers")} /></Field>
+                  <Field label="Household Classification">
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.householdClassification} onChange={set("householdClassification")}><option value="">Select</option><option>Owner</option><option>Rental</option><option>Co-habit / Shared</option><option>Informal Settler</option></select></div>
+                  </Field>
+                </div>
+              </>}
+
+            </div>
+
+            {/* Footer */}
+            <div className="pf-modal-foot">
+              <button className="pf-btn-ghost" onClick={tab === 0 ? closeModal : () => setTab(t => t - 1)}>
+                {tab === 0 ? "Cancel" : "← Back"}
+              </button>
+              <div style={{ display: "flex", gap: "0.65rem" }}>
+                {tab < TABS.length - 1
+                  ? <button className="pf-btn-primary" onClick={() => setTab(t => t + 1)}>Next <ProfileIconArrow /></button>
+                  : <button className="pf-btn-primary" onClick={save} disabled={saving}><IconSave /> {saving ? "Saving..." : "Save Changes"}</button>
+                }
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
