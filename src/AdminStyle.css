@@ -575,6 +575,66 @@ nav {
   @apply w-full box-border;
 }
 
+/* ── ANALYTICS TABS ── */
+.analytics-tabs-container {
+  display: flex;
+  gap: 32px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-top: 32px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px; /* Slight breathing room for the scrollbar */
+  
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* ── SLEEK CUSTOM SCROLLBAR FOR CHROME/EDGE/SAFARI ── */
+.analytics-tabs-container::-webkit-scrollbar {
+  height: 6px; /* Ultra-thin horizontal scrollbar */
+}
+
+.analytics-tabs-container::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.analytics-tabs-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Subtle slate color */
+  border-radius: 10px;
+}
+
+.analytics-tabs-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Slightly darker grey when the user hovers over it */
+}
+
+/* ── TAB BUTTON STYLES ── */
+.analytics-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 4px 12px 4px;
+  margin-bottom: -4px; /* Pulls the border down to perfectly overlap the track */
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.analytics-tab:hover {
+  color: #317D89;
+}
+
+.analytics-tab.active {
+  border-bottom: 2px solid #317D89;
+  font-weight: 700;
+  color: #0f172a;
+}
+
 /* ===================================================== */
 /* FEEDBACK PAGE*/
 /* ===================================================== */

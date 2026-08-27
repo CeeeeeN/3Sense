@@ -8261,7 +8261,7 @@ h4,
 
 /* ── Color variants ── */
 .summary-widget--teal {
-  background: #31547c;
+  background: #0F52BA;
   box-shadow: 0 4px 16px rgba(49, 125, 137, 0.30);
 }
 
@@ -8270,7 +8270,7 @@ h4,
 }
 
 .summary-widget--amber {
-  background: #BDBD64;
+  background: #FF6E00;
   box-shadow: 0 4px 16px rgba(189, 189, 100, 0.35);
 }
 
@@ -8279,7 +8279,7 @@ h4,
 }
 
 .summary-widget--green {
-  background: #2DB17B;
+  background: #086623;
   box-shadow: 0 4px 16px rgba(45, 177, 123, 0.30);
 }
 
@@ -8956,11 +8956,11 @@ h4,
 }
 
 .db-widget-teal {
-  background: #31547c !important;
+  background: #0F52BA !important;
 }
 
 .db-widget-amber {
-  background: #BDBD64 !important;
+  background: #FFDA03 !important;
 }
 
 .db-widget-green {

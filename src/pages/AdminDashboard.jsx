@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import AIInsightsWidget from "../components/AIInsightsWidget";
@@ -26,7 +26,17 @@ import {
   limit
 } from "firebase/firestore";
 
+const TABS = [
+  { id: 'resident', label: 'Resident Analytics' },
+  { id: 'services', label: 'Services & Facilities' },
+  { id: 'programs', label: 'Programs & Livelihood' },
+  { id: 'sentiment', label: 'Sentiment & Satisfaction' },
+  { id: 'peace', label: 'Peace & Order' },
+  { id: 'bswd', label: 'Social Welfare' }
+];
+
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState('resident');
 
   // ── REACT QUERY: The centralized data fetcher ──
   const { data, isLoading, isError, error } = useQuery({
@@ -145,81 +155,104 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* SUMMARY CARDS */}
+        {/* PINNED: SUMMARY CARDS */}
         <DashboardSummaryCards 
           stats={stats} 
           totalFeedbacks={feedbacks.length} 
         />
 
-        {/* ROW 1: RESIDENT DEMOGRAPHICS (4 Columns) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '24px' }}>
-          <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', gridColumn: '1 / -1' }}>
-            <h1 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Resident Analytics</h1>
+        {/* TAB NAVIGATION */}
+        <div className="analytics-tabs-container">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`analytics-tab ${activeTab === tab.id ? 'active' : ''}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-            <div className="resident-analytics-grid">
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Resident Demographic</h2>
-                <ResidentDemographics data={residentsData} />
-              </div>
-
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Age Distribution</h2>
-                <AgeAnalytics data={residentsData} />
-              </div>
-
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Sex Assigned at Birth</h2>
-                <SexAnalytics data={residentsData} />
-              </div>
-
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Gender Orientation</h2>
-                <GenderOrientationAnalytics data={residentsData} />
+        {/* TAB CONTENT */}
+        <div style={{ minHeight: "400px" }}>
+          
+          {/* TAB: RESIDENT ANALYTICS */}
+          {activeTab === 'resident' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', gridColumn: '1 / -1' }}>
+                <h1 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Resident Analytics</h1>
+                <div className="resident-analytics-grid">
+                  <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Resident Demographic</h2>
+                    <ResidentDemographics data={residentsData} />
+                  </div>
+                  <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Age Distribution</h2>
+                    <AgeAnalytics data={residentsData} />
+                  </div>
+                  <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Sex Assigned at Birth</h2>
+                    <SexAnalytics data={residentsData} />
+                  </div>
+                  <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Gender Orientation</h2>
+                    <GenderOrientationAnalytics data={residentsData} />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB: SERVICES & FACILITIES */}
+          {activeTab === 'services' && (
+            <ServiceFacilityAnalytics 
+              docRequestsData={docRequestsData} 
+              facilityRequestsData={facilityRequestsData} 
+            />
+          )}
+
+          {/* TAB: PROGRAMS & LIVELIHOOD */}
+          {activeTab === 'programs' && (
+            <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Program & Livelihood Attendance</h1>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Total registered residents across all programs</p>
+              <ProgramAnalytics data={[...generalAttendees, ...livelihoodAttendees]} />
+            </div>
+          )}
+
+          {/* TAB: SENTIMENT & SATISFACTION */}
+          {activeTab === 'sentiment' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+              <SentimentSummaryCard feedbacks={feedbacks} />
+              <div style={{ flex: '2 1 500px' }}>
+                <SentimentComparisonChart />
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PEACE & ORDER */}
+          {activeTab === 'peace' && (
+            <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Peace & Order Overview</h1>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for incident reports, urgency levels, and location hotspots</p>
+              <PeaceAndOrderAnalytics data={incidentData} />
+            </div>
+          )}
+
+          {/* TAB: SOCIAL WELFARE (BSWD) */}
+          {activeTab === 'bswd' && (
+            <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Social Welfare (BSWD) Overview</h1>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for displaced persons reports, tips, and sighting locations</p>
+              <BSWDAnalytics data={bswdData} />
+            </div>
+          )}
+
         </div>
 
-        {/* ROW 2: SERVICE & FACILITY USAGE (Full Width) */}
-        <ServiceFacilityAnalytics 
-          docRequestsData={docRequestsData} 
-          facilityRequestsData={facilityRequestsData} 
-        />
-
-        {/* ROW 3: PROGRAM ATTENDANCE (Full Width) */}
-        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '20px' }}>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Program & Livelihood Attendance</h1>
-          <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Total registered residents across all programs</p>
-          <ProgramAnalytics data={[...generalAttendees, ...livelihoodAttendees]} />
-        </div>
-
-        {/* ROW 4: SENTIMENT & SATISFACTION (2 Columns) */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginTop: '20px' }}>
-          <SentimentSummaryCard feedbacks={feedbacks} />
-
-          <div style={{ flex: '2 1 500px' }}>
-            <SentimentComparisonChart />
-          </div>
-        </div>
-
-        {/* ROW 5: PEACE & ORDER ANALYTICS */}
-        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '20px' }}>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Peace & Order Overview</h1>
-          <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for incident reports, urgency levels, and location hotspots</p>
-          
-          <PeaceAndOrderAnalytics data={incidentData} />
-        </div>
-
-        {/* ROW 6: BSWD ANALYTICS */}
-        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '20px' }}>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Social Welfare (BSWD) Overview</h1>
-          <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for displaced persons reports, tips, and sighting locations</p>
-          
-          <BSWDAnalytics data={bswdData} />
-        </div>
-
-        {/* ROW 7: AI INSIGHTS */}
-        <div className="section" style={{ marginTop: '20px' }}>
+        {/* PINNED: AI INSIGHTS */}
+        <div className="section" style={{ marginTop: '32px' }}>
           <div className="dashboard-section">
             <AIInsightsWidget feedbacks={feedbacks} />
           </div>
