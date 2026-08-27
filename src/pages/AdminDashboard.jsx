@@ -48,7 +48,7 @@ export default function AdminDashboard() {
         getCountFromServer(collectionGroup(db, "residents")),
         getCountFromServer(collection(db, "pending_registrations"))
       ]);
-
+ 
       // 2. PARALLEL BOUNDED FETCHES: Download the data for charts (capped to prevent read spikes)
       const [
         fbSnap, resSnap, docSnap, facSnap, attSnap, livSnap, incSnap, bswdSnap

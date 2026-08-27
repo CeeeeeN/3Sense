@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, AlertTriangle, Clock, BarChart2, List } from 'lucide-react';
@@ -7,7 +7,6 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs,
 import { onAuthStateChanged } from 'firebase/auth';
 import { logTransaction } from '../services/logger';
 
-// Import our newly separated components
 import SummaryDashboard from '../components/Feedback/SummaryDashboard';
 import FeedbackTable from '../components/Feedback/FeedbackTable';
 import ReviewModal from '../components/Feedback/ReviewModal';
@@ -21,10 +20,11 @@ export default function AdminFeedback() {
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // States for 'All' tab filtering
+  // States for 'All' tab filtering & sorting
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterSentiment, setFilterSentiment] = useState('All');
+  const [sortOrder, setSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc, rating_desc, rating_asc
 
   // Analytics States
   const [wordCloud, setWordCloud] = useState([]);
@@ -36,10 +36,8 @@ export default function AdminFeedback() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    // Listen for the currently logged-in user
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Find their document in the approvedAdmins collection
         const q = query(
           collection(db, "approvedAdmins"),
           where("uid", "==", user.uid)
@@ -59,8 +57,6 @@ export default function AdminFeedback() {
 
   // --- FETCH FIREBASE DATA ---
   useEffect(() => {
-    // BOUNDED QUERY: Cap to the 200 most recent feedback entries. 
-    // This keeps the Word Cloud and Heatmap relevant to current events while preventing read spikes.
     const q = query(
       collection(db, "feedback"), 
       orderBy("createdAt", "desc"),
@@ -72,10 +68,13 @@ export default function AdminFeedback() {
         const data = doc.data();
 
         let formattedDate = "Unknown";
+        let rawDate = 0;
         if (data.createdAt?.toDate) {
           formattedDate = data.createdAt.toDate().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+          rawDate = data.createdAt.toDate().getTime();
         } else if (typeof data.createdAt === 'string') {
           formattedDate = data.createdAt;
+          rawDate = new Date(data.createdAt).getTime() || 0;
         }
 
         return {
@@ -83,13 +82,14 @@ export default function AdminFeedback() {
           ...data,
           userName: data.userName || data.UserName || "Resident",
           comment: data.comment || data.Comment || "",
-          rating: data.rating || data.Rating || 0,
+          rating: Number(data.rating || data.Rating || 0),
           facilityName: data.facilityName || data.FacilityName || "General",
           sentiment: data.sentiment || data.Sentiment || "Pending AI",
           severity: data.severity || data.Severity || null,
           status: data.status || data.Status || "pending",
           referenceID: data.referenceID || data.ReferenceID || "Unknown",
           createdAt: formattedDate,
+          rawDate: rawDate,
         };
       });
 
@@ -100,6 +100,7 @@ export default function AdminFeedback() {
 
     return () => unsubscribe();
   }, []);
+
   // --- ANALYTICS ENGINE ---
   const generateAnalytics = (data) => {
     if (data.length === 0) return;
@@ -146,28 +147,49 @@ export default function AdminFeedback() {
     setHeatmapData(hData);
   };
 
-  // --- FILTERING LOGIC ---
+  // --- FILTERING & SORTING LOGIC ---
+  const actionRequiredFeedbacks = useMemo(() => {
+    return feedbacks.filter(fb =>
+      String(fb.sentiment).toLowerCase() === 'negative' &&
+      String(fb.status).toLowerCase() !== 'resolved'
+    ).sort((a, b) => (b.rawDate || 0) - (a.rawDate || 0));
+  }, [feedbacks]);
 
-  // Rule: Only show Negative feedback that is NOT resolved
-  const actionRequiredFeedbacks = feedbacks.filter(fb =>
-    String(fb.sentiment).toLowerCase() === 'negative' &&
-    String(fb.status).toLowerCase() !== 'resolved'
-  );
+  const allFilteredFeedbacks = useMemo(() => {
+    return feedbacks.filter(fb => {
+      const searchStr = String(searchTerm).toLowerCase();
+      const matchesSearch =
+        String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
+        String(fb.comment || "").toLowerCase().includes(searchStr) ||
+        String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
+        String(fb.userName || "").toLowerCase().includes(searchStr);
 
-  const allFilteredFeedbacks = feedbacks.filter(fb => {
-    const searchStr = String(searchTerm).toLowerCase();
-    const matchesSearch =
-      String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
-      String(fb.comment || "").toLowerCase().includes(searchStr) ||
-      String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
-      String(fb.userName || "").toLowerCase().includes(searchStr);
+      const matchesStatus = filterStatus === 'All' || String(fb.status).toLowerCase() === filterStatus.toLowerCase();
+      const matchesSentiment = filterSentiment === 'All' || String(fb.sentiment).toLowerCase() === filterSentiment.toLowerCase();
+      return matchesSearch && matchesStatus && matchesSentiment;
+    }).sort((a, b) => {
+      if (sortOrder === "date_desc") {
+        return (b.rawDate || 0) - (a.rawDate || 0);
+      }
+      if (sortOrder === "date_asc") {
+        return (a.rawDate || 0) - (b.rawDate || 0);
+      }
+      if (sortOrder === "name_asc") {
+        return (a.userName || "").localeCompare(b.userName || "");
+      }
+      if (sortOrder === "name_desc") {
+        return (b.userName || "").localeCompare(a.userName || "");
+      }
+      if (sortOrder === "rating_desc") {
+        return (b.rating || 0) - (a.rating || 0);
+      }
+      if (sortOrder === "rating_asc") {
+        return (a.rating || 0) - (b.rating || 0);
+      }
+      return 0;
+    });
+  }, [feedbacks, searchTerm, filterStatus, filterSentiment, sortOrder]);
 
-    const matchesStatus = filterStatus === 'All' || String(fb.status).toLowerCase() === filterStatus.toLowerCase();
-    const matchesSentiment = filterSentiment === 'All' || String(fb.sentiment).toLowerCase() === filterSentiment.toLowerCase();
-    return matchesSearch && matchesStatus && matchesSentiment;
-  });
-
-  // --- HANDLERS ---
   const handleReviewClick = (fb) => {
     setSelectedFeedback(fb);
     setIsModalOpen(true);
@@ -189,8 +211,8 @@ export default function AdminFeedback() {
         adminName,
         adminRole,
         "Update Feedback",
-        `Updated feedback (Ref: ${selectedFeedback.ReferenceID || docId}) - New Status: ${newStatus} - Admin Note: ${adminNote.substring(0, 50)}...`
-      )
+        `Updated feedback (Ref: ${selectedFeedback?.referenceID || docId}) - New Status: ${newStatus} - Admin Note: ${adminNote.substring(0, 50)}...`
+      );
     } catch (error) {
       console.error("Error updating feedback:", error);
       alert("Failed to update feedback.");
@@ -198,8 +220,8 @@ export default function AdminFeedback() {
         adminName,
         adminRole,
         "Failed Feedback Update",
-        `Attempted to update feedback (Ref: ${selectedFeedback.ReferenceID || docId}) - Error: ${error.message}`
-      )
+        `Attempted to update feedback (Ref: ${selectedFeedback?.referenceID || docId}) - Error: ${error.message}`
+      );
     }
   };
 
@@ -277,6 +299,15 @@ export default function AdminFeedback() {
                       <option value="responded">Responded</option>
                       <option value="resolved">Resolved</option>
                     </select>
+
+                    <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                      <option value="date_desc">Date: Newest First</option>
+                      <option value="date_asc">Date: Oldest First</option>
+                      <option value="name_asc">Resident: A to Z</option>
+                      <option value="name_desc">Resident: Z to A</option>
+                      <option value="rating_desc">Rating: Highest First</option>
+                      <option value="rating_asc">Rating: Lowest First</option>
+                    </select>
                   </div>
                 </div>
                 <FeedbackTable
@@ -289,7 +320,6 @@ export default function AdminFeedback() {
           </>
         )}
 
-        {/* Modal Overlay Component */}
         <ReviewModal
           isOpen={isModalOpen}
           feedback={selectedFeedback}

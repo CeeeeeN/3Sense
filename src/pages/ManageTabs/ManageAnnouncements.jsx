@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Manage_IconLocation, IconAdd } from "../../components/Icons";
 import { auth, db } from "../../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -41,6 +41,8 @@ function DescriptionPreview({ text }) {
 export default function ManageAnnouncements() {
   const [announcements, setAnnouncements] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, title_asc, title_desc
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -48,11 +50,9 @@ export default function ManageAnnouncements() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dateError, setDateError] = useState("");
 
-  // Email blast state
   const [showEmailBlast, setShowEmailBlast] = useState(false);
   const [emailBlastTarget, setEmailBlastTarget] = useState(null);
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
@@ -67,10 +67,8 @@ export default function ManageAnnouncements() {
   });
 
   useEffect(() => {
-    // Listen for the currently logged-in user
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Find their document in the approvedAdmins collection
         const q = query(
           collection(db, "approvedAdmins"),
           where("uid", "==", user.uid),
@@ -94,6 +92,10 @@ export default function ManageAnnouncements() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCategory, sortOrder]);
 
   const handleReqChange = (index, value) => {
     const updated = [...newAnnouncement.requirements];
@@ -150,7 +152,6 @@ export default function ManageAnnouncements() {
     e.preventDefault();
     if (isSubmitting) return;
 
-    // Date validation — only when a date is actually entered
     if (newAnnouncement.time) {
       const selected = new Date(newAnnouncement.time);
       if (selected < new Date()) {
@@ -211,7 +212,24 @@ export default function ManageAnnouncements() {
     setShowAddModal(true);
   };
 
-  const filteredAnnouncements = announcements.filter(a => a.title.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredAnnouncements = useMemo(() => {
+    return announcements
+      .filter(a => {
+        const matchesSearch = (a.title || "").toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = filterCategory === "All" || (a.category || "").toLowerCase() === filterCategory.toLowerCase();
+        return matchesSearch && matchesCategory;
+      })
+      .sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+
+        if (sortOrder === "date_desc") return dateB - dateA;
+        if (sortOrder === "date_asc") return dateA - dateB;
+        if (sortOrder === "title_asc") return (a.title || "").localeCompare(b.title || "");
+        if (sortOrder === "title_desc") return (b.title || "").localeCompare(a.title || "");
+        return 0;
+      });
+  }, [announcements, searchTerm, filterCategory, sortOrder]);
 
   const totalPages = Math.ceil(filteredAnnouncements.length / ITEMS_PER_PAGE);
   const paginatedAnnouncements = filteredAnnouncements.slice(
@@ -267,10 +285,40 @@ export default function ManageAnnouncements() {
         </button>
       </div>
 
-      <div className="as-controls">
-        <div className="as-search-box">
+      {/* FILTER & SORT CONTROLS - ALIGNED */}
+      <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input type="text" placeholder="Search announcements..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+          >
+            <option value="All">All Audiences</option>
+            <option value="All Residents">All Residents</option>
+            <option value="Student">Student</option>
+            <option value="Senior Citizen">Senior Citizen</option>
+            <option value="PWD">PWD</option>
+            <option value="Solo Parent">Solo Parent</option>
+            <option value="OFW">OFW</option>
+            <option value="Indigenous People">Indigenous People</option>
+            <option value="LGBT">LGBT</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+          >
+            <option value="date_desc">Posted: Newest First</option>
+            <option value="date_asc">Posted: Oldest First</option>
+            <option value="title_asc">Title: A to Z</option>
+            <option value="title_desc">Title: Z to A</option>
+          </select>
         </div>
       </div>
 
@@ -313,7 +361,7 @@ export default function ManageAnnouncements() {
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: "not-allowed" }}
           >
             Previous
           </button>
@@ -322,7 +370,7 @@ export default function ManageAnnouncements() {
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: "not-allowed" }}
           >
             Next
           </button>

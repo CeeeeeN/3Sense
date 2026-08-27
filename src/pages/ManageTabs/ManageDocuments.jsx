@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Manage_IconClock,
   IconAdd,
@@ -54,13 +54,13 @@ function DescriptionPreview({ text }) {
 export default function ManageDocuments() {
   const [documents, setDocuments] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortCatalog, setSortCatalog] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, fee_asc, fee_desc
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null);
   const [editingDocId, setEditingDocId] = useState(null);
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
@@ -78,15 +78,22 @@ export default function ManageDocuments() {
   const [purposeFormError, setPurposeFormError] = useState("");
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the document types fetch to 100 items to prevent unbounded read growth
     const docsQuery = query(
       collection(db, "documents"),
-      orderBy("createdAt", "desc"), // Show newly added document types at the top
+      orderBy("createdAt", "desc"),
       limit(100)
     );
 
     const unsubscribe = onSnapshot(docsQuery, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map((doc) => {
+        const docData = doc.data();
+        const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+        return {
+          id: doc.id,
+          rawDate,
+          ...docData
+        };
+      });
       setDocuments(data);
     });
     
@@ -94,10 +101,8 @@ export default function ManageDocuments() {
   }, []);
 
   useEffect(() => {
-    // Listen for the currently logged-in user
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Find their document in the approvedAdmins collection
         const q = query(
           collection(db, "approvedAdmins"),
           where("uid", "==", user.uid),
@@ -114,6 +119,10 @@ export default function ManageDocuments() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortCatalog]);
 
   const handleEdit = (docType) => {
     setNewDocument({
@@ -171,7 +180,6 @@ export default function ManageDocuments() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        // Write documentID back as a queryable field
         await updateDoc(newRef, { documentID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_DOCUMENT_TYPE", `Added new document type: ${newDocument.documentName} (ID: ${newRef.id})`);
       }
@@ -241,9 +249,27 @@ export default function ManageDocuments() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  const filteredDocs = documents.filter((d) =>
-    (d.documentName || d.title || "").toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredDocs = useMemo(() => {
+    return documents
+      .filter((d) =>
+        (d.documentName || d.title || "").toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        if (sortCatalog === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortCatalog === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortCatalog === "name_asc") {
+          const nameA = a.documentName || a.title || "";
+          const nameB = b.documentName || b.title || "";
+          return nameA.localeCompare(nameB);
+        }
+        if (sortCatalog === "name_desc") {
+          const nameA = a.documentName || a.title || "";
+          const nameB = b.documentName || b.title || "";
+          return nameB.localeCompare(nameA);
+        }
+        return 0;
+      });
+  }, [documents, searchTerm, sortCatalog]);
 
   const totalPages = Math.ceil(filteredDocs.length / ITEMS_PER_PAGE);
   const paginatedDocs = filteredDocs.slice(
@@ -306,8 +332,9 @@ export default function ManageDocuments() {
         </div>
       </div>
 
-      <div className="as-controls">
-        <div className="as-search-box">
+      {/* SEARCH AND SORT TOOLBAR */}
+      <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg
             width="20"
             height="20"
@@ -329,13 +356,24 @@ export default function ManageDocuments() {
             onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
+
+        <select
+          value={sortCatalog}
+          onChange={(e) => setSortCatalog(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
+        >
+          <option value="date_desc">Added: Newest First</option>
+          <option value="date_asc">Added: Oldest First</option>
+          <option value="name_asc">Name: A to Z</option>
+          <option value="name_desc">Name: Z to A</option>
+        </select>
       </div>
 
       <div className="as-card-grid">
         {paginatedDocs.map((doc) => (
           <div className="as-card" key={doc.id}>
             <div className="as-card-header">
-            <h2 className="as-card-title">{doc.documentName || doc.title}</h2>
+              <h2 className="as-card-title">{doc.documentName || doc.title}</h2>
             </div>
             {doc.description && (
               <div style={{ marginBottom: "10px" }}><DescriptionPreview text={doc.description} /></div>
@@ -383,7 +421,7 @@ export default function ManageDocuments() {
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: "not-allowed" }}
           >
             Previous
           </button>
@@ -392,7 +430,7 @@ export default function ManageDocuments() {
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: "not-allowed" }}
           >
             Next
           </button>
@@ -591,7 +629,6 @@ export default function ManageDocuments() {
                   </div>
                 </div>
 
-                {/* ── Purpose Options Manager ── */}
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>

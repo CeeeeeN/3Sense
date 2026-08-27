@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Clock, ShieldAlert, Activity, FilterX } from 'lucide-react';
@@ -9,18 +9,17 @@ export default function AdminLogs() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // --- FILTER STATES ---
+  // --- FILTER & SORT STATES ---
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [sortOrder, setSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc, action_asc, action_desc
   
   // --- PAGINATION STATES ---
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(15);
 
-  // --- FETCH LOGS FROM FIREBASE ---
   useEffect(() => {
-    // BOUNDED QUERY: Audit logs grow exponentially. Cap to the 300 most recent actions.
     const q = query(
       collection(db, 'audit_logs'), 
       orderBy('timestamp', 'desc'),
@@ -30,13 +29,15 @@ export default function AdminLogs() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const logData = snapshot.docs.map(doc => {
         const data = doc.data();
+        const rawTime = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : (data.timestamp ? new Date(data.timestamp).getTime() : 0);
         return {
           id: doc.id,
           adminName: data.adminName || 'Unknown',
           adminRole: data.adminRole || 'Unknown',
           actionType: data.actionType || 'SYSTEM_ACTION',
           details: data.details || 'No details provided',
-          timestamp: data.timestamp 
+          timestamp: data.timestamp,
+          rawTime: rawTime
         };
       });
       setLogs(logData);
@@ -46,7 +47,6 @@ export default function AdminLogs() {
     return () => unsubscribe();
   }, []);
 
-  // --- HELPER FUNCTIONS ---
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'Just now';
     if (typeof timestamp.toDate === 'function') {
@@ -61,56 +61,76 @@ export default function AdminLogs() {
   const getBadgeColor = (actionType) => {
     const type = actionType.toUpperCase();
     if (type.includes('APPROVE') || type.includes('RESOLVE') || type.includes('CLAIM')) {
-      return { bg: '#dcfce7', text: '#166534' }; // Green
+      return { bg: '#dcfce7', text: '#166534' };
     }
     if (type.includes('REJECT') || type.includes('DELETE') || type.includes('REMOVE')) {
-      return { bg: '#fee2e2', text: '#991b1b' }; // Red
+      return { bg: '#fee2e2', text: '#991b1b' };
     }
     if (type.includes('UPDATE') || type.includes('EDIT')) {
-      return { bg: '#fef3c7', text: '#92400e' }; // Yellow/Orange
+      return { bg: '#fef3c7', text: '#92400e' };
     }
-    return { bg: '#e0e7ff', text: '#3730a3' }; // Default Blue
+    return { bg: '#e0e7ff', text: '#3730a3' };
   };
 
-  // --- FILTERING ---
-  const filteredLogs = logs.filter(log => {
-    const safeSearch = String(searchTerm || "").toLowerCase();
-    const matchesSearch = 
-      String(log.adminName || "").toLowerCase().includes(safeSearch) ||
-      String(log.actionType || "").toLowerCase().includes(safeSearch) ||
-      String(log.details || "").toLowerCase().includes(safeSearch) ||
-      String(log.adminRole || "").toLowerCase().includes(safeSearch);
+  // --- FILTERING & SORTING ---
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      const safeSearch = String(searchTerm || "").toLowerCase();
+      const matchesSearch = 
+        String(log.adminName || "").toLowerCase().includes(safeSearch) ||
+        String(log.actionType || "").toLowerCase().includes(safeSearch) ||
+        String(log.details || "").toLowerCase().includes(safeSearch) ||
+        String(log.adminRole || "").toLowerCase().includes(safeSearch);
 
-    let matchesDate = true;
-    if ((startDate || endDate) && log.timestamp) {
-      const logDate = typeof log.timestamp.toDate === 'function' 
-        ? log.timestamp.toDate() 
-        : new Date(log.timestamp);
-      
-      logDate.setHours(0, 0, 0, 0);
+      let matchesDate = true;
+      if ((startDate || endDate) && log.timestamp) {
+        const logDate = typeof log.timestamp.toDate === 'function' 
+          ? log.timestamp.toDate() 
+          : new Date(log.timestamp);
+        
+        logDate.setHours(0, 0, 0, 0);
 
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        if (logDate < start) matchesDate = false;
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (logDate < start) matchesDate = false;
+        }
+        
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (logDate > end) matchesDate = false;
+        }
       }
-      
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        if (logDate > end) matchesDate = false;
+
+      return matchesSearch && matchesDate;
+    }).sort((a, b) => {
+      if (sortOrder === 'date_desc') {
+        return (b.rawTime || 0) - (a.rawTime || 0);
       }
-    }
+      if (sortOrder === 'date_asc') {
+        return (a.rawTime || 0) - (b.rawTime || 0);
+      }
+      if (sortOrder === 'name_asc') {
+        return a.adminName.localeCompare(b.adminName);
+      }
+      if (sortOrder === 'name_desc') {
+        return b.adminName.localeCompare(a.adminName);
+      }
+      if (sortOrder === 'action_asc') {
+        return a.actionType.localeCompare(b.actionType);
+      }
+      if (sortOrder === 'action_desc') {
+        return b.actionType.localeCompare(a.actionType);
+      }
+      return 0;
+    });
+  }, [logs, searchTerm, startDate, endDate, sortOrder]);
 
-    return matchesSearch && matchesDate;
-  });
-
-  // Reset to page 1 whenever filters or itemsPerPage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, startDate, endDate, itemsPerPage]);
+  }, [searchTerm, startDate, endDate, sortOrder, itemsPerPage]);
 
-  // --- PAGINATION LOGIC ---
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
@@ -174,7 +194,7 @@ export default function AdminLogs() {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Start Date</label>
               <input 
@@ -197,7 +217,23 @@ export default function AdminLogs() {
               />
             </div>
 
-            {/* Clear Filters Button */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Sort By</label>
+              <select
+                className="filter-select"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                style={{ padding: '8px 12px' }}
+              >
+                <option value="date_desc">Date: Newest First</option>
+                <option value="date_asc">Date: Oldest First</option>
+                <option value="name_asc">Admin Name: A to Z</option>
+                <option value="name_desc">Admin Name: Z to A</option>
+                <option value="action_asc">Action: A to Z</option>
+                <option value="action_desc">Action: Z to A</option>
+              </select>
+            </div>
+
             {(startDate || endDate) && (
               <button 
                 onClick={() => { setStartDate(''); setEndDate(''); }}
@@ -216,7 +252,7 @@ export default function AdminLogs() {
         </div>
 
         {/* DATA TABLE */}
-        <div className="req-table-wrapper">
+        <div className="req-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {loading ? (
             <div className="empty-state">
               <Clock className="animate-spin mb-2" size={32} />
@@ -229,13 +265,13 @@ export default function AdminLogs() {
               <p>No system actions match your current search and date filters.</p>
             </div>
           ) : (
-            <table className="req-table">
+            <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
                 <tr>
-                  <th style={{ width: '15%' }}>Date & Time</th>
-                  <th style={{ width: '20%' }}>Admin</th>
-                  <th style={{ width: '15%' }}>Action Type</th>
-                  <th style={{ width: '50%' }}>Details</th>
+                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Date & Time</th>
+                  <th style={{ width: '20%', whiteSpace: 'nowrap' }}>Admin</th>
+                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Action Type</th>
+                  <th style={{ width: '50%', minWidth: '250px' }}>Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,7 +296,8 @@ export default function AdminLogs() {
                           fontWeight: 700, 
                           background: badge.bg, 
                           color: badge.text,
-                          display: 'inline-block'
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap'
                         }}>
                           {log.actionType.replace(/_/g, ' ')}
                         </span>
@@ -293,7 +330,6 @@ export default function AdminLogs() {
             gap: '16px'
           }}>
             
-            {/* Rows Per Page Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b' }}>
               <span>Rows per page:</span>
               <select 
@@ -315,7 +351,6 @@ export default function AdminLogs() {
               </select>
             </div>
 
-            {/* Page Buttons */}
             {totalPages > 1 && (
               <div className="af-pagination" style={{ display: 'flex', gap: '8px', margin: 0 }}>
                 <button 
@@ -340,7 +375,6 @@ export default function AdminLogs() {
               </div>
             )}
 
-            {/* Showing X of Y text */}
             <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
               Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredLogs.length)} of {filteredLogs.length} logs
             </div>

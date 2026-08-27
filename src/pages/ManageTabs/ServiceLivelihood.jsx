@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../../firebase/firebase";
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
@@ -10,7 +10,6 @@ import { runStatusMaintenance } from "../../services/statusUpdater";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildLivelihoodEmail } from "../../utils/emailTemplates";
 
-// ── Helper: returns today's date string "YYYY-MM-DD" ──────────────────────────
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 const formatTs = (ts) => {
@@ -34,51 +33,23 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// ── Pagination Component ──────────────────────────────────────────────────────
-const PaginationControls = ({ currentPage, totalPages, setCurrentPage }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}>
-    <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-      Page <span style={{ fontWeight: 600, color: "#111827" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#111827" }}>{totalPages || 1}</span>
-    </span>
-    <div style={{ display: "flex", gap: "8px" }}>
-      <button
-        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-        disabled={currentPage === 1}
-        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === 1 ? "#f3f4f6" : "#fff", color: currentPage === 1 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
-      >
-        Previous
-      </button>
-      <button
-        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-        disabled={currentPage === totalPages || totalPages === 0}
-        style={{ padding: "6px 12px", border: "1px solid #d1d5db", background: currentPage === totalPages || totalPages === 0 ? "#f3f4f6" : "#fff", color: currentPage === totalPages || totalPages === 0 ? "#9ca3af" : "#374151", borderRadius: "6px", cursor: currentPage === totalPages || totalPages === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem", fontWeight: 500 }}
-      >
-        Next
-      </button>
-    </div>
-  </div>
-);
-
-// ── Blank form state ──────────────────────────────────────────────────────────
 const BLANK = {
   title: "", description: "", date: "", startTime: "", endTime: "",
   location: "", slots: "", demographic: "", customFields: [],
 };
 
 export default function ServiceLivelihood({ onBack }) {
-  // ── Programs ─────────────────────────────────────────────────────
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
-  // ── Registrations ─────────────────────────────────────────────────
   const [participants, setParticipants] = useState([]);
   const [loadingParts, setLoadingParts] = useState(true);
 
-  // ── Pagination State ──────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc");
 
-  // ── Modals ────────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -87,20 +58,13 @@ export default function ServiceLivelihood({ onBack }) {
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // ── Edit state (ported from ManagePrograms) ───────────────────────
   const [editingProgramId, setEditingProgramId] = useState(null);
-
-  // Email blast state
   const [emailBlastTarget, setEmailBlastTarget] = useState(null);
-
-  // ── New / edit program form ───────────────────────────────────────
   const [newProgram, setNewProgram] = useState(BLANK);
 
-  // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
     runStatusMaintenance();
 
-    // BOUNDED QUERY: Cap to the 100 most recent programs
     const q = query(
       collection(db, "Programs"), 
       orderBy("updatedAt", "desc"),
@@ -130,9 +94,7 @@ export default function ServiceLivelihood({ onBack }) {
     return () => unsub();
   }, []);
 
-  // ── Real-time: Registrations ──────────────────────────────────────
   useEffect(() => {
-    // BOUNDED QUERY: Cap to 150 most recent registrations to prevent massive read spikes
     const q = query(
       collection(db, "livelihoodRegistrations"), 
       orderBy("submittedAt", "desc"),
@@ -140,13 +102,24 @@ export default function ServiceLivelihood({ onBack }) {
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      setParticipants(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setParticipants(snap.docs.map(d => {
+        const docData = d.data();
+        const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
+        return {
+          id: d.id,
+          rawDate,
+          ...docData
+        };
+      }));
       setLoadingParts(false);
     });
     return () => unsub();
   }, []);
 
-  // ── Slot logic: only APPROVED count ──────────────────────────────
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, sortOrder]);
+
   const getApprovedCount = (programId) =>
     participants.filter(p => p.programId === programId && (p.status || "").toLowerCase() === "approved").length;
 
@@ -155,14 +128,12 @@ export default function ServiceLivelihood({ onBack }) {
     return prog.slots - getApprovedCount(prog.id);
   };
 
-  // ── Open "Add" modal (clean slate) ───────────────────────────────
   const openAddModal = () => {
     setEditingProgramId(null);
     setNewProgram(BLANK);
     setShowAddModal(true);
   };
 
-  // ── Edit (ported from ManagePrograms) ────────────────────────────
   const handleEdit = (prog) => {
     setNewProgram({
       title: prog.title || "",
@@ -180,7 +151,6 @@ export default function ServiceLivelihood({ onBack }) {
     setShowAddModal(true);
   };
 
-  // ── Delete (ported from ManagePrograms) ──────────────────────────
   const handleDelete = async (id, progTitle) => {
     if (!window.confirm(`Are you sure you want to delete "${progTitle}"?`)) return;
     try {
@@ -191,7 +161,6 @@ export default function ServiceLivelihood({ onBack }) {
     }
   };
 
-  // ── Save: add OR update (ported from ManagePrograms) ─────────────
   const handleAddProgram = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -214,13 +183,11 @@ export default function ServiceLivelihood({ onBack }) {
 
     try {
       if (editingProgramId) {
-        // ── Update existing program ──
         await updateDoc(doc(db, "Programs", editingProgramId), {
           ...programData,
           updatedAt: serverTimestamp(),
         });
       } else {
-        // ── Create new program ──
         await addDoc(collection(db, "Programs"), {
           ...programData,
           programType: "livelihood",
@@ -240,7 +207,6 @@ export default function ServiceLivelihood({ onBack }) {
     setSaving(false);
   };
 
-  // ── Approve ───────────────────────────────────────────────────────
   const handleApprove = async (p) => {
     const prog = programs.find(pr => pr.id === p.programId);
     if (prog && prog.slots > 0) {
@@ -269,7 +235,6 @@ export default function ServiceLivelihood({ onBack }) {
     } catch (err) { console.error(err); }
   };
 
-  // ── Reject ────────────────────────────────────────────────────────
   const handleConfirmReject = async (e) => {
     e.preventDefault();
     if (!rejectTarget || !rejectReason.trim()) return;
@@ -296,7 +261,6 @@ export default function ServiceLivelihood({ onBack }) {
     setSaving(false);
   };
 
-  // ── Remove approval → back to pending ────────────────────────────
   const handleConfirmRemove = async () => {
     if (!removeTarget) return;
     setSaving(true);
@@ -309,7 +273,6 @@ export default function ServiceLivelihood({ onBack }) {
     setSaving(false);
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────
   const stats = {
     total: participants.length,
     approved: participants.filter(p => (p.status || "").toLowerCase() === "approved").length,
@@ -317,14 +280,73 @@ export default function ServiceLivelihood({ onBack }) {
     rejected: participants.filter(p => (p.status || "").toLowerCase() === "rejected").length,
   };
 
-  // ── Pagination Calculation ────────────────────────────────────────
-  const totalPages = Math.ceil(participants.length / itemsPerPage);
-  const paginatedParticipants = participants.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+  const filteredParticipants = useMemo(() => {
+    return participants
+      .filter(p => {
+        const s = (p.status || "pending").toLowerCase();
+        if (filterStatus === "All") return true;
+        return s === filterStatus.toLowerCase();
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") {
+          const nameA = a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = b.fullName || `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameA.localeCompare(nameB);
+        }
+        if (sortOrder === "name_desc") {
+          const nameA = a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = b.fullName || `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameB.localeCompare(nameA);
+        }
+        if (sortOrder === "prog_asc") {
+          return (a.programName || "").localeCompare(b.programName || "");
+        }
+        return 0;
+      });
+  }, [participants, filterStatus, sortOrder]);
+
+  const totalPages = Math.ceil(filteredParticipants.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedParticipants = filteredParticipants.slice(
+    startIndex,
+    startIndex + itemsPerPage
   );
 
-  // ─────────────────────────────────────────────────────────────────
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 2) {
+        pages.push(1, 2, 3, "...", totalPages);
+      } else if (currentPage >= totalPages - 1) {
+        pages.push(1, "...", totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage, "...", totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        className={`af-page-btn ${currentPage === page ? "active" : ""}`}
+        onClick={() => (typeof page === "number" ? setCurrentPage(page) : null)}
+        disabled={typeof page !== "number"}
+        style={{
+          cursor: typeof page === "number" ? "pointer" : "default",
+          border: typeof page !== "number" ? "none" : "",
+          background: typeof page !== "number" ? "transparent" : "",
+        }}
+      >
+        {page}
+      </button>
+    ));
+  };
+
   return (
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
@@ -342,105 +364,158 @@ export default function ServiceLivelihood({ onBack }) {
           </button>
         </div>
 
-        {/* ── Programs ── */}
+        {/* ── Active Programs Grid ── */}
         <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: "20px", paddingBottom: "20px" }}>
-          <h3 style={{ marginBottom: "10px" }}>Active Programs</h3>
+          <h3 style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+            Active Programs
+            <span style={{ fontSize: "0.85rem", fontWeight: 500, color: "#6b7280" }}>
+              ({programs.length})
+            </span>
+          </h3>
           {loadingPrograms ? (
             <p style={{ color: "#9ca3af" }}>Loading…</p>
           ) : programs.length === 0 ? (
             <p style={{ color: "#9ca3af" }}>No programs yet.</p>
           ) : (
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              {programs.map(prog => {
-                const approved = getApprovedCount(prog.id);
-                const left = getSlotsLeft(prog);
-                const full = left !== null && left <= 0;
+            <div
+              style={{
+                maxHeight: "460px",
+                overflowY: "auto",
+                padding: "12px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                background: "#f8fafc",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                  gap: "14px",
+                }}
+              >
+                {programs.map(prog => {
+                  const approved = getApprovedCount(prog.id);
+                  const left = getSlotsLeft(prog);
+                  const full = left !== null && left <= 0;
 
-                return (
-                  <div
-                    key={prog.id}
-                    style={{
-                      padding: "16px",
-                      border: `2px solid ${full ? "#fca5a5" : "#2DB17B"}`,
-                      background: full ? "#fff1f2" : "#f0fdf4",
-                      borderRadius: "8px",
-                      minWidth: "250px",
-                      maxWidth: "300px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <div style={{ fontWeight: "bold", color: full ? "#991b1b" : "#166534" }}>{prog.title}</div>
-                    <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>
-                      {prog.date}
-                      {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
-                      {prog.startTime ? ` • ${prog.startTime}${prog.endTime ? ` - ${prog.endTime}` : ""}` : ""}
-                    </div>
-                    {prog.location && (
-                      <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>{prog.location}</div>
-                    )}
-                    {prog.demographic && (
+                  return (
+                    <div
+                      key={prog.id}
+                      style={{
+                        padding: "16px",
+                        border: `2px solid ${full ? "#fca5a5" : "#2DB17B"}`,
+                        background: full ? "#fff1f2" : "#ffffff",
+                        borderRadius: "10px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                      }}
+                    >
+                      <div style={{ fontWeight: "bold", fontSize: "0.95rem", color: full ? "#991b1b" : "#166534" }}>
+                        {prog.title}
+                      </div>
                       <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>
-                        <strong>Target:</strong> {prog.demographic}
+                        {prog.date}
+                        {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
+                        {prog.startTime ? ` • ${prog.startTime}${prog.endTime ? ` - ${prog.endTime}` : ""}` : ""}
                       </div>
-                    )}
-                    <div style={{ marginTop: "4px", fontSize: "0.82rem" }}>
-                      <span style={{ fontWeight: 600, color: "#166534" }}>{approved} approved</span>
-                      {prog.slots > 0 && (
-                        <span style={{ color: "#6b7280" }}>
-                          {" / "}{prog.slots} slots ·{" "}
-                          <span style={{ fontWeight: 600, color: full ? "#991b1b" : "#15803d" }}>
-                            {full ? "Full" : `${left} left`}
-                          </span>
-                        </span>
+                      {prog.location && (
+                        <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>{prog.location}</div>
                       )}
-                    </div>
-                    {prog.slots > 0 && (
-                      <div style={{ marginTop: "4px", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
-                        <div style={{
-                          height: "100%",
-                          width: `${Math.min((approved / prog.slots) * 100, 100)}%`,
-                          background: full ? "#ef4444" : "#2DB17B",
-                          borderRadius: "4px",
-                          transition: "width 0.3s",
-                        }} />
+                      {prog.demographic && (
+                        <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+                          <strong>Target:</strong> {prog.demographic}
+                        </div>
+                      )}
+                      <div style={{ marginTop: "4px", fontSize: "0.82rem" }}>
+                        <span style={{ fontWeight: 600, color: "#166534" }}>{approved} approved</span>
+                        {prog.slots > 0 && (
+                          <span style={{ color: "#6b7280" }}>
+                            {" / "}{prog.slots} slots ·{" "}
+                            <span style={{ fontWeight: 600, color: full ? "#991b1b" : "#15803d" }}>
+                              {full ? "Full" : `${left} left`}
+                            </span>
+                          </span>
+                        )}
                       </div>
-                    )}
+                      {prog.slots > 0 && (
+                        <div style={{ marginTop: "4px", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
+                          <div style={{
+                            height: "100%",
+                            width: `${Math.min((approved / prog.slots) * 100, 100)}%`,
+                            background: full ? "#ef4444" : "#2DB17B",
+                            borderRadius: "4px",
+                            transition: "width 0.3s",
+                          }} />
+                        </div>
+                      )}
 
-                    <div style={{ display: "flex", gap: "6px", marginTop: "12px", flexWrap: "wrap" }}>
-                      <button
-                        className="as-btn-ghost"
-                        style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem" }}
-                        onClick={() => handleEdit(prog)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="as-btn-ghost"
-                        style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", color: "#0369a1", borderColor: "#bae6fd" }}
-                        onClick={() => setEmailBlastTarget(prog)}
-                        title="Send email to approved registrants"
-                      >
-                        Email
-                      </button>
-                      <button
-                        className="as-btn-ghost"
-                        style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", color: "#dc2626", borderColor: "#fca5a5" }}
-                        onClick={() => handleDelete(prog.id, prog.title)}
-                      >
-                        Delete
-                      </button>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "12px", flexWrap: "wrap" }}>
+                        <button
+                          className="as-btn-ghost"
+                          style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", background: "#fff" }}
+                          onClick={() => handleEdit(prog)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="as-btn-ghost"
+                          style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", color: "#0369a1", borderColor: "#bae6fd", background: "#fff" }}
+                          onClick={() => setEmailBlastTarget(prog)}
+                          title="Send email to approved registrants"
+                        >
+                          Email
+                        </button>
+                        <button
+                          className="as-btn-ghost"
+                          style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", color: "#dc2626", borderColor: "#fca5a5", background: "#fff" }}
+                          onClick={() => handleDelete(prog.id, prog.title)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
         {/* ── Stats row ── */}
-        <h3 style={{ marginBottom: "10px" }}>Participant Registrations</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+          <h3 style={{ margin: 0 }}>Participant Registrations</h3>
+
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <select
+              className="filter-select"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+            >
+              <option value="All">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+
+            <select
+              className="filter-select"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
+            >
+              <option value="date_desc">Date: Newest First</option>
+              <option value="date_asc">Date: Oldest First</option>
+              <option value="name_asc">Participant: A to Z</option>
+              <option value="name_desc">Participant: Z to A</option>
+              <option value="prog_asc">Program: A to Z</option>
+            </select>
+          </div>
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
           {[
             { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
@@ -459,8 +534,8 @@ export default function ServiceLivelihood({ onBack }) {
         {loadingParts ? (
           <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
         ) : (
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+            <table className="req-table" style={{ width: "100%", minWidth: "850px", borderCollapse: "collapse", textAlign: "left" }}>
               <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <tr>
                   {["Ref #", "Full Name", "Contact", "Program", "Slots Left", "Applied", "Status", "Actions"].map(h => (
@@ -471,10 +546,10 @@ export default function ServiceLivelihood({ onBack }) {
                 </tr>
               </thead>
               <tbody>
-                {participants.length === 0 && (
+                {filteredParticipants.length === 0 && (
                   <tr>
                     <td colSpan={8} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>
-                      No registrations yet.
+                      No registrations match your criteria.
                     </td>
                   </tr>
                 )}
@@ -558,13 +633,44 @@ export default function ServiceLivelihood({ onBack }) {
                 })}
               </tbody>
             </table>
-            {/* Pagination Controls */}
-            {participants.length > 0 && (
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                setCurrentPage={setCurrentPage}
-              />
+
+            {filteredParticipants.length > 0 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "16px 24px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                flexWrap: "wrap",
+                gap: "16px"
+              }}>
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Showing {startIndex + 1} to{" "}
+                  {Math.min(startIndex + itemsPerPage, filteredParticipants.length)} of{" "}
+                  {filteredParticipants.length} entries
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                    {renderPageNumbers()}
+                    <button
+                      className="af-page-btn"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -574,7 +680,6 @@ export default function ServiceLivelihood({ onBack }) {
           <div className="as-modal-overlay">
             <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
               <div className="as-modal-header">
-                {/* Title changes between Add and Edit (ported from ManagePrograms) */}
                 <h2>{editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}</h2>
                 <button className="as-modal-close" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
               </div>
@@ -594,7 +699,6 @@ export default function ServiceLivelihood({ onBack }) {
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
                     <div>
-                      {/* ── Start Date: min=today prevents past dates (ported from ManagePrograms) ── */}
                       <label className="as-form-label">Start Date <span style={{ color: "red" }}>*</span></label>
                       <input
                         type="date"
@@ -607,14 +711,12 @@ export default function ServiceLivelihood({ onBack }) {
                           setNewProgram(prev => ({
                             ...prev,
                             date: newDate,
-                            // Reset end date if it falls before the new start date
                             endDate: prev.endDate && prev.endDate < newDate ? newDate : prev.endDate,
                           }));
                         }}
                       />
                     </div>
                     <div>
-                      {/* ── End Date: min is the later of today or start date (ported from ManagePrograms) ── */}
                       <label className="as-form-label">
                         End Date
                         <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
@@ -816,4 +918,3 @@ export default function ServiceLivelihood({ onBack }) {
     </>
   );
 }
-

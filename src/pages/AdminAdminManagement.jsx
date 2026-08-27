@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import "../AdminStyle.css";
 import AdminLayout from "../components/AdminLayout";
 import { auth, db } from "../firebase/firebase";
@@ -21,12 +21,10 @@ import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 
 export default function AdminManagement() {
-  // ================= STATE =================
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
@@ -36,11 +34,13 @@ export default function AdminManagement() {
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  const [viewMode, setViewMode] = useState("default");
+  const [activeTab, setActiveTab] = useState("requests");
 
   const [searchAdmin, setSearchAdmin] = useState("");
   const [searchRequest, setSearchRequest] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [sortRequest, setSortRequest] = useState("date_desc");
+  const [sortAdmin, setSortAdmin] = useState("name_asc");
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -54,13 +54,9 @@ export default function AdminManagement() {
   const [requestRowsPerPage, setRequestRowsPerPage] = useState(10);
   const [adminRowsPerPage, setAdminRowsPerPage] = useState(10);
 
-  const defaultRows = 3;
-
   useEffect(() => {
-    // Listen for the currently logged-in user
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Find their document in the approvedAdmins collection
         const q = query(
           collection(db, "approvedAdmins"),
           where("uid", "==", user.uid)
@@ -78,13 +74,11 @@ export default function AdminManagement() {
     return () => unsubscribe();
   }, []);
 
-  // ================= STEP 1: CHECK IF SERVICE HEAD =================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
 
-        // Check pendingAdmins first
         const pendingQ = query(
           collection(db, "pendingAdmins"),
           where("uid", "==", user.uid),
@@ -102,7 +96,6 @@ export default function AdminManagement() {
           }
         }
 
-        // Also check approvedAdmins
         const approvedQ = query(
           collection(db, "approvedAdmins"),
           where("uid", "==", user.uid),
@@ -126,11 +119,9 @@ export default function AdminManagement() {
     return () => unsubscribe();
   }, []);
 
-  // ================= STEP 2: FETCH DATA FROM FIRESTORE =================
   useEffect(() => {
     if (!isSuperAdmin) return;
 
-    // BOUNDED QUERY: Defend against registration spam by capping pending requests to the 100 most recent
     const pendingQuery = query(
       collection(db, "pendingAdmins"),
       orderBy("createdAt", "desc"),
@@ -146,10 +137,11 @@ export default function AdminManagement() {
             docId: doc.id,
             ...docData,
             email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
+            rawDate: docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : 0,
             dateSubmitted:
               docData.createdAt?.toDate().toLocaleDateString("en-US", {
                 year: "numeric",
-                month: "long",
+                month: "short",
                 day: "numeric",
               }) || "N/A",
           };
@@ -158,7 +150,6 @@ export default function AdminManagement() {
       },
     );
 
-    // BOUNDED QUERY: Hard ceiling on approved admins to prevent read spikes
     const approvedQuery = query(
       collection(db, "approvedAdmins"),
       limit(100)
@@ -185,7 +176,6 @@ export default function AdminManagement() {
     };
   }, [isSuperAdmin, adminRole, currentUser]);
 
-  // ================= STEP 3: APPROVE =================
   const handleApprove = async () => {
     if (!selectedRequest) return;
 
@@ -226,7 +216,6 @@ export default function AdminManagement() {
     }
   };
 
-  // ================= STEP 4: REJECT =================
   const confirmReject = async () => {
     if (!selectedRequest) return;
 
@@ -256,7 +245,6 @@ export default function AdminManagement() {
     }
   };
 
-  // ================= STEP 5: DELETE APPROVED ADMIN =================
   const confirmDeleteAdmin = async () => {
     if (!selectedAdmin) return;
 
@@ -284,7 +272,6 @@ export default function AdminManagement() {
     }
   };
 
-  // ================= STEP 6: UPDATE ROLE =================
   const handleSaveRole = async () => {
     if (!selectedAdmin) return;
 
@@ -315,67 +302,58 @@ export default function AdminManagement() {
     }
   };
 
-  // ================= FILTERED DATA =================
-  const filteredAdmins = admins
-    .filter((admin) => {
-      return admin.fullName?.toLowerCase().includes(searchAdmin.toLowerCase());
-    })
-    .slice()
-    .reverse();
+  const filteredAdmins = useMemo(() => {
+    return admins
+      .filter((admin) => {
+        return (admin.fullName || "").toLowerCase().includes(searchAdmin.toLowerCase()) ||
+          (admin.username || "").toLowerCase().includes(searchAdmin.toLowerCase()) ||
+          (admin.position || "").toLowerCase().includes(searchAdmin.toLowerCase());
+      })
+      .sort((a, b) => {
+        if (sortAdmin === "name_asc") return (a.fullName || "").localeCompare(b.fullName || "");
+        if (sortAdmin === "name_desc") return (b.fullName || "").localeCompare(a.fullName || "");
+        if (sortAdmin === "role_asc") return (a.role || "Standard Admin").localeCompare(b.role || "Standard Admin");
+        if (sortAdmin === "role_desc") return (b.role || "Standard Admin").localeCompare(a.role || "Standard Admin");
+        return 0;
+      });
+  }, [admins, searchAdmin, sortAdmin]);
 
-  const filteredRequests = requests
-    .filter((req) => {
-      const searchText = searchRequest.toLowerCase();
-      const matchesSearch =
-        req.fullName?.toLowerCase().includes(searchText) ||
-        req.email?.toLowerCase().includes(searchText) ||
-        req.username?.toLowerCase().includes(searchText);
-      const matchesStatus =
-        filterStatus === "All" || req.status === filterStatus;
-      return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      if (a.status === "pending" && b.status !== "pending") return -1;
-      if (a.status !== "pending" && b.status === "pending") return 1;
-      return 0;
-    });
+  const filteredRequests = useMemo(() => {
+    return requests
+      .filter((req) => {
+        const searchText = searchRequest.toLowerCase();
+        const matchesSearch =
+          (req.fullName || "").toLowerCase().includes(searchText) ||
+          (req.email || "").toLowerCase().includes(searchText) ||
+          (req.username || "").toLowerCase().includes(searchText);
+        const matchesStatus =
+          filterStatus === "All" || req.status === filterStatus;
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (sortRequest === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortRequest === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortRequest === "name_asc") return (a.fullName || "").localeCompare(b.fullName || "");
+        if (sortRequest === "name_desc") return (b.fullName || "").localeCompare(a.fullName || "");
+        return 0;
+      });
+  }, [requests, searchRequest, filterStatus, sortRequest]);
 
   const totalRequestPages = Math.ceil(filteredRequests.length / requestRowsPerPage);
   const requestStartIndex = (requestPage - 1) * requestRowsPerPage;
-
-  const paginatedRequests =
-    viewMode === "default"
-      ? filteredRequests.slice(0, defaultRows)
-      : filteredRequests.slice(
-        requestStartIndex,
-        requestStartIndex + requestRowsPerPage
-      );
+  const paginatedRequests = filteredRequests.slice(requestStartIndex, requestStartIndex + requestRowsPerPage);
 
   const totalAdminPages = Math.ceil(filteredAdmins.length / adminRowsPerPage);
   const adminStartIndex = (adminPage - 1) * adminRowsPerPage;
-
-  const paginatedAdmins =
-    viewMode === "default"
-      ? filteredAdmins.slice(0, defaultRows)
-      : filteredAdmins.slice(
-        adminStartIndex,
-        adminStartIndex + adminRowsPerPage
-      );
+  const paginatedAdmins = filteredAdmins.slice(adminStartIndex, adminStartIndex + adminRowsPerPage);
 
   useEffect(() => {
     setRequestPage(1);
-  }, [searchRequest, filterStatus, requestRowsPerPage]);
+  }, [searchRequest, filterStatus, sortRequest, requestRowsPerPage]);
 
   useEffect(() => {
     setAdminPage(1);
-  }, [searchAdmin, adminRowsPerPage]);
-
-  useEffect(() => {
-    if (viewMode === "default") {
-      setRequestPage(1);
-      setAdminPage(1);
-    }
-  }, [viewMode]);
+  }, [searchAdmin, sortAdmin, adminRowsPerPage]);
 
   const renderPageNumbers = (currentPage, totalPages, setPage) => {
     const pages = [];
@@ -410,20 +388,16 @@ export default function AdminManagement() {
     ));
   };
 
-  // ================= LOADING =================
   if (authLoading) {
     return (
       <AdminLayout>
-        <div
-          style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem" }}
-        >
+        <div style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem" }}>
           Loading...
         </div>
       </AdminLayout>
     );
   }
 
-  // ================= ACCESS GUARD =================
   if (!isSuperAdmin) {
     return (
       <AdminLayout>
@@ -437,28 +411,31 @@ export default function AdminManagement() {
     );
   }
 
-  // ================= RENDER =================
   return (
     <AdminLayout>
-      <div className="main-content">
-        {/* ================= REGISTRATION REQUESTS ================= */}
-        {(viewMode === "default" || viewMode === "requests") && (
-          <div className="section">
-            <div className="section-header">
-              <div>
-                <h2 className="requests-title">
-                  Admin Registration Requests
-                </h2>
-                <p className="af-subtitle">Pending approval (
-                  {filteredRequests.filter((r) => r.status === "pending").length})</p>
-              </div>
+      <div className="requests-container">
+        <div className="requests-header">
+          <h1 className="requests-title">Admin Management</h1>
+          <p className="requests-subtitle">Manage system administrative privileges, registrations, and accounts.</p>
+        </div>
 
-              {viewMode === "default" ? (
-                <button className="view-btn" onClick={() => setViewMode("requests")}> See All Requests </button>
-              ) : (
-                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchRequest(""); setFilterStatus("All"); setRequestPage(1); }}> Return </button>
-              )}
-            </div>
+        <div className="req-tabs">
+          <button
+            className={`req-tab ${activeTab === "requests" ? "active" : ""}`}
+            onClick={() => setActiveTab("requests")}
+          >
+            Registration Requests
+          </button>
+          <button
+            className={`req-tab ${activeTab === "admins" ? "active" : ""}`}
+            onClick={() => setActiveTab("admins")}
+          >
+            Admin Accounts
+          </button>
+        </div>
+
+        {activeTab === "requests" && (
+          <>
             <div className="requests-controls">
               <div className="search-wrapper" style={{ position: "relative" }}>
                 <Search
@@ -472,7 +449,6 @@ export default function AdminManagement() {
                     pointerEvents: "none",
                   }}
                 />
-
                 <input
                   type="text"
                   placeholder="Search requests..."
@@ -483,7 +459,16 @@ export default function AdminManagement() {
                 />
               </div>
 
-              <div className="filter-group">
+              <div
+                className="filter-group"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "12px",
+                  alignItems: "center",
+                  flexWrap: "nowrap"
+                }}
+              >
                 <select
                   className="filter-select"
                   value={filterStatus}
@@ -494,10 +479,22 @@ export default function AdminManagement() {
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
                 </select>
+
+                <select
+                  className="filter-select"
+                  value={sortRequest}
+                  onChange={(e) => setSortRequest(e.target.value)}
+                >
+                  <option value="date_desc">Date: Newest First</option>
+                  <option value="date_asc">Date: Oldest First</option>
+                  <option value="name_asc">Name: A to Z</option>
+                  <option value="name_desc">Name: Z to A</option>
+                </select>
               </div>
             </div>
-            <div className="req-table-wrapper">
-              <table className="req-table">
+
+            <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr>
                     <th>Full Name</th>
@@ -507,18 +504,18 @@ export default function AdminManagement() {
                     <th>Username</th>
                     <th>Date Submitted</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    <th style={{ textAlign: "center" }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedRequests.length > 0 ? (
                     paginatedRequests.map((req) => (
                       <tr key={req.docId}>
-                        <td>{req.fullName}</td>
+                        <td style={{ fontWeight: 500 }}>{req.fullName}</td>
                         <td>{formatDisplayEmail(req.email, adminRole, currentUser?.uid === req.uid)}</td>
                         <td>{req.contact}</td>
                         <td>{req.position}</td>
-                        <td>{req.username}</td>
+                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>{req.username}</td>
                         <td>{req.dateSubmitted}</td>
                         <td>
                           <span
@@ -530,7 +527,7 @@ export default function AdminManagement() {
                         </td>
                         <td>
                           {req.status === "pending" ? (
-                            <div className="btn-group">
+                            <div className="btn-group" style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
                               <button
                                 className="approve-btn"
                                 onClick={() => {
@@ -551,7 +548,7 @@ export default function AdminManagement() {
                               </button>
                             </div>
                           ) : (
-                            <span className="action-disabled">Completed</span>
+                            <span className="action-disabled" style={{ display: "block", textAlign: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Completed</span>
                           )}
                         </td>
                       </tr>
@@ -560,9 +557,9 @@ export default function AdminManagement() {
                     <tr>
                       <td
                         colSpan={8}
-                        style={{ textAlign: "center", padding: "16px" }}
+                        style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}
                       >
-                        No results found.
+                        No requests found.
                       </td>
                     </tr>
                   )}
@@ -570,7 +567,7 @@ export default function AdminManagement() {
               </table>
             </div>
 
-            {viewMode === "requests" && filteredRequests.length > 0 && (
+            {filteredRequests.length > 0 && (
               <div style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -581,8 +578,6 @@ export default function AdminManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-
-                {/* Rows per page */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                   <span>Rows per page:</span>
                   <select
@@ -604,7 +599,6 @@ export default function AdminManagement() {
                   </select>
                 </div>
 
-                {/* Pagination buttons */}
                 {totalRequestPages > 1 && (
                   <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
                     <button
@@ -614,9 +608,7 @@ export default function AdminManagement() {
                     >
                       Previous
                     </button>
-
                     {renderPageNumbers(requestPage, totalRequestPages, setRequestPage)}
-
                     <button
                       className="af-page-btn"
                       onClick={() => setRequestPage(prev => Math.min(prev + 1, totalRequestPages))}
@@ -627,7 +619,6 @@ export default function AdminManagement() {
                   </div>
                 )}
 
-                {/* Showing text */}
                 <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                   Showing {requestStartIndex + 1} to{" "}
                   {Math.min(requestStartIndex + requestRowsPerPage, filteredRequests.length)} of{" "}
@@ -635,20 +626,11 @@ export default function AdminManagement() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {/* ================= ADMIN ACCOUNT MANAGEMENT ================= */}
-        {(viewMode === "default" || viewMode === "admins") && (
-          <div className="section">
-            <div className="section-header">
-              <h2 className="requests-title"> Admin Account Management</h2>
-              {viewMode === "default" ? (
-                <button className="view-btn" onClick={() => setViewMode("admins")}> See All Admins </button>
-              ) : (
-                <button className="view-btn" onClick={() => { setViewMode("default"); setSearchAdmin(""); setAdminPage(1); }}> Return </button>
-              )}
-            </div>
+        {activeTab === "admins" && (
+          <>
             <div className="requests-controls">
               <div className="search-wrapper" style={{ position: "relative" }}>
                 <Search
@@ -662,7 +644,6 @@ export default function AdminManagement() {
                     pointerEvents: "none",
                   }}
                 />
-
                 <input
                   type="text"
                   placeholder="Search admin..."
@@ -672,31 +653,67 @@ export default function AdminManagement() {
                   style={{ paddingLeft: "36px" }}
                 />
               </div>
+
+              <div
+                className="filter-group"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "12px",
+                  alignItems: "center",
+                  flexWrap: "nowrap"
+                }}
+              >
+                <select
+                  className="filter-select"
+                  value={sortAdmin}
+                  onChange={(e) => setSortAdmin(e.target.value)}
+                >
+                  <option value="name_asc">Name: A to Z</option>
+                  <option value="name_desc">Name: Z to A</option>
+                  <option value="role_asc">System Role: Ascending</option>
+                  <option value="role_desc">System Role: Descending</option>
+                </select>
+              </div>
             </div>
-            <div className="req-table-wrapper">
-              <table className="req-table">
+
+            <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr>
                     <th>Full Name</th>
                     <th>Username</th>
                     <th>Position</th>
-                    <th>More Details</th>
-                    <th>Action</th>
+                    <th>System Role</th>
+                    <th style={{ textAlign: "center" }}>More Details</th>
+                    <th style={{ textAlign: "center" }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedAdmins.length > 0 ? (
                     paginatedAdmins.map((admin) => (
                       <tr key={admin.docId}>
-                        <td>{admin.fullName}</td>
-                        <td>{admin.username}</td>
+                        <td style={{ fontWeight: 500 }}>{admin.fullName}</td>
+                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>{admin.username}</td>
                         <td>{admin.position}</td>
                         <td>
+                          <span style={{
+                            background: admin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6',
+                            color: admin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
+                            padding: "4px 10px",
+                            borderRadius: "12px",
+                            fontSize: "0.78rem",
+                            fontWeight: "600"
+                          }}>
+                            {admin.role || "Standard Admin"}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
                           <button
-                            className="view-btn"
+                            className="as-btn-ghost"
+                            style={{ padding: "6px 12px", fontSize: "0.8rem" }}
                             onClick={() => {
                               setSelectedAdmin(admin);
-                              // Load current role, default to Standard if none exists yet
                               setEditedRole(admin.role || "Standard Admin");
                               setShowViewModal(true);
                             }}
@@ -704,9 +721,10 @@ export default function AdminManagement() {
                             View
                           </button>
                         </td>
-                        <td>
+                        <td style={{ textAlign: "center" }}>
                           <button
                             className="reject-btn"
+                            style={{ padding: "6px 12px", fontSize: "0.8rem" }}
                             onClick={() => {
                               setSelectedAdmin(admin);
                               setShowDeleteModal(true);
@@ -720,10 +738,10 @@ export default function AdminManagement() {
                   ) : (
                     <tr>
                       <td
-                        colSpan={5}
-                        style={{ textAlign: "center", padding: "16px" }}
+                        colSpan={6}
+                        style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}
                       >
-                        No results found.
+                        No admin accounts found.
                       </td>
                     </tr>
                   )}
@@ -731,7 +749,7 @@ export default function AdminManagement() {
               </table>
             </div>
 
-            {viewMode === "admins" && filteredAdmins.length > 0 && (
+            {filteredAdmins.length > 0 && (
               <div style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -742,8 +760,6 @@ export default function AdminManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-
-                {/* Rows per page */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                   <span>Rows per page:</span>
                   <select
@@ -765,7 +781,6 @@ export default function AdminManagement() {
                   </select>
                 </div>
 
-                {/* Pagination buttons */}
                 {totalAdminPages > 1 && (
                   <div className="af-pagination" style={{ display: "flex", gap: "8px" }}>
                     <button
@@ -775,9 +790,7 @@ export default function AdminManagement() {
                     >
                       Previous
                     </button>
-
                     {renderPageNumbers(adminPage, totalAdminPages, setAdminPage)}
-
                     <button
                       className="af-page-btn"
                       onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
@@ -788,7 +801,6 @@ export default function AdminManagement() {
                   </div>
                 )}
 
-                {/* Showing text */}
                 <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                   Showing {adminStartIndex + 1} to{" "}
                   {Math.min(adminStartIndex + adminRowsPerPage, filteredAdmins.length)} of{" "}
@@ -796,13 +808,10 @@ export default function AdminManagement() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      {/* ================= MODALS ================= */}
-
-      {/* Approve Modal */}
       {showApproveModal && (
         <div className="as-modal-overlay">
           <div className="modal">
@@ -829,7 +838,6 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* Reject Modal */}
       {showRejectModal && (
         <div className="as-modal-overlay">
           <div className="modal">
@@ -855,7 +863,6 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* Delete Modal */}
       {showDeleteModal && (
         <div className="as-modal-overlay">
           <div className="modal">
@@ -881,11 +888,9 @@ export default function AdminManagement() {
         </div>
       )}
 
-      {/* View Admin Details Modal */}
       {showViewModal && selectedAdmin && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "420px" }}>
-
             <div className="as-modal-header">
               <h2>Admin Details</h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
@@ -899,12 +904,10 @@ export default function AdminManagement() {
                 <p><strong>Position:</strong> {selectedAdmin.position}</p>
                 <p><strong>Username:</strong> {selectedAdmin.username}</p>
 
-                {/* --- NEW: SYSTEM ROLE SECTION --- */}
                 <div style={{ marginTop: "16px", borderTop: "1px dashed #ccc", paddingTop: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <strong>System Role:</strong>
 
-                    {/* Logic: Only Super Admin can edit, and cannot edit themselves */}
                     {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid ? (
                       <select
                         value={editedRole}
@@ -943,14 +946,11 @@ export default function AdminManagement() {
                 </div>
               </div>
 
-              {/* --- NEW: SAVE CHANGES BUTTON --- */}
-              {/* Only shows if user is Super Admin, is not editing themselves, and actually changed the dropdown */}
               {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && editedRole !== (selectedAdmin.role || "Standard Admin") && (
                 <div className="modal-actions" style={{ marginTop: "20px", justifyContent: "flex-end", borderTop: "1px solid #eee", paddingTop: "16px" }}>
                   <button className="approve-btn" onClick={handleSaveRole}>Save Role Changes</button>
                 </div>
               )}
-
             </div>
           </div>
         </div>

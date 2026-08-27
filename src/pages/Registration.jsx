@@ -777,19 +777,20 @@ export default function Registration({ onBack }) {
 
   const [form, setForm] = useState({
     idNumber: "",
-    firstName: "", middleName: "", lastName: "", suffix: "", religion: "",
+    firstName: "", middleName: "", lastName: "", suffix: "", religion: "", religionOther: "",
     birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
-    citizenship: "Filipino", contactNumber: "", email: "", residingSinceYear: "",
-    houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
+    citizenship: "Filipino", citizenshipOther: "", contactNumber: "", email: "", residingSinceYear: "",
+    houseNumber: "", street: "", subdivision: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
     categories: [],
     pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
-    educationAttainment: "", educationStatus: "", occupation: "", employmentStatus: "",
+    educationAttainment: "", educationStatus: "", postGradLevel: "", occupation: "", employmentStatus: "",
     totalMembers: "", householdClassification: "",
   });
 
   const total = STEPS.length;
   const progress = submitted ? 100 : (step / (total - 1)) * 100;
   const isPwd = form.categories.includes("PWD");
+  const showEmail = form.age === "" || Number(form.age) >= 15; 
 
   const applyOcr = useCallback((data) => {
     const mapping = {
@@ -852,11 +853,12 @@ export default function Registration({ onBack }) {
       if (!form.residingSinceYear) missing.push("Residing Since Year");
       if (!form.contactNumber.trim()) missing.push("Contact Number");
       else if (form.contactNumber.length < 10) missing.push("Valid Contact Number");
+      if (showEmail) {
       if (!form.email.trim()) missing.push("Email Address");
       else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+     }
     }
     if (step === 3) {
-      if (!form.houseNumber.trim()) missing.push("House / Unit Number");
       if (!form.street.trim()) missing.push("Street");
       if (!form.region.trim()) missing.push("Region");
       if (!form.province.trim()) missing.push("Province");
@@ -1071,14 +1073,37 @@ export default function Registration({ onBack }) {
                           <option>Jr.</option><option>Sr.</option><option>II</option><option>III</option><option>IV</option>
                         </SelectField>
                       </Field>
-                      <Field label="Religion"><InputField icon={RegisIconReligion} type="text" placeholder="Roman Catholic" value={form.religion} onChange={set("religion")} /></Field>
+                      <Field label="Religion">
+                        <SelectField icon={RegisIconReligion} value={form.religion} onChange={set("religion")}>
+                          <option value="">Select religion</option>
+                          <option>Roman Catholic</option>
+                          <option>Islam</option>
+                          <option>Iglesia ni Cristo</option>
+                          <option>Evangelical</option>
+                          <option>Aglipayan (Philippine Independent Church)</option>
+                          <option>Seventh-day Adventist</option>
+                          <option>Bible Baptist Church</option>
+                          <option>United Church of Christ in the Philippines (UCCP)</option>
+                          <option>Jehovah's Witnesses</option>
+                          <option>The Church of Jesus Christ of Latter-day Saints</option>
+                          <option>Buddhist</option>
+                          <option>Hindu</option>
+                          <option>None</option>
+                          <option>Others</option>
+                        </SelectField>
+                      </Field>
                       <Field label="Civil Status" required>
                         <SelectField icon={RegisIconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
                           <option value="">Select status</option>
-                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
+                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Cohabitation</option>
                         </SelectField>
                       </Field>
                     </div>
+                    {form.religion === "Others" && (
+                      <Field label="Please specify religion">
+                        <InputField type="text" placeholder="Please specify" value={form.religionOther} onChange={set("religionOther")} />
+                      </Field>
+                    )}
                     <div className="reg-form-grid cols-3">
                       <Field label="Birth Date" required><InputField icon={RegisIconCalendar} type="date" value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
                       <Field label="Age"><InputField icon={RegisIconClock} type="number" placeholder="Auto-computed" value={form.age} readOnly /></Field>
@@ -1114,13 +1139,36 @@ export default function Registration({ onBack }) {
                       </Field>
                     )}
                     <div className="reg-form-grid cols-2">
-                      <Field label="Citizenship" required><InputField icon={IconFlag} type="text" placeholder="Filipino" value={form.citizenship} onChange={set("citizenship")} /></Field>
+                      <Field label="Citizenship" required>
+                        <SelectField icon={IconFlag} value={form.citizenship} onChange={set("citizenship")}>
+                          <option value="">Select citizenship</option>
+                          <option>Filipino</option>
+                          <option>Dual Citizen</option>
+                          <option>Foreign National</option>
+                          <option>Naturalized Filipino</option>
+                          <option>Others</option>
+                        </SelectField>
+                      </Field>
                       <Field label="Residing Since (Year)" required><InputField icon={RegisIconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                     </div>
-                    <div className="reg-form-grid cols-2">
+                    {form.citizenship === "Others" && (
+                      <Field label="Please specify citizenship">
+                        <InputField type="text" placeholder="Please specify" value={form.citizenshipOther} onChange={set("citizenshipOther")} />
+                      </Field>
+                    )}
+                    <div className={`reg-form-grid ${showEmail ? "cols-2" : "cols-1"}`}>
                       <Field label="Contact Number" required><InputField icon={RegisIconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
-                      <Field label="Email Address" required hint="We'll send your approval notification here."><InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} /></Field>
+                      {showEmail && (
+                        <Field label="Email Address" required hint="We'll send your approval notification here.">
+                          <InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} />
+                        </Field>
+                      )}
                     </div>
+                    {!showEmail && (
+                      <p style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "-0.6rem" }}>
+                        Email is not required for residents under 15 years old.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1140,14 +1188,19 @@ export default function Registration({ onBack }) {
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
-                      <Field label="House / Unit Number" required><InputField icon={RegisIconHome} type="text" placeholder="123" value={form.houseNumber} onChange={set("houseNumber")} autofilled={af("houseNumber")} /></Field>
+                      <Field label={<>House / Unit Number <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
+                        <InputField icon={RegisIconHome} type="text" placeholder="123" value={form.houseNumber} onChange={set("houseNumber")} autofilled={af("houseNumber")} />
+                      </Field>
                       <Field label="Street" required><InputField icon={RegisIconHome} type="text" placeholder="Malanday Street" value={form.street} onChange={set("street")} autofilled={af("street")} /></Field>
                     </div>
+                    <Field label={<>Subdivision / Village <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
+                      <InputField icon={RegisIconHome} type="text" placeholder="e.g. Maysan Ville Subdivision" value={form.subdivision} onChange={set("subdivision")} />
+                    </Field>
                     <div className="reg-form-grid cols-2">
-                      <Field label="Region" required><InputField icon={RegisIconGlobe} type="text" value={form.region} readOnly /></Field>
-                      <Field label="Province" required><InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} autofilled={af("province")} /></Field>
-                      <Field label="City / Municipality" required><InputField icon={RegisIconPin} type="text" value={form.city} readOnly /></Field>
                       <Field label="Barangay" required><InputField icon={RegisIconPin} type="text" value={form.barangay} readOnly /></Field>
+                      <Field label="City / Municipality" required><InputField icon={RegisIconPin} type="text" value={form.city} readOnly /></Field>
+                      <Field label="Province" required><InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} autofilled={af("province")} /></Field>
+                      <Field label="Region" required><InputField icon={RegisIconGlobe} type="text" value={form.region} readOnly /></Field>
                     </div>
                   </div>
                 </div>
@@ -1237,8 +1290,34 @@ export default function Registration({ onBack }) {
                         </SelectField>
                       </Field>
                     </div>
+                    {form.educationAttainment === "Post Graduate" && (
+                      <Field label="Post Graduate Level">
+                        <SelectField icon={RegisIconGradCap} value={form.postGradLevel} onChange={set("postGradLevel")}>
+                          <option value="">Select level</option>
+                          <option>Masters</option>
+                          <option>Doctorate</option>
+                        </SelectField>
+                      </Field>
+                    )}
                     <div className="reg-form-grid cols-2">
-                      <Field label="Occupation"><InputField icon={RegisIconBriefcase} type="text" placeholder="Teacher, Engineer..." value={form.occupation} onChange={set("occupation")} /></Field>
+                      <Field label="Occupation" hint="Select from the list or type your own.">
+                        <InputField icon={RegisIconBriefcase} type="text" list="occupation-options" placeholder="e.g. Teacher, Vendor, Self-Employed" value={form.occupation} onChange={set("occupation")} />
+                        <datalist id="occupation-options">
+                          <option value="Teacher" />
+                          <option value="Construction Worker" />
+                          <option value="Vendor" />
+                          <option value="Self-Employed" />
+                          <option value="Driver" />
+                          <option value="Office Employee" />
+                          <option value="Government Employee" />
+                          <option value="Overseas Filipino Worker (OFW)" />
+                          <option value="Business Owner" />
+                          <option value="Farmer" />
+                          <option value="Fisherman" />
+                          <option value="Housewife / Homemaker" />
+                          <option value="Student" />
+                        </datalist>
+                      </Field>
                       <Field label="Employment Status" required>
                         <SelectField icon={RegisIconBriefcase} value={form.employmentStatus} onChange={set("employmentStatus")}>
                           <option value="">Select status</option>
@@ -1265,8 +1344,12 @@ export default function Registration({ onBack }) {
                       <Field label="Household Classification" required>
                         <SelectField icon={RegisIconHome} value={form.householdClassification} onChange={set("householdClassification")}>
                           <option value="">Select classification</option>
-                          <option>Owner</option><option>Rental</option>
-                          <option>Co-habit / Shared</option><option>Informal Settler</option>
+                          <option>Owned</option>
+                          <option>Owned, Lot Rented</option>
+                          <option>Rented</option>
+                          <option>Rent-Free with Consent of Owner</option>
+                          <option>Rent-Free without Consent of Owner</option>
+                          <option>Informal Settler</option>
                         </SelectField>
                       </Field>
                     </div>
@@ -1313,15 +1396,16 @@ export default function Registration({ onBack }) {
                     <ReviewField label="Sex" value={form.sex} />
                     <ReviewField label="Gender" value={form.gender === "Others" ? (rv(form.genderOther) || "Others") : rv(form.gender)} />
                     <ReviewField label="Civil Status" value={rv(form.civilStatus)} />
-                    <ReviewField label="Religion" value={rv(form.religion)} />
-                    <ReviewField label="Citizenship" value={rv(form.citizenship)} />
+                    <ReviewField label="Religion" value={form.religion === "Others" ? (rv(form.religionOther) || "Others") : rv(form.religion)} />
+                    <ReviewField label="Citizenship" value={form.citizenship === "Others" ? (rv(form.citizenshipOther) || "Others") : rv(form.citizenship)} />
                     <ReviewField label="Residing Since" value={rv(form.residingSinceYear)} />
                     <ReviewField label="Contact Number" value={rv(form.contactNumber)} />
-                    <ReviewField label="Email Address" value={rv(form.email)} full />
+                    {showEmail && <ReviewField label="Email Address" value={rv(form.email)} full />}
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgMapPin size={18} />} title="Address">
                     <ReviewField label="House / Street" value={rv(fullAddr)} />
+                    <ReviewField label="Subdivision / Village" value={rv(form.subdivision)} />
                     <ReviewField label="Barangay" value={rv(form.barangay)} />
                     <ReviewField label="City / Municipality" value={rv(form.city)} />
                     <ReviewField label="Province" value={rv(form.province)} />
@@ -1346,7 +1430,7 @@ export default function Registration({ onBack }) {
                   </ReviewSection>
 
                   <ReviewSection icon={<SvgGradCap size={18} />} title="Education & Employment">
-                    <ReviewField label="Highest Attainment" value={rv(form.educationAttainment)} />
+                    <ReviewField label="Highest Attainment" value={form.educationAttainment === "Post Graduate" ? [form.educationAttainment, form.postGradLevel].filter(Boolean).join(" - ") : rv(form.educationAttainment)} />
                     <ReviewField label="Education Status" value={rv(form.educationStatus)} />
                     <ReviewField label="Occupation" value={rv(form.occupation)} />
                     <ReviewField label="Employment Status" value={rv(form.employmentStatus)} />

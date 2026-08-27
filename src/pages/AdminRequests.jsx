@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Eye, CheckCircle, XCircle, X, Calendar, FileText, User, Info, Clock } from 'lucide-react';
@@ -9,11 +9,6 @@ import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
 import { formatDisplayEmail } from '../utils/maskEmail';
 import { getFamilyNumber } from '../utils/householdNumbers';
-
-const getSaved = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
-  catch { return fallback; }
-};
 
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
@@ -27,6 +22,7 @@ export default function AdminRequests() {
   const [activeTab, setActiveTab] = useState('Facility'); // 'Facility', 'Document', or 'Equipment'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [sortOrder, setSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -50,7 +46,6 @@ export default function AdminRequests() {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
-    // If it's a string like YYYY-MM-DD
     if (typeof timestamp === 'string' && timestamp.includes('-')) {
       const d = new Date(timestamp);
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -82,8 +77,6 @@ export default function AdminRequests() {
   }, []);
 
   useEffect(() => {
-    // Run listeners in parallel and BOUND the queries to prevent read spikes
-    // We only fetch the 150 most recent documents per collection
     const docQuery = query(collection(db, 'document_requests'), orderBy('submittedAt', 'desc'), limit(150));
     const facQuery = query(collection(db, 'facility_reservations'), orderBy('submittedAt', 'desc'), limit(150));
     const eqQuery = query(collection(db, 'equipment_rentals'), orderBy('submittedAt', 'desc'), limit(150));
@@ -93,11 +86,7 @@ export default function AdminRequests() {
     let eqList = [];
 
     const updateCombined = () => {
-      const combined = [...docList, ...facList, ...eqList].sort((a, b) => {
-        const dateA = a.rawDate?.toDate ? a.rawDate.toDate().getTime() : (a.rawDate ? new Date(a.rawDate).getTime() : 0);
-        const dateB = b.rawDate?.toDate ? b.rawDate.toDate().getTime() : (b.rawDate ? new Date(b.rawDate).getTime() : 0);
-        return dateB - dateA;
-      });
+      const combined = [...docList, ...facList, ...eqList];
       setRequests(combined);
       setLoading(false);
     };
@@ -117,7 +106,7 @@ export default function AdminRequests() {
           type: data.documentType || 'Unknown Document',
           purpose: data.purpose || 'No purpose stated',
           dateRequested: formatDate(rawDate),
-          rawDate: rawDate,
+          rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
           dateNeeded: formatDate(data.dateNeeded),
           status: data.status || 'Pending',
           allData: { ...data, email: sanitizedEmail }
@@ -142,7 +131,7 @@ export default function AdminRequests() {
           type: data.facilityName || data.facility || 'Unknown Facility',
           purpose: data.purpose || 'No purpose stated',
           dateRequested: formatDate(rawDate),
-          rawDate: rawDate,
+          rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
           dateNeeded: data.date ? `${formatDate(data.date)} (${formatTime(data.startTime)} - ${formatTime(data.endTime)})` : (formatDate(data.reservationDate) + time),
           status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
           allData: { ...data, email: sanitizedEmail }
@@ -166,7 +155,7 @@ export default function AdminRequests() {
           type: data.equipmentName || 'Unknown Equipment',
           purpose: data.purpose || 'No purpose stated',
           dateRequested: formatDate(rawDate),
-          rawDate: rawDate,
+          rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
           dateNeeded: `Pick-up: ${formatDate(data.pickUpDate)}`,
           status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
           allData: { ...data, email: sanitizedEmail }
@@ -182,24 +171,40 @@ export default function AdminRequests() {
     };
   }, [adminRole]);
 
-  // --- FILTERING LOGIC ---
-  const filteredRequests = requests.filter(req => {
-    const matchesTab = req.category === activeTab;
-    const safeSearchTerm = String(searchTerm || "").toLowerCase();
-    const safeResidentName = String(req.residentName || "").toLowerCase();
-    const safeType = String(req.type || "").toLowerCase();
-    const safeId = String(req.id || "").toLowerCase();
-    const safeStatus = String(req.status || "").toLowerCase();
+  // --- FILTERING & SORTING LOGIC ---
+  const filteredRequests = useMemo(() => {
+    return requests.filter(req => {
+      const matchesTab = req.category === activeTab;
+      const safeSearchTerm = String(searchTerm || "").toLowerCase();
+      const safeResidentName = String(req.residentName || "").toLowerCase();
+      const safeType = String(req.type || "").toLowerCase();
+      const safeId = String(req.id || "").toLowerCase();
+      const safeStatus = String(req.status || "").toLowerCase();
 
-    const matchesSearch = 
-      safeResidentName.includes(safeSearchTerm) ||
-      safeType.includes(safeSearchTerm) ||
-      safeId.includes(safeSearchTerm);
+      const matchesSearch = 
+        safeResidentName.includes(safeSearchTerm) ||
+        safeType.includes(safeSearchTerm) ||
+        safeId.includes(safeSearchTerm);
+        
+      const matchesStatus = filterStatus === 'All' || safeStatus === filterStatus.toLowerCase();
       
-    const matchesStatus = filterStatus === 'All' || safeStatus === filterStatus.toLowerCase();
-    
-    return matchesTab && matchesSearch && matchesStatus;
-  });
+      return matchesTab && matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+      if (sortOrder === "date_desc") {
+        return (b.rawDate || 0) - (a.rawDate || 0);
+      }
+      if (sortOrder === "date_asc") {
+        return (a.rawDate || 0) - (b.rawDate || 0);
+      }
+      if (sortOrder === "name_asc") {
+        return (a.residentName || "").localeCompare(b.residentName || "");
+      }
+      if (sortOrder === "name_desc") {
+        return (b.residentName || "").localeCompare(a.residentName || "");
+      }
+      return 0;
+    });
+  }, [requests, activeTab, searchTerm, filterStatus, sortOrder]);
 
   useEffect(() => {
     setFilterStatus('All');
@@ -207,7 +212,7 @@ export default function AdminRequests() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, filterStatus]);
+  }, [activeTab, searchTerm, filterStatus, sortOrder]);
 
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -267,7 +272,6 @@ export default function AdminRequests() {
     const target = req || selectedRequest;
     if (!target) return;
 
-    // Optional: Overlap check for Facility Reservations
     if (target.category === 'Facility') {
       const hasOverlap = requests.some(r => {
         if (r.category !== 'Facility' || r.docId === target.docId || String(r.status || "").toLowerCase() !== 'approved') return false;
@@ -301,7 +305,6 @@ export default function AdminRequests() {
       
       if (residentID && hhID) {
         const label = target.type;
-        // Dynamically select the correct notification type based on category
         let notifType = 'document_update';
         if (target.category === 'Facility') notifType = 'facility_update';
         if (target.category === 'Equipment') notifType = 'equipment_update';
@@ -376,7 +379,6 @@ export default function AdminRequests() {
         
         if (eqId && requestedQty > 0) {
           const eqRef = doc(db, 'equipment', eqId);
-          // Use a negative increment to subtract the quantity
           await updateDoc(eqRef, {
             quantity: increment(-requestedQty)
           });
@@ -425,7 +427,6 @@ export default function AdminRequests() {
         
         if (eqId && requestedQty > 0) {
           const eqRef = doc(db, 'equipment', eqId);
-          // Use a positive increment to restore the quantity
           await updateDoc(eqRef, {
             quantity: increment(requestedQty)
           });
@@ -530,20 +531,40 @@ export default function AdminRequests() {
           </button>
         </div>
 
-        {/* FILTERS */}
+        {/* FILTERS - ALIGNED HORIZONTALLY */}
         <div className="requests-controls">
-          <div className="search-wrapper">
-            <Search className="search-icon" size={20} />
+          <div className="search-wrapper" style={{ position: "relative" }}>
+            <Search
+              size={18}
+              style={{
+                position: "absolute",
+                left: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#94a3b8",
+                pointerEvents: "none",
+              }}
+            />
             <input
               type="text"
               placeholder={`Search by Name, ${activeTab} or Ref #...`}
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ paddingLeft: "36px" }}
             />
           </div>
 
-          <div className="filter-group">
+          <div
+            className="filter-group"
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: "12px",
+              alignItems: "center",
+              flexWrap: "nowrap"
+            }}
+          >
             <select
               className="filter-select"
               value={filterStatus}
@@ -552,7 +573,6 @@ export default function AdminRequests() {
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
-              {/* Document and Equipment specific statuses */}
               {(activeTab === 'Document' || activeTab === 'Equipment') && (
                 <>
                   <option value="Ready for Pickup">Ready for Pickup</option>
@@ -563,6 +583,17 @@ export default function AdminRequests() {
                 <option value="Returned">Returned</option>
               )}
               <option value="Rejected">Rejected</option>
+            </select>
+
+            <select
+              className="filter-select"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
+              <option value="date_desc">Date: Newest First</option>
+              <option value="date_asc">Date: Oldest First</option>
+              <option value="name_asc">Requester: A to Z</option>
+              <option value="name_desc">Requester: Z to A</option>
             </select>
           </div>
         </div>
@@ -692,7 +723,6 @@ export default function AdminRequests() {
               </div>
 
               <div className="modal-body">
-                {/* Section 1: Information */}
                 <div className="modal-section">
                   <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>
                     Section 1: {activeTab === 'Facility' ? 'Reservation' : activeTab === 'Equipment' ? 'Equipment' : 'Document'} Information
@@ -735,14 +765,12 @@ export default function AdminRequests() {
                   </div>
                 </div>
 
-                {/* Section 2: Request Details */}
                 <div className="modal-section" style={{ marginTop: '1.5rem' }}>
                   <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>
                     Section 2: {activeTab === 'Document' ? 'Personal Information' : 'Request Details'}
                   </h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
 
-                    {/* Facility Specific Layout */}
                     {activeTab === 'Facility' && (
                       <>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
@@ -784,7 +812,6 @@ export default function AdminRequests() {
                       </>
                     )}
 
-                    {/* Equipment Specific Layout */}
                     {activeTab === 'Equipment' && (
                       <>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
@@ -822,7 +849,6 @@ export default function AdminRequests() {
                       </>
                     )}
 
-                    {/* Document Specific Layout */}
                     {activeTab === 'Document' && (
                       <>
                         <div className="detail-item">
@@ -885,11 +911,9 @@ export default function AdminRequests() {
                   </div>
                 </div>
 
-                {/* Section 3: Additional Details (Dynamic) */}
                 <div className="modal-section" style={{ marginTop: '1.5rem' }}>
                   <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>Section 3: Additional Specific Requirements</h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                    {/* Dynamic Fields Mapping */}
                     {selectedRequest.allData?.customFields && Object.entries(selectedRequest.allData.customFields)
                       .filter(([key, value]) => typeof value !== 'object' && value !== '')
                       .map(([key, value]) => (
@@ -956,7 +980,7 @@ export default function AdminRequests() {
               </div>
               <div className="modal-body">
                 <p style={{ marginBottom: '1.25rem', fontSize: '0.9rem', color: '#64748b', lineHeight: '1.6' }}>
-                  Please providing a clear reason for rejecting the request from <strong>{selectedRequest.residentName}</strong>.
+                  Please provide a clear reason for rejecting the request from <strong>{selectedRequest.residentName}</strong>.
                   This info will be visible to the resident.
                 </p>
                 <div className="detail-item">
