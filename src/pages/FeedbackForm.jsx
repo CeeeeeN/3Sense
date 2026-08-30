@@ -12,7 +12,7 @@ const STAR_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
 const generateRefId = () => {
   const num = Math.floor(Math.random() * 900) + 100;
-  return `MAL-2026-${num}`;
+  return `FB-${new Date().getFullYear()}-${num}`;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

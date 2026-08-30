@@ -118,7 +118,6 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       updatePending();
     });
 
-    // 👇 NEW LISTENER: Process Equipment data
     const unsubEq = onSnapshot(qEq, (snap) => {
       eqData = snap.docs.map(doc => ({ id: doc.id, _type: "EQUIPMENT", title: doc.data().equipmentName || "Equipment Rental", ...doc.data() }));
       updatePending();
