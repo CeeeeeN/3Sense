@@ -131,9 +131,9 @@ export const subscribeToAnnouncements = (callback) => {
 
       if (data.createdAt) {
         // handle firestore timestamp
-        displayDate = data.createdAt.toDate ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : new Date(data.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+        displayDate = data.createdAt.toDate ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" }) : new Date(data.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
       } else {
-        displayDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+        displayDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
       }
 
       return {

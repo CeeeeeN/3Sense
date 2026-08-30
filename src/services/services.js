@@ -1,7 +1,7 @@
 import { db } from "../firebase/firebase";
 import {
   collection, addDoc, getDocs,
-  query, where, orderBy, serverTimestamp,
+  query, where, orderBy, serverTimestamp, limit
 } from "firebase/firestore";
 
 // ══════════════════════════════
@@ -254,22 +254,32 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
   const isMyRecord = (item) => {
     const rId = item.residentID || "";
     const uId = item.userID || "";
-    if (rId === residentID || uId === residentID) return true;
-    if ((role === "Household Head" || role === "head") && (rId === "head" || uId === "head" || rId === userID || uId === userID)) {
-      return true;
-    }
+    if (rId === residentID || uId === residentID || rId === userID || uId === userID) return true;
     return false;
   };
 
-  // BOUNDED QUERIES: Limit to 50 most recent records to prevent massive read spikes
-  const docQ = query(
-    collection(db, "document_requests"), 
-    where("householdID", "==", householdID),
-    orderBy("submittedAt", "desc"),
-    limit(50)
-  );
-  const docSnap = await getDocs(docQ);
-  const docs = docSnap.docs.map(d => ({
+  const fetchWithFallback = async (collectionName, dateField, mapper, limitCount = 50) => {
+    try {
+      const q = query(
+        collection(db, collectionName), 
+        where("householdID", "==", householdID),
+        orderBy(dateField, "desc"),
+        limit(limitCount)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(mapper).filter(isMyRecord);
+    } catch (err) {
+      console.warn(`[${collectionName}] Index missing. Falling back to unindexed query.`, err);
+      const fallbackQ = query(
+        collection(db, collectionName), 
+        where("householdID", "==", householdID)
+      );
+      const fallbackSnap = await getDocs(fallbackQ);
+      return fallbackSnap.docs.map(mapper).filter(isMyRecord);
+    }
+  };
+
+  const docs = await fetchWithFallback("document_requests", "submittedAt", d => ({
     id: d.id,
     category: "Document",
     serviceName: d.data().documentType || "Document Request",
@@ -277,16 +287,9 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     status: d.data().status || "Pending",
     date: d.data().submittedAt,
     ...d.data(),
-  })).filter(isMyRecord);
+  }));
 
-  const facQ = query(
-    collection(db, "facility_reservations"), 
-    where("householdID", "==", householdID),
-    orderBy("submittedAt", "desc"),
-    limit(50)
-  );
-  const facSnap = await getDocs(facQ);
-  const facs = facSnap.docs.map(d => ({
+  const facs = await fetchWithFallback("facility_reservations", "submittedAt", d => ({
     id: d.id,
     category: "Facility",
     serviceName: d.data().facilityName || "Facility Reservation",
@@ -294,16 +297,9 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     status: d.data().status || "Pending",
     date: d.data().submittedAt,
     ...d.data(),
-  })).filter(isMyRecord);
+  }));
 
-  const eqQ = query(
-    collection(db, "equipment_rentals"), 
-    where("householdID", "==", householdID),
-    orderBy("submittedAt", "desc"),
-    limit(50)
-  );
-  const eqSnap = await getDocs(eqQ);
-  const eqs = eqSnap.docs.map(d => ({
+  const eqs = await fetchWithFallback("equipment_rentals", "submittedAt", d => ({
     id: d.id,
     category: "Equipment",
     serviceName: d.data().equipmentName || "Equipment Rental",
@@ -311,10 +307,50 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     status: d.data().status || "Pending",
     date: d.data().submittedAt,
     ...d.data(),
-  })).filter(isMyRecord);
+  }));
 
-  // Merge all three arrays and sort by date descending
-  const all = [...docs, ...facs, ...eqs];
+  const fbs = await fetchWithFallback("feedback", "createdAt", d => ({
+    id: d.id,
+    category: d.data().category || "Feedback",
+    serviceName: d.data().facilityName || "Feedback",
+    refNum: d.data().referenceID || d.data().refNum || "",
+    status: d.data().status || "Submitted",
+    date: d.data().createdAt,
+    ...d.data(),
+  }));
+
+  const pos = await fetchWithFallback("incidentReports", "submittedAt", d => ({
+    id: d.id,
+    category: "Peace & Order",
+    serviceName: d.data().incidentType || "Incident Report",
+    refNum: d.data().refNum || "",
+    status: d.data().status || "Submitted",
+    date: d.data().submittedAt,
+    ...d.data(),
+  }));
+
+  const bswds = await fetchWithFallback("bswdReports", "submittedAt", d => ({
+    id: d.id,
+    category: "BSWD",
+    serviceName: d.data().type === "tip" ? "Anonymous Tip" : "BSWD Report",
+    refNum: d.data().refNum || "",
+    status: d.data().status || "Submitted",
+    date: d.data().submittedAt,
+    ...d.data(),
+  }));
+
+  const lhs = await fetchWithFallback("livelihoodRegistrations", "submittedAt", d => ({
+    id: d.id,
+    category: "Livelihood",
+    serviceName: d.data().programName || "Registration",
+    refNum: d.data().regNum || d.data().refNum || "",
+    status: d.data().status || "Submitted",
+    date: d.data().submittedAt,
+    ...d.data(),
+  }));
+
+  // Merge all arrays and sort by date descending
+  const all = [...docs, ...facs, ...eqs, ...fbs, ...pos, ...bswds, ...lhs];
   all.sort((a, b) => {
     const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
     const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);

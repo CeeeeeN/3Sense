@@ -334,7 +334,7 @@ export default function ManageAnnouncements() {
             <DescriptionPreview text={ann.description} />
             <ul className="as-card-details">
               <li><Manage_IconLocation /> {ann.location || "TBA"}</li>
-              {ann.time && <li><strong>Time:</strong> {new Date(ann.time).toLocaleString()}</li>}
+              {ann.time && <li><strong>Time:</strong> {new Date(ann.time).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</li>}
               <li><strong>Target Audience:</strong> {ann.category}</li>
               <li><strong>Date Posted:</strong> {ann.date}</li>
               <li><strong>Posted By:</strong> {ann.postedBy}</li>

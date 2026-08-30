@@ -60,7 +60,7 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
               <span className="db-popup-detail-icon"><CalendarIcon /></span>
               <div>
                 <div className="db-popup-detail-label">Date &amp; Time</div>
-                <div className="db-popup-detail-value">{ann.time ? new Date(ann.time).toLocaleString() : ann.date}</div>
+                <div className="db-popup-detail-value">{ann.time ? new Date(ann.time).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ann.date}</div>
               </div>
             </div>
             <div className="db-popup-detail-item">
@@ -494,7 +494,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                         textOverflow: 'ellipsis'
                       }}>{a.description}</div>
                     </div>
-                    <div className="ann-row__date">{a.time ? new Date(a.time).toLocaleDateString() : a.date}</div>
+                    <div className="ann-row__date">{a.time ? new Date(a.time).toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" }) : a.date}</div>
                     <div className="ann-row__cat">
                       <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
                     </div>
