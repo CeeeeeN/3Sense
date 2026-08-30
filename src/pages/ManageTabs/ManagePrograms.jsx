@@ -419,7 +419,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <tr>
-                  {["User ID", "Name", "Contact", "Date Registered", "Slots Left", "Status", "Actions"].map((h) => (
+                  {["Ref Number", "Name", "Contact", "Date Registered", "Status", "Actions"].map((h) => (
                     <th key={h} style={{
                       padding: "14px 16px", fontWeight: 600, color: "#4b5563",
                       fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left",
@@ -443,7 +443,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                     return (
                       <tr key={a.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                         <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>
-                          {a.userID || a.id.slice(0, 8)}
+                          {a.regNum || "No Ref Number"}
                         </td>
                         <td style={{ padding: "14px 16px", fontWeight: 500 }}>
                           {a.userName || a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim() || "—"}
@@ -453,13 +453,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                         </td>
                         <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>
                           {a.createdAt ? formatTs(a.createdAt) : "—"}
-                        </td>
-                        <td style={{ padding: "14px 16px" }}>
-                          {left !== null ? (
-                            <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166534" }}>
-                              {left <= 0 ? "Full" : `${left} left`}
-                            </span>
-                          ) : <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>}
                         </td>
                         <td style={{ padding: "14px 16px" }}>
                           <StatusBadge status={a.status || "pending"} />

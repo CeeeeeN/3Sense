@@ -4,12 +4,6 @@ import {
   query, where, orderBy, serverTimestamp,
 } from "firebase/firestore";
 
-const generateRef = () => {
-  const year = new Date().getFullYear();
-  const rand = String(Math.floor(10000 + Math.random() * 90000));
-  return `BM-${year}-${rand}`;
-};
-
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
 // ══════════════════════════════
@@ -22,7 +16,7 @@ const generateRef = () => {
  * @param {object} customData
  */
 export async function submitDocumentRequest(householdID, residentID, userName, docType, form, customData = {}) {
-  const requestID = generateRef();
+  const requestID = `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "document_requests"), {
     requestID,
     householdID,
@@ -73,7 +67,7 @@ export async function getDocumentRequests(householdID) {
  * @param {object} customData
  */
 export async function submitFacilityReservation(householdID, residentID, userName, facility, form, customData = {}) {
-  const reservationID = generateRef();
+  const reservationID = `FAC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "facility_reservations"), {
     reservationID,
     householdID,
@@ -108,7 +102,7 @@ export async function submitFacilityReservation(householdID, residentID, userNam
  * @param {object} customData
  */
 export async function submitEquipmentRental(householdID, residentID, userName, equipment, form, customData = {}) {
-  const rentalID = generateRef();
+  const rentalID = `EQU-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "equipment_rentals"), {
     rentalID,
     householdID,
@@ -180,10 +174,12 @@ export async function trackIncidentReport(refNum) {
 // 💚 BSWD REPORTS & TIPS
 // ══════════════════════════════
 export async function submitBSWDReport(householdID, userID, residentID, form) {
+  const refNum = `BSWD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "bswdReports"), {
     householdID,
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
+    refNum,
     type:           "homeless_report",
     reporterName:   form.name || "Anonymous",
     location:       form.location,
@@ -195,10 +191,12 @@ export async function submitBSWDReport(householdID, userID, residentID, form) {
 }
 
 export async function submitBSWDTip(householdID, userID, residentID, form) {
+  const refNum = `BSWD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "bswdReports"), {
     householdID,
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
+    refNum,
     type:    "tip",
     about:   form.about,
     tip:     form.tip,

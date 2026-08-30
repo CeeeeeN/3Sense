@@ -320,6 +320,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
             doc(db, "Programs", prog.id, "attendees", activeUserId),
             {
               userID: activeUserId,
+              regNum: reg,
               userName: userName || fullName,
               fullName,
               contact: form.contact,
