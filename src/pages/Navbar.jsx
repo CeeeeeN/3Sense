@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import barangayLogo from "./barangay-logo.jpg";
 import { IconBell, NavIconUser, IconProfile2, IconSettings, IconHelp, IconLogout } from "../components/Icons";
+import NotificationModal from "../components/NotificationModal";
 import {
   subscribeToUserNotifications,
   markNotificationAsRead,
@@ -17,29 +18,6 @@ const NAV_ITEMS = [
   { key: "emergency", label: "Emergency", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>, emergency: true },
 ];
 
-const NOTIF_ICONS = {
-  document_update: { icon: "📄", bg: "rgba(232,160,32,0.1)" },
-  facility_update: { icon: "🏛️", bg: "rgba(49,125,137,0.1)" },
-  program_reminder: { icon: "📢", bg: "rgba(13,122,85,0.1)" },
-  announcement: { icon: "📣", bg: "rgba(49,125,137,0.12)" },
-  general: { icon: "🔔", bg: "rgba(100,100,200,0.1)" },
-};
-
-function formatNotifTime(timestamp) {
-  if (!timestamp) return "";
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -55,12 +33,9 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
       const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
       return tb - ta;
     });
-  const notifRef = useRef(null);
+
   const userRef = useRef(null);
-
   const unreadCount = notifications.filter(n => !n.isRead).length;
-
-  // Transaction notifications (document_update, facility_update, etc.)
 
   useEffect(() => {
     if (!householdID || !memberID) return;
@@ -68,7 +43,6 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
     return () => unsub();
   }, [householdID, memberID]);
 
-  // Announcement notifications — residentID="household" marks household-wide notifs
   useEffect(() => {
     if (!householdID) return;
     const unsub = subscribeToUserNotifications(householdID, "household", setHouseholdNotifs);
@@ -77,7 +51,6 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
 
   useEffect(() => {
     const handler = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
       if (userRef.current && !userRef.current.contains(e.target)) setUserOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -98,28 +71,94 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
   useEffect(() => {
     if (showLogoutModal) {
       document.body.style.overflow = "hidden";
-    } else if (window.innerWidth <= 768 && (notifOpen || userOpen)) {
+    } else if (window.innerWidth <= 768 && userOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
-  }, [showLogoutModal, notifOpen, userOpen]);
+  }, [showLogoutModal, userOpen]);
 
   const clearAll = () => markAllNotificationsAsRead(notifications);
   const markRead = (id) => markNotificationAsRead(id);
-  const handleDelete = async (e, id) => {
-    e.stopPropagation();
+  const handleDelete = async (id) => {
     await deleteUserNotification(id);
   };
+
   const handleNotifClick = (n) => {
     markRead(n.id);
     setNotifOpen(false);
-    // Announcement notifications deep-link to the announcement popup
-    if (n.type === "announcement" && n.refNum && onNavigate) {
+
+    if (!onNavigate) return;
+
+    const type = (n.type || "").toLowerCase();
+    const text = [n.title || "", n.message || "", n.category || ""].join(" ").toLowerCase();
+
+    // 1. Announcements -> Home popup
+    if (type === "announcement" || text.includes("announcement")) {
       onNavigate("home", { announcementID: n.refNum });
+      return;
     }
+
+    // 2. Equipment requests / rentals -> Activity
+    if (
+      type.includes("equipment") ||
+      text.includes("equipment") ||
+      text.includes("rental") ||
+      text.includes("chair") ||
+      text.includes("tent")
+    ) {
+      onNavigate("activity", { tab: "equipment", refNum: n.refNum });
+      return;
+    }
+
+    // 3. Documents / Clearance / Indigency -> Activity
+    if (
+      type.includes("document") ||
+      text.includes("document") ||
+      text.includes("clearance") ||
+      text.includes("indigency") ||
+      text.includes("certificate") ||
+      text.includes("permit")
+    ) {
+      onNavigate("activity", { tab: "documents", refNum: n.refNum });
+      return;
+    }
+
+    // 4. Facility reservations -> Activity
+    if (
+      type.includes("facility") ||
+      text.includes("facility") ||
+      text.includes("reservation") ||
+      text.includes("court") ||
+      text.includes("hall")
+    ) {
+      onNavigate("activity", { tab: "facilities", refNum: n.refNum });
+      return;
+    }
+
+    // 5. Programs / Livelihood / Health
+    if (
+      type.includes("program") ||
+      text.includes("program") ||
+      text.includes("livelihood") ||
+      text.includes("scholarship") ||
+      text.includes("health")
+    ) {
+      onNavigate("services", { subTab: "programs", refNum: n.refNum });
+      return;
+    }
+
+    // 6. Household / Profile
+    if (text.includes("household") || text.includes("resident") || text.includes("member")) {
+      onNavigate("profile");
+      return;
+    }
+
+    // Default fallback
+    onNavigate("activity");
   };
+
   const nav = (page) => { if (onNavigate) onNavigate(page); };
 
   const handleLogoutConfirm = () => {
@@ -132,8 +171,8 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
       <div className="nb-root-spacer" />
       <div className="nb-root">
 
-        {(notifOpen || userOpen) && (
-          <div className="nb-backdrop" onClick={() => { setNotifOpen(false); setUserOpen(false); }} />
+        {userOpen && (
+          <div className="nb-backdrop" onClick={() => setUserOpen(false)} />
         )}
 
         {/* ── TOP BAR ── */}
@@ -148,72 +187,24 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
 
           <div className="nb-topbar-right">
 
-            {/* BELL */}
-            <div className="nb-dropdown-wrap" ref={notifRef}>
-              <button
-                className={`nb-icon-btn${notifOpen ? " active" : ""}`}
-                onClick={() => {
-                  setNotifOpen(v => !v);
-                  setUserOpen(false);
-                }}
-                title="Notifications"
-              >
-                <IconBell />
-                {unreadCount > 0 && <span className="nb-notif-dot" />}
-              </button>
-              {notifOpen && (
-                <div className="nb-notif-dropdown">
-                  <div className="nb-notif-head">
-                    <h4>Notifications {unreadCount > 0 && <span className="nb-notif-count">{unreadCount}</span>}</h4>
-                    {unreadCount > 0 && <button className="nb-notif-clear" onClick={clearAll}>Mark all read</button>}
-                  </div>
-                  <div className="nb-notif-body-wrap" style={{ maxHeight: "350px", overflowY: "auto" }}>
-                    {notifications.length === 0 ? (
-                      <div style={{ padding: "1.5rem 1rem", textAlign: "center", color: "var(--muted)", fontSize: "0.85rem" }}>
-                        No notifications yet.
-                      </div>
-                    ) : (
-                      notifications.map(n => {
-                        const style = NOTIF_ICONS[n.type] || NOTIF_ICONS.general;
-                        return (
-                          <div key={n.id} className={`nb-notif-item${!n.isRead ? " unread" : ""}`} onClick={() => handleNotifClick(n)}>
-                            <div className="nb-notif-icon" style={{ background: style.bg }}>{style.icon}</div>
-                            <div className="nb-notif-body">
-                              <div className="nb-notif-title">{n.title}</div>
-                              <div className="nb-notif-desc">{n.message}</div>
-                              <div className="nb-notif-time">{formatNotifTime(n.createdAt)}</div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
-                              {!n.isRead && <div className="nb-unread-dot" />}
-                              <button
-                                className="nb-notif-delete-btn"
-                                title="Delete"
-                                onClick={(e) => handleDelete(e, n.id)}
-                                style={{
-                                  background: "none", border: "none", cursor: "pointer",
-                                  padding: "4px", borderRadius: "4px", color: "var(--muted)",
-                                  fontSize: "0.7rem", lineHeight: 1, display: "flex",
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.color = "#e03e3e"}
-                                onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* BELL BUTTON */}
+            <button
+              className={`nb-icon-btn${notifOpen ? " active" : ""}`}
+              onClick={() => {
+                setNotifOpen(true);
+                setUserOpen(false);
+              }}
+              title="Notifications"
+            >
+              <IconBell />
+              {unreadCount > 0 && <span className="nb-notif-dot" />}
+            </button>
 
-            {/* USER */}
+            {/* USER ACCOUNT DROPDOWN */}
             <div className="nb-dropdown-wrap" ref={userRef}>
               <button
                 className={`nb-icon-btn${userOpen ? " active" : ""}`}
-                onClick={() => { setUserOpen(v => !v); setNotifOpen(false); }}
+                onClick={() => setUserOpen(v => !v)}
                 title="Account"
               >
                 <NavIconUser />
@@ -223,7 +214,6 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                   <div className="nb-user-info">
                     <div className="nb-user-info-name">{userName || "—"}</div>
                     <div className="nb-user-info-id">{householdID || "—"}</div>
-                    { }
                     <div className="nb-user-info-role">
                       {userRole === "Household Head" ? "⭐ Household Head" : 
                        userRole === "Branch Head" ? "⭐ Branch Head" : "👤 Member"}
@@ -261,6 +251,17 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
           ))}
         </div>
 
+        {/* ── NOTIFICATION POPUP MODAL ── */}
+        <NotificationModal
+          isOpen={notifOpen}
+          onClose={() => setNotifOpen(false)}
+          notifications={notifications}
+          onNotificationClick={handleNotifClick}
+          onMarkAllRead={clearAll}
+          onDelete={handleDelete}
+        />
+
+        {/* ── LOGOUT MODAL ── */}
         {showLogoutModal && (
           <div
             className="nb-logout-modal-overlay"

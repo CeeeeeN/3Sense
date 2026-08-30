@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../AdminStyle.css";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { ROLE_PERMISSIONS } from "../services/permissions";
+import NotificationModal from "./NotificationModal";
 import {
   collection,
   query,
@@ -13,6 +14,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  deleteDoc,
   writeBatch,
 } from "firebase/firestore";
 
@@ -35,8 +37,7 @@ export default function AdminLayout({ children }) {
   const topBarTitle = titles[location.pathname] || "Dashboard";
 
   const [isOpen, setIsOpen] = useState(false);
-  const [showNotif, setShowNotif] = useState(false);
-  const notifRef = useRef(null);
+  const [showNotifModal, setShowNotifModal] = useState(false);
 
   const [currentUserData, setCurrentUserData] = useState({
     fullName: "Loading...",
@@ -115,44 +116,7 @@ export default function AdminLayout({ children }) {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setShowNotif(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // ─── HELPER: RESOLVE ACCURATE NOTIFICATION TITLE ───────────────
-  const getNotificationHeader = (n) => {
-    const text = [
-      n.title || "",
-      n.type || "",
-      n.category || "",
-      n.message || "",
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    if (text.includes("admin registration") || text.includes("new admin")) return "NEW ADMIN";
-    if (text.includes("bswd") || text.includes("homeless") || text.includes("displacement")) return "BSWD REPORT";
-    if (text.includes("incident") || text.includes("tanod") || text.includes("peace") || text.includes("blotter") || text.includes("noise complaint") || text.includes("altercation")) return "PEACE & ORDER";
-    if (text.includes("vawc")) return "VAWC REPORT";
-    if (text.includes("badac") || text.includes("drug")) return "BADAC REPORT";
-    if (text.includes("bosca") || text.includes("senior")) return "BOSCA REPORT";
-    if (text.includes("livelihood") || text.includes("skills training")) return "LIVELIHOOD PROGRAM";
-    if (text.includes("document") || text.includes("clearance") || text.includes("indigency") || text.includes("permit")) return "DOCUMENT REQUEST";
-    if (text.includes("facility") || text.includes("reservation") || text.includes("court") || text.includes("hall")) return "FACILITY RESERVATION";
-    if (text.includes("equipment") || text.includes("rental") || text.includes("chair") || text.includes("tent")) return "EQUIPMENT RENTAL";
-    if (text.includes("household") || text.includes("resident registration")) return "RESIDENT REGISTRATION";
-    if (text.includes("sentiment") || text.includes("feedback") || text.includes("rating")) return "FEEDBACK";
-
-    return (n.title || n.type || "NOTIFICATION").replace(/_/g, " ").toUpperCase();
-  };
-
-  // ─── 3. PRIORITIZED ROLE-BASED NOTIFICATION FILTER (TEST A2) ───
+  // ─── 3. PRIORITIZED ROLE-BASED NOTIFICATION FILTER ────────────
   const filteredNotifications = useMemo(() => {
     const cleanRole = (currentUserData.role || "").toLowerCase().replace(/[\s&_-]/g, "");
     const cleanPos  = (currentUserData.position || "").toLowerCase().replace(/[\s&_-]/g, "");
@@ -162,7 +126,6 @@ export default function AdminLayout({ children }) {
       cleanPos.includes("servicehead") ||
       cleanRole.includes("servicehead");
 
-    // Super Admins & Service Heads receive all notifications
     if (isSuperAdmin) return notifications;
 
     return notifications.filter((n) => {
@@ -175,17 +138,12 @@ export default function AdminLayout({ children }) {
         .join(" ")
         .toLowerCase();
 
-      // Priority 1: Admin Registrations (Super Admin only)
       if (tag.includes("new admin") || tag.includes("admin registration") || tag.includes("admin_registration")) {
         return false;
       }
-
-      // Priority 2: BSWD (Displacement, Homeless, Tips)
       if (tag.includes("bswd") || tag.includes("displacement") || tag.includes("homeless") || tag.includes("tip")) {
         return cleanRole.includes("bswd") || cleanPos.includes("bswd");
       }
-
-      // Priority 3: Peace & Order (Incidents, Blotters, Tanod, Altercations, Disputes, Noise)
       if (
         tag.includes("incident") ||
         tag.includes("blotter") ||
@@ -197,23 +155,15 @@ export default function AdminLayout({ children }) {
       ) {
         return cleanRole.includes("peaceorder") || cleanPos.includes("peaceorder");
       }
-
-      // Priority 4: VAWC
       if (tag.includes("vawc") || tag.includes("violence against women")) {
         return cleanRole.includes("vawc") || cleanPos.includes("vawc");
       }
-
-      // Priority 5: BOSCA
       if (tag.includes("bosca") || tag.includes("senior citizen")) {
         return cleanRole.includes("bosca") || cleanPos.includes("bosca");
       }
-
-      // Priority 6: BADAC
       if (tag.includes("badac") || tag.includes("drug")) {
         return cleanRole.includes("badac") || cleanPos.includes("badac");
       }
-
-      // Priority 7: Livelihood & Programs
       if (tag.includes("livelihood") || tag.includes("skills training") || tag.includes("program")) {
         return (
           cleanRole.includes("livelihood") ||
@@ -222,8 +172,6 @@ export default function AdminLayout({ children }) {
           cleanRole.includes("standardadmin")
         );
       }
-
-      // Priority 8: Requests (Documents, Facilities, Equipment)
       if (
         tag.includes("document") ||
         tag.includes("facility") ||
@@ -233,13 +181,9 @@ export default function AdminLayout({ children }) {
       ) {
         return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
       }
-
-      // Priority 9: Household & Resident Registrations
       if (tag.includes("household") || tag.includes("resident")) {
         return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
       }
-
-      // Priority 10: General Feedback / Ratings
       if (tag.includes("feedback") || tag.includes("sentiment") || tag.includes("rating")) {
         return cleanRole.includes("secretary") || cleanRole.includes("standardadmin");
       }
@@ -248,7 +192,7 @@ export default function AdminLayout({ children }) {
     });
   }, [notifications, currentUserData]);
 
-  // ─── 4. MARK AS READ ───────────────────────────────────────────
+  // ─── 4. MARK AS READ & DELETE ─────────────────────────────────
   const markAsRead = async (id) => {
     try {
       await updateDoc(doc(db, "notifications", id), { isRead: true });
@@ -273,14 +217,22 @@ export default function AdminLayout({ children }) {
     }
   };
 
+  const deleteAdminNotification = async (id) => {
+    try {
+      await deleteDoc(doc(db, "notifications", id));
+    } catch (err) {
+      console.error("Failed to delete notification:", err);
+    }
+  };
+
   const unreadCount = filteredNotifications.filter((n) => !n.isRead).length;
 
-  // ─── 5. CLICKABLE REDIRECT ROUTING (TEST A3) ───────────────────
+  // ─── 5. CLICKABLE ROUTING ─────────────────────────────────────
   const handleNotificationClick = async (n) => {
     if (!n.isRead) {
       await markAsRead(n.id);
     }
-    setShowNotif(false);
+    setShowNotifModal(false);
 
     const tag = [
       n.type || "",
@@ -516,103 +468,29 @@ export default function AdminLayout({ children }) {
           <h1>{topBarTitle}</h1>
 
           <div className="top-actions">
-            {/* NOTIFICATIONS DROPDOWN */}
-            <div className="notif-wrapper" ref={notifRef}>
-              <button
-                className="bell-btn"
-                onClick={() => setShowNotif(!showNotif)}
+            {/* NOTIFICATIONS BELL BUTTON */}
+            <button
+              className="bell-btn"
+              onClick={() => setShowNotifModal(true)}
+              title="Notifications"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                </svg>
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
 
-                {unreadCount > 0 && <span className="notif-dot"></span>}
-              </button>
-
-              {showNotif && (
-                <div className="notif-dropdown">
-                  <div className="notif-header">
-                    <div className="notif-title">
-                      Notifications{" "}
-                      <span className="notif-count">{unreadCount}</span>
-                    </div>
-                    <button onClick={markAllAsRead}>Mark all read</button>
-                  </div>
-
-                  <div className="notif-list">
-                    {filteredNotifications.length === 0 ? (
-                      <div className="notif-empty">No notifications for your role</div>
-                    ) : (
-                      filteredNotifications.map((n) => {
-                        const headerLabel = getNotificationHeader(n);
-
-                        return (
-                          <div
-                            key={n.id}
-                            className={`notif-item ${n.isRead ? "read" : ""}`}
-                            onClick={() => handleNotificationClick(n)}
-                            style={{
-                              cursor: "pointer",
-                              transition: "background 0.2s ease",
-                            }}
-                          >
-                            <div className="notif-icon">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="18"
-                                height="18"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                              </svg>
-                            </div>
-
-                            <div className="notif-text">
-                              <strong style={{ color: "#0f172a" }}>
-                                {headerLabel}
-                              </strong>
-                              <p style={{ margin: "2px 0 4px 0", color: "#475569" }}>
-                                {n.message}
-                              </p>
-                              <span className="notif-time">
-                                {n.createdAt?.toDate
-                                  ? n.createdAt.toDate().toLocaleString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                      hour12: true,
-                                    })
-                                  : "Just now"}
-                              </span>
-                            </div>
-
-                            {!n.isRead && <span className="notif-dot"></span>}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+              {unreadCount > 0 && <span className="notif-dot"></span>}
+            </button>
 
             <div className="top-divider"></div>
 
@@ -627,6 +505,16 @@ export default function AdminLayout({ children }) {
         {/* MAIN CONTENT */}
         {children}
       </div>
+
+      {/* CENTERED NOTIFICATION MODAL */}
+      <NotificationModal
+        isOpen={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        notifications={filteredNotifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAllRead={markAllAsRead}
+        onDelete={deleteAdminNotification}
+      />
 
       {/* LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (
