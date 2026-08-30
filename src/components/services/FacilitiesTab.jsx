@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, query, limit, where } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
-import { submitFacilityReservation } from "../../services/services";
+import { submitFacilityReservation, submitEquipmentRental } from "../../services/services";
 import { createNotification } from "../../services/notifications";
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
 
@@ -56,7 +56,6 @@ function AdvanceBookingBanner() {
       fontSize: "14px",
       color: "#1e40af",
     }}>
-      {/* Calendar/clock icon */}
       <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
@@ -97,7 +96,6 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
   const [reservationFacility, setReservationFacility] = useState(null);
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the static facilities fetch
     const q = query(
       collection(db, "facilities"),
       limit(50)
@@ -111,7 +109,6 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
 
   return (
     <>
-      {/* ── Advance booking reminder shown on the facility list ── */}
       <AdvanceBookingBanner />
 
       <div className="sv-facilities-list">
@@ -237,10 +234,9 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Fully Reserved</span>
       </div>
 
-      {/* ── Inline 3-day rule note under calendar — mobile-responsive fix ── */}
       <div style={{
         display: "flex",
-        alignItems: "flex-start",   /* changed from "center" so icon stays top-aligned on wrap */
+        alignItems: "flex-start",
         gap: "6px",
         marginTop: "10px",
         fontSize: "12px",
@@ -251,12 +247,11 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         padding: "7px 10px",
       }}>
         <svg
-          style={{ flexShrink: 0, marginTop: "1px" }}   /* nudge icon down 1px to align with first text line */
+          style={{ flexShrink: 0, marginTop: "1px" }}
           width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
         >
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
-        {/* flex: 1 lets the text take all remaining width and wrap naturally */}
         <span style={{ flex: 1, lineHeight: "1.5" }}>
           Bookings must be made at least <strong>3 days in advance</strong>. Greyed-out dates are unavailable.
         </span>
@@ -266,20 +261,22 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
 }
 
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
-  const facilityName = facility?.name || facility?.title || "Barangay Multi-Purpose Hall";
+  const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
-    ? `Reserve a time slot for ${facility?.name || facility?.title}. Approval is required before confirmation.`
+    ? `Reserve a time slot for ${facilityName}. Approval is required before confirmation.`
     : "Reserve a facility for your event. Approval is required before confirmation.";
 
   const [approvedReservations, setApprovedReservations] = useState([]);
   const [allActiveReservations, setAllActiveReservations] = useState([]);
   const [fullyBookedDates, setFullyBookedDates] = useState([]);
 
+  // ── EQUIPMENT BUNDLING STATE ──
+  const [equipmentInventory, setEquipmentInventory] = useState([]);
+  const [selectedEquipment, setSelectedEquipment] = useState({});
+
   useEffect(() => {
     if (!facility) return;
     
-    // Only fetch reservations for the specific facility, 
-    // rather than the entire barangay's booking history
     const q = query(
       collection(db, "facility_reservations"),
       where("facilityId", "==", String(facility.id))
@@ -291,7 +288,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        
         if (data.date) { 
           const stat = (data.status || "").toLowerCase();
           if (stat === "rejected") return;
@@ -321,6 +317,18 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     });
     return () => unsub();
   }, [facility]);
+
+  // ── FETCH AVAILABLE EQUIPMENT ──
+  useEffect(() => {
+    const q = query(collection(db, "equipment"), limit(50));
+    const unsub = onSnapshot(q, snapshot => {
+      const availableEq = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(eq => eq.available && eq.quantity > 0);
+      setEquipmentInventory(availableEq);
+    });
+    return () => unsub();
+  }, []);
 
   const [form, setForm] = useState({
     fullName: "", email: "", contactNumber: "",
@@ -412,6 +420,8 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       (facility?.customFields || []).forEach(f => {
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
+
+      // 1. Submit the Primary Facility Reservation
       const generatedRef = await submitFacilityReservation(
         householdID,
         userData?.residentID || userID || "",
@@ -420,6 +430,30 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         form,
         customData
       );
+
+      // 2. Submit Bundled Equipment Requests
+      const eqPromises = Object.values(selectedEquipment).map(eq => {
+        return submitEquipmentRental(
+          householdID,
+          userData?.residentID || userID || "",
+          form.fullName || userName || "Unknown",
+          eq, // Pass the entire equipment object containing id and name
+          {
+            purpose: `Facility Bundle (${facilityName}): ${form.purpose}`,
+            quantity: eq.requestedQuantity,
+            pickUpDate: form.date, // Match the facility date
+            returnDate: form.date,
+            notes: `Bundled with facility reservation ${generatedRef}. ${form.notes}`,
+            email: form.email,
+            contactNumber: form.contactNumber
+          },
+          {}
+        );
+      });
+
+      // Process all equipment rentals concurrently
+      await Promise.all(eqPromises);
+
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {
@@ -437,6 +471,13 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
         <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
       </div>
+      
+      {Object.keys(selectedEquipment).length > 0 && (
+        <div style={{ fontSize: '13px', color: '#64748b', background: '#f1f5f9', padding: '10px', borderRadius: '6px', marginBottom: '1rem', textAlign: 'center' }}>
+          Your bundled equipment request has also been submitted and will be reviewed alongside this facility.
+        </div>
+      )}
+
       <div className="sv-status-badge"><ServiceClockIcon /> Pending Approval</div>
       <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>Close</button>
     </div>
@@ -456,7 +497,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         </div>
       </div>
 
-      {/* ── Advance booking reminder inside the modal form ── */}
       <div style={{
         display: "flex",
         alignItems: "flex-start",
@@ -565,6 +605,49 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           </div>
         </div>
 
+        {/* ── BUNDLED EQUIPMENT RENTALS ── */}
+        <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
+          <div className="sv-field-section-label">Additional Equipment <span className="sv-optional">(Optional)</span></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+            {equipmentInventory.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>No equipment available at this time.</div>
+            ) : (
+              equipmentInventory.map(eq => (
+                <div key={eq.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>{eq.equipmentName || eq.name}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Inventory: {eq.quantity} available</div>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={eq.quantity}
+                    placeholder="0"
+                    className="sv-input"
+                    style={{ width: '80px', padding: '8px 12px', textAlign: 'center' }}
+                    value={selectedEquipment[eq.id]?.requestedQuantity || ""}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (isNaN(val) || val <= 0) {
+                        const next = { ...selectedEquipment };
+                        delete next[eq.id];
+                        setSelectedEquipment(next);
+                      } else {
+                        // Cap input to available inventory
+                        const finalVal = val > eq.quantity ? eq.quantity : val;
+                        setSelectedEquipment(prev => ({
+                          ...prev,
+                          [eq.id]: { ...eq, requestedQuantity: finalVal }
+                        }));
+                      }
+                    }}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
         {facility?.customFields?.length > 0 && (
           <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
             <div className="sv-field-section-label">Additional Information</div>
@@ -593,7 +676,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           </div>
         )}
 
-        <div className="sv-calendar-col">
+        <div className="sv-calendar-col" style={{ marginTop: "1.5rem" }}>
           <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
           <Calendar
             selectedDate={form.date}

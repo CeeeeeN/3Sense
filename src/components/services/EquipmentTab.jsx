@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
-// Make sure to create this matching function in your services file!
 import { submitEquipmentRental } from "../../services/services"; 
 import { ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
 
-// Generic Box/Tool icon for Equipment
 const EquipmentIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -61,11 +59,8 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
   const [rentalEquipment, setRentalEquipment] = useState(null);
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the inventory fetch to prevent unbounded read spikes 
-    // when hundreds of residents open the tab simultaneously.
     const q = query(
       collection(db, "equipment"),
-      // We cap it at 100 items for now. If you have more than 100 equipment items, consider implementing pagination or a "Load More" button.
       limit(100) 
     );
 
@@ -81,28 +76,37 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
       <AdvanceRentalBanner />
 
       <div className="sv-facilities-list">
-        {equipmentList.map(eq => (
-          <div key={eq.id} className="sv-facility-card">
-            <div className="sv-facility-card__left">
-              <div className="sv-facility-card__icon-wrap"><EquipmentIcon /></div>
-              <div>
-                <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
-                <div className="sv-facility-card__meta">
-                  <span>{eq.quantity ? `Total Inventory: ${eq.quantity} units` : "Quantity unlisted"}</span>
+        {equipmentList.map(eq => {
+          // Dynamically check if the item is out of stock (quantity <= 0)
+          const isOutOfStock = eq.quantity !== undefined && eq.quantity !== "" && Number(eq.quantity) <= 0;
+          
+          // It is only available if the admin switch is ON and it has stock
+          const isAvailable = eq.available !== false && !isOutOfStock;
+
+          return (
+            <div key={eq.id} className="sv-facility-card">
+              <div className="sv-facility-card__left">
+                <div className="sv-facility-card__icon-wrap"><EquipmentIcon /></div>
+                <div>
+                  <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
+                  <div className="sv-facility-card__meta">
+                    <span>{eq.quantity !== undefined && eq.quantity !== "" ? `Total Inventory: ${eq.quantity} units` : "Quantity unlisted"}</span>
+                  </div>
+                  <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
                 </div>
-                <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
+              </div>
+              <div className="sv-facility-card__right">
+                <span className={`sv-avail-badge${isAvailable ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
+                  <span className="sv-avail-dot" />
+                  {isAvailable ? "Available" : (isOutOfStock ? "Unavailable (Out of Stock)" : "Unavailable")}
+                </span>
+                {isAvailable && (
+                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>
+                )}
               </div>
             </div>
-            <div className="sv-facility-card__right">
-              <span className={`sv-avail-badge${eq.available ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
-                <span className="sv-avail-dot" />{eq.available ? "Available" : "Unavailable"}
-              </span>
-              {eq.available && (
-                <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {rentalEquipment && (

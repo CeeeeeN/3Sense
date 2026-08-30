@@ -160,13 +160,18 @@ export default function ManageEquipment() {
     }
     setPurposeFormError("");
     try {
+      const equipmentPayload = {
+        ...newEquipment,
+        quantity: Number(newEquipment.quantity) 
+      };
+
       if (editingEquipmentId) {
-        await updateDoc(doc(db, "equipment", editingEquipmentId), { ...newEquipment, updatedAt: serverTimestamp() });
-        logTransaction(adminName, adminRole, "EDITED_EQUIPMENT", `Edited equipment: ${newEquipment.equipmentName} (ID: ${editingEquipmentId})`);
+        await updateDoc(doc(db, "equipment", editingEquipmentId), { ...equipmentPayload, updatedAt: serverTimestamp() });
+        logTransaction(adminName, adminRole, "EDITED_EQUIPMENT", `Edited equipment: ${equipmentPayload.equipmentName} (ID: ${editingEquipmentId})`);
       } else {
-        const newRef = await addDoc(collection(db, "equipment"), { ...newEquipment, createdAt: serverTimestamp() });
+        const newRef = await addDoc(collection(db, "equipment"), { ...equipmentPayload, createdAt: serverTimestamp() });
         await updateDoc(newRef, { equipmentID: newRef.id });
-        logTransaction(adminName, adminRole, "ADDED_EQUIPMENT", `Added new equipment: ${newEquipment.equipmentName} (ID: ${newRef.id})`);
+        logTransaction(adminName, adminRole, "ADDED_EQUIPMENT", `Added new equipment: ${equipmentPayload.equipmentName} (ID: ${newRef.id})`);
       }
       setNewEquipment({ equipmentName: "", quantity: "", description: "", available: true, purposeOptions: [] });
       setPurposeInput("");
