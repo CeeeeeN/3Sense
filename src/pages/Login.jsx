@@ -117,8 +117,11 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
         const fullName = [m.firstName, m.lastName].filter(Boolean).join(" ") || `Member ${i + 1}`;
         const initials = ((m.firstName?.[0] || "") + (m.lastName?.[0] || "M")).toUpperCase();
 
-        // Find which branch this member belongs to
-        const myBranch = result.branches?.find(b => b.id === m.branchID);
+        // FIX: Apply the "BR-001" fallback for legacy residents missing a branchID
+        const activeBranchID = m.branchID || "BR-001";
+
+        // Find which branch this member belongs to using the fallback ID
+        const myBranch = result.branches?.find(b => b.id === activeBranchID);
 
         // Normalize role — backward compat with old "head" value
         const rawRole = m.role || "Member";
@@ -135,7 +138,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           name: fullName,
           initials: initials || "M",
           role: displayRole,
-          branchID: m.branchID || null,
+          branchID: activeBranchID, // Replaced the null fallback with activeBranchID
           isBranchHead: isHouseholdHead || isBranchHead,
           color: COLORS[i % COLORS.length],
           profilePhoto: m.profilePhoto || null,
