@@ -20,11 +20,16 @@ export default function AdminFeedback() {
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // States for 'All' tab filtering & sorting
+  // States for 'Action Required' tab filtering & sorting
+  const [actionSearchTerm, setActionSearchTerm] = useState('');
+  const [actionFilterStatus, setActionFilterStatus] = useState('All');
+  const [actionSortOrder, setActionSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc
+
+  // States for 'All Feedback' tab filtering & sorting
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterSentiment, setFilterSentiment] = useState('All');
-  const [sortOrder, setSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc, rating_desc, rating_asc
+  const [sortOrder, setSortOrder] = useState('date_desc');
 
   // Analytics States
   const [wordCloud, setWordCloud] = useState([]);
@@ -147,47 +152,89 @@ export default function AdminFeedback() {
     setHeatmapData(hData);
   };
 
-  // --- FILTERING & SORTING LOGIC ---
+  // --- BASE ACTION REQUIRED LIST (FOR BADGE COUNT) ---
   const actionRequiredFeedbacks = useMemo(() => {
     return feedbacks.filter(fb =>
       String(fb.sentiment).toLowerCase() === 'negative' &&
       String(fb.status).toLowerCase() !== 'resolved'
-    ).sort((a, b) => (b.rawDate || 0) - (a.rawDate || 0));
+    );
   }, [feedbacks]);
 
-  const allFilteredFeedbacks = useMemo(() => {
-    return feedbacks.filter(fb => {
-      const searchStr = String(searchTerm).toLowerCase();
-      const matchesSearch =
-        String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
-        String(fb.comment || "").toLowerCase().includes(searchStr) ||
-        String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
-        String(fb.userName || "").toLowerCase().includes(searchStr);
+  // --- ACTION REQUIRED FILTERING & SORTING LOGIC ---
+  const filteredActionRequiredFeedbacks = useMemo(() => {
+    return actionRequiredFeedbacks
+      .filter(fb => {
+        const searchStr = String(actionSearchTerm).toLowerCase();
+        const matchesSearch =
+          String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
+          String(fb.comment || "").toLowerCase().includes(searchStr) ||
+          String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
+          String(fb.userName || "").toLowerCase().includes(searchStr);
 
-      const matchesStatus = filterStatus === 'All' || String(fb.status).toLowerCase() === filterStatus.toLowerCase();
-      const matchesSentiment = filterSentiment === 'All' || String(fb.sentiment).toLowerCase() === filterSentiment.toLowerCase();
-      return matchesSearch && matchesStatus && matchesSentiment;
-    }).sort((a, b) => {
-      if (sortOrder === "date_desc") {
-        return (b.rawDate || 0) - (a.rawDate || 0);
-      }
-      if (sortOrder === "date_asc") {
-        return (a.rawDate || 0) - (b.rawDate || 0);
-      }
-      if (sortOrder === "name_asc") {
-        return (a.userName || "").localeCompare(b.userName || "");
-      }
-      if (sortOrder === "name_desc") {
-        return (b.userName || "").localeCompare(a.userName || "");
-      }
-      if (sortOrder === "rating_desc") {
-        return (b.rating || 0) - (a.rating || 0);
-      }
-      if (sortOrder === "rating_asc") {
-        return (a.rating || 0) - (b.rating || 0);
-      }
-      return 0;
-    });
+        const matchesStatus =
+          actionFilterStatus === 'All' ||
+          String(fb.status).toLowerCase() === actionFilterStatus.toLowerCase();
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (actionSortOrder === "date_desc") {
+          return (b.rawDate || 0) - (a.rawDate || 0);
+        }
+        if (actionSortOrder === "date_asc") {
+          return (a.rawDate || 0) - (b.rawDate || 0);
+        }
+        if (actionSortOrder === "name_asc") {
+          return (a.userName || "").localeCompare(b.userName || "");
+        }
+        if (actionSortOrder === "name_desc") {
+          return (b.userName || "").localeCompare(a.userName || "");
+        }
+        return 0;
+      });
+  }, [actionRequiredFeedbacks, actionSearchTerm, actionFilterStatus, actionSortOrder]);
+
+  // --- ALL FEEDBACK FILTERING & SORTING LOGIC ---
+  const allFilteredFeedbacks = useMemo(() => {
+    return feedbacks
+      .filter(fb => {
+        const searchStr = String(searchTerm).toLowerCase();
+        const matchesSearch =
+          String(fb.facilityName || "").toLowerCase().includes(searchStr) ||
+          String(fb.comment || "").toLowerCase().includes(searchStr) ||
+          String(fb.referenceID || "").toLowerCase().includes(searchStr) ||
+          String(fb.userName || "").toLowerCase().includes(searchStr);
+
+        const matchesStatus =
+          filterStatus === 'All' ||
+          String(fb.status).toLowerCase() === filterStatus.toLowerCase();
+        const matchesSentiment =
+          filterSentiment === 'All' ||
+          String(fb.sentiment).toLowerCase() === filterSentiment.toLowerCase();
+
+        return matchesSearch && matchesStatus && matchesSentiment;
+      })
+      .sort((a, b) => {
+        if (sortOrder === "date_desc") {
+          return (b.rawDate || 0) - (a.rawDate || 0);
+        }
+        if (sortOrder === "date_asc") {
+          return (a.rawDate || 0) - (b.rawDate || 0);
+        }
+        if (sortOrder === "name_asc") {
+          return (a.userName || "").localeCompare(b.userName || "");
+        }
+        if (sortOrder === "name_desc") {
+          return (b.userName || "").localeCompare(a.userName || "");
+        }
+        if (sortOrder === "rating_desc") {
+          return (b.rating || 0) - (a.rating || 0);
+        }
+        if (sortOrder === "rating_asc") {
+          return (a.rating || 0) - (b.rating || 0);
+        }
+        return 0;
+      });
   }, [feedbacks, searchTerm, filterStatus, filterSentiment, sortOrder]);
 
   const handleReviewClick = (fb) => {
@@ -241,20 +288,60 @@ export default function AdminFeedback() {
         <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
           <button
             onClick={() => setActiveTab('summary')}
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'summary' ? '3px solid #317D89' : '3px solid transparent', color: activeTab === 'summary' ? '#317D89' : '#64748b', fontWeight: activeTab === 'summary' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'summary' ? '3px solid #317D89' : '3px solid transparent',
+              color: activeTab === 'summary' ? '#317D89' : '#64748b',
+              fontWeight: activeTab === 'summary' ? 700 : 500,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
             <BarChart2 size={18} /> Dashboard Summary
           </button>
           <button
             onClick={() => setActiveTab('action')}
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'action' ? '3px solid #e11d48' : '3px solid transparent', color: activeTab === 'action' ? '#e11d48' : '#64748b', fontWeight: activeTab === 'action' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'action' ? '3px solid #e11d48' : '3px solid transparent',
+              color: activeTab === 'action' ? '#e11d48' : '#64748b',
+              fontWeight: activeTab === 'action' ? 700 : 500,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
             <AlertTriangle size={18} /> Action Required
-            {actionRequiredFeedbacks.length > 0 && <span style={{ background: '#e11d48', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>{actionRequiredFeedbacks.length}</span>}
+            {actionRequiredFeedbacks.length > 0 && (
+              <span style={{ background: '#e11d48', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
+                {actionRequiredFeedbacks.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('all')}
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'all' ? '3px solid #317D89' : '3px solid transparent', color: activeTab === 'all' ? '#317D89' : '#64748b', fontWeight: activeTab === 'all' ? 700 : 500, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            style={{
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'all' ? '3px solid #317D89' : '3px solid transparent',
+              color: activeTab === 'all' ? '#317D89' : '#64748b',
+              fontWeight: activeTab === 'all' ? 700 : 500,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
             <List size={18} /> All Feedback
           </button>
@@ -262,7 +349,10 @@ export default function AdminFeedback() {
 
         {/* Tab Content Routing */}
         {loading ? (
-          <div className="empty-state"><Clock className="animate-spin mb-2" size={32} /><h3>Loading...</h3></div>
+          <div className="empty-state">
+            <Clock className="animate-spin mb-2" size={32} />
+            <h3>Loading...</h3>
+          </div>
         ) : (
           <>
             {activeTab === 'summary' && (
@@ -270,37 +360,142 @@ export default function AdminFeedback() {
             )}
 
             {activeTab === 'action' && (
-              <FeedbackTable
-                dataList={actionRequiredFeedbacks}
-                emptyMessage="Hooray! No negative feedback requires admin action right now."
-                onReview={handleReviewClick}
-              />
+              <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+                {/* Search & Filter Controls matching AdminManagement format */}
+                <div className="requests-controls">
+                  <div className="search-wrapper" style={{ position: "relative" }}>
+                    <Search
+                      size={18}
+                      style={{
+                        position: "absolute",
+                        left: "12px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search by Name, Facility or Ref #..."
+                      className="search-input"
+                      value={actionSearchTerm}
+                      onChange={(e) => setActionSearchTerm(e.target.value)}
+                      style={{ paddingLeft: "36px" }}
+                    />
+                  </div>
+
+                  <div
+                    className="filter-group"
+                    style={{
+                      display: "flex",
+                      flexDirection: "row",
+                      gap: "12px",
+                      alignItems: "center",
+                      flexWrap: "nowrap",
+                    }}
+                  >
+                    <select
+                      className="filter-select"
+                      value={actionFilterStatus}
+                      onChange={(e) => setActionFilterStatus(e.target.value)}
+                    >
+                      <option value="All">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="analyzed">Analyzed</option>
+                      <option value="under review">Under Review</option>
+                      <option value="responded">Responded</option>
+                    </select>
+
+                    <select
+                      className="filter-select"
+                      value={actionSortOrder}
+                      onChange={(e) => setActionSortOrder(e.target.value)}
+                    >
+                      <option value="date_desc">Date: Newest First</option>
+                      <option value="date_asc">Date: Oldest First</option>
+                      <option value="name_asc">Resident: A to Z</option>
+                      <option value="name_desc">Resident: Z to A</option>
+                    </select>
+                  </div>
+                </div>
+
+                <FeedbackTable
+                  dataList={filteredActionRequiredFeedbacks}
+                  emptyMessage={
+                    actionSearchTerm || actionFilterStatus !== 'All'
+                      ? "No action-required feedback matches your search criteria."
+                      : "Hooray! No negative feedback requires admin action right now."
+                  }
+                  onReview={handleReviewClick}
+                />
+              </div>
             )}
 
             {activeTab === 'all' && (
               <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
                 <div className="requests-controls">
-                  <div className="search-wrapper">
-                    <Search className="search-icon" size={20} />
-                    <input type="text" placeholder="Search Facility, Name, or Ref #..." className="search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <div className="search-wrapper" style={{ position: "relative" }}>
+                    <Search
+                      size={18}
+                      style={{
+                        position: "absolute",
+                        left: "12px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search Facility, Name, or Ref #..."
+                      className="search-input"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      style={{ paddingLeft: "36px" }}
+                    />
                   </div>
-                  <div className="filter-group" style={{ display: 'flex', flexDirection: 'row', gap: '12px', alignItems: 'center' }}>
-                    <select className="filter-select" value={filterSentiment} onChange={(e) => setFilterSentiment(e.target.value)}>
+
+                  <div
+                    className="filter-group"
+                    style={{
+                      display: "flex",
+                      flexDirection: "row",
+                      gap: "12px",
+                      alignItems: "center",
+                      flexWrap: "nowrap",
+                    }}
+                  >
+                    <select
+                      className="filter-select"
+                      value={filterSentiment}
+                      onChange={(e) => setFilterSentiment(e.target.value)}
+                    >
                       <option value="All">All Sentiments</option>
                       <option value="Positive">Positive</option>
                       <option value="Neutral">Neutral</option>
                       <option value="Negative">Negative</option>
                     </select>
 
-                    <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                    <select
+                      className="filter-select"
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                    >
                       <option value="All">All Statuses</option>
+                      <option value="pending">Pending</option>
                       <option value="analyzed">Analyzed</option>
                       <option value="under review">Under Review</option>
                       <option value="responded">Responded</option>
                       <option value="resolved">Resolved</option>
                     </select>
 
-                    <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                    <select
+                      className="filter-select"
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value)}
+                    >
                       <option value="date_desc">Date: Newest First</option>
                       <option value="date_asc">Date: Oldest First</option>
                       <option value="name_asc">Resident: A to Z</option>
@@ -310,6 +505,7 @@ export default function AdminFeedback() {
                     </select>
                   </div>
                 </div>
+
                 <FeedbackTable
                   dataList={allFilteredFeedbacks}
                   emptyMessage="No feedback matches your search criteria."
