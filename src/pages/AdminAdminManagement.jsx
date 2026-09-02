@@ -391,7 +391,7 @@ export default function AdminManagement() {
   if (authLoading) {
     return (
       <AdminLayout>
-        <div style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem" }}>
+        <div style={{ textAlign: "center", padding: "60px" }}>
           Loading...
         </div>
       </AdminLayout>
@@ -511,11 +511,11 @@ export default function AdminManagement() {
                   {paginatedRequests.length > 0 ? (
                     paginatedRequests.map((req) => (
                       <tr key={req.docId}>
-                        <td style={{ fontWeight: 500 }}>{req.fullName}</td>
+                        <td>{req.fullName}</td>
                         <td>{formatDisplayEmail(req.email, adminRole, currentUser?.uid === req.uid)}</td>
                         <td>{req.contact}</td>
                         <td>{req.position}</td>
-                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>{req.username}</td>
+                        <td>{req.username}</td>
                         <td>{req.dateSubmitted}</td>
                         <td>
                           <span
@@ -548,7 +548,7 @@ export default function AdminManagement() {
                               </button>
                             </div>
                           ) : (
-                            <span className="action-disabled" style={{ display: "block", textAlign: "center", color: "#9ca3af", fontSize: "0.85rem" }}>Completed</span>
+                            <span className="action-disabled" style={{ display: "block", textAlign: "center", color: "#9ca3af" }}>Completed</span>
                           )}
                         </td>
                       </tr>
@@ -578,7 +578,7 @@ export default function AdminManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span>Rows per page:</span>
                   <select
                     value={requestRowsPerPage}
@@ -619,7 +619,7 @@ export default function AdminManagement() {
                   </div>
                 )}
 
-                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                <div style={{ color: '#64748b' }}>
                   Showing {requestStartIndex + 1} to{" "}
                   {Math.min(requestStartIndex + requestRowsPerPage, filteredRequests.length)} of{" "}
                   {filteredRequests.length}
@@ -693,8 +693,8 @@ export default function AdminManagement() {
                   {paginatedAdmins.length > 0 ? (
                     paginatedAdmins.map((admin) => (
                       <tr key={admin.docId}>
-                        <td style={{ fontWeight: 500 }}>{admin.fullName}</td>
-                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>{admin.username}</td>
+                        <td>{admin.fullName}</td>
+                        <td>{admin.username}</td>
                         <td>{admin.position}</td>
                         <td>
                           <span style={{
@@ -702,8 +702,7 @@ export default function AdminManagement() {
                             color: admin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
                             padding: "4px 10px",
                             borderRadius: "12px",
-                            fontSize: "0.78rem",
-                            fontWeight: "600"
+                            display: "inline-block"
                           }}>
                             {admin.role || "Standard Admin"}
                           </span>
@@ -711,7 +710,7 @@ export default function AdminManagement() {
                         <td style={{ textAlign: "center" }}>
                           <button
                             className="as-btn-ghost"
-                            style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                            style={{ padding: "6px 12px" }}
                             onClick={() => {
                               setSelectedAdmin(admin);
                               setEditedRole(admin.role || "Standard Admin");
@@ -724,7 +723,7 @@ export default function AdminManagement() {
                         <td style={{ textAlign: "center" }}>
                           <button
                             className="reject-btn"
-                            style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                            style={{ padding: "6px 12px" }}
                             onClick={() => {
                               setSelectedAdmin(admin);
                               setShowDeleteModal(true);
@@ -760,7 +759,7 @@ export default function AdminManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span>Rows per page:</span>
                   <select
                     value={adminRowsPerPage}
@@ -801,7 +800,7 @@ export default function AdminManagement() {
                   </div>
                 )}
 
-                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                <div style={{ color: '#64748b' }}>
                   Showing {adminStartIndex + 1} to{" "}
                   {Math.min(adminStartIndex + adminRowsPerPage, filteredAdmins.length)} of{" "}
                   {filteredAdmins.length}
@@ -816,7 +815,7 @@ export default function AdminManagement() {
         <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Approve Admin Account</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+            <p style={{ textAlign: "center" }}>
               Are you sure you want to approve{" "}
               <strong>{selectedRequest?.fullName}</strong>?
             </p>
@@ -842,7 +841,7 @@ export default function AdminManagement() {
         <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Confirm Rejection</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+            <p style={{ textAlign: "center" }}>
               Are you sure you want to reject this request?
             </p>
             <div className="modal-actions">
@@ -867,7 +866,7 @@ export default function AdminManagement() {
         <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Delete Admin</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+            <p style={{ textAlign: "center" }}>
               This action cannot be undone. <br /> Delete this admin?
             </p>
             <div className="modal-actions">
@@ -935,9 +934,7 @@ export default function AdminManagement() {
                         background: selectedAdmin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6',
                         color: selectedAdmin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
                         padding: "4px 12px",
-                        borderRadius: "20px",
-                        fontSize: "0.85rem",
-                        fontWeight: "600"
+                        borderRadius: "20px"
                       }}>
                         {selectedAdmin.role || "Standard Admin"}
                       </span>

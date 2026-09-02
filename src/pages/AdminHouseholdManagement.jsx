@@ -577,7 +577,7 @@ export default function HouseholdManagement() {
 
             <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="req-table" style={{ minWidth: "850px" }}>
-                <thead style={{ background: '#f9fafb' }}>
+                <thead>
                   <tr>
                     <th>Full Name</th>
                     <th>Household Number</th>
@@ -591,24 +591,24 @@ export default function HouseholdManagement() {
                   {paginatedHhRequests.length > 0 ? (
                     paginatedHhRequests.map((req) => (
                       <tr key={req.id}>
-                        <td style={{ fontWeight: 500 }}>{req.fullName}</td>
-                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{req.householdId}</td>
-                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{req.branchId ? getFamilyNumber(req.householdId, req.branchId) : "Pending"}</td>
+                        <td>{req.fullName}</td>
+                        <td>{req.householdId}</td>
+                        <td>{req.branchId ? getFamilyNumber(req.householdId, req.branchId) : "Pending"}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {req.category && req.category.map((c, i) => (
-                              <span key={i} style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
+                              <span key={i} style={{ background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
                             ))}
                           </div>
                         </td>
-                        <td style={{ color: '#6b7280' }}>{req.dateSubmitted}</td>
+                        <td>{req.dateSubmitted}</td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedHhRequest(req); setShowHhViewModal(true); }}>View</button>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhViewModal(true); }}>View</button>
                             {req.status === "pending" && (
                               <>
-                                <button className="as-btn-aqua" style={{ background: '#0d7a55', padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedHhRequest(req); setShowHhApproveModal(true); }}>Approve</button>
-                                <button className="as-btn-aqua" style={{ background: '#ef4444', padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedHhRequest(req); setShowHhRejectModal(true); }}>Reject</button>
+                                <button className="as-btn-aqua" style={{ background: '#0d7a55', padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhApproveModal(true); }}>Approve</button>
+                                <button className="as-btn-aqua" style={{ background: '#ef4444', padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhRejectModal(true); }}>Reject</button>
                               </>
                             )}
                           </div>
@@ -633,7 +633,7 @@ export default function HouseholdManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span>Rows per page:</span>
                   <select
                     value={hhRowsPerPage}
@@ -673,7 +673,7 @@ export default function HouseholdManagement() {
                   </div>
                 )}
 
-                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                <div style={{ color: '#64748b' }}>
                   Showing {hhStartIndex + 1} to{" "}
                   {Math.min(hhStartIndex + hhRowsPerPage, filteredHhRequests.length)} of{" "}
                   {filteredHhRequests.length}
@@ -758,7 +758,7 @@ export default function HouseholdManagement() {
 
             <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="req-table" style={{ minWidth: "850px" }}>
-                <thead style={{ background: '#f9fafb' }}>
+                <thead>
                   <tr>
                     <th>Full Name</th>
                     <th>Household Number</th>
@@ -772,19 +772,19 @@ export default function HouseholdManagement() {
                   {paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
                       <tr key={`${res.householdId}__${res.id}`}>
-                        <td style={{ fontWeight: 500 }}>{res.fullName}</td>
-                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{res.householdId}</td>
-                        <td style={{ color: '#4b5563', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem' }}>{res.familyNumber || getFamilyNumber(res.householdId, res.branchID)}</td>
+                        <td>{res.fullName}</td>
+                        <td>{res.householdId}</td>
+                        <td>{res.familyNumber || getFamilyNumber(res.householdId, res.branchID)}</td>
                         <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {res.category && res.category.map((c, i) => (
-                              <span key={i} style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
+                              <span key={i} style={{ background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
                             ))}
                           </div>
                         </td>
                         <td>
                           <span className={`status-badge status-${res.status.toLowerCase().replace(/\s+/g, "")}`} style={{
-                            padding: '4px 10px', fontSize: '0.8rem', borderRadius: '12px', fontWeight: 600, display: 'inline-block',
+                            padding: '4px 10px', borderRadius: '12px', display: 'inline-block',
                             background: res.status === 'Clear Case' ? '#dcfce7' : res.status === 'Pending Case' ? '#fef3c7' : res.status === 'Violation' ? '#fee2e2' : '#e5e7eb',
                             color: res.status === 'Clear Case' ? '#166534' : res.status === 'Pending Case' ? '#92400e' : res.status === 'Violation' ? '#991b1b' : '#374151'
                           }}>
@@ -793,11 +793,11 @@ export default function HouseholdManagement() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View</button>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View</button>
                             {!res.isPendingActivation && (
-                              <button className="as-btn-aqua" style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
+                              <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
                             )}
-                            <button className="as-btn-aqua" style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#ef4444', color: 'white', borderColor: '#ef4444' }} onClick={() => { setResidentToDelete(res); setShowDeleteModal(true); }}>Delete</button>
+                            <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#ef4444', color: 'white', borderColor: '#ef4444' }} onClick={() => { setResidentToDelete(res); setShowDeleteModal(true); }}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -820,7 +820,7 @@ export default function HouseholdManagement() {
                 flexWrap: "wrap",
                 gap: "16px"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span>Rows per page:</span>
                   <select
                     value={rowsPerPage}
@@ -860,7 +860,7 @@ export default function HouseholdManagement() {
                   </div>
                 )}
 
-                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                <div style={{ color: '#64748b' }}>
                   Showing {startIndex + 1} to{" "}
                   {Math.min(startIndex + rowsPerPage, filteredResidents.length)} of{" "}
                   {filteredResidents.length}
@@ -888,10 +888,10 @@ export default function HouseholdManagement() {
             </div>
 
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
-              <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
+              <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
-                  <strong>Household Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedResident.householdId}</span><br />
-                  <strong>Family Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
+                  <strong>Household Number:</strong> <span>{selectedResident.householdId}</span><br />
+                  <strong>Family Number:</strong> <span>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
                   <div style={{ marginTop: '8px' }}>
                     <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
                   </div>
@@ -924,7 +924,7 @@ export default function HouseholdManagement() {
                   </div>
                 )}
                 {selectedResident.adminLastUpdatedBy && (
-                  <div style={{ gridColumn: '1 / -1', fontSize: "0.8rem", color: "#888", marginTop: "8px" }}>
+                  <div style={{ gridColumn: '1 / -1', color: "#888", marginTop: "8px" }}>
                     Last updated by <strong>{selectedResident.adminLastUpdatedBy}</strong>
                     {selectedResident.adminLastUpdatedByPosition ? ` (${selectedResident.adminLastUpdatedByPosition})` : ""}
                   </div>
@@ -954,9 +954,9 @@ export default function HouseholdManagement() {
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
               <div className="admin-details">
                 <p><strong>Full Name:</strong> {statusData.fullName}</p>
-                <p><strong>Household Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{statusData.householdId}</span></p>
-                <p><strong>Family Number:</strong> <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{statusData.familyNumber || getFamilyNumber(statusData.householdId, statusData.branchID)}</span></p>
-                <p style={{ fontSize: "0.8rem", color: "#888" }}>
+                <p><strong>Household Number:</strong> <span>{statusData.householdId}</span></p>
+                <p><strong>Family Number:</strong> <span>{statusData.familyNumber || getFamilyNumber(statusData.householdId, statusData.branchID)}</span></p>
+                <p style={{ color: "#888" }}>
                   Setting as: <strong>{adminProfile.fullName}</strong>
                   {adminProfile.position ? ` · ${adminProfile.position}` : ""}
                 </p>
@@ -1031,7 +1031,7 @@ export default function HouseholdManagement() {
             </div>
 
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
-              <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', fontSize: '0.9rem' }}>
+              <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
                   <strong>Date Submitted:</strong> {selectedHhRequest.dateSubmitted}<br />
                   <div style={{ marginTop: '8px' }}>
@@ -1070,7 +1070,7 @@ export default function HouseholdManagement() {
         <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Approve Resident Registration</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+            <p style={{ textAlign: "center" }}>
               Approving will create a Household ID and email the resident. They will appear in the Account Management tab.
             </p>
             <div className="modal-actions">
@@ -1101,7 +1101,7 @@ export default function HouseholdManagement() {
         <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Confirm Rejection</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+            <p style={{ textAlign: "center" }}>
               Are you sure you want to reject this resident registration? This will delete the request permanently.
             </p>
             <div className="modal-actions">
@@ -1126,7 +1126,7 @@ export default function HouseholdManagement() {
         <div className="as-modal-overlay">
           <div className="modal">
             <h3 className="modal-title">Confirm Deletion</h3>
-            <p style={{ fontSize: "0.85rem", textAlign: "center" }}>
+            <p style={{ textAlign: "center" }}>
               Are you sure you want to delete the resident <strong>{residentToDelete.fullName}</strong>? This action cannot be undone.
             </p>
             <div className="modal-actions">
