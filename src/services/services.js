@@ -299,15 +299,31 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   }));
 
-  const eqs = await fetchWithFallback("equipment_rentals", "submittedAt", d => ({
-    id: d.id,
-    category: "Equipment",
-    serviceName: d.data().equipmentName || "Equipment Rental",
-    refNum: d.data().rentalID || d.data().refNum || "",
-    status: d.data().status || "Pending",
-    date: d.data().submittedAt,
-    ...d.data(),
-  }));
+  const eqs = await fetchWithFallback("equipment_rentals", "submittedAt", d => {
+    const rawData = d.data();
+    const rawStatus = rawData.status || "Pending";
+    let effectiveStatus = rawStatus;
+    const alreadyResolved = ['Returned', 'Unreturned', 'Rejected'].includes(rawStatus);
+    if (!alreadyResolved && rawStatus === "Claimed" && rawData.returnDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const returnDate = new Date(rawData.returnDate + "T00:00:00");
+      if (returnDate < today) {
+        effectiveStatus = "Overdue";
+      }
+    }
+
+    return {
+      id: d.id,
+      category: "Equipment",
+      serviceName: rawData.equipmentName || "Equipment Rental",
+      refNum: rawData.rentalID || rawData.refNum || "",
+      status: effectiveStatus,
+      firestoreStatus: rawStatus,
+      date: rawData.submittedAt,
+      ...rawData,
+    };
+  });
 
   const fbs = await fetchWithFallback("feedback", "createdAt", d => ({
     id: d.id,
