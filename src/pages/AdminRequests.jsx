@@ -31,6 +31,8 @@ export default function AdminRequests() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [isUnreturnedModalOpen, setIsUnreturnedModalOpen] = useState(false);
+  const [unreturnedNotes, setUnreturnedNotes] = useState('');
 
   // --- FIREBASE HELPER FUNCTIONS ---
   const formatTime = (time24) => {
@@ -145,6 +147,19 @@ export default function AdminRequests() {
         const data = doc.data();
         let rawDate = data.submittedAt || data.createdAt || null;
         const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
+
+        const firestoreStatus = data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1) : 'Pending';
+        let effectiveStatus = firestoreStatus;
+        const alreadyResolved = ['Returned', 'Unreturned', 'Rejected'].includes(firestoreStatus);
+        if (!alreadyResolved && firestoreStatus === 'Claimed' && data.returnDate) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const returnDate = new Date(data.returnDate + 'T00:00:00');
+          if (returnDate < today) {
+            effectiveStatus = 'Overdue';
+          }
+        }
+
         return {
           docId: doc.id,
           collectionName: 'equipment_rentals',
@@ -157,7 +172,8 @@ export default function AdminRequests() {
           dateRequested: formatDate(rawDate),
           rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
           dateNeeded: `Pick-up: ${formatDate(data.pickUpDate)}`,
-          status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
+          status: effectiveStatus,
+          firestoreStatus,
           allData: { ...data, email: sanitizedEmail }
         };
       });
@@ -262,10 +278,18 @@ export default function AdminRequests() {
     setRejectReason('');
   };
 
+  const openUnreturnedModal = (request) => {
+    setSelectedRequest(request);
+    setIsUnreturnedModalOpen(true);
+    setUnreturnedNotes('');
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setIsRejectModalOpen(false);
+    setIsUnreturnedModalOpen(false);
     setSelectedRequest(null);
+    setUnreturnedNotes('');
   };
 
   const handleApprove = async (req) => {
@@ -456,6 +480,47 @@ export default function AdminRequests() {
     }
   };
 
+  const handleConfirmUnreturned = async () => {
+    const target = selectedRequest;
+    if (!target) return;
+    try {
+      const requestRef = doc(db, target.collectionName, target.docId);
+      await updateDoc(requestRef, {
+        status: 'Unreturned',
+        unreturnedReportedBy: adminName,
+        unreturnedReportedRole: adminRole,
+        unreturnedReportedAt: new Date(),
+        unreturnedNotes: unreturnedNotes.trim() || '',
+        returnDate: target.allData?.returnDate || '',
+      });
+
+      logTransaction(
+        adminName, adminRole,
+        'REPORTED_UNRETURNED',
+        `Reported equipment (Ref: ${target.docId}) as unreturned for ${target.residentName}. Return date was: ${target.allData?.returnDate || 'N/A'}`
+      );
+
+      const residentID = target.allData?.residentID || target.allData?.userID || '';
+      const hhID       = target.allData?.householdID || '';
+      const refNum     = target.id || '';
+
+      if (residentID && hhID) {
+        await createUserNotification(
+          hhID, residentID,
+          'Equipment Not Returned — Action Required',
+          `The equipment "${target.type}" you rented has been reported as unreturned. Its return date was ${target.allData?.returnDate || 'N/A'}. Please contact the Barangay Hall immediately.`,
+          'equipment_update', refNum
+        );
+      }
+
+      alert('Equipment reported as Unreturned.');
+      closeModal();
+    } catch (error) {
+      console.error('Error reporting unreturned:', error);
+      alert('Failed to report equipment as unreturned.');
+    }
+  };
+
   const handleConfirmReject = async () => {
     if (rejectReason.trim() === '') {
       alert("Please provide a reason for rejection.");
@@ -580,7 +645,11 @@ export default function AdminRequests() {
                 </>
               )}
               {activeTab === 'Equipment' && (
-                <option value="Returned">Returned</option>
+                <>
+                  <option value="Overdue">Overdue</option>
+                  <option value="Unreturned">Unreturned</option>
+                  <option value="Returned">Returned</option>
+                </>
               )}
               <option value="Rejected">Rejected</option>
             </select>
@@ -674,9 +743,28 @@ export default function AdminRequests() {
                             <CheckCircle size={16} /> Mark Claimed
                           </button>
                         )}
-                        {String(req.status || "").toLowerCase() === 'claimed' && req.category === 'Equipment' && (
+                        {(['claimed', 'overdue', 'unreturned'].includes(String(req.status || '').toLowerCase())) && req.category === 'Equipment' && (
                           <button className="btn-approve" title="Returned" onClick={(e) => { e.stopPropagation(); handleReturned(req); }}>
                             <CheckCircle size={16} /> Mark Returned
+                          </button>
+                        )}
+                        {String(req.status || "").toLowerCase() === 'overdue' && req.category === 'Equipment' && (
+                          <button
+                            title="Report Unreturned"
+                            onClick={(e) => { e.stopPropagation(); openUnreturnedModal(req); }}
+                            style={{
+                              height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+                              fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              gap: '6px', padding: '0 14px', borderRadius: '8px',
+                              background: '#fff7ed', color: '#c2410c',
+                              border: '1.5px solid #fed7aa',
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            Report Unreturned
                           </button>
                         )}
                         <button className="btn-view" title="View Details" onClick={(e) => { e.stopPropagation(); openViewModal(req); }}>
@@ -832,7 +920,10 @@ export default function AdminRequests() {
                         </div>
                         <div className="detail-item">
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Return Date</label>
-                          <p className="detail-value">{formatDate(selectedRequest.allData?.returnDate) || 'N/A'}</p>
+                          <p className="detail-value" style={{ color: selectedRequest.status === 'Overdue' ? '#dc2626' : 'inherit', fontWeight: selectedRequest.status === 'Overdue' ? 600 : 'inherit' }}>
+                            {formatDate(selectedRequest.allData?.returnDate) || 'N/A'}
+                            {selectedRequest.status === 'Overdue' && <span style={{ marginLeft: '8px', fontSize: '0.75rem', background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>OVERDUE</span>}
+                          </p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Quantity Requested</label>
@@ -846,6 +937,21 @@ export default function AdminRequests() {
                           <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Additional Notes</label>
                           <p className="detail-value">{selectedRequest.allData?.notes || 'None'}</p>
                         </div>
+                        {selectedRequest.status === 'Overdue' && (
+                          <div style={{
+                            gridColumn: 'span 2', display: 'flex', alignItems: 'flex-start', gap: '10px',
+                            background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px',
+                            padding: '12px 14px', marginTop: '4px', fontSize: '0.85rem', color: '#9a3412',
+                          }}>
+                            <svg style={{ flexShrink: 0, marginTop: '2px' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            <div>
+                              <strong style={{ display: 'block', color: '#7c2d12', marginBottom: '2px' }}>Equipment Return Overdue</strong>
+                              This rental has passed its scheduled return date of <strong>{formatDate(selectedRequest.allData?.returnDate)}</strong>. The equipment has not been returned yet. Please coordinate with the resident and mark it as <strong>Returned</strong> once the equipment is back.
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
 
@@ -960,9 +1066,27 @@ export default function AdminRequests() {
                     <CheckCircle size={16} /> Mark Claimed
                   </button>
                 )}
-                {String(selectedRequest.status || "").toLowerCase() === 'claimed' && selectedRequest.category === 'Equipment' && (
+                {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
                   <button className="btn-approve" onClick={() => handleReturned()}>
                     <CheckCircle size={16} /> Mark Returned
+                  </button>
+                )}
+                {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
+                  <button
+                    onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
+                    style={{
+                      height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+                      fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      gap: '6px', padding: '0 16px', borderRadius: '8px',
+                      background: '#fff7ed', color: '#c2410c',
+                      border: '1.5px solid #fed7aa',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Report Unreturned
                   </button>
                 )}
               </div>
@@ -1007,6 +1131,88 @@ export default function AdminRequests() {
                   style={{ background: '#ef4444', color: 'white', border: 'none' }}
                 >
                   Confirm Rejection
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REPORT UNRETURNED CONFIRMATION MODAL */}
+        {isUnreturnedModalOpen && selectedRequest && (
+          <div className="as-modal-overlay" onClick={closeModal}>
+            <div className="modal-content" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="as-modal-header" style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  <h2 style={{ color: '#7c2d12', margin: 0 }}>Report Equipment as Unreturned</h2>
+                </div>
+                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
+              </div>
+
+              <div className="modal-body">
+                {/* Rental Summary */}
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px 16px', marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rental Summary</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '0.875rem' }}>
+                    <div><span style={{ color: '#94a3b8' }}>Resident: </span><strong style={{ color: '#1e293b' }}>{selectedRequest.residentName}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>Equipment: </span><strong style={{ color: '#1e293b' }}>{selectedRequest.type}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>Ref #: </span><strong style={{ color: '#1e293b', fontFamily: 'monospace' }}>{String(selectedRequest.id || '').toUpperCase()}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>Return Date: </span><strong style={{ color: '#dc2626' }}>{formatDate(selectedRequest.allData?.returnDate)}</strong></div>
+                  </div>
+                </div>
+
+                <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#64748b', lineHeight: '1.65' }}>
+                  This action will mark the equipment as <strong style={{ color: '#c2410c' }}>Unreturned</strong> and notify the resident. The date of this report will be recorded. Use this only when you have confirmed the equipment has not been returned.
+                </p>
+
+                <div className="detail-item">
+                  <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#475569', display: 'block', marginBottom: '6px' }}>Admin Notes <span style={{ fontWeight: 400, color: '#94a3b8' }}>(Optional)</span></label>
+                  <textarea
+                    rows="3"
+                    placeholder="E.g., Multiple follow-ups made, resident not reachable, equipment confirmed not returned as of today..."
+                    style={{
+                      width: '100%', padding: '0.875rem', borderRadius: '8px',
+                      border: '1.5px solid #e2e8f0', fontFamily: 'inherit',
+                      fontSize: '0.875rem', marginTop: '0', resize: 'none', outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                    value={unreturnedNotes}
+                    onChange={(e) => setUnreturnedNotes(e.target.value)}
+                    autoFocus
+                    onFocus={(e) => e.target.style.borderColor = '#f97316'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
+
+                <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '7px', padding: '10px 12px' }}>
+                  <svg style={{ flexShrink: 0, marginTop: '1px' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  A notification will be sent to the resident and the report date will be logged for record-keeping.
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn-view" onClick={closeModal}>Cancel</button>
+                <button
+                  onClick={handleConfirmUnreturned}
+                  style={{
+                    height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+                    fontSize: '0.875rem', cursor: 'pointer', display: 'inline-flex',
+                    alignItems: 'center', gap: '6px', padding: '0 20px', borderRadius: '8px',
+                    background: '#c2410c', color: 'white', border: 'none', transition: 'background 0.2s',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#9a3412'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#c2410c'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  Confirm — Report as Unreturned
                 </button>
               </div>
             </div>

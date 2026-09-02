@@ -18268,6 +18268,21 @@ h4,
   color: #5a5aaf;
 }
 
+.pf-tx-badge.overdue {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.pf-tx-badge.unreturned {
+  background: rgba(194, 65, 12, 0.1);
+  color: #c2410c;
+}
+
+.pf-tx-badge.returned {
+  background: rgba(13, 122, 85, 0.1);
+  color: #0d7a55;
+}
+
 .pf-tx-bdot {
   width: 5px;
   height: 5px;
@@ -19784,6 +19799,16 @@ h4,
   }
 }
 
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
 /* ==========================================================
    HEADER / BANNER ANIMATIONS (fire once on page load)

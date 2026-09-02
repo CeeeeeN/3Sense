@@ -1643,6 +1643,46 @@ nav {
 .status-badge.rejected::before {
   background: #ef4444;
 }
+.status-badge.overdue {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.status-badge.overdue::before {
+  background: #dc2626;
+}
+.status-badge.unreturned {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+.status-badge.unreturned::before {
+  background: #f97316;
+}
+.status-badge.returned {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.status-badge.returned::before {
+  background: #22c55e;
+}
+.status-badge.claimed {
+  background: #ede9fe;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
+}
+.status-badge.claimed::before {
+  background: #7c3aed;
+}
+.status-badge.ready-for-pickup {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+.status-badge.ready-for-pickup::before {
+  background: #3b82f6;
+}
 
 /* Action Buttons */
 .btn-view,

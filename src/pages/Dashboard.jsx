@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot, getCountFromServer } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, getCountFromServer, orderBy, limit } from "firebase/firestore";
 import { subscribeToAnnouncements } from "../services/announcements";
 import FeedbackAlerts from "../components/Feedback/FeedbackAlerts";
 import {
@@ -143,6 +143,194 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
   );
 }
 
+function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev, onNext }) {
+  const rental = rentals[currentIdx];
+  const isUnreturned = rental?.status === 'Unreturned';
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  if (!rental) return null;
+
+  const fmt = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric'
+      });
+    } catch { return dateStr; }
+  };
+
+  const accentColor  = isUnreturned ? '#c2410c' : '#dc2626';
+  const accentLight  = isUnreturned ? '#fff7ed' : '#fef2f2';
+  const accentBorder = isUnreturned ? '#fed7aa' : '#fecaca';
+  const badgeLabel   = isUnreturned ? 'Unreturned' : 'Overdue';
+  const warningText  = isUnreturned
+    ? 'The Barangay has formally reported this equipment as unreturned. Please visit the Barangay Hall immediately to resolve this matter.'
+    : 'Return date has passed. Please return the equipment to the Barangay Hall as soon as possible to avoid further penalties.';
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(15,23,42,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+        backdropFilter: 'blur(3px)',
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{
+        background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '420px',
+        overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
+        animation: 'modalIn 0.28s cubic-bezier(0.34,1.56,0.64,1)',
+        fontFamily: "'Poppins', sans-serif",
+      }}>
+
+      <div style={{ height: '5px', background: `linear-gradient(90deg, ${accentColor}, ${isUnreturned ? '#f97316' : '#f87171'})` }} />
+
+      <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 20px 0',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Equipment Rental</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Return Reminder</div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: '#f1f5f9', border: 'none', cursor: 'pointer',
+              width: 30, height: 30, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#64748b', transition: 'background 0.15s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div style={{ padding: '16px 20px 0' }}>
+          <div style={{
+            background: '#f8fafc', border: '1px solid #e2e8f0',
+            borderRadius: '12px', padding: '14px 16px',
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
+              {[
+                { label: 'Equipment', value: rental.equipmentName || rental.type || 'N/A' },
+                { label: 'Quantity', value: `${rental.quantity || 1} unit${rental.quantity > 1 ? 's' : ''}` },
+                { label: 'Pickup Date', value: fmt(rental.pickUpDate) },
+                { label: 'Return Date', value: fmt(rental.returnDate), highlight: true },
+              ].map(({ label, value, highlight }) => (
+                <div key={label}>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{label}</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: highlight ? accentColor : '#1e293b' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Status:</span>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                padding: '3px 10px', borderRadius: '100px',
+                background: accentLight, border: `1px solid ${accentBorder}`,
+                fontSize: '0.72rem', fontWeight: 800, color: accentColor, letterSpacing: '0.06em',
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: accentColor, display: 'inline-block' }} />
+                {badgeLabel.toUpperCase()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '12px 20px 0' }}>
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: '10px',
+            background: accentLight, border: `1px solid ${accentBorder}`,
+            borderRadius: '10px', padding: '12px 14px', fontSize: '0.82rem', color: accentColor,
+          }}>
+            <svg style={{ flexShrink: 0, marginTop: '1px' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span style={{ lineHeight: 1.6 }}>{warningText}</span>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: total > 1 ? 'space-between' : 'flex-end',
+          padding: '16px 20px 20px', gap: '10px',
+        }}>
+          {total > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={onPrev} disabled={currentIdx === 0}
+                style={{
+                  width: 30, height: 30, borderRadius: '50%', border: '1.5px solid #e2e8f0',
+                  background: currentIdx === 0 ? '#f8fafc' : '#fff',
+                  cursor: currentIdx === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: currentIdx === 0 ? '#cbd5e1' : '#475569',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{currentIdx + 1} / {total}</span>
+              <button
+                onClick={onNext} disabled={currentIdx === total - 1}
+                style={{
+                  width: 30, height: 30, borderRadius: '50%', border: '1.5px solid #e2e8f0',
+                  background: currentIdx === total - 1 ? '#f8fafc' : '#fff',
+                  cursor: currentIdx === total - 1 ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: currentIdx === total - 1 ? '#cbd5e1' : '#475569',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            </div>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 20px', borderRadius: '8px', border: 'none',
+              background: accentColor, color: '#fff', cursor: 'pointer',
+              fontSize: '0.82rem', fontWeight: 700, fontFamily: "'Poppins', sans-serif",
+              transition: 'opacity 0.15s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.opacity = '0.85'}
+            onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+          >
+            I Understand
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SubLabel({ icon, label }) {
   return (
     <div style={{
@@ -214,6 +402,20 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   const [announcementsData, setAnnouncementsData] = useState([]);
   const [userCategories, setUserCategories] = useState([]);
 
+  const [overdueRentals, setOverdueRentals] = useState([]);
+  const [eqAlertIdx, setEqAlertIdx] = useState(0);
+  const [showEqModal, setShowEqModal] = useState(true);
+  const [isMobile480, setIsMobile480] = useState(typeof window !== 'undefined' ? window.innerWidth <= 480 : false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile480(window.innerWidth <= 480);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [widgets, setWidgets] = useState([
     { icon: <VerifiedVisitIcon />, color: "teal", value: "...", label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
     { icon: <DocumentIcon />, color: "amber", value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
@@ -227,6 +429,48 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
     });
     return () => unsubAnns();
   }, []);
+
+  useEffect(() => {
+    if (!propsHouseholdID || !memberID) return;
+
+    const q = query(
+      collection(db, 'equipment_rentals'),
+      where('householdID', '==', propsHouseholdID),
+      where('residentID', '==', memberID),
+      orderBy('submittedAt', 'desc'),
+      limit(50)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const alerts = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => {
+          const s = r.status || '';
+          if (s === 'Unreturned') return true;
+          if (s === 'Claimed' && r.returnDate) {
+            const rd = new Date(r.returnDate + 'T00:00:00');
+            return rd < today;
+          }
+          return false;
+        })
+        .map(r => ({
+          ...r,
+          status: r.status === 'Claimed' ? 'Overdue' : r.status,
+        }));
+
+      setOverdueRentals(alerts);
+      if (alerts.length > 0) {
+        setEqAlertIdx(0);
+      } else {
+        setShowEqModal(false);
+      }
+    });
+
+    return () => unsub();
+  }, [propsHouseholdID, memberID]);
 
   // Deep-link: open a specific announcement popup when arriving from a notification
   useEffect(() => {
@@ -392,6 +636,76 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
       <div className="db-content">
 
+        {overdueRentals.length > 0 && (
+          <div style={{ marginBottom: "20px" }}>
+            <div
+              onClick={() => setShowEqModal(true)}
+              style={{
+                display: isMobile480 ? "block" : "flex",
+                alignItems: isMobile480 ? "unset" : "center",
+                justifyContent: isMobile480 ? "unset" : "space-between",
+                gap: isMobile480 ? "0" : "12px",
+                backgroundColor: overdueRentals.some(r => r.status === 'Unreturned') ? "#fff7ed" : "#fef2f2",
+                borderLeft: `4px solid ${overdueRentals.some(r => r.status === 'Unreturned') ? "#ea580c" : "#ef4444"}`,
+                padding: "12px 16px",
+                borderRadius: "8px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                cursor: "pointer",
+                transition: "transform 0.1s ease-in-out",
+                textAlign: isMobile480 ? "center" : "left"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.01)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+            >
+              <div style={{ flex: isMobile480 ? "unset" : 1, marginBottom: isMobile480 ? "10px" : "0" }}>
+                <h4 style={{
+                  margin: 0,
+                  fontSize: "0.9rem",
+                  color: overdueRentals.some(r => r.status === 'Unreturned') ? "#9a3412" : "#991b1b",
+                  fontFamily: "'Poppins', sans-serif"
+                }}>
+                  {overdueRentals.some(r => r.status === 'Unreturned')
+                    ? (overdueRentals.length > 1 ? `Action Required: ${overdueRentals.length} Equipment Rentals Unreturned` : `Action Required: Equipment Reported as Unreturned`)
+                    : (overdueRentals.length > 1 ? `Action Required: ${overdueRentals.length} Equipment Rentals Overdue` : `Action Required: Overdue Equipment Return`)
+                  }
+                </h4>
+
+                <p style={{
+                  margin: 0,
+                  fontSize: "0.8rem",
+                  color: overdueRentals.some(r => r.status === 'Unreturned') ? "#c2410c" : "#b91c1c",
+                  fontFamily: "'Poppins', sans-serif"
+                }}>
+                  {overdueRentals.length > 1
+                    ? <>Please return your rented <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || "Equipment"}</strong> and {overdueRentals.length - 1} other item(s) to the Barangay Hall.</>
+                    : <>Please return your rented <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || "Equipment"}</strong> to the Barangay Hall as soon as possible.</>
+                  }
+                </p>
+              </div>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowEqModal(true); }}
+                style={{
+                  backgroundColor: overdueRentals.some(r => r.status === 'Unreturned') ? "#ea580c" : "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  padding: "6px 14px",
+                  borderRadius: "6px",
+                  fontSize: "0.75rem",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  fontFamily: "'Poppins', sans-serif",
+                  whiteSpace: "nowrap",
+                  display: "block",
+                  margin: isMobile480 ? "10px auto 0 auto" : "0"
+                }}
+              >
+                Review Now
+              </button>
+            </div>
+          </div>
+        )}
+
         <FeedbackAlerts 
           householdID={propsHouseholdID} 
           residentID={memberID}
@@ -543,6 +857,16 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         />
       )}
       {selectedAnn && <UnifiedAnnouncementPopup ann={selectedAnn} onClose={() => setSelectedAnn(null)} />}
+      {showEqModal && overdueRentals.length > 0 && (
+        <EquipmentRentalAlertModal
+          rentals={overdueRentals}
+          currentIdx={Math.min(eqAlertIdx, overdueRentals.length - 1)}
+          total={overdueRentals.length}
+          onClose={() => setShowEqModal(false)}
+          onPrev={() => setEqAlertIdx(i => Math.max(0, i - 1))}
+          onNext={() => setEqAlertIdx(i => Math.min(overdueRentals.length - 1, i + 1))}
+        />
+      )}
     </main>
   );
 }

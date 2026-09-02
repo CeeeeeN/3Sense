@@ -737,6 +737,181 @@ export default function Profile({ onNavigate, householdID, memberID, userRole, u
         </div>
       )}
 
+            {statusHistory.length > 0 ? (
+              statusHistory.map((entry, i) => {
+                const dotColor = entry.status === "Clear Case"
+                  ? "#0d7a55"
+                  : entry.status === "Pending Case"
+                    ? "#e8a020"
+                    : "#e03e3e";
+                const byLine = [
+                  entry.setBy,
+                  entry.setByPosition ? `(${entry.setByPosition})` : null,
+                ].filter(Boolean).join(" ");
+
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>
+                        Status set to "{entry.status}"
+                        {entry.remarks ? ` — ${entry.remarks}` : ""}
+                      </div>
+                      {entry.incident && (
+                        <div style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: 1 }}>
+                          {entry.incident}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>
+                        {formatHistoryDate(entry.setAt)} · by {byLine}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+            <div style={{ fontSize: "0.82rem", color: "var(--muted)", fontStyle: "italic" }}>
+                No status changes recorded yet.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* 8. TRANSACTIONS */}
+        <Card icon={IconHistory} title="Service & Transaction History">
+          <div className="pf-table-wrap">
+            <table className="pf-table">
+              <thead>
+                <tr>
+                  <th>Service Name</th>
+                  <th>Ref #</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Category</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txLoading ? (
+                  <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>Loading transactions...</td></tr>
+                ) : transactions.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>No transactions found.</td></tr>
+                ) : (
+                  transactions.slice((txPage - 1) * txPerPage, txPage * txPerPage).map((tx, i) => {
+                    const dateStr = tx.date?.toDate
+                      ? tx.date.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : tx.date ? new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+                    const statusLower = (tx.status || "pending").toLowerCase().replace(/\s+/g, "-");
+                    const isOverdue = tx.status === "Overdue";
+                    const isUnreturned = tx.status === "Unreturned";
+                    const isAlerted = isOverdue || isUnreturned;
+
+                    // Format return date for equipment rentals
+                    const returnDateStr = tx.category === "Equipment" && tx.returnDate
+                      ? new Date(tx.returnDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : null;
+
+                    const returnDateColor = isUnreturned ? "#c2410c" : isOverdue ? "#dc2626" : "var(--muted)";
+                    const rowBg = isUnreturned
+                      ? "rgba(249,115,22,0.05)"
+                      : isOverdue
+                        ? "rgba(239,68,68,0.04)"
+                        : {};
+
+                    return (
+                      <tr key={tx.id || i} style={isAlerted ? { background: rowBg } : {}}>
+                        <td>
+                          <div className="pf-tx-name">{tx.serviceName}</div>
+                          {returnDateStr && (
+                            <div style={{ fontSize: "0.72rem", color: returnDateColor, marginTop: "2px", display: "flex", alignItems: "center", gap: "4px" }}>
+                              {isAlerted ? (
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={returnDateColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                              ) : (
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                              )}
+                              Return: {returnDateStr}
+                            </div>
+                          )}
+                        </td>
+                        <td><div className="pf-tx-date" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem" }}>{tx.refNum || "—"}</div></td>
+                        <td><div className="pf-tx-date">{dateStr}</div></td>
+                        <td>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span className={`pf-tx-badge ${statusLower}`}>
+                              <span className="pf-tx-bdot" />
+                              {tx.status}
+                            </span>
+                            {isUnreturned && (
+                              <div style={{ fontSize: "0.65rem", color: "#c2410c", fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
+                                Contact barangay!
+                              </div>
+                            )}
+                            {isOverdue && (
+                              <div style={{ fontSize: "0.65rem", color: "#dc2626", fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
+                                Past due date!
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{tx.category}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+
+            {!txLoading && transactions.some(tx => tx.status === "Unreturned") && (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: "12px",
+                background: "rgba(249,115,22,0.08)", border: "1.5px solid rgba(249,115,22,0.35)",
+                borderRadius: "10px", padding: "14px 16px", margin: "12px 0 0 0", fontSize: "13px", color: "#7c2d12",
+              }}>
+                <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div style={{ flex: 1, lineHeight: "1.6" }}>
+                  <strong style={{ display: "block", color: "#9a3412", marginBottom: "2px" }}>⚠ Unreturned Equipment — Immediate Action Required</strong>
+                  The Barangay has formally reported that equipment you rented has not been returned. Please visit the <strong>Barangay Hall</strong> immediately to return the equipment or clarify the situation. Continued non-return may result in further action.
+                </div>
+              </div>
+            )}
+
+            {!txLoading && transactions.some(tx => tx.status === "Overdue") && (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: "12px",
+                background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
+                borderRadius: "10px", padding: "14px 16px", margin: "12px 0 0 0", fontSize: "13px", color: "#b91c1c",
+              }}>
+                <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div style={{ flex: 1, lineHeight: "1.6" }}>
+                  <strong style={{ display: "block", color: "#991b1b", marginBottom: "2px" }}>Overdue Equipment Return</strong>
+                  You have equipment that has not been returned by its scheduled return date. Please return the equipment to the Barangay Hall as soon as possible to avoid further penalties. The status will update to <strong>Returned</strong> once the admin records the return.
+                </div>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {transactions.length > txPerPage && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "1rem", gap: "0.5rem" }}>
+                <button
+                  onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                  disabled={txPage === 1}
+                  style={{
+                    padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
+                    background: txPage === 1 ? "#f1f5f9" : "var(--primary)", color: txPage === 1 ? "#94a3b8" : "#fff",
+                    border: "none", cursor: txPage === 1 ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Prev
+                </button>
+                <div style={{ fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", color: "var(--text)", margin: "0 0.5rem" }}>
+                  Page {txPage} of {Math.ceil(transactions.length / txPerPage)}
       {/* ── LIVE CAMERA MODAL ── */}
       {cameraModalOpen && (
         <div className="pf-overlay" style={{ zIndex: 1050 }} onClick={(e) => { if (e.target === e.currentTarget) closeCamera(); }}>
