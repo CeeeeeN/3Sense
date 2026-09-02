@@ -34,13 +34,11 @@ async function validateIsGovernmentId(imageBase64) {
 }
 
 // ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
-// Uses the free OCR.space API to extract text from the base64 image and parse
-// PhilSys ID formats automatically using a smart lookahead algorithm.
 async function performLiveOCR(imageBase64) {
   try {
     const formData = new FormData();
     formData.append("base64Image", imageBase64);
-    formData.append("apikey", "helloworld"); // Public free key for OCR.space
+    formData.append("apikey", "helloworld");
     formData.append("language", "eng");
     formData.append("isOverlayRequired", false);
     formData.append("detectOrientation", true);
@@ -58,29 +56,26 @@ async function performLiveOCR(imageBase64) {
     }
 
     const text = result.ParsedResults[0].ParsedText;
-    console.log("Live OCR Extracted Text:\n", text); // Helpful for debugging
+    console.log("Live OCR Extracted Text:\n", text);
 
     let data = {
       idNumber: "", firstName: "", middleName: "", lastName: "",
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    // 1. Extract ID Number
     const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
     if (idMatch) {
-        data.idNumber = idMatch[0].replace(/\s/g, ''); 
+      data.idNumber = idMatch[0].replace(/\s/g, ''); 
     }
 
-    // 2. Extract Birth Date Globally
     const dobMatch = text.match(/(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2},?\s+\d{4}/i);
     if (dobMatch) {
-        const d = new Date(dobMatch[0].replace(/,/g, ''));
-        if (!isNaN(d.getTime())) {
-            data.birthDate = d.toISOString().split('T')[0];
-        }
+      const d = new Date(dobMatch[0].replace(/,/g, ''));
+      if (!isNaN(d.getTime())) {
+        data.birthDate = d.toISOString().split('T')[0];
+      }
     }
 
-    // 3. Smart Line-by-Line Parsing for Names and Address
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const cleanName = (str) => str.replace(/[^A-Z\sÑñ-]/ig, '').trim();
 
@@ -88,24 +83,24 @@ async function performLiveOCR(imageBase64) {
       const line = lines[i].toUpperCase();
 
       const extractNextValidLine = (startIndex) => {
-          for (let j = startIndex + 1; j < Math.min(startIndex + 4, lines.length); j++) {
-              const nextLine = lines[j].toUpperCase();
-              if (nextLine.match(/NAME|GIVEN|MIDDLE|LAST|DATE|BIRTH|ADDRESS|BLOOD|SEX|MALE|FEMALE|PHILIPPINES|REPUBLIKA|KAPANGANAKAN|TIRAHAN|APELYIDO|PANGALAN|GITNANG/)) continue;
-              if (nextLine.match(/\d{4}-\d{4}/)) continue; 
-              
-              const cleaned = cleanName(lines[j]);
-              if (cleaned.length > 1) return cleaned;
-          }
-          return "";
+        for (let j = startIndex + 1; j < Math.min(startIndex + 4, lines.length); j++) {
+          const nextLine = lines[j].toUpperCase();
+          if (nextLine.match(/NAME|GIVEN|MIDDLE|LAST|DATE|BIRTH|ADDRESS|BLOOD|SEX|MALE|FEMALE|PHILIPPINES|REPUBLIKA|KAPANGANAKAN|TIRAHAN|APELYIDO|PANGALAN|GITNANG/)) continue;
+          if (nextLine.match(/\d{4}-\d{4}/)) continue; 
+          
+          const cleaned = cleanName(lines[j]);
+          if (cleaned.length > 1) return cleaned;
+        }
+        return "";
       };
 
       const extractInlineOrNext = (keywordRegex) => {
-          const parts = line.split(keywordRegex);
-          if (parts.length > 1 && parts[parts.length - 1].trim().length > 1) {
-              const inlineVal = cleanName(parts[parts.length - 1]);
-              if (inlineVal) return inlineVal;
-          }
-          return extractNextValidLine(i);
+        const parts = line.split(keywordRegex);
+        if (parts.length > 1 && parts[parts.length - 1].trim().length > 1) {
+          const inlineVal = cleanName(parts[parts.length - 1]);
+          if (inlineVal) return inlineVal;
+        }
+        return extractNextValidLine(i);
       };
 
       if (/(?:LAST\s*NAME|APELYIDO)/i.test(line) && !data.lastName) {
@@ -118,18 +113,18 @@ async function performLiveOCR(imageBase64) {
         data.middleName = extractInlineOrNext(/(?:MIDDLE\s*NAME|GITNANG\s*APELYIDO|GITNANG)/i);
       }
       else if (/(?:ADDRESS|TIRAHAN)/i.test(line) && !data.houseNumber) {
-         let addrLine = line.split(/(?:ADDRESS|TIRAHAN)/i).pop().trim();
-         if (!addrLine && lines[i + 1]) {
-             addrLine = lines[i + 1].trim() + " " + (lines[i + 2] || "").trim();
-         }
-         if (addrLine) {
-             const parts = addrLine.split(',');
-             if (parts.length > 0) {
-                 const firstPart = parts[0].trim().split(' ');
-                 data.houseNumber = firstPart[0].replace(/[^0-9A-Z-]/ig, ''); 
-                 data.street = firstPart.slice(1).join(' ').replace(/[^A-Z0-9\s.-]/ig, '').trim();
-             }
-         }
+        let addrLine = line.split(/(?:ADDRESS|TIRAHAN)/i).pop().trim();
+        if (!addrLine && lines[i + 1]) {
+          addrLine = lines[i + 1].trim() + " " + (lines[i + 2] || "").trim();
+        }
+        if (addrLine) {
+          const parts = addrLine.split(',');
+          if (parts.length > 0) {
+            const firstPart = parts[0].trim().split(' ');
+            data.houseNumber = firstPart[0].replace(/[^0-9A-Z-]/ig, ''); 
+            data.street = firstPart.slice(1).join(' ').replace(/[^A-Z0-9\s.-]/ig, '').trim();
+          }
+        }
       }
     }
 
@@ -224,15 +219,19 @@ const SvgBranch = ({ size = 22 }) => (
     <path d="M6 9h6a3 3 0 013 3v3" />
   </svg>
 );
-// Added SvgHashtag for ID number
 const SvgHashtag = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
     <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
   </svg>
 );
+const SvgArrowRight = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+  </svg>
+);
 
-// ─── Family Branch Step (with inline Create Branch modal) ────────────────────
+// ─── Family Branch Step ───────────────────────────────────────────────────────
 function AmFamilyBranchStep({ onConfirm, householdID }) {
   const branchDisplayID = (branchID) => {
     const num = parseInt((branchID || "").replace("BR-", ""), 10);
@@ -397,8 +396,6 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
   );
 }
 
-
-
 // ─── Camera hook ──────────────────────────────────────────────────────────────
 function useCamera() {
   const videoRef = useRef(null);
@@ -481,9 +478,8 @@ function SelectField({ icon: Icon, children, ...props }) {
   );
 }
 
-// ─── ID Scan Step ─────────────────────────────────────────────────────────────
-function AmIdScanStep({ onConfirm }) {
-  // idle | camera | preview | validating | invalid | processing | done
+// ─── ID Scan Step (Includes prominent Skip ID button) ──────────────────────────
+function AmIdScanStep({ onConfirm, onSkip }) {
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
@@ -517,14 +513,12 @@ function AmIdScanStep({ onConfirm }) {
   const confirm = async () => {
     setMode("validating"); setResult(null);
 
-    // Initial check just for UI flow
     const res = await validateIsGovernmentId(preview);
     setResult(res);
     if (res.isValid === false || res.isValid === null) { setMode("invalid"); return; }
 
     setMode("processing");
 
-    // Live OCR!
     const data = await performLiveOCR(preview);
     if (res.idNumber && !data.idNumber) data.idNumber = res.idNumber;
 
@@ -537,7 +531,9 @@ function AmIdScanStep({ onConfirm }) {
       <div className="am-scan-header">
         <div className="am-scan-icon-wrap"><SvgIdCard size={22} /></div>
         <div>
-          <h3 className="am-scan-title">Scan Your ID</h3>
+          <h3 className="am-scan-title">
+            Scan Your ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span>
+          </h3>
           <p className="am-scan-sub">Take a photo or upload a valid government-issued ID. Data will autofill the form.</p>
         </div>
       </div>
@@ -560,6 +556,32 @@ function AmIdScanStep({ onConfirm }) {
             </div>
             {uploadErr && <div className="am-upload-error"><SvgAlert size={14} /> {uploadErr}</div>}
           </div>
+
+          {/* SKIP BUTTON */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "0.4rem" }}>
+            <button
+              type="button"
+              onClick={onSkip}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.75rem 1.75rem",
+                background: "#ffffff",
+                border: "2px solid #317D89",
+                borderRadius: "8px",
+                color: "#317D89",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.06)",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Skip ID Upload &amp; Continue <SvgArrowRight />
+            </button>
+          </div>
+
           <div className="am-info-box">
             <SvgInfo2 size={15} />
             <p>Your ID image is used for identity verification and will be submitted with this member's record.</p>
@@ -645,6 +667,7 @@ function AmIdScanStep({ onConfirm }) {
               <button className="am-btn am-btn-ghost" onClick={reverify} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> Re-verify</button>
             )}
             <button className="am-btn am-btn-primary" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> Try Different Image</button>
+            <button className="am-btn am-btn-ghost" onClick={onSkip} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Skip ID Upload →</button>
           </div>
         </div>
       )}
@@ -834,8 +857,8 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     
     Object.entries(mapping).forEach(([ocrKey, formKey]) => {
       if (data[ocrKey] && !manuallyEdited.current.has(formKey)) { 
-          updates[formKey] = data[ocrKey]; 
-          filled.add(formKey); 
+        updates[formKey] = data[ocrKey]; 
+        filled.add(formKey); 
       }
     });
 
@@ -944,7 +967,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
     }]);
 
-    // Reset for next member and explicitly delete ID image state from memory
     setForm({ ...BLANK_FORM });
     setIdImage(null);
     setSelfieImage(null);
@@ -1111,13 +1133,18 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
             />
           )}
 
-          {/* ── STEP 1: ID SCAN ── */}
+          {/* ── STEP 1: ID SCAN (WITH SKIP BUTTON INTEGRATION) ── */}
           {outerStep === 1 && (
             <div>
               <AmIdScanStep
                 onConfirm={(img, data) => {
                   setIdImage(img);
                   applyOcr(data);
+                  setOuterStep(2);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onSkip={() => {
+                  setIdImage(null);
                   setOuterStep(2);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
@@ -1262,9 +1289,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       <Field label="Residing Since (Year)" required><InputField icon={IconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                     </div>
 
-                    {/* Branch Head Section — rules enforced here */}
                     {familyBranch === "BR-001" ? (
-                      // BR-001: head is always the original registrant, never changeable
                       <div className="am-special-checks">
                         <div style={{
                           padding: "0.75rem 1rem", borderRadius: "10px",
@@ -1275,7 +1300,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                         </div>
                       </div>
                     ) : needsHead ? (
-                      // Branch has no head yet — first member MUST be the head
                       <div className="am-special-checks">
                         <div style={{
                           padding: "0.75rem 1rem", borderRadius: "10px",
@@ -1286,7 +1310,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                         </div>
                       </div>
                     ) : (
-                      // Branch already has a head — show info only, no option to change
                       <div className="am-special-checks">
                         <div style={{
                           padding: "0.75rem 1rem", borderRadius: "10px",
