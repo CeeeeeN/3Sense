@@ -10,7 +10,8 @@ export default function AIInsightsWidget({ feedbacks }) {
   const uniqueFacilities = useMemo(() => {
     if (!feedbacks) return ['Overall'];
     const facilities = feedbacks
-      .map(f => f.FacilityName || f.Facility || "Unknown")
+      // Look for both camelCase and PascalCase
+      .map(f => f.facilityName || f.FacilityName || f.facility || f.Facility || "Unknown")
       .filter((val, index, self) => self.indexOf(val) === index && val !== "Unknown");
     
     return ['Overall', ...facilities];
@@ -27,18 +28,24 @@ export default function AIInsightsWidget({ feedbacks }) {
     if (timeframe === 'Month') cutoffDate.setDate(now.getDate() - 30);
 
     const validIssues = feedbacks.filter((f) => {
-      if (!f.CreatedAt) return false;
-      const feedbackDate = f.CreatedAt.toDate ? f.CreatedAt.toDate() : new Date(f.CreatedAt);
+      // Fix: Support lowercase createdAt from Firestore
+      const timestamp = f.createdAt || f.CreatedAt;
+      if (!timestamp) return false;
       
-      const matchesFacility = selectedFacility === 'Overall' || 
-                              (f.FacilityName === selectedFacility || f.Facility === selectedFacility);
+      const feedbackDate = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      
+      const facName = f.facilityName || f.FacilityName || f.facility || f.Facility;
+      const matchesFacility = selectedFacility === 'Overall' || facName === selectedFacility;
+
+      // Fix: Support lowercase detectedIssue from AI processing
+      const issue = f.detectedIssue || f.DetectedIssue;
 
       return (
         feedbackDate >= cutoffDate && 
-        matchesFacility && // Apply the facility filter here
-        f.DetectedIssue && 
-        f.DetectedIssue !== "None" && 
-        f.DetectedIssue !== "Uncategorized Complaint"
+        matchesFacility && 
+        issue && 
+        issue !== "None" && 
+        issue !== "Uncategorized Complaint"
       );
     });
 
@@ -46,7 +53,8 @@ export default function AIInsightsWidget({ feedbacks }) {
 
     const issueCounts = {};
     validIssues.forEach(f => {
-      issueCounts[f.DetectedIssue] = (issueCounts[f.DetectedIssue] || 0) + 1;
+      const issue = f.detectedIssue || f.DetectedIssue;
+      issueCounts[issue] = (issueCounts[issue] || 0) + 1;
     });
 
     let topIssue = null;
@@ -65,7 +73,7 @@ export default function AIInsightsWidget({ feedbacks }) {
       count: maxCount,
       advice: suggestions
     };
-  }, [feedbacks, timeframe, selectedFacility]); // Added selectedFacility to dependency array
+  }, [feedbacks, timeframe, selectedFacility]); 
 
   return (
     <div className="ai-insights-card">
