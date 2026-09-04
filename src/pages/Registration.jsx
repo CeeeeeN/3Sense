@@ -165,7 +165,7 @@ const SvgGradCap = ({ size = 26 }) => (
 );
 const SvgHome = ({ size = 26 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     <polyline points="9 22 9 12 15 12 15 22" />
   </svg>
 );
@@ -385,7 +385,7 @@ function UploadErrorMsg({ msg }) {
   );
 }
 
-function CameraError({ error, onUpload, fileRef }) {
+function CameraError({ error, fileRef }) {
   return (
     <div className="reg-camera-error">
       <div className="reg-camera-error-icon"><SvgAlert size={22} /></div>
@@ -484,7 +484,6 @@ function IdScanStep({ onConfirm, onSkip }) {
             <UploadErrorMsg msg={uploadError} />
           </div>
 
-          {/* Prominent Direct Skip Card Button */}
           <div style={{ display: "flex", justifyContent: "center", marginTop: "0.5rem" }}>
             <button
               type="button"
@@ -693,7 +692,6 @@ function SelfieStep({ onConfirm }) {
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <SvgCamera /> Open Camera
               </button>
-
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
             <UploadErrorMsg msg={uploadError} />
@@ -775,6 +773,11 @@ export default function Registration({ onBack }) {
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
 
+  // Date constants for boundary checks
+  const todayStr = new Date().toISOString().split("T")[0];
+  const currentYear = new Date().getFullYear();
+  const minDobStr = `${currentYear - 125}-01-01`;
+
   const [form, setForm] = useState({
     idNumber: "",
     firstName: "", middleName: "", lastName: "", suffix: "", religion: "", religionOther: "",
@@ -790,7 +793,7 @@ export default function Registration({ onBack }) {
   const total = STEPS.length;
   const progress = submitted ? 100 : (step / (total - 1)) * 100;
   const isPwd = form.categories.includes("PWD");
-  const showEmail = form.age === "" || Number(form.age) >= 15; 
+  const showEmail = form.age === "" || Number(form.age) >= 15;
 
   const applyOcr = useCallback((data) => {
     const mapping = {
@@ -813,7 +816,7 @@ export default function Registration({ onBack }) {
       const dob = new Date(data.birthDate); const today = new Date();
       let age = today.getFullYear() - dob.getFullYear();
       if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-      updates.age = age > 0 ? String(age) : "";
+      updates.age = age >= 0 ? String(age) : "";
     }
 
     setForm((prev) => ({ ...prev, ...updates }));
@@ -830,7 +833,7 @@ export default function Registration({ onBack }) {
       const dob = new Date(e.target.value); const today = new Date();
       let age = today.getFullYear() - dob.getFullYear();
       if (today.getMonth() - dob.getMonth() < 0 || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) age--;
-      setForm((f) => ({ ...f, birthDate: e.target.value, age: age > 0 ? String(age) : "" }));
+      setForm((f) => ({ ...f, birthDate: e.target.value, age: age >= 0 ? String(age) : "" }));
     }
   };
 
@@ -854,9 +857,56 @@ export default function Registration({ onBack }) {
       if (!form.contactNumber.trim()) missing.push("Contact Number");
       else if (form.contactNumber.length < 10) missing.push("Valid Contact Number");
       if (showEmail) {
-      if (!form.email.trim()) missing.push("Email Address");
-      else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
-     }
+        if (!form.email.trim()) missing.push("Email Address");
+        else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+      }
+
+      if (missing.length > 0) {
+        setErrorMsg(`Please fill in required fields: ${missing.join(", ")}`);
+        return false;
+      }
+
+      // ── VALIDATION FIXES: A9, A10, A11 ───────────────────────────────────────────
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // A9 & A10: Birth Date Validations
+      if (form.birthDate) {
+        const dob = new Date(form.birthDate + "T00:00:00");
+        if (isNaN(dob.getTime())) {
+          setErrorMsg("Please enter a valid birth date.");
+          return false;
+        }
+
+        // A9: Birth date cannot be in the future
+        if (dob > today) {
+          setErrorMsg("Birth date cannot be beyond today's date.");
+          return false;
+        }
+
+        // A10: Birth date cannot be an impossible past date (> 125 years ago)
+        const minYear = today.getFullYear() - 125;
+        if (dob.getFullYear() < minYear) {
+          setErrorMsg(`Birth date cannot be earlier than year ${minYear}.`);
+          return false;
+        }
+      }
+
+      // A11: Residing Since Year Validations
+      // Note: Household residency may precede an individual's birth year.
+      if (form.residingSinceYear) {
+        const resYear = Number(form.residingSinceYear);
+        const thisYear = today.getFullYear();
+
+        if (isNaN(resYear) || resYear > thisYear) {
+          setErrorMsg(`Residing since year cannot be in the future (max: ${thisYear}).`);
+          return false;
+        }
+        if (resYear < 1900) {
+          setErrorMsg("Residing since year cannot be earlier than 1900.");
+          return false;
+        }
+      }
     }
     if (step === 3) {
       if (!form.street.trim()) missing.push("Street");
@@ -1105,7 +1155,17 @@ export default function Registration({ onBack }) {
                       </Field>
                     )}
                     <div className="reg-form-grid cols-3">
-                      <Field label="Birth Date" required><InputField icon={RegisIconCalendar} type="date" value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
+                      <Field label="Birth Date" required>
+                        <InputField
+                          icon={RegisIconCalendar}
+                          type="date"
+                          max={todayStr}
+                          min={minDobStr}
+                          value={form.birthDate}
+                          onChange={set("birthDate")}
+                          autofilled={af("birthDate")}
+                        />
+                      </Field>
                       <Field label="Age"><InputField icon={RegisIconClock} type="number" placeholder="Auto-computed" value={form.age} readOnly /></Field>
                       <Field label="Birth Place" required><InputField icon={RegisIconPin} type="text" placeholder="Valenzuela City" value={form.birthPlace} onChange={set("birthPlace")} /></Field>
                     </div>
@@ -1149,7 +1209,17 @@ export default function Registration({ onBack }) {
                           <option>Others</option>
                         </SelectField>
                       </Field>
-                      <Field label="Residing Since (Year)" required><InputField icon={RegisIconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
+                      <Field label="Residing Since (Year)" required>
+                        <InputField
+                          icon={RegisIconCalendar}
+                          type="number"
+                          min="1900"
+                          max={currentYear}
+                          placeholder="e.g. 2010"
+                          value={form.residingSinceYear}
+                          onChange={set("residingSinceYear")}
+                        />
+                      </Field>
                     </div>
                     {form.citizenship === "Others" && (
                       <Field label="Please specify citizenship">
@@ -1472,7 +1542,7 @@ export default function Registration({ onBack }) {
           )}
         </div>
 
-        {/* FOOTER ACTIONS - Always visible across all steps */}
+        {/* FOOTER ACTIONS */}
         {!submitted && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%", maxWidth: "800px", margin: "1.5rem auto 0 auto" }}>
             {errorMsg && (
