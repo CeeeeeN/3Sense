@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
+// Generates the MAL-YYYY-XXXXX format for the Household container
 export const generateHouseholdID = async () => {
   const currentYear = String(new Date().getFullYear());
   const snapshot = await getDocs(collection(db, "households"));
@@ -16,7 +17,6 @@ export const generateHouseholdID = async () => {
 
   snapshot.forEach(doc => {
     const parts = doc.id.split('-');
-    // Support both MAL and legacy HH numbering parsing
     if (parts.length === 3 && parts[1] === currentYear) {
       const num = parseInt(parts[2], 10);
       if (!isNaN(num) && num > maxCount) {
@@ -28,6 +28,13 @@ export const generateHouseholdID = async () => {
   const count = maxCount + 1;
   const padded = String(count).padStart(5, "0");
   return `MAL-${currentYear}-${padded}`;
+};
+
+// Generates the permanent MAL-YYYY-XXXXXXXX format for the Resident
+export const generateResidentUID = () => {
+  const year = new Date().getFullYear();
+  const random8Digits = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+  return `MAL-${year}-${random8Digits}`;
 };
 
 export const approveRegistration = async (docID) => {
@@ -45,6 +52,8 @@ export const approveRegistration = async (docID) => {
   }
 
   const householdID = await generateHouseholdID();
+  const permanentUID = generateResidentUID(); // Generate the permanent anchor
+  
   const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
   const genderResolved = data.gender === "Others" 
     ? (data.genderOther || "Others") 
@@ -68,6 +77,7 @@ export const approveRegistration = async (docID) => {
     activatedAt: null,
 
     _pendingHeadData: {
+      UID: permanentUID, // Save the permanent UID here
       idNumber: data.idNumber || "",
       firstName: data.firstName || "",
       middleName: data.middleName || "",

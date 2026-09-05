@@ -19,7 +19,7 @@ import {
   orderBy,
   limit
 } from "firebase/firestore";
-import { approveRegistration } from "../services/admin";
+import { approveRegistration, generateResidentUID } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
@@ -493,6 +493,31 @@ export default function HouseholdManagement() {
     }
   };
 
+  // checks if user has UID, if not, generate one and save it to Firestore
+  const handleViewResident = async (res) => {
+    // Open the modal immediately so the admin doesn't experience lag
+    setSelectedResident(res);
+    setShowResidentModal(true);
+
+    // The Lazy Patch: If they don't have a UID, generate and save it in the background
+    if (!res.isPendingActivation && !res.UID) {
+      try {
+        const newUID = generateResidentUID();
+        const residentRef = doc(db, "households", res.householdId, "residents", res.id);
+        
+        await updateDoc(residentRef, { 
+          UID: newUID,
+          updatedAt: serverTimestamp() 
+        });
+        
+        // Update the modal UI immediately so the Admin sees the new ID
+        setSelectedResident(prev => ({ ...prev, UID: newUID }));
+      } catch (error) {
+        console.error("Silent UID patch failed:", error);
+      }
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="requests-container">
@@ -793,7 +818,7 @@ export default function HouseholdManagement() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View</button>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => handleViewResident(res)}>View</button>
                             {!res.isPendingActivation && (
                               <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
                             )}
@@ -890,6 +915,7 @@ export default function HouseholdManagement() {
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
               <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
+                  <strong>Barangay UID:</strong> <span style={{ color: "#0d7a55", fontWeight: "bold", letterSpacing: "0.5px" }}>{selectedResident.UID || "Generating..."}</span><br />
                   <strong>Household Number:</strong> <span>{selectedResident.householdId}</span><br />
                   <strong>Family Number:</strong> <span>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
                   <div style={{ marginTop: '8px' }}>
