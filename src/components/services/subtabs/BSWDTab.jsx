@@ -3,6 +3,12 @@ import { HeartIcon, ServiceMapPinIcon, SendIcon } from "../../Icons";
 import { submitBSWDReport, submitBSWDTip } from "../../../services/services";
 import { createNotification } from "../../../services/notifications";
 
+// ── SESSION HELPER ────────────────────────────────────────────────────────────
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 export default function BSWDTab({ userData, householdID }) {
   const [reportForm, setReportForm] = useState({
     name: "",
@@ -61,7 +67,9 @@ export default function BSWDTab({ userData, householdID }) {
         }
       }
 
-      const finalReportData = { ...reportForm, photo: finalPhotoUrl };
+      // <-- EXTRACT & INJECT PERMANENT UID HERE
+      const userUID = userData?.UID || getSaved("UID", null);
+      const finalReportData = { ...reportForm, photo: finalPhotoUrl, UID: userUID };
 
       await submitBSWDReport(householdID || "Public", userData?.userID || "", userData?.residentID || "", finalReportData);
 
@@ -94,7 +102,11 @@ export default function BSWDTab({ userData, householdID }) {
     setIsTipSubmitting(true);
 
     try {
-      await submitBSWDTip(householdID || "Public", userData?.userID || "", userData?.residentID || "", tipForm);
+      // <-- EXTRACT & INJECT PERMANENT UID HERE
+      const userUID = userData?.UID || getSaved("UID", null);
+      const finalTipData = { ...tipForm, UID: userUID };
+
+      await submitBSWDTip(householdID || "Public", userData?.userID || "", userData?.residentID || "", finalTipData);
 
       const tipperLabel = tipForm.contact?.trim() || "Anonymous";
       await createNotification(

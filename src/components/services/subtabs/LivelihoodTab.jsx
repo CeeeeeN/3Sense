@@ -6,6 +6,12 @@ import {
   addDoc, serverTimestamp, orderBy, limit
 } from "firebase/firestore";
 
+// ── SESSION HELPER ─────────────────────────────────────────────────
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 // ── Helpers ────────────────────────────────────────────────────────
 const generateRegNum = () => {
   const year = new Date().getFullYear();
@@ -126,7 +132,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     
     const unsubs = programs.map((prog) => {
       // BOUNDED QUERY: Only fetch registrations for THIS specific program, capped at 300.
-      // This stops the app from downloading the entire barangay's registration history!
       const q = query(
         collection(db, "livelihoodRegistrations"),
         where("programId", "==", prog.id),
@@ -144,26 +149,39 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     return () => unsubs.forEach((u) => u());
   }, [programs]);
 
-  // ── Real-time: MY registrations ──────────────────────────────────
+  // ── Real-time: MY registrations (Decoupled Query) ──────────────────
   useEffect(() => {
-    const filterValue = householdID;
-    if (!filterValue) return;
+    const activeUserId = userData?.userID || userData?.residentID || "";
+    const hid = householdID || "";
+    const userUID = userData?.UID || getSaved("UID", null);
+
+    if (!activeUserId && !hid && !userUID) return;
 
     setLoadingMyRegs(true);
+
+    const [queryField, queryValue] = userUID 
+      ? ["UID", userUID] 
+      : activeUserId 
+        ? ["userID", activeUserId] 
+        : ["householdID", hid];
+
     const q = query(
       collection(db, "livelihoodRegistrations"),
-      where("householdID", "==", filterValue),
-      orderBy("submittedAt", "desc"),
+      where(queryField, "==", queryValue)
     );
+    
     const unsub = onSnapshot(q, (snap) => {
-      setMyRegs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort client-side to avoid composite index requirements
+      docs.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
+      setMyRegs(docs);
       setLoadingMyRegs(false);
     }, (err) => {
       console.error("My regs listener:", err);
       setLoadingMyRegs(false);
     });
     return () => unsub();
-  }, [householdID]);
+  }, [userData, householdID]);
 
   // ── Slot helpers ─────────────────────────────────────────────────
   const getApprovedCount = (programId) => programApprovedCounts[programId] || 0;
@@ -207,8 +225,13 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       try {
         const reg = generateRegNum();
         const timeLabel = [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ");
+        
+        // <-- EXTRACT PERMANENT UID HERE
+        const userUID = userData?.UID || getSaved("UID", null);
+
         await addDoc(collection(db, "livelihoodRegistrations"), {
           regNum: reg,
+          UID: userUID, // <-- INJECTED UID
           firstName: form.firstName,
           middleName: form.middleName || "",
           lastName: form.lastName,

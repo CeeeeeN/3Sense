@@ -245,7 +245,6 @@ export default function ServiceBswd({ onBack }) {
         </div>
       </div>
 
-      {/* Tab bar consistent with AdminRequests */}
       <div className="req-tabs" style={{ marginBottom: "20px" }}>
         <button
           className={`req-tab ${activeTab === "reports" ? "active" : ""}`}
@@ -261,7 +260,6 @@ export default function ServiceBswd({ onBack }) {
         </button>
       </div>
 
-      {/* Stat row */}
       {activeTab === "reports" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
@@ -489,97 +487,112 @@ export default function ServiceBswd({ onBack }) {
       )}
 
       {/* ── DETAIL MODAL POPUP ── */}
-      {selectedItem && (
-        <div 
-          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(17, 24, 39, 0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} 
-          onClick={() => setSelectedItem(null)}
-        >
+      {selectedItem && (() => {
+        // Calculate anonymity dynamically based on the modal's selected item
+        const reporterName = selectedItem.reporterName || selectedItem.contact || "Anonymous";
+        const isAnonymous = reporterName.trim().toLowerCase() === "anonymous";
+
+        return (
           <div 
-            style={{ background: "#fff", padding: "0", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }} 
-            onClick={e => e.stopPropagation()}
+            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(17, 24, 39, 0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} 
+            onClick={() => setSelectedItem(null)}
           >
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
-              <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>
-                {selectedItem.type === "tip" ? "Community Tip Details" : "Displacement Report Details"}
-              </h2>
-              <button 
-                onClick={() => setSelectedItem(null)}
-                style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
-              >&times;</button>
-            </div>
-
-            <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
-                <div>
-                  <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Reported By</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: 500, color: "#111827", marginTop: "4px" }}>
-                    {selectedItem.reporterName || selectedItem.contact || "Anonymous"}
-                  </div>
-                  <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>Date: {formatTs(selectedItem.submittedAt)}</div>
-                </div>
-                <StatusBadge status={selectedItem.status} />
+            <div 
+              style={{ background: "#fff", padding: "0", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }} 
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
+                <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>
+                  {selectedItem.type === "tip" ? "Community Tip Details" : "Displacement Report Details"}
+                </h2>
+                <button 
+                  onClick={() => setSelectedItem(null)}
+                  style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
+                >&times;</button>
               </div>
 
-              <div style={{ marginBottom: "20px", background: "#f3f4f6", padding: "16px", borderRadius: "8px" }}>
-                <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "8px" }}>
-                  {selectedItem.type === "tip" ? "Subject / About" : "Location"}
-                </div>
-                <div style={{ color: "#111827", fontWeight: 500, fontSize: "1.05rem" }}>
-                  {selectedItem.location || selectedItem.about || "Not specified"}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: "24px" }}>
-                <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "8px" }}>
-                  Description / Information
-                </div>
-                <p style={{ margin: 0, color: "#374151", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                  {selectedItem.description || selectedItem.tip || "No description provided."}
-                </p>
-              </div>
-
-              {selectedItem.photoFileName && selectedItem.photoFileName.startsWith('http') && (
-                <div>
-                  <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "12px" }}>
-                    Attached Evidence
+              <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
+                  <div>
+                    <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Reported By</div>
+                    
+                    <div style={{ fontSize: "1.1rem", fontWeight: 500, color: "#111827", marginTop: "4px" }}>
+                      {reporterName}
+                    </div>
+                    
+                    {/* Conditionally display the UID if the reporter is NOT anonymous */}
+                    {!isAnonymous && selectedItem.UID && (
+                      <div style={{ fontSize: "0.85rem", color: "#317D89", marginTop: "2px", fontWeight: 600 }}>
+                        UID: {selectedItem.UID}
+                      </div>
+                    )}
+                    
+                    <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>Date: {formatTs(selectedItem.submittedAt)}</div>
                   </div>
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#f9fafb", padding: "4px" }}>
-                    <img 
-                      src={selectedItem.photoFileName} 
-                      alt="Report Evidence" 
-                      style={{ width: "100%", height: "auto", display: "block", borderRadius: "4px" }} 
-                    />
+                  <StatusBadge status={selectedItem.status} />
+                </div>
+
+                <div style={{ marginBottom: "20px", background: "#f3f4f6", padding: "16px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "8px" }}>
+                    {selectedItem.type === "tip" ? "Subject / About" : "Location"}
+                  </div>
+                  <div style={{ color: "#111827", fontWeight: 500, fontSize: "1.05rem" }}>
+                    {selectedItem.location || selectedItem.about || "Not specified"}
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>Update Status:</span>
-                <select
-                  value={selectedItem.status || "pending"}
-                  onChange={(e) => updateStatus(selectedItem.id, e.target.value)}
-                  disabled={saving}
-                  style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem", cursor: "pointer", background: "#fff", fontWeight: 500 }}
+                <div style={{ marginBottom: "24px" }}>
+                  <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "8px" }}>
+                    Description / Information
+                  </div>
+                  <p style={{ margin: 0, color: "#374151", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                    {selectedItem.description || selectedItem.tip || "No description provided."}
+                  </p>
+                </div>
+
+                {selectedItem.photoFileName && selectedItem.photoFileName.startsWith('http') && (
+                  <div>
+                    <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "12px" }}>
+                      Attached Evidence
+                    </div>
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#f9fafb", padding: "4px" }}>
+                      <img 
+                        src={selectedItem.photoFileName} 
+                        alt="Report Evidence" 
+                        style={{ width: "100%", height: "auto", display: "block", borderRadius: "4px" }} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>Update Status:</span>
+                  <select
+                    value={selectedItem.status || "pending"}
+                    onChange={(e) => updateStatus(selectedItem.id, e.target.value)}
+                    disabled={saving}
+                    style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem", cursor: "pointer", background: "#fff", fontWeight: 500 }}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="received">Received</option>
+                    <option value="responded">Responded</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+                <button 
+                  onClick={() => setSelectedItem(null)}
+                  style={{ padding: "8px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 500, cursor: "pointer" }}
                 >
-                  <option value="pending">Pending</option>
-                  <option value="received">Received</option>
-                  <option value="responded">Responded</option>
-                  <option value="resolved">Resolved</option>
-                </select>
+                  Close
+                </button>
               </div>
-              <button 
-                onClick={() => setSelectedItem(null)}
-                style={{ padding: "8px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 500, cursor: "pointer" }}
-              >
-                Close
-              </button>
-            </div>
 
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   ); 

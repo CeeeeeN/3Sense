@@ -8,6 +8,12 @@ import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, Servi
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+// ── SESSION HELPER ──
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 const to12h = (t) => {
   if (!t) return t;
   const [h, m] = t.split(":");
@@ -421,13 +427,17 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
 
+      // <-- INJECT UID HERE
+      const userUID = userData?.UID || getSaved("UID", null);
+      const submissionForm = { ...form, UID: userUID };
+
       // 1. Submit the Primary Facility Reservation
       const generatedRef = await submitFacilityReservation(
         householdID,
         userData?.residentID || userID || "",
         userName || "Unknown",
         facility,
-        form,
+        submissionForm, // Passed the updated payload containing the UID
         customData
       );
 
@@ -437,15 +447,16 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           householdID,
           userData?.residentID || userID || "",
           form.fullName || userName || "Unknown",
-          eq, // Pass the entire equipment object containing id and name
+          eq, 
           {
             purpose: `Facility Bundle (${facilityName}): ${form.purpose}`,
             quantity: eq.requestedQuantity,
-            pickUpDate: form.date, // Match the facility date
+            pickUpDate: form.date, 
             returnDate: form.date,
             notes: `Bundled with facility reservation ${generatedRef}. ${form.notes}`,
             email: form.email,
-            contactNumber: form.contactNumber
+            contactNumber: form.contactNumber,
+            UID: userUID // Inject UID into the equipment payload too
           },
           {}
         );

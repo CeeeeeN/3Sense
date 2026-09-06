@@ -9,6 +9,14 @@ import {
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "../firebase/firebase";
 
+// Fallback UID generator for legacy accounts missing a UID
+const generateResidentUID = () => {
+    const year = new Date().getFullYear();
+    const timeSlice = Date.now().toString().slice(-4);
+    const random4 = Math.floor(1000 + Math.random() * 9000).toString();
+    return `MAL-${year}-${timeSlice}${random4}`;
+};
+
 export const activateAccount = async (householdID, password, confirmPassword) => {
     if (password !== confirmPassword) {
         throw new Error("Passwords do not match.");
@@ -46,7 +54,11 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         ? (head.genderOther || "Others")
         : (head.gender || head.genderOrientation || "");
 
+    // Retrieve the admin-assigned UID, or generate a fresh one if it's missing
+    const finalUID = head.UID || generateResidentUID();
+
     await setDoc(headRef, {
+        UID:         finalUID,
         residentID:  "head",
         householdID: cleanID,
         role:        "Household Head",

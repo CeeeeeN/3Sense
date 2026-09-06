@@ -91,6 +91,7 @@ export const getMemberProfile = async (householdID, residentID) => {
         });
 
     return {
+        UID:         d.UID || "", // <-- RETRIEVE PERMANENT UID
         residentID:  residentID,
         householdID: householdID,
         householdNumber: householdID,
@@ -202,6 +203,11 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
 
         updatedAt: serverTimestamp(),
     };
+
+    // <-- SAFELY PRESERVE OR UPDATE THE UID
+    if (updatedData.UID !== undefined) {
+        payload.UID = updatedData.UID;
+    }
 
     if (updatedData.profilePhoto !== undefined) {
         payload.profilePhoto = updatedData.profilePhoto;

@@ -1,7 +1,7 @@
 import { db } from "../firebase/firebase";
 import {
   collection, addDoc, getDocs,
-  query, where, orderBy, serverTimestamp, limit
+  query, where, orderBy, serverTimestamp, limit, or
 } from "firebase/firestore";
 
 // ══════════════════════════════
@@ -19,9 +19,10 @@ export async function submitDocumentRequest(householdID, residentID, userName, d
   const requestID = `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "document_requests"), {
     requestID,
+    UID:             form.UID || "",                             // <-- INJECTED UID
     householdID,
-    residentID,                                   // Firestore doc ID of the resident
-    documentID:      docType.id,                   // renamed from documentId
+    residentID,                                                  // Firestore doc ID of the resident
+    documentID:      docType.id,                                 // renamed from documentId
     documentType:    docType.documentName || docType.name || docType.title, // display name
     fee:             docType.fee || "Free",
     processingDays:  docType.days || docType.processingTime || "",
@@ -70,9 +71,10 @@ export async function submitFacilityReservation(householdID, residentID, userNam
   const reservationID = `FAC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "facility_reservations"), {
     reservationID,
+    UID:           form.UID || "",                                 // <-- INJECTED UID
     householdID,
-    residentID,                                    // Firestore doc ID of the resident
-    facilityID:    facility?.id || "",             // renamed from facilityId
+    residentID,                                                    // Firestore doc ID of the resident
+    facilityID:    facility?.id || "",                             // renamed from facilityId
     facilityName:  facility?.facilityName || facility?.name || facility?.title || "Barangay Multi-Purpose Hall",
     fullName:      form.fullName || userName,
     email:         form.email || "",
@@ -105,15 +107,16 @@ export async function submitEquipmentRental(householdID, residentID, userName, e
   const rentalID = `EQU-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "equipment_rentals"), {
     rentalID,
+    UID:           form.UID || "",                                 // <-- INJECTED UID
     householdID,
-    residentID,                                    // Firestore doc ID of the resident
+    residentID,                                                    // Firestore doc ID of the resident
     equipmentID:   equipment?.id || "",            
     equipmentName: equipment?.equipmentName || equipment?.name || "Equipment",
     fullName:      form.fullName || userName,
     email:         form.email || "",
     contactNumber: form.contactNumber || "",
     purpose:       form.purpose,
-    quantity:      Number(form.quantity),          // Ensures quantity is saved as a number
+    quantity:      Number(form.quantity),                          // Ensures quantity is saved as a number
     pickUpDate:    form.pickUpDate,
     returnDate:    form.returnDate,
     notes:         form.notes || "",
@@ -138,6 +141,7 @@ export async function submitIncidentReport(householdID, userID, residentID, form
   const refNum = `PO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "incidentReports"), {
     refNum,
+    UID:            form.UID || "",                                // <-- INJECTED UID
     householdID,
     userID,       // Firebase Auth UID
     residentID,   // Firestore doc ID
@@ -177,6 +181,7 @@ export async function submitBSWDReport(householdID, userID, residentID, form) {
   const refNum = `BSWD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "bswdReports"), {
     householdID,
+    UID:            form.UID || "",                                // <-- INJECTED UID
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
     refNum,
@@ -194,6 +199,7 @@ export async function submitBSWDTip(householdID, userID, residentID, form) {
   const refNum = `BSWD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "bswdReports"), {
     householdID,
+    UID:         form.UID || "",                                   // <-- INJECTED UID
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
     refNum,
@@ -213,6 +219,7 @@ export async function submitLivelihoodRegistration(householdID, userID, resident
   const regNum = `LH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   await addDoc(collection(db, "livelihoodRegistrations"), {
     regNum,
+    UID:             form.UID || "",                               // <-- INJECTED UID
     householdID,
     userID,      // Firebase Auth UID
     residentID,  // Firestore doc ID
@@ -245,37 +252,87 @@ export async function getLivelihoodRegistrations(householdID) {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
+
+// ══════════════════════════════
+// 🏠 HOUSEHOLD TRANSFERS
+// ══════════════════════════════
+/**
+ * @param {string} currentHouseholdID
+ * @param {string} residentID
+ * @param {string} userUID
+ * @param {string} userName
+ * @param {object} form
+ */
+export async function submitHouseholdTransfer(currentHouseholdID, residentID, userUID, userName, form) {
+  const transferID = `TRF-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+  
+  await addDoc(collection(db, "household_transfers"), {
+    transferID,
+    UID:                userUID || "", 
+    residentID,
+    requesterName:      userName || "Unknown",
+    currentHouseholdID,
+    transferType:       form.transferType, // "existing" or "new"
+    
+    // Target data (only populated if joining existing)
+    targetHouseholdID:  form.transferType === "existing" ? form.targetHouseholdID : "",
+    
+    // New household data (only populated if creating new)
+    newHouseNumber:     form.transferType === "new" ? form.newHouseNumber : "",
+    newStreet:          form.transferType === "new" ? form.newStreet : "",
+    
+    reason:             form.reason,
+    proofFileName:      form.proofFileName || "",
+    proofURL:           form.proofURL || "",
+    status:             "Pending",
+    submittedAt:        serverTimestamp(),
+  });
+  
+  return transferID;
+}
+
+
 // ══════════════════════════════
 // 📋 USER TRANSACTION HISTORY
 // ══════════════════════════════
-export async function fetchUserTransactions(householdID, residentID, userID, role = "Member") {
-  if (!householdID) return [];
+// DECOUPLED FROM HOUSEHOLD ID: Uses the permanent UID or Resident ID
+export async function fetchUserTransactions(householdID, residentID, userID, role = "Member", userUID = null) {
+  if (!residentID && !userUID) return []; // Need at least one valid identity anchor
 
-  const isMyRecord = (item) => {
-    const rId = item.residentID || "";
-    const uId = item.userID || "";
-    if (rId === residentID || uId === residentID || rId === userID || uId === userID) return true;
-    return false;
-  };
+  // Build the unified Hybrid Query
+  const conditions = [];
+  if (userUID) conditions.push(where("UID", "==", userUID));
+  if (residentID) conditions.push(where("residentID", "==", residentID));
+  if (userID) conditions.push(where("userID", "==", userID));
+  
+  const identityQuery = or(...conditions);
 
   const fetchWithFallback = async (collectionName, dateField, mapper, limitCount = 50) => {
     try {
       const q = query(
         collection(db, collectionName), 
-        where("householdID", "==", householdID),
+        identityQuery,
         orderBy(dateField, "desc"),
         limit(limitCount)
       );
       const snap = await getDocs(q);
-      return snap.docs.map(mapper).filter(isMyRecord);
+      return snap.docs.map(mapper);
     } catch (err) {
       console.warn(`[${collectionName}] Index missing. Falling back to unindexed query.`, err);
+      // Firebase triggers this fallback if the `or()` composite index hasn't been built yet
       const fallbackQ = query(
         collection(db, collectionName), 
-        where("householdID", "==", householdID)
+        identityQuery
       );
       const fallbackSnap = await getDocs(fallbackQ);
-      return fallbackSnap.docs.map(mapper).filter(isMyRecord);
+      const docs = fallbackSnap.docs.map(mapper);
+      // Sort manually since orderBy was dropped in the fallback
+      docs.sort((a, b) => {
+        const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return tb - ta;
+      });
+      return docs.slice(0, limitCount);
     }
   };
 
