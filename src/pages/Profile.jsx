@@ -5,6 +5,8 @@ import { fetchUserTransactions } from "../services/services";
 import QRCode from "qrcode";
 
 import TransferHouseholdModal from "../components/TransferHouseholdModal";
+import TransferHeadModal from "../components/TransferHeadModal";
+import TransferBranchHeadModal from "../components/TransferBranchHeadModal";
 
 const QR_PAT = [
   true, true, true, false, true,
@@ -217,6 +219,9 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const fullName = [data.firstName, data.middleName, data.lastName, data.suffix].filter(Boolean).join(" ");
   const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
 
+  const isHead = userRole === "Household Head" || userRole === "head";
+  const isBranchHead = userRole === "Branch Head";
+
   // Load member profile from Firestore on mount
   useEffect(() => {
     let isMounted = true;
@@ -236,7 +241,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           const newUID = generateResidentUID();
           loadedProfile.UID = newUID;
           try {
-            await updateMemberProfile(householdID, memberID, { UID: newUID });
+            await updateMemberProfile(householdID, memberID, { ...loadedProfile, UID: newUID });
+            
             // Sync with local storage
             const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
             session.UID = newUID;
@@ -253,6 +259,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       })
       .catch(err => {
         console.error("[Profile] Error:", err);
+
+        // Auto-logout if profile was transferred to a new household
+        if (err.message.includes("not found")) {
+          alert("Your profile has been transferred. Please log in again using your new Household ID.");
+          localStorage.removeItem("brgy_session"); // Wipe the dead session
+          if (onNavigate) onNavigate("logout");    // Kick back to login screen
+        }
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -980,6 +993,22 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           {/* ── SETTINGS AND PREFERENCES MENU (MOBILE APP MATCH) ── */}
           <div style={{ marginBottom: "2rem" }}>
             <Card icon={IconSettings} title="Preferences">
+              {isHead && (
+                <SettingRow 
+                  icon={ProfileIconUser} 
+                  title="Transfer Head Role" 
+                  description="Assign the Household Head role to another member" 
+                  onClick={() => setActiveModal('transferHead')} 
+                />
+              )}
+              {isBranchHead && (
+                <SettingRow 
+                  icon={ProfileIconUser} 
+                  title="Transfer Branch Head Role" 
+                  description="Assign the Branch Head role to another member" 
+                  onClick={() => setActiveModal('transferBranchHead')} 
+                />
+              )}
               <SettingRow 
                 icon={IconBell} 
                 title="Push Notifications" 
@@ -1044,7 +1073,40 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       )}
 
       {/* ── SETTINGS ACTION MODALS ── */}
-      {activeModal === 'transfer' && <TransferHouseholdModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'transfer' && (
+        <TransferHouseholdModal 
+          onClose={() => setActiveModal(null)} 
+          currentHouseholdID={householdID} 
+          userData={data}
+          memberID={memberID} 
+        />
+      )}
+
+      {activeModal === 'transferHead' && (
+        <TransferHeadModal 
+          onClose={() => setActiveModal(null)} 
+          householdID={householdID} 
+          currentHeadID={memberID} 
+          onLogout={() => {
+            localStorage.removeItem("brgy_session");
+            if (onNavigate) onNavigate("logout");
+          }}
+        />
+      )}
+
+      {activeModal === 'transferBranchHead' && (
+        <TransferBranchHeadModal 
+          onClose={() => setActiveModal(null)} 
+          householdID={householdID}
+          currentBranchID={data.branchID} // Pass their current branch so it filters correctly
+          currentHeadID={memberID} 
+          onLogout={() => {
+            localStorage.removeItem("brgy_session");
+            if (onNavigate) onNavigate("logout");
+          }}
+        />
+      )}
+
       {activeModal === 'help' && <HelpFaqModal onClose={() => setActiveModal(null)} />}
       {activeModal === 'contact' && <ContactModal onClose={() => setActiveModal(null)} />}
       {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}

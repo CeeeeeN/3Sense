@@ -25,10 +25,20 @@ import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 import { getFamilyNumber } from "../utils/householdNumbers";
 
+
+import TransferRequestsTab from "../components/TransferRequestsTab"; 
+import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab"; 
+
 export default function HouseholdManagement() {
   const [residents, setResidents] = useState([]);
   const [hhRequests, setHhRequests] = useState([]);
+  
+  // ── NEW TRANSFER STATES ──
+  const [transfers, setTransfers] = useState([]);
+  const [newHouseholds, setNewHouseholds] = useState([]);
 
+  // ── TABS ──
+  // Options: "requests", "residents", "transfers", "new_households"
   const [activeTab, setActiveTab] = useState("requests");
 
   const [search, setSearch] = useState("");
@@ -101,6 +111,7 @@ export default function HouseholdManagement() {
     fetchAdmin();
   }, []);
 
+  // ── 1. REGISTRATION REQUESTS LISTENER ──
   useEffect(() => {
     const pendingQuery = query(
       collection(db, "pending_registrations"),
@@ -129,6 +140,7 @@ export default function HouseholdManagement() {
     return () => unsub();
   }, [adminRole]);
 
+  // ── 2. ACTIVE RESIDENTS LISTENER ──
   useEffect(() => {
     let latestActive = [];
     let latestPending = [];
@@ -217,6 +229,40 @@ export default function HouseholdManagement() {
       unsubHouseholds();
     };
   }, [adminRole]);
+
+  // ── 3. HOUSEHOLD TRANSFERS LISTENER ──
+  useEffect(() => {
+    const q = query(
+      collection(db, "household_transfers"),
+      orderBy("submittedAt", "desc"),
+      limit(200)
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const existingList = [];
+      const newList = [];
+
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const item = {
+          id: docSnap.id,
+          dateSubmitted: data.submittedAt ? data.submittedAt.toDate().toLocaleDateString() : "N/A",
+          ...data
+        };
+
+        if (data.transferType === "existing") {
+          existingList.push(item);
+        } else if (data.transferType === "new") {
+          newList.push(item);
+        }
+      });
+
+      setTransfers(existingList);
+      setNewHouseholds(newList);
+    });
+
+    return () => unsub();
+  }, []);
 
   const filteredHhRequests = useMemo(() => {
     return hhRequests
@@ -493,13 +539,10 @@ export default function HouseholdManagement() {
     }
   };
 
-  // checks if user has UID, if not, generate one and save it to Firestore
   const handleViewResident = async (res) => {
-    // Open the modal immediately so the admin doesn't experience lag
     setSelectedResident(res);
     setShowResidentModal(true);
 
-    // The Lazy Patch: If they don't have a UID, generate and save it in the background
     if (!res.isPendingActivation && !res.UID) {
       try {
         const newUID = generateResidentUID();
@@ -510,7 +553,6 @@ export default function HouseholdManagement() {
           updatedAt: serverTimestamp() 
         });
         
-        // Update the modal UI immediately so the Admin sees the new ID
         setSelectedResident(prev => ({ ...prev, UID: newUID }));
       } catch (error) {
         console.error("Silent UID patch failed:", error);
@@ -523,7 +565,7 @@ export default function HouseholdManagement() {
       <div className="requests-container">
         <div className="requests-header">
           <h1 className="requests-title">Household Management</h1>
-          <p className="requests-subtitle">Manage household registration requests and resident records.</p>
+          <p className="requests-subtitle">Manage household registrations, residents, and transfer requests.</p>
         </div>
 
         <div className="req-tabs">
@@ -539,8 +581,21 @@ export default function HouseholdManagement() {
           >
             Resident Accounts
           </button>
+          <button
+            className={`req-tab ${activeTab === "transfers" ? "active" : ""}`}
+            onClick={() => setActiveTab("transfers")}
+          >
+            Household Transfers
+          </button>
+          <button
+            className={`req-tab ${activeTab === "new_households" ? "active" : ""}`}
+            onClick={() => setActiveTab("new_households")}
+          >
+            New Household Requests
+          </button>
         </div>
 
+        {/* ── TAB: REGISTRATION REQUESTS ── */}
         {activeTab === "requests" && (
           <>
             <div className="requests-controls">
@@ -708,6 +763,7 @@ export default function HouseholdManagement() {
           </>
         )}
 
+        {/* ── TAB: RESIDENT ACCOUNTS ── */}
         {activeTab === "residents" && (
           <>
             <div className="requests-controls">
@@ -894,8 +950,15 @@ export default function HouseholdManagement() {
             )}
           </>
         )}
+
+        {/* ── TAB: HOUSEHOLD TRANSFERS ── */}
+        {activeTab === "transfers" && <TransferRequestsTab transfers={transfers} />}
+
+        {/* ── TAB: NEW HOUSEHOLD REQUESTS ── */}
+        {activeTab === "new_households" && <NewHouseholdRequestsTab newHouseholds={newHouseholds} />}
       </div>
 
+      {/* ── MODALS (EXISTING) ── */}
       {showResidentModal && selectedResident && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "600px" }}>

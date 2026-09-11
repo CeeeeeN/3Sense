@@ -3,8 +3,10 @@ import {
     getDoc,
     updateDoc,
     setDoc,
+    deleteDoc,
     deleteField,
     serverTimestamp,
+    writeBatch
 } from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "../firebase/firebase";
@@ -50,11 +52,82 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
 
     const head = data._pendingHeadData || {};
     const headRef = doc(db, "households", cleanID, "residents", "head");
+    
+    // ─── NEW: BRANCH-OFF MIGRATION LOGIC ───
+    if (data.branchingData && data.branchingData.oldHouseholdID && data.branchingData.residentID) {
+        // Fetch the resident's actual, mature profile from their old household
+        const oldResidentRef = doc(db, "households", data.branchingData.oldHouseholdID, "residents", data.branchingData.residentID);
+        const oldResidentSnap = await getDoc(oldResidentRef);
+        
+        if (oldResidentSnap.exists()) {
+            const oldData = oldResidentSnap.data();
+            const batch = writeBatch(db);
+
+            // Copy their old profile exactly, but promote them and update their location
+            batch.set(headRef, {
+                ...oldData,
+                householdID: cleanID,
+                residentID: "head",
+                role: "Household Head",
+                branchID: "BR-001",
+                userID: userCredential.user.uid,
+                // Update their address to match the newly registered household
+                houseNumber: data.houseNumber || "",
+                street: data.street || "",
+                barangay: data.barangay || "Malanday",
+                city: data.city || "Valenzuela City",
+                province: data.province || "",
+                region: data.region || "NCR",
+                updatedAt: serverTimestamp()
+            });
+
+            // Delete their old ghost profile
+            batch.delete(oldResidentRef);
+            
+            // Clean up the household container
+            batch.update(householdRef, {
+                activated: true,
+                activatedAt: serverTimestamp(),
+                userID: userCredential.user.uid,
+                _pendingHeadData: deleteField(),
+                branchingData: deleteField() // Clean up the breadcrumb
+            });
+
+            // Set up their branch
+            const branchRef = doc(db, "households", cleanID, "branches", "BR-001");
+            batch.set(branchRef, {
+                branchName: `${oldData.lastName || head.lastName || ""} Family`.trim(),
+                familyNumber: `${cleanID}-1`,
+                residentID: "head",
+                createdAt: serverTimestamp(),
+            });
+
+            await batch.commit();
+
+            return {
+                householdID: cleanID,
+                name: [oldData.firstName, oldData.lastName].filter(Boolean).join(" "),
+                email: data.email,
+                address: {
+                    houseNumber: data.houseNumber || "",
+                    street: data.street || "",
+                    barangay: data.barangay || "Malanday",
+                    city: data.city || "Valenzuela City",
+                    province: data.province || "",
+                    region: data.region || "NCR",
+                },
+            };
+        }
+        // If the old resident profile went missing, the code naturally falls through 
+        // to standard registration logic below to ensure they aren't locked out.
+    }
+    // ───────────────────────────────────────
+
+    // STANDARD REGISTRATION LOGIC
     const genderResolved = head.gender === "Others"
         ? (head.genderOther || "Others")
         : (head.gender || head.genderOrientation || "");
 
-    // Retrieve the admin-assigned UID, or generate a fresh one if it's missing
     const finalUID = head.UID || generateResidentUID();
 
     await setDoc(headRef, {

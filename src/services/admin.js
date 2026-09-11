@@ -75,9 +75,12 @@ export const approveRegistration = async (docID) => {
     createdAt: serverTimestamp(),
     activated: false,
     activatedAt: null,
+    
+    // <-- NEW: Preserve the branching instructions for activation.js
+    branchingData: data.branchingPayload || null,
 
     _pendingHeadData: {
-      UID: permanentUID, // Save the permanent UID here
+      UID: permanentUID, // Save the permanent UID here (ignored during branching)
       idNumber: data.idNumber || "",
       firstName: data.firstName || "",
       middleName: data.middleName || "",

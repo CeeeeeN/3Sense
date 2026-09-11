@@ -1,7 +1,8 @@
 import { db } from "../firebase/firebase";
 import {
   collection, addDoc, getDocs,
-  query, where, orderBy, serverTimestamp, limit, or
+  query, where, orderBy, serverTimestamp, limit, or,
+  getDoc, doc, writeBatch, updateDoc
 } from "firebase/firestore";
 
 // ══════════════════════════════
@@ -256,40 +257,324 @@ export async function getLivelihoodRegistrations(householdID) {
 // ══════════════════════════════
 // 🏠 HOUSEHOLD TRANSFERS
 // ══════════════════════════════
-/**
- * @param {string} currentHouseholdID
- * @param {string} residentID
- * @param {string} userUID
- * @param {string} userName
- * @param {object} form
- */
 export async function submitHouseholdTransfer(currentHouseholdID, residentID, userUID, userName, form) {
   const transferID = `TRF-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
   
+  const isExisting = form.transferType === "existing";
+
   await addDoc(collection(db, "household_transfers"), {
     transferID,
     UID:                userUID || "", 
     residentID,
     requesterName:      userName || "Unknown",
     currentHouseholdID,
-    transferType:       form.transferType, // "existing" or "new"
-    
-    // Target data (only populated if joining existing)
-    targetHouseholdID:  form.transferType === "existing" ? form.targetHouseholdID : "",
-    
-    // New household data (only populated if creating new)
+    transferType:       form.transferType, 
+    targetHouseholdID:  isExisting ? form.targetHouseholdID : "",
+    targetBranchID:     isExisting ? (form.targetBranchID || "BR-001") : "",
     newHouseNumber:     form.transferType === "new" ? form.newHouseNumber : "",
     newStreet:          form.transferType === "new" ? form.newStreet : "",
-    
     reason:             form.reason,
     proofFileName:      form.proofFileName || "",
     proofURL:           form.proofURL || "",
     status:             "Pending",
+    headApproval:       isExisting ? "Pending" : "N/A", // N/A if creating new household
     submittedAt:        serverTimestamp(),
   });
+
+  // Target the Receiving Head and trigger a notification
+  if (isExisting) {
+    try {
+      const headResidentID = await getHouseholdHeadID(form.targetHouseholdID);
+      if (headResidentID) {
+        // Use your existing user notification pipeline
+        await createUserNotification(
+          form.targetHouseholdID, 
+          headResidentID, 
+          "Transfer Request", 
+          `${userName} requested to join your household (${form.targetBranchID || "BR-001"}).`, 
+          "transfer_approval", 
+          transferID
+        );
+      }
+    } catch (err) {
+      console.warn("Could not dispatch transfer notification to target head:", err);
+    }
+  }
   
   return transferID;
 }
+
+/**
+ * Admin action to approve or reject a household transfer request.
+ * Securely migrates the resident's profile and safeguards against accidental deletion.
+ */
+import { generateHouseholdID } from "../services/admin";
+export async function processHouseholdTransfer(transferDocID, newStatus, requestData) {
+  const transferRef = doc(db, "household_transfers", transferDocID);
+
+  if (newStatus === "Approved") {
+    // 1. Fetch the resident's current data
+    const oldResidentRef = doc(db, "households", requestData.currentHouseholdID, "residents", requestData.residentID);
+    const residentSnap = await getDoc(oldResidentRef);
+
+    if (!residentSnap.exists()) {
+      throw new Error("Resident data not found. They may have already been moved or deleted.");
+    }
+
+    const residentData = residentSnap.data();
+    const batch = writeBatch(db);
+
+    let finalTargetHouseholdID = requestData.targetHouseholdID;
+    let newRole = "Member";
+    let newBranch = requestData.targetBranchID || "BR-001";
+
+    // ── CREATE NEW HOUSEHOLD LOGIC ──
+    if (requestData.transferType === "new") {
+      // Generate a brand new Household ID
+      finalTargetHouseholdID = await generateHouseholdID();
+      const newHhRef = doc(db, "households", finalTargetHouseholdID);
+      
+      // Initialize the new household container
+      batch.set(newHhRef, {
+        houseNumber: requestData.newHouseNumber || "",
+        street: requestData.newStreet || "",
+        barangay: "Malanday",
+        activated: true,
+        createdAt: serverTimestamp()
+      });
+      
+      newRole = "Household Head"; // They are the founder of this new household
+      newBranch = "BR-001";
+    }
+
+    // ── DATA MIGRATION LOGIC ──
+    const newResidentRef = doc(db, "households", finalTargetHouseholdID, "residents", requestData.residentID);
+
+    if (oldResidentRef.path === newResidentRef.path) {
+      // SAFEGUARD: If moving to a branch inside the SAME household, ONLY update fields.
+      // NEVER run batch.delete() here or the user gets wiped!
+      batch.update(newResidentRef, {
+        branchID: newBranch,
+        role: newRole,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // CROSS-HOUSEHOLD TRANSFER: Set new document, then delete the old one.
+      batch.set(newResidentRef, {
+        ...residentData,
+        householdID: finalTargetHouseholdID,
+        branchID: newBranch,
+        role: newRole,
+        updatedAt: serverTimestamp()
+      });
+      batch.delete(oldResidentRef);
+    }
+
+    // 3. Mark the transfer request as Approved
+    batch.update(transferRef, {
+      status: newStatus,
+      targetHouseholdID: finalTargetHouseholdID, // Save generated ID for records
+      updatedAt: serverTimestamp()
+    });
+
+    await batch.commit();
+
+  } else {
+    // If simply rejecting, just update the transfer document
+    await updateDoc(transferRef, {
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
+  }
+}
+
+/**
+ * Verifies if a Target Household exists and fetches its valid branches.
+ * @param {string} householdID
+ */
+export async function fetchHouseholdBranchesForTransfer(householdID) {
+  if (!householdID) return { exists: false, branches: [] };
+  
+  const hhRef = doc(db, "households", householdID);
+  const hhSnap = await getDoc(hhRef);
+  
+  if (!hhSnap.exists()) {
+    return { exists: false, branches: [] };
+  }
+
+  const branchesRef = collection(db, "households", householdID, "branches");
+  const branchesSnap = await getDocs(branchesRef);
+  
+  if (branchesSnap.empty) {
+    return { exists: true, branches: [{ id: "BR-001", name: "BR-001 (Main)" }] };
+  }
+
+  const branches = branchesSnap.docs.map(doc => ({
+    id: doc.id,
+    name: `${doc.id} ${doc.data().branchName ? `(${doc.data().branchName})` : ""}`.trim()
+  }));
+
+  // Ensure BR-001 is always an option
+  if (!branches.some(b => b.id === "BR-001")) {
+     branches.unshift({ id: "BR-001", name: "BR-001 (Main)" });
+  }
+
+  return { exists: true, branches };
+}
+
+
+// ══════════════════════════════
+// 👑 HOUSEHOLD HEAD TRANSFER
+// ══════════════════════════════
+/**
+ * Fetches all residents in a specific household to populate the transfer dropdown.
+ */
+export async function getHouseholdResidents(householdID) {
+  if (!householdID) return [];
+  const residentsRef = collection(db, "households", householdID, "residents");
+  const snap = await getDocs(residentsRef);
+  return snap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+}
+
+/**
+ * Swaps the Household Head role between the current head and a target member.
+ */
+export async function transferHouseholdHeadRole(householdID, currentHeadID, newHeadID) {
+  if (!householdID || !currentHeadID || !newHeadID) {
+    throw new Error("Missing required parameters to transfer the head role.");
+  }
+
+  const currentHeadRef = doc(db, "households", householdID, "residents", currentHeadID);
+  const newHeadRef = doc(db, "households", householdID, "residents", newHeadID);
+
+  const batch = writeBatch(db);
+
+  // Demote current head to Member
+  batch.update(currentHeadRef, {
+    role: "Member",
+    updatedAt: serverTimestamp()
+  });
+
+  // Promote new head
+  batch.update(newHeadRef, {
+    role: "Household Head",
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+}
+
+/**
+ * Swaps the Branch Head role between the current branch head and a target member.
+ */
+export async function transferBranchHeadRole(householdID, currentHeadID, newHeadID) {
+  if (!householdID || !currentHeadID || !newHeadID) {
+    throw new Error("Missing required parameters to transfer the branch head role.");
+  }
+
+  const currentHeadRef = doc(db, "households", householdID, "residents", currentHeadID);
+  const newHeadRef = doc(db, "households", householdID, "residents", newHeadID);
+
+  const batch = writeBatch(db);
+
+  // Demote current branch head to Member
+  batch.update(currentHeadRef, {
+    role: "Member",
+    updatedAt: serverTimestamp()
+  });
+
+  // Promote new branch head
+  batch.update(newHeadRef, {
+    role: "Branch Head",
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+}
+
+// ══════════════════════════════
+// 🔒 PIN VERIFICATION
+// ══════════════════════════════
+const hashPin = async (pin) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pin);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+};
+
+export async function verifyResidentPIN(householdID, residentID, inputPin) {
+  if (!inputPin) throw new Error("Please enter your PIN.");
+  
+  const residentRef = doc(db, "households", householdID, "residents", residentID);
+  const snap = await getDoc(residentRef);
+  
+  if (!snap.exists()) {
+    throw new Error("Resident profile not found.");
+  }
+  
+  const data = snap.data();
+  const savedPinHash = data.pinHash; 
+  
+  if (!savedPinHash) {
+    throw new Error("No PIN is set on your profile. Please set up a PIN in your settings first.");
+  }
+
+  // Hash the user's input using your exact SHA-256 logic
+  const hashedInput = await hashPin(inputPin);
+
+  // Compare the hashes
+  if (savedPinHash !== hashedInput) {
+    throw new Error("Incorrect PIN. Please try again.");
+  }
+  
+  return true;
+}
+
+
+// ══════════════════════════════
+// 🏠 HOUSEHOLD TRANSFER NOTIFICATIONS & APPROVAL
+// ══════════════════════════════
+
+import { createUserNotification } from "./userNotifications"; // <-- Make sure to import this at the top!
+
+/**
+ * Finds the head resident ID for a given household to dispatch targeted alerts.
+ */
+export async function getHouseholdHeadID(householdID) {
+  const residentsRef = collection(db, "households", householdID, "residents");
+  const q = query(residentsRef, where("role", "in", ["Household Head", "head"]));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    return snap.docs[0].id;
+  }
+  return null;
+}
+
+/**
+ * Fetches transfer request details for the consent modal.
+ */
+export async function getTransferRequestDetails(transferID) {
+  const q = query(collection(db, "household_transfers"), where("transferID", "==", transferID), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() };
+}
+
+/**
+ * Household/Branch Head approves or rejects the incoming member.
+ */
+export async function respondToTransferConsent(transferDocID, headDecision) {
+  const transferRef = doc(db, "household_transfers", transferDocID);
+  await updateDoc(transferRef, {
+    headApproval: headDecision, // "Approved" or "Rejected"
+    headRespondedAt: serverTimestamp(),
+  });
+}
+
 
 
 // ══════════════════════════════

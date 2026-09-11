@@ -759,7 +759,7 @@ function SelfieStep({ onConfirm }) {
 }
 
 // ─── Main Registration Component ──────────────────────────────────────────────
-export default function Registration({ onBack }) {
+export default function Registration({ onBack, branchingPayload }) {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState("");
@@ -939,7 +939,7 @@ export default function Registration({ onBack }) {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await submitRegistration({ ...form, idImage, selfieImage });
+      await submitRegistration({ ...form, idImage, selfieImage, branchingPayload });
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
       setRefNumber(ref);
       setSubmitted(true);
