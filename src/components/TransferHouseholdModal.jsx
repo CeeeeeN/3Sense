@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { submitHouseholdTransfer, fetchHouseholdBranchesForTransfer } from "../services/services";
+//import ErrorMessage from "../components/ErrorMessage";
 
-// ADDED onNavigate to props
 export default function TransferHouseholdModal({ onClose, currentHouseholdID, userData, memberID, onNavigate }) {
   const [step, setStep] = useState(1);
   const [transferType, setTransferType] = useState(""); // "existing" or "new"
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   
-  // Dynamic Branch State
+  // Dynamic Branch State (for existing households)
   const [availableBranches, setAvailableBranches] = useState([{ id: "BR-001", name: "BR-001 (Main)" }]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [targetError, setTargetError] = useState("");
@@ -16,15 +16,26 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
   // Form State
   const [form, setForm] = useState({
     currentHouseholdID: currentHouseholdID || "",
+    
+    // For joining existing household
     targetHouseholdID: "",
     targetBranchID: "BR-001",
+    
+    // For creating new household
+    newHouseNumber: "",
+    newStreet: "",
+    newEmail: "",
+
+    // Shared
     reason: "",
     proofFileName: "",
     proofFile: null
   });
 
-  // Debounced query to validate target household and fetch its branches
+  // Debounced query to validate target household and fetch its branches (ONLY for existing)
   useEffect(() => {
+    if (transferType !== "existing") return;
+
     const fetchBranches = async () => {
       const target = form.targetHouseholdID.trim().toUpperCase();
       if (!target || target.length < 8) {
@@ -56,38 +67,12 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       }
     };
 
-    const timer = setTimeout(() => {
-      if (transferType === "existing") fetchBranches();
-    }, 600);
-
+    const timer = setTimeout(() => { fetchBranches(); }, 600);
     return () => clearTimeout(timer);
   }, [form.targetHouseholdID, transferType]);
 
   const handleNext = () => {
     if (step === 1 && !transferType) return;
-    
-    // <-- NEW REDIRECT LOGIC -->
-    if (transferType === "new") {
-      alert("To create a new household, you will be redirected to the standard registration form. Once your new household is approved by the admin, your profile will be automatically transferred.");
-      
-      sessionStorage.setItem("branchingPayload", JSON.stringify({
-        isBranching: true, 
-        oldHouseholdID: currentHouseholdID, 
-        residentID: memberID 
-      }));
-
-      onClose(); // Close the modal
-      
-      // Navigate to the registration page and pass the branching payload
-      if (onNavigate) {
-        onNavigate("logout"); // Triggers your standard logout flow
-      } else {
-        // Fallback if onNavigate is missing: hard refresh to clear state
-        window.location.href = "/"; 
-      }
-      return;
-    }
-
     setStep(s => s + 1);
   };
 
@@ -96,7 +81,16 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
     if (targetError) return; 
     
     if (!form.currentHouseholdID.trim()) return setErrorMsg("Current Household ID is required.");
-    if (!form.targetHouseholdID.trim()) return setErrorMsg("Target Household ID is required.");
+
+    // Validation Branching based on Type
+    if (transferType === "existing") {
+      if (!form.targetHouseholdID.trim()) return setErrorMsg("Target Household ID is required.");
+    } else {
+      if (!form.newHouseNumber.trim()) return setErrorMsg("Please provide your new house or unit number.");
+      if (!form.newStreet.trim() || form.newStreet.trim().length < 3) return setErrorMsg("Please provide your new street or purok name.");
+      if (!form.newEmail.trim() || !/\S+@\S+\.\S+/.test(form.newEmail)) return setErrorMsg("A valid email address is required to receive your new Household ID.");
+    }
+
     if (!form.reason || form.reason.trim().length < 10) return setErrorMsg("Please provide a clearer reason for the transfer (min 10 chars).");
     if (!form.proofFile) return setErrorMsg("Please upload a valid proof document or ID.");
 
@@ -133,6 +127,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       const userUID = userData?.UID || "";
       const userName = [userData?.firstName, userData?.lastName].filter(Boolean).join(" ");
 
+      // Submits to the same backend pipeline!
       await submitHouseholdTransfer(form.currentHouseholdID, residentID, userUID, userName, submissionData);
       
       setStep(3); 
@@ -160,7 +155,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
           </button>
         </div>
 
-        <div className="pf-modal-body" style={{ padding: '1.5rem' }}>
+        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: "75vh", overflowY: "auto" }}>
           
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -219,51 +214,97 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
 
           {step === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              
               <div className="pf-field">
                 <label className="pf-lbl">Current Household ID <span className="req">*</span></label>
                 <input 
                   className="pf-inp" 
                   placeholder="e.g. MAL-2026-00000"
                   value={form.currentHouseholdID} 
-                  onChange={e => setForm({...form, currentHouseholdID: e.target.value.toUpperCase()})}
+                  readOnly // Block editing to prevent errors
+                  style={{ background: "#f8fafc", color: "#64748b" }}
                 />
               </div>
 
-              <div style={{ display: "flex", gap: "1rem" }}>
-                <div className="pf-field" style={{ flex: 2 }}>
-                  <label className="pf-lbl">Target Household ID <span className="req">*</span></label>
-                  <input 
-                    className={`pf-inp ${targetError ? 'error' : ''}`} 
-                    style={targetError ? { borderColor: '#e03e3e', background: '#fef2f2' } : {}}
-                    placeholder="MAL-2026-XXXXX" 
-                    value={form.targetHouseholdID} 
-                    onChange={e => setForm({...form, targetHouseholdID: e.target.value.toUpperCase()})} 
-                  />
-                  {targetError && <div style={{ color: "#e03e3e", fontSize: "0.75rem", marginTop: "4px" }}>{targetError}</div>}
+              {/* ── CONDITIONAL RENDER: JOINING EXISTING ── */}
+              {transferType === "existing" && (
+                <div style={{ display: "flex", gap: "1rem" }}>
+                  <div className="pf-field" style={{ flex: 2 }}>
+                    <label className="pf-lbl">Target Household ID <span className="req">*</span></label>
+                    <input 
+                      className={`pf-inp ${targetError ? 'error' : ''}`} 
+                      style={targetError ? { borderColor: '#e03e3e', background: '#fef2f2' } : {}}
+                      placeholder="MAL-2026-XXXXX" 
+                      value={form.targetHouseholdID} 
+                      onChange={e => setForm({...form, targetHouseholdID: e.target.value.toUpperCase()})} 
+                    />
+                    {targetError && <div style={{ color: "#e03e3e", fontSize: "0.75rem", marginTop: "4px" }}>{targetError}</div>}
+                  </div>
+                  
+                  <div className="pf-field" style={{ flex: 1 }}>
+                    <label className="pf-lbl">Target Branch</label>
+                    <select 
+                      className="pf-inp" 
+                      style={{ padding: "0.6rem", background: loadingBranches ? "#f1f5f9" : "#fff" }}
+                      value={form.targetBranchID} 
+                      onChange={e => setForm({...form, targetBranchID: e.target.value})}
+                      disabled={loadingBranches || availableBranches.length === 0}
+                    >
+                      {loadingBranches ? (
+                        <option value="">Loading...</option>
+                      ) : availableBranches.length === 0 ? (
+                        <option value="">Not Found</option>
+                      ) : (
+                        availableBranches.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
                 </div>
-                
-                <div className="pf-field" style={{ flex: 1 }}>
-                  <label className="pf-lbl">Target Branch</label>
-                  <select 
-                    className="pf-inp" 
-                    style={{ padding: "0.6rem", background: loadingBranches ? "#f1f5f9" : "#fff" }}
-                    value={form.targetBranchID} 
-                    onChange={e => setForm({...form, targetBranchID: e.target.value})}
-                    disabled={loadingBranches || availableBranches.length === 0}
-                  >
-                    {loadingBranches ? (
-                      <option value="">Loading...</option>
-                    ) : availableBranches.length === 0 ? (
-                      <option value="">Not Found</option>
-                    ) : (
-                      availableBranches.map(b => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </div>
+              )}
 
+              {/* ── CONDITIONAL RENDER: CREATING NEW ── */}
+              {transferType === "new" && (
+                <>
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <div className="pf-field" style={{ flex: 1 }}>
+                      <label className="pf-lbl">New House/Unit Number <span className="req">*</span></label>
+                      <input 
+                        className="pf-inp" 
+                        placeholder="e.g. 142" 
+                        value={form.newHouseNumber} 
+                        onChange={e => setForm({...form, newHouseNumber: e.target.value})} 
+                      />
+                    </div>
+                    <div className="pf-field" style={{ flex: 2 }}>
+                      <label className="pf-lbl">New Street / Purok <span className="req">*</span></label>
+                      <input 
+                        className="pf-inp" 
+                        placeholder="e.g. Malanday Street" 
+                        value={form.newStreet} 
+                        onChange={e => setForm({...form, newStreet: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="pf-field">
+                    <label className="pf-lbl">Contact Email <span className="req">*</span></label>
+                    <input 
+                      type="email"
+                      className="pf-inp" 
+                      placeholder="We will send your new Household ID here" 
+                      value={form.newEmail} 
+                      onChange={e => setForm({...form, newEmail: e.target.value})} 
+                    />
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
+                      This email will be used to activate your new household account.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── SHARED FIELDS ── */}
               <div className="pf-field">
                 <label className="pf-lbl">Reason for Transfer <span className="req">*</span></label>
                 <textarea 
@@ -302,9 +343,11 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               </div>
 
               {errorMsg && (
-                <div style={{ color: "#e03e3e", fontSize: "0.85rem", background: "#fef2f2", padding: "10px", borderRadius: "8px", border: "1px solid #fecaca" }}>
-                  {errorMsg}
-                </div>
+                <ErrorMessage 
+                  message={errorMsg} 
+                  onDismiss={() => setErrorMsg("")} 
+                  style={{ marginTop: "0.5rem" }} 
+                />
               )}
             </div>
           )}
@@ -316,7 +359,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               </div>
               <h3 style={{ margin: "0 0 0.5rem 0", color: "#111827", fontSize: "1.25rem" }}>Request Submitted</h3>
               <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: "1.5", margin: 0 }}>
-                Your transfer request has been sent to the Barangay Administration for review. You will be notified once it has been approved.
+                Your request to {transferType === "new" ? "create a new household" : "transfer to an existing household"} has been sent to the Barangay Administration. You will be notified once it is approved.
               </p>
             </div>
           )}
@@ -340,7 +383,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
             <button 
               className="pf-btn-primary" 
               onClick={handleSubmit} 
-              disabled={isSubmitting || !form.reason || !form.proofFile || !form.currentHouseholdID || targetError !== "" || loadingBranches}
+              disabled={isSubmitting || !form.reason || !form.proofFile || !form.currentHouseholdID || (transferType === "existing" && (targetError !== "" || loadingBranches))}
             >
               {isSubmitting ? "Submitting..." : "Submit Request"}
             </button>

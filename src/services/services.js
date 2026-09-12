@@ -4,6 +4,7 @@ import {
   query, where, orderBy, serverTimestamp, limit, or,
   getDoc, doc, writeBatch, updateDoc
 } from "firebase/firestore";
+import { generateHouseholdID, sendApprovalEmail } from "./admin";
 
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
@@ -273,20 +274,19 @@ export async function submitHouseholdTransfer(currentHouseholdID, residentID, us
     targetBranchID:     isExisting ? (form.targetBranchID || "BR-001") : "",
     newHouseNumber:     form.transferType === "new" ? form.newHouseNumber : "",
     newStreet:          form.transferType === "new" ? form.newStreet : "",
+    newEmail:           form.transferType === "new" ? form.newEmail : "", // <-- NEW FIELD
     reason:             form.reason,
     proofFileName:      form.proofFileName || "",
     proofURL:           form.proofURL || "",
     status:             "Pending",
-    headApproval:       isExisting ? "Pending" : "N/A", // N/A if creating new household
+    headApproval:       isExisting ? "Pending" : "N/A",
     submittedAt:        serverTimestamp(),
   });
 
-  // Target the Receiving Head and trigger a notification
   if (isExisting) {
     try {
       const headResidentID = await getHouseholdHeadID(form.targetHouseholdID);
       if (headResidentID) {
-        // Use your existing user notification pipeline
         await createUserNotification(
           form.targetHouseholdID, 
           headResidentID, 
@@ -304,16 +304,17 @@ export async function submitHouseholdTransfer(currentHouseholdID, residentID, us
   return transferID;
 }
 
-/**
- * Admin action to approve or reject a household transfer request.
- * Securely migrates the resident's profile and safeguards against accidental deletion.
- */
-import { generateHouseholdID } from "../services/admin";
+
 export async function processHouseholdTransfer(transferDocID, newStatus, requestData) {
   const transferRef = doc(db, "household_transfers", transferDocID);
+  
+  const transferSnap = await getDoc(transferRef);
+  if (!transferSnap.exists()) {
+    throw new Error("Transfer request not found in database.");
+  }
+  const transferDBData = transferSnap.data();
 
   if (newStatus === "Approved") {
-    // 1. Fetch the resident's current data
     const oldResidentRef = doc(db, "households", requestData.currentHouseholdID, "residents", requestData.residentID);
     const residentSnap = await getDoc(oldResidentRef);
 
@@ -329,58 +330,75 @@ export async function processHouseholdTransfer(transferDocID, newStatus, request
     let newBranch = requestData.targetBranchID || "BR-001";
 
     // ── CREATE NEW HOUSEHOLD LOGIC ──
-    if (requestData.transferType === "new") {
-      // Generate a brand new Household ID
+    if (transferDBData.transferType === "new") {
       finalTargetHouseholdID = await generateHouseholdID();
       const newHhRef = doc(db, "households", finalTargetHouseholdID);
       
-      // Initialize the new household container
+      // Initialize the unactivated household container using DB data
       batch.set(newHhRef, {
-        houseNumber: requestData.newHouseNumber || "",
-        street: requestData.newStreet || "",
+        householdID: finalTargetHouseholdID,
+        houseNumber: transferDBData.newHouseNumber || "",
+        street: transferDBData.newStreet || "",
         barangay: "Malanday",
-        activated: true,
-        createdAt: serverTimestamp()
+        city: "Valenzuela City",
+        province: "",
+        region: "NCR",
+        email: (transferDBData.newEmail || "").trim().toLowerCase(), // Secured from DB
+        totalMembers: 1,
+        householdClassification: "",
+        activated: false,
+        activatedAt: null,
+        createdAt: serverTimestamp(),
+        
+        // Breadcrumbs for activation.js
+        branchingData: {
+          isBranching: true,
+          oldHouseholdID: requestData.currentHouseholdID,
+          residentID: requestData.residentID
+        }
       });
       
-      newRole = "Household Head"; // They are the founder of this new household
-      newBranch = "BR-001";
-    }
-
-    // ── DATA MIGRATION LOGIC ──
-    const newResidentRef = doc(db, "households", finalTargetHouseholdID, "residents", requestData.residentID);
-
-    if (oldResidentRef.path === newResidentRef.path) {
-      // SAFEGUARD: If moving to a branch inside the SAME household, ONLY update fields.
-      // NEVER run batch.delete() here or the user gets wiped!
-      batch.update(newResidentRef, {
-        branchID: newBranch,
-        role: newRole,
-        updatedAt: serverTimestamp()
-      });
     } else {
-      // CROSS-HOUSEHOLD TRANSFER: Set new document, then delete the old one.
-      batch.set(newResidentRef, {
-        ...residentData,
-        householdID: finalTargetHouseholdID,
-        branchID: newBranch,
-        role: newRole,
-        updatedAt: serverTimestamp()
-      });
-      batch.delete(oldResidentRef);
+      // ── MIGRATION LOGIC (Existing Household ONLY) ──
+      const newResidentRef = doc(db, "households", finalTargetHouseholdID, "residents", requestData.residentID);
+
+      if (oldResidentRef.path === newResidentRef.path) {
+        batch.update(newResidentRef, {
+          branchID: newBranch,
+          role: newRole,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        batch.set(newResidentRef, {
+          ...residentData,
+          householdID: finalTargetHouseholdID,
+          branchID: newBranch,
+          role: newRole,
+          updatedAt: serverTimestamp()
+        });
+        batch.delete(oldResidentRef);
+      }
     }
 
-    // 3. Mark the transfer request as Approved
     batch.update(transferRef, {
       status: newStatus,
-      targetHouseholdID: finalTargetHouseholdID, // Save generated ID for records
+      targetHouseholdID: finalTargetHouseholdID, 
       updatedAt: serverTimestamp()
     });
 
     await batch.commit();
 
+    if (transferDBData.transferType === "new" && transferDBData.newEmail) {
+      console.log(`[Email Trigger] Dispatching approval to: ${transferDBData.newEmail}`);
+      try {
+        await sendApprovalEmail(finalTargetHouseholdID, transferDBData.requesterName, transferDBData.newEmail);
+        console.log("[Email Trigger] Successfully sent.");
+      } catch(err) {
+        console.warn("[Email Trigger] Failed:", err);
+      }
+    }
+
   } else {
-    // If simply rejecting, just update the transfer document
     await updateDoc(transferRef, {
       status: newStatus,
       updatedAt: serverTimestamp()

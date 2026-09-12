@@ -126,7 +126,7 @@ export const approveRegistration = async (docID) => {
   return { householdID, registrationID: docID, email: data.email, name: fullName };
 };
 
-const sendApprovalEmail = async (householdID, name, toEmail) => {
+export const sendApprovalEmail = async (householdID, name, toEmail) => {
   try {
     const response = await fetch("/api/resend-email", {
       method: "POST",
