@@ -94,7 +94,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
   }
 
-
+  
 
   function switchScreen(s) {
     setScreen(s);

@@ -15,6 +15,7 @@ import ActivityPage from "./ActivityPage";
 import EmergencyPage from "./EmergencyPage";
 import { requestPushPermission, listenForForegroundMessages } from "../services/fcm";
 
+
 // Routing maps
 const PAGE_TO_PATH = {
   home: "/home",
@@ -87,6 +88,16 @@ export default function UserApp() {
   const [feedbackService, setFeedbackService] = useState(
     scannedServiceId ? { id: scannedServiceId, name: scannedServiceName } : null,
   );
+
+  // ── DETECT BRANCHING REQUEST ──
+  useEffect(() => {
+    // If the user has a branching payload waiting, instantly open the registration page
+    const branchingData = sessionStorage.getItem("branchingPayload");
+    if (branchingData && page !== "register") {
+      setPage("register");
+    }
+  }, []);
+  // ──────────────────────────────
 
   // Sync URL when page changes
   useEffect(() => {

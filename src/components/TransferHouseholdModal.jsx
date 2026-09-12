@@ -69,17 +69,21 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
     // <-- NEW REDIRECT LOGIC -->
     if (transferType === "new") {
       alert("To create a new household, you will be redirected to the standard registration form. Once your new household is approved by the admin, your profile will be automatically transferred.");
+      
+      sessionStorage.setItem("branchingPayload", JSON.stringify({
+        isBranching: true, 
+        oldHouseholdID: currentHouseholdID, 
+        residentID: memberID 
+      }));
+
       onClose(); // Close the modal
       
       // Navigate to the registration page and pass the branching payload
       if (onNavigate) {
-        // NOTE: Adjust "logout" or "register" depending on how your router works. 
-        // If registration is outside the logged-in area, you may need to log them out first.
-        onNavigate("register", { 
-          isBranching: true, 
-          oldHouseholdID: currentHouseholdID, 
-          residentID: memberID 
-        });
+        onNavigate("logout"); // Triggers your standard logout flow
+      } else {
+        // Fallback if onNavigate is missing: hard refresh to clear state
+        window.location.href = "/"; 
       }
       return;
     }

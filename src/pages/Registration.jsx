@@ -939,7 +939,13 @@ export default function Registration({ onBack, branchingPayload }) {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      const storedBranchingData = sessionStorage.getItem("branchingPayload");
+      const branchingPayload = storedBranchingData ? JSON.parse(storedBranchingData) : null;
+
       await submitRegistration({ ...form, idImage, selfieImage, branchingPayload });
+
+      sessionStorage.removeItem("branchingPayload");
+
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
       setRefNumber(ref);
       setSubmitted(true);
@@ -961,6 +967,8 @@ export default function Registration({ onBack, branchingPayload }) {
 
   const handleCancel = () => {
     if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) { if (onBack) onBack(); }
+      sessionStorage.removeItem("branchingPayload");
+      if (onBack) onBack();
   };
 
   const rv = (val) => val?.trim() || null;
