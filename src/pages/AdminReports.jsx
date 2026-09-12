@@ -27,16 +27,16 @@ const getImageFormat = (src) => {
 };
 
 export default function Reports() {
-
   // ── State ────────────────────────────────────────────────────────────────────
   const [reportType, setReportType] = useState("demographics");
   const [residentData, setResidentData] = useState([]);
   const [householdData, setHouseholdData] = useState([]);
+  const [vawcData, setVawcData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [sexFilter, setSexFilter] = useState("all");
-  const [sortDemographics, setSortDemographics] = useState("name_asc"); // name_asc, name_desc, age_asc, age_desc, hhid_asc, hhid_desc
-  const [sortRbiA, setSortRbiA] = useState("hhid_asc"); // hhid_asc, hhid_desc, members_desc, members_asc, head_asc, head_desc
+  const [sortDemographics, setSortDemographics] = useState("name_asc");
+  const [sortRbiA, setSortRbiA] = useState("hhid_asc");
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [demoPage, setDemoPage] = useState(1);
@@ -139,7 +139,20 @@ export default function Reports() {
     fetchHouseholds();
   }, []);
 
-  // ── Demographics filter & sort ───────────────────────────────────────────────
+  // ── Fetch VAWC Cases ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchVawc = async () => {
+      try {
+        const snap = await getDocs(collection(db, "vawcCases"));
+        setVawcData(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error fetching VAWC cases for report:", err);
+      }
+    };
+    fetchVawc();
+  }, [reportType]);
+
+  // ── Demographics Calculations ───────────────────────────────────────────────
   const filteredResidents = useMemo(() => {
     let result = residentData;
     if (sexFilter !== "all") {
@@ -207,42 +220,42 @@ export default function Reports() {
       {
         label: "Labor Force",
         male: residentData.filter((r) => r.sex === "Male" && r.employmentStatus === "Employed").length,
-        female: residentData.filter((r) => r.sex === "Female" && r.employmentStatus === "Employed").length
+        female: residentData.filter((r) => r.sex === "Female" && r.employmentStatus === "Employed").length,
       },
       {
         label: "Unemployed",
         male: residentData.filter((r) => r.sex === "Male" && r.employmentStatus === "Unemployed").length,
-        female: residentData.filter((r) => r.sex === "Female" && r.employmentStatus === "Unemployed").length
+        female: residentData.filter((r) => r.sex === "Female" && r.employmentStatus === "Unemployed").length,
       },
       {
         label: "Out of School Children (OSC) 6–14 yrs old",
         male: residentData.filter((r) => r.sex === "Male" && r.age !== null && r.age >= 6 && r.age <= 14 && r.educationStatus === "Out of School").length,
-        female: residentData.filter((r) => r.sex === "Female" && r.age !== null && r.age >= 6 && r.age <= 14 && r.educationStatus === "Out of School").length
+        female: residentData.filter((r) => r.sex === "Female" && r.age !== null && r.age >= 6 && r.age <= 14 && r.educationStatus === "Out of School").length,
       },
       {
         label: "Out of School Youth (OSY) 15–24 yrs old",
         male: residentData.filter((r) => r.sex === "Male" && r.age !== null && r.age >= 15 && r.age <= 24 && r.educationStatus === "Out of School").length,
-        female: residentData.filter((r) => r.sex === "Female" && r.age !== null && r.age >= 15 && r.age <= 24 && r.educationStatus === "Out of School").length
+        female: residentData.filter((r) => r.sex === "Female" && r.age !== null && r.age >= 15 && r.age <= 24 && r.educationStatus === "Out of School").length,
       },
       {
         label: "Person with Disabilities (PWDs)",
         male: residentData.filter((r) => r.sex === "Male" && r.categories?.isPWD).length,
-        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isPWD).length
+        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isPWD).length,
       },
       {
         label: "Overseas Filipino Workers (OFWs)",
         male: residentData.filter((r) => r.sex === "Male" && r.categories?.isOFW).length,
-        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isOFW).length
+        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isOFW).length,
       },
       {
         label: "Solo Parents",
         male: residentData.filter((r) => r.sex === "Male" && r.categories?.isSoloParent).length,
-        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isSoloParent).length
+        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isSoloParent).length,
       },
       {
         label: "Indigenous Peoples (IPs)",
         male: residentData.filter((r) => r.sex === "Male" && r.categories?.isIP).length,
-        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isIP).length
+        female: residentData.filter((r) => r.sex === "Female" && r.categories?.isIP).length,
       },
     ].map((s) => ({ ...s, total: s.male + s.female }));
 
@@ -257,19 +270,19 @@ export default function Reports() {
       {
         label: "Filipino",
         male: residentData.filter((r) => r.sex === "Male" && r.citizenship !== "Foreigner").length,
-        female: residentData.filter((r) => r.sex === "Female" && r.citizenship !== "Foreigner").length
+        female: residentData.filter((r) => r.sex === "Female" && r.citizenship !== "Foreigner").length,
       },
       {
         label: "Foreigner",
         male: residentData.filter((r) => r.sex === "Male" && r.citizenship === "Foreigner").length,
-        female: residentData.filter((r) => r.sex === "Female" && r.citizenship === "Foreigner").length
+        female: residentData.filter((r) => r.sex === "Female" && r.citizenship === "Foreigner").length,
       },
     ].map((s) => ({ ...s, total: s.male + s.female }));
 
     return { ageBrackets, sectors, civilStatuses, citizenshipRows };
   }, [residentData]);
 
-  // ── RBI Form A household data & sorting ───────────────────────────────────────
+  // ── RBI Form A Data ──────────────────────────────────────────────────────────
   const rbiFormAData = useMemo(() => {
     return householdData
       .map((hh) => {
@@ -291,6 +304,219 @@ export default function Reports() {
         return 0;
       });
   }, [householdData, residentData, sortRbiA]);
+
+  const vawcStats = useMemo(() => {
+    const total = vawcData.length;
+    const gender = {
+      M: vawcData.filter((c) => c.gender === "M").length,
+      F: vawcData.filter((c) => c.gender === "F").length,
+    };
+    const age = {
+      "0-4": vawcData.filter((c) => (c.ageBracket || "").includes("0-4")).length,
+      "5-9": vawcData.filter((c) => (c.ageBracket || "").includes("5-9")).length,
+      "10-14": vawcData.filter((c) => (c.ageBracket || "").includes("10-14")).length,
+      "15-17": vawcData.filter((c) => (c.ageBracket || "").includes("15-17")).length,
+      "18+": vawcData.filter((c) => (c.ageBracket || "").includes("18") || (c.ageBracket || "").includes("above")).length,
+    };
+    const violence = {
+      physical: vawcData.filter((c) => (c.typeOfViolence || "").includes("Physical")).length,
+      sexual: vawcData.filter((c) => (c.typeOfViolence || "").includes("Sexual")).length,
+      psychological: vawcData.filter((c) => (c.typeOfViolence || "").includes("Psychological") || (c.typeOfViolence || "").includes("Emotional")).length,
+      neglect: vawcData.filter((c) => (c.typeOfViolence || "").includes("Neglect")).length,
+    };
+    const perpetrator = {
+      immediate: vawcData.filter((c) => (c.perpetrator || "").includes("Immediate Family")).length,
+      closeRelative: vawcData.filter((c) => (c.perpetrator || "").includes("Close Relative")).length,
+      acquaintance: vawcData.filter((c) => (c.perpetrator || "").includes("Acquaintance")).length,
+      stranger: vawcData.filter((c) => (c.perpetrator || "").includes("Stranger")).length,
+      localOffice: vawcData.filter((c) => (c.perpetrator || "").includes("Local Office")).length,
+      lawEnforcer: vawcData.filter((c) => (c.perpetrator || "").includes("Law Enforcer")).length,
+      others: vawcData.filter((c) => (c.perpetrator || "").includes("Others") || (c.perpetrator || "").includes("Guardian")).length,
+    };
+    const actions = {
+      lswdo: vawcData.filter((c) => (c.actionTaken || "").includes("LSWDO")).length,
+      pnp: vawcData.filter((c) => (c.actionTaken || "").includes("PNP")).length,
+      nbi: vawcData.filter((c) => (c.actionTaken || "").includes("NBI")).length,
+      medical: vawcData.filter((c) => (c.actionTaken || "").includes("Medical")).length,
+      legal: vawcData.filter((c) => (c.actionTaken || "").includes("Legal")).length,
+      ngo: vawcData.filter((c) => (c.actionTaken || "").includes("NGO") || (c.actionTaken || "").includes("FBO")).length,
+    };
+
+    return { total, gender, age, violence, perpetrator, actions };
+  }, [vawcData]);
+
+  // ── VAWC CSV Export ──
+  const handleExportVawcCSV = () => {
+    const headers = [
+      "Total VAC Victims", "Male", "Female",
+      "0-4 YO", "5-9 YO", "10-14 YO", "15-17 YO", "18+ Disability",
+      "Physical Abuse", "Sexual Abuse", "Psych/Emotional", "Neglect",
+      "Immediate Family", "Close Relative", "Acquaintance", "Stranger", "Local Office", "Law Enforcer", "Other Perpetrators",
+      "Referred LSWDO", "Referred PNP", "Referred NBI", "Referred Medical", "Referred Legal", "Referred NGO/FBO",
+    ];
+    const s = vawcStats;
+    const row = [
+      s.total, s.gender.M, s.gender.F,
+      s.age["0-4"], s.age["5-9"], s.age["10-14"], s.age["15-17"], s.age["18+"],
+      s.violence.physical, s.violence.sexual, s.violence.psychological, s.violence.neglect,
+      s.perpetrator.immediate, s.perpetrator.closeRelative, s.perpetrator.acquaintance, s.perpetrator.stranger, s.perpetrator.localOffice, s.perpetrator.lawEnforcer, s.perpetrator.others,
+      s.actions.lswdo, s.actions.pnp, s.actions.nbi, s.actions.medical, s.actions.legal, s.actions.ngo,
+    ];
+
+    const csv = [headers.join(","), row.join(",")].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `VAWC_Monitoring_Report_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    logTransaction(adminName, adminRole, "Exported VAWC CSV", `Total cases: ${vawcData.length}`);
+  };
+
+  const handleExportVawcPDF = async () => {
+    setExportLoading(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "landscape" });
+      const pageW = doc.internal.pageSize.width;
+      const pageH = doc.internal.pageSize.height;
+      let y = 14;
+
+      const logoImg = await loadImage(barangayLogo);
+      const logoFormat = getImageFormat(barangayLogo);
+      if (logoImg) {
+        doc.addImage(logoImg, logoFormat, 14, 8, 16, 16);
+      }
+
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+      doc.text("Republic of the Philippines", pageW / 2, y, { align: "center" }); y += 4;
+      doc.text("City of Valenzuela", pageW / 2, y, { align: "center" }); y += 4;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
+      doc.text("BARANGAY MALANDAY", pageW / 2, y, { align: "center" }); y += 6;
+
+      doc.setFontSize(10);
+      doc.text("MONITORING OF INCIDENCE ON VIOLENCE AGAINST CHILDREN (VAC) / VAW DESK", pageW / 2, y, { align: "center" }); y += 5;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+      doc.text(`Covered Period: As of ${new Date().toLocaleDateString("en-PH")} | National Capital Region`, pageW / 2, y, { align: "center" }); y += 8;
+
+      // Render Table Structure
+      const s = vawcStats;
+      doc.setFontSize(6.5); doc.setFont("helvetica", "bold");
+      doc.setFillColor(240, 244, 248);
+      doc.rect(14, y, pageW - 28, 14, "F");
+
+      // Super Headers
+      doc.rect(14, y, 22, 14); doc.text("BARANGAY", 16, y + 9);
+      doc.rect(36, y, 16, 14); doc.text("VAC VICTIMS (1)", 37, y + 9);
+      doc.rect(52, y, 16, 7);  doc.text("GENDER (2)", 54, y + 5);
+      doc.rect(68, y, 40, 7);  doc.text("AGE (3)", 82, y + 5);
+      doc.rect(108, y, 40, 7); doc.text("TYPES OF VIOLENCE (4)", 118, y + 5);
+      doc.rect(148, y, 56, 7); doc.text("PERPETRATORS (5)", 166, y + 5);
+      doc.rect(204, y, pageW - 204 - 14, 7); doc.text("ACTIONS TAKEN BY THE BARANGAY / BCPC (6)", 218, y + 5);
+
+      // Sub Headers
+      const subY = y + 7;
+      doc.setFontSize(5);
+      doc.rect(52, subY, 8, 7); doc.text("M", 55, subY + 5);
+      doc.rect(60, subY, 8, 7); doc.text("F", 63, subY + 5);
+
+      doc.rect(68, subY, 8, 7); doc.text("0-4", 70, subY + 5);
+      doc.rect(76, subY, 8, 7); doc.text("5-9", 78, subY + 5);
+      doc.rect(84, subY, 8, 7); doc.text("10-14", 85, subY + 5);
+      doc.rect(92, subY, 8, 7); doc.text("15-17", 93, subY + 5);
+      doc.rect(100, subY, 8, 7); doc.text("18+ Dis", 101, subY + 5);
+
+      doc.rect(108, subY, 10, 7); doc.text("Phys", 110, subY + 5);
+      doc.rect(118, subY, 10, 7); doc.text("Sex", 120, subY + 5);
+      doc.rect(128, subY, 10, 7); doc.text("Psych", 130, subY + 5);
+      doc.rect(138, subY, 10, 7); doc.text("Negl", 140, subY + 5);
+
+      doc.rect(148, subY, 8, 7); doc.text("Imm", 150, subY + 5);
+      doc.rect(156, subY, 8, 7); doc.text("Close", 157, subY + 5);
+      doc.rect(164, subY, 8, 7); doc.text("Acq", 166, subY + 5);
+      doc.rect(172, subY, 8, 7); doc.text("Strg", 174, subY + 5);
+      doc.rect(180, subY, 8, 7); doc.text("Offc", 182, subY + 5);
+      doc.rect(188, subY, 8, 7); doc.text("Law", 190, subY + 5);
+      doc.rect(196, subY, 8, 7); doc.text("Othr", 198, subY + 5);
+
+      doc.rect(204, subY, 13, 7); doc.text("LSWDO", 205, subY + 5);
+      doc.rect(217, subY, 11, 7); doc.text("PNP", 219, subY + 5);
+      doc.rect(228, subY, 11, 7); doc.text("NBI", 230, subY + 5);
+      doc.rect(239, subY, 13, 7); doc.text("Medical", 240, subY + 5);
+      doc.rect(252, subY, 13, 7); doc.text("Legal", 254, subY + 5);
+      doc.rect(265, subY, pageW - 265 - 14, 7); doc.text("NGO", 267, subY + 5);
+
+      y += 14;
+
+      // Data Row
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+      const rowH = 8;
+      doc.rect(14, y, 22, rowH); doc.text("MALANDAY", 16, y + 5.5);
+      doc.rect(36, y, 16, rowH); doc.text(String(s.total), 42, y + 5.5);
+      doc.rect(52, y, 8, rowH); doc.text(String(s.gender.M), 55, y + 5.5);
+      doc.rect(60, y, 8, rowH); doc.text(String(s.gender.F), 63, y + 5.5);
+
+      doc.rect(68, y, 8, rowH); doc.text(String(s.age["0-4"]), 71, y + 5.5);
+      doc.rect(76, y, 8, rowH); doc.text(String(s.age["5-9"]), 79, y + 5.5);
+      doc.rect(84, y, 8, rowH); doc.text(String(s.age["10-14"]), 87, y + 5.5);
+      doc.rect(92, y, 8, rowH); doc.text(String(s.age["15-17"]), 95, y + 5.5);
+      doc.rect(100, y, 8, rowH); doc.text(String(s.age["18+"]), 103, y + 5.5);
+
+      doc.rect(108, y, 10, rowH); doc.text(String(s.violence.physical), 112, y + 5.5);
+      doc.rect(118, y, 10, rowH); doc.text(String(s.violence.sexual), 122, y + 5.5);
+      doc.rect(128, y, 10, rowH); doc.text(String(s.violence.psychological), 132, y + 5.5);
+      doc.rect(138, y, 10, rowH); doc.text(String(s.violence.neglect), 142, y + 5.5);
+
+      doc.rect(148, y, 8, rowH); doc.text(String(s.perpetrator.immediate), 151, y + 5.5);
+      doc.rect(156, y, 8, rowH); doc.text(String(s.perpetrator.closeRelative), 159, y + 5.5);
+      doc.rect(164, y, 8, rowH); doc.text(String(s.perpetrator.acquaintance), 167, y + 5.5);
+      doc.rect(172, y, 8, rowH); doc.text(String(s.perpetrator.stranger), 175, y + 5.5);
+      doc.rect(180, y, 8, rowH); doc.text(String(s.perpetrator.localOffice), 183, y + 5.5);
+      doc.rect(188, y, 8, rowH); doc.text(String(s.perpetrator.lawEnforcer), 191, y + 5.5);
+      doc.rect(196, y, 8, rowH); doc.text(String(s.perpetrator.others), 199, y + 5.5);
+
+      doc.rect(204, y, 13, rowH); doc.text(String(s.actions.lswdo), 209, y + 5.5);
+      doc.rect(217, y, 11, rowH); doc.text(String(s.actions.pnp), 221, y + 5.5);
+      doc.rect(228, y, 11, rowH); doc.text(String(s.actions.nbi), 232, y + 5.5);
+      doc.rect(239, y, 13, rowH); doc.text(String(s.actions.medical), 244, y + 5.5);
+      doc.rect(252, y, 13, rowH); doc.text(String(s.actions.legal), 257, y + 5.5);
+      doc.rect(265, y, pageW - 265 - 14, rowH); doc.text(String(s.actions.ngo), 270, y + 5.5);
+
+      y += rowH + 20;
+
+      doc.setFontSize(8); doc.setFont("helvetica", "normal");
+      doc.text("Prepared by:", 14, y);
+      doc.text("Submitted by:", pageW / 2 - 30, y);
+      doc.text("Noted by:", pageW - 80, y);
+      y += 14;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("VAW-C DESK PERSON", 14, y);
+      doc.line(14, y + 1, 75, y + 1);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+      doc.text("Desk Officer / Case Manager", 14, y + 5);
+
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+      doc.text("GIRLIE C. MANING", pageW / 2 - 30, y);
+      doc.line(pageW / 2 - 30, y + 1, pageW / 2 + 35, y + 1);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+      doc.text("Barangay Secretary", pageW / 2 - 30, y + 5);
+
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+      doc.text("HON. EFREN S. SANTIAGO", pageW - 80, y);
+      doc.line(pageW - 80, y + 1, pageW - 14, y + 1);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+      doc.text("Punong Barangay", pageW - 80, y + 5);
+
+      doc.save(`VAWC_Monitoring_Report_${new Date().toISOString().split("T")[0]}.pdf`);
+      logTransaction(adminName, adminRole, "Exported VAWC PDF", `Total cases: ${vawcData.length}`);
+    } catch (err) {
+      console.error("VAWC PDF export failed:", err);
+      alert("PDF export failed. Check browser console.");
+    }
+    setExportLoading(false);
+  };
 
   const handleExportDemographicsCSV = () => {
     const headers = ["Full Name", "Sex", "Age", "Birth Date", "Civil Status", "Citizenship", "Occupation", "Household ID"];
@@ -389,7 +615,7 @@ export default function Reports() {
       const LOGO_SIZE = 14;
       const LOGO_X = 14;
       const LOGO_Y = 5;
-      const textX = logoImg ? LOGO_X + LOGO_SIZE + 4 : 14; 
+      const textX = logoImg ? LOGO_X + LOGO_SIZE + 4 : 14;
 
       const drawHeader = () => {
         if (logoImg) {
@@ -718,7 +944,7 @@ export default function Reports() {
       <div className="requests-container">
         <div className="requests-header">
           <h1 className="requests-title">Reports & RBI</h1>
-          <p className="requests-subtitle">Generate official barangay demographic reports, RBI Form A, and RBI Form C.</p>
+          <p className="requests-subtitle">Generate official barangay demographic reports, RBI Form A, RBI Form C, and VAW-C Desk returns.</p>
         </div>
 
         {/* ── TABS ── */}
@@ -740,6 +966,12 @@ export default function Reports() {
             onClick={() => setReportType("rbi-c")}
           >
             RBI Form C
+          </button>
+          <button
+            className={`req-tab ${reportType === "vawc" ? "active" : ""}`}
+            onClick={() => setReportType("vawc")}
+          >
+            VAWC Cases
           </button>
         </div>
 
@@ -821,7 +1053,7 @@ export default function Reports() {
                     borderTop: "1px solid #e2e8f0",
                     background: "#f8fafc",
                     flexWrap: "wrap",
-                    gap: "16px"
+                    gap: "16px",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                       <span>Rows per page:</span>
@@ -829,12 +1061,12 @@ export default function Reports() {
                         value={demoRowsPerPage}
                         onChange={(e) => setDemoRowsPerPage(Number(e.target.value))}
                         style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          background: 'white',
-                          color: '#334155',
-                          cursor: 'pointer'
+                          padding: "4px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          background: "white",
+                          color: "#334155",
+                          cursor: "pointer",
                         }}
                       >
                         <option value={10}>10</option>
@@ -864,7 +1096,7 @@ export default function Reports() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    <div style={{ fontSize: "0.85rem", color: "#64748b" }}>
                       Showing {filteredResidents.length > 0 ? demoStartIndex + 1 : 0} to{" "}
                       {Math.min(demoStartIndex + demoRowsPerPage, filteredResidents.length)} of{" "}
                       {filteredResidents.length}
@@ -953,7 +1185,7 @@ export default function Reports() {
                     borderTop: "1px solid #e2e8f0",
                     background: "#f8fafc",
                     flexWrap: "wrap",
-                    gap: "16px"
+                    gap: "16px",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
                       <span>Rows per page:</span>
@@ -961,12 +1193,12 @@ export default function Reports() {
                         value={rbiARowsPerPage}
                         onChange={(e) => setRbiARowsPerPage(Number(e.target.value))}
                         style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          background: 'white',
-                          color: '#334155',
-                          cursor: 'pointer'
+                          padding: "4px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          background: "white",
+                          color: "#334155",
+                          cursor: "pointer",
                         }}
                       >
                         <option value={10}>10</option>
@@ -996,7 +1228,7 @@ export default function Reports() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    <div style={{ fontSize: "0.85rem", color: "#64748b" }}>
                       Showing {rbiFormAData.length > 0 ? rbiAStartIndex + 1 : 0} to{" "}
                       {Math.min(rbiAStartIndex + rbiARowsPerPage, rbiFormAData.length)} of{" "}
                       {rbiFormAData.length}
@@ -1130,6 +1362,116 @@ export default function Reports() {
                     </table>
                   </div>
                 </div>
+              </div>
+
+            </div>
+          </>
+        )}
+
+        {/* ══ VAWC CASES TAB (Screenshot 1 & Screenshot 2 Structure) ═══════ */}
+        {reportType === "vawc" && (
+          <>
+            <div className="card-grid">
+              <div className="card">Total VAC Victims<br /><strong>{vawcStats.total}</strong></div>
+              <div className="card">Gender: Male<br /><strong>{vawcStats.gender.M}</strong></div>
+              <div className="card">Gender: Female<br /><strong>{vawcStats.gender.F}</strong></div>
+              <div className="card">Cases Acted Upon<br /><strong style={{ color: "#166534" }}>{vawcData.filter(c => c.status === "Acted Upon").length}</strong></div>
+            </div>
+
+            <div className="section">
+              <div className="report-header">
+                <div>
+                  <h2>Monitoring of Incidence on Violence Against Children (VAC)</h2>
+                  <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "4px 0 0 0" }}>
+                    Barangay: MALANDAY | City: VALENZUELA | Region: NATIONAL CAPITAL REGION
+                  </p>
+                </div>
+                <div className="report-controls" style={{ display: "flex", gap: "10px" }}>
+                  <button className="export-btn" onClick={handleExportVawcCSV} disabled={vawcData.length === 0 || exportLoading}>
+                    Export CSV
+                  </button>
+                  <button className="export-btn" onClick={handleExportVawcPDF} disabled={vawcData.length === 0 || exportLoading}>
+                    {exportLoading ? "Generating…" : "Export PDF"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Official Document Matrix (Screenshot 1) */}
+              <div className="req-table-wrapper" style={{ overflowX: "auto", border: "1px solid #cbd5e1", borderRadius: "8px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "center" }}>
+                  <thead>
+                    <tr style={{ background: "#f1f5f9", borderBottom: "1px solid #cbd5e1" }}>
+                      <th rowSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>BARANGAY</th>
+                      <th rowSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>VAC VICTIMS<br />(1)</th>
+                      <th colSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>GENDER<br />(2)</th>
+                      <th colSpan="5" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>AGE<br />(3)</th>
+                      <th colSpan="4" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>TYPES OF VIOLENCE<br />(4)</th>
+                      <th colSpan="7" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>PERPETRATORS<br />(5)</th>
+                      <th colSpan="6" style={{ ...thStyle, textAlign: "center" }}>ACTIONS TAKEN BY THE BARANGAY / BCPC<br />(6)</th>
+                    </tr>
+                    <tr style={{ background: "#f8fafc", fontSize: "10px", borderBottom: "2px solid #cbd5e1" }}>
+                      {/* Gender */}
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>M</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>F</th>
+                      {/* Age */}
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>0-4 (3a)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>5-9 (3b)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>10-14 (3c)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>15-17 (3d)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>18+ Dis</th>
+                      {/* Types */}
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Phys (4a)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Sex (4b)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Psych (4c)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Negl (4d)</th>
+                      {/* Perpetrators */}
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Imm (5a)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Close (5b)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Acq (5c)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Strg (5d)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Offc (5e)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Law (5f)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Othr (5g)</th>
+                      {/* Actions */}
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>LSWDO (6a)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>PNP (6b)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>NBI (6c)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Medical (6d)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Legal (6e)</th>
+                      <th style={{ padding: "6px" }}>NGO (6f)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ background: "#fff", fontWeight: 600 }}>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>MALANDAY</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1", color: "#1e3a5f" }}>{vawcStats.total}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.gender.M}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.gender.F}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.age["0-4"]}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.age["5-9"]}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.age["10-14"]}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.age["15-17"]}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.age["18+"]}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.violence.physical}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.violence.sexual}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.violence.psychological}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.violence.neglect}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.immediate}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.closeRelative}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.acquaintance}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.stranger}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.localOffice}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.lawEnforcer}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.perpetrator.others}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.actions.lswdo}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.actions.pnp}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.actions.nbi}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.actions.medical}</td>
+                      <td style={{ padding: "12px", borderRight: "1px solid #cbd5e1" }}>{vawcStats.actions.legal}</td>
+                      <td style={{ padding: "12px" }}>{vawcStats.actions.ngo}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
             </div>
