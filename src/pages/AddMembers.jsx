@@ -908,6 +908,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   // ─── Validation ─────────────────────────────────────────────────────────────
   const validateTab = (tabNum) => {
     const missing = [];
+    
     if (tabNum === 1) {
       if (!form.firstName.trim()) missing.push("First Name");
       if (!form.lastName.trim()) missing.push("Last Name");
@@ -920,18 +921,35 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       if (!form.email.trim()) missing.push("Email Address");
       else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
     }
+    
     if (tabNum === 2 && !form.sameAddress) {
       if (!form.houseNumber.trim()) missing.push("House / Unit Number");
       if (!form.street.trim()) missing.push("Street");
       if (!form.province.trim()) missing.push("Province");
     }
+    
+    // <-- NEW: Tab 3 Validation for PWD Status -->
+    if (tabNum === 3) {
+      const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
+      if (isPwd) {
+        if (!form.pwdStatus) missing.push("PWD Status");
+        if (!form.disabilityType) missing.push("Disability Type");
+      }
+    }
+    
     if (tabNum === 4) {
       if (!form.educationAttainment) missing.push("Highest Educational Attainment");
       if (!form.educationStatus) missing.push("Education Status");
       if (!form.employmentStatus) missing.push("Employment Status");
     }
-    if (missing.length > 0) { setMemberError(`Please fill in required fields: ${missing.join(", ")}`); return false; }
-    setMemberError(""); return true;
+    
+    if (missing.length > 0) { 
+      setMemberError(`Please fill in required fields: ${missing.join(", ")}`); 
+      return false; 
+    }
+    
+    setMemberError(""); 
+    return true;
   };
 
   const goNext = (nextTab) => {
@@ -941,7 +959,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const goBack = (prevTab) => { setMemberError(""); setTab(prevTab); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const addMember = async () => {
-    if (!validateTab(1) || !validateTab(4)) { setTab(1); return; }
+    // strictly validate in order, jumping to the first invalid tab
+    if (!validateTab(1)) { setTab(1); return; }
+    if (!validateTab(2)) { setTab(2); return; }
+    if (!validateTab(3)) { setTab(3); return; }
+    if (!validateTab(4)) { setTab(4); return; }
 
     const isBR001 = familyBranch === "BR-001";
     const isHead = !isBR001 && (needsHead || form.isBranchHead);
@@ -949,6 +971,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     const fullName = [form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || `Member ${members.length + 1}`;
     const initials = (form.firstName?.[0] || "") + (form.lastName?.[0] || "M");
     const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
+    
     try {
       await addHouseholdMember(householdID, {
         ...form,
@@ -1212,7 +1235,12 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                   const num = i + 1;
                   const status = num < tab ? "done" : num === tab ? "active" : "";
                   return (
-                    <div key={num} className={`am-inner-step ${status}`} onClick={() => setTab(num)}>
+                    <div 
+                      key={num} 
+                      className={`am-inner-step ${status}`} 
+                      // <-- FIX: Only allow clicking past completed tabs so they can't skip validation -->
+                      onClick={() => { if (status === "done") setTab(num); }} 
+                    >
                       <div className="am-inner-step-num">{status === "done" ? "✓" : num}</div>
                       {label}
                     </div>
