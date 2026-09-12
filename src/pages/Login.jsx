@@ -2,6 +2,7 @@ import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useCallback } from "react";
 import { loginWithHouseholdID, getMemberPin, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
 import { LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser } from "../components/Icons";
+import ErrorMessage from "../components/ErrorMessage";
 
 function MobileHeader({ onBack }) {
   return (
@@ -89,6 +90,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   const [redirectProgress, setRedirectProgress] = useState(0);
   const [loginLoading, setLoginLoading] = useState(false);
   const [expandedBranches, setExpandedBranches] = useState({});
+  const [errorMsg, setErrorMsg] = useState("");
 
   function toggleBranch(branchId) {
     setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
@@ -104,6 +106,8 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   async function handleLogin() {
     if (!hhNumber.trim() || !password) return;
     setLoginLoading(true);
+    setErrorMsg("");
+
     try {
       const result = await loginWithHouseholdID(hhNumber.trim(), password);
       const COLORS = [
@@ -150,7 +154,11 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
       setBranches(result.branches || []);
       switchScreen("profiles");
     } catch (err) {
-      alert(err.message);
+      let message = err.message || "An unexpected error occurred.";
+      if (message.includes("auth/invalid-credential") || message.includes("auth/user-not-found") || message.includes("auth/wrong-password")) {
+        message = "Incorrect Household Number or Password. Please try again.";
+      }
+      setErrorMsg(message);
     } finally {
       setLoginLoading(false);
     }
@@ -342,7 +350,11 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <div className="input-wrap">
                   <span className="field-icon"><LoginHomeIcon /></span>
                   <input type="text" placeholder="e.g. MAL-2026-00142"
-                    value={hhNumber} onChange={e => setHhNumber(e.target.value)}
+                    value={hhNumber} 
+                    onChange={e => {
+                      setHhNumber(e.target.value);
+                      setErrorMsg(""); // Clear error when they start typing
+                    }}
                     autoComplete="off" onKeyDown={e => e.key === "Enter" && handleLogin()} />
                 </div>
               </div>
@@ -352,7 +364,11 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <div className="input-wrap has-toggle">
                   <span className="field-icon"><LoginLockIcon /></span>
                   <input type={showPw ? "text" : "password"} placeholder="Enter your password"
-                    value={password} onChange={e => setPassword(e.target.value)}
+                    value={password} 
+                    onChange={e => {
+                      setPassword(e.target.value);
+                      setErrorMsg(""); // Clear error when they start typing
+                    }}
                     onKeyDown={e => e.key === "Enter" && handleLogin()} />
                   <button className="toggle-pw" onClick={() => setShowPw(v => !v)} type="button">
                     {showPw ? <LoginEyeOffIcon /> : <LoginEyeIcon />}
@@ -363,6 +379,15 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
                 <button className="btn-ghost-sm" onClick={onForgotPassword}>Forgot password?</button>
               </div>
+
+              {/*Display the custom ErrorMessage if login fails*/}
+              {errorMsg && (
+                <ErrorMessage 
+                  message={errorMsg} 
+                  onDismiss={() => setErrorMsg("")} 
+                  style={{ marginBottom: "1rem" }} 
+                />
+              )}
 
               <button className="act-btn-main" onClick={handleLogin} disabled={!hhNumber.trim() || !password || loginLoading}>
                 {loginLoading ? "Signing in..." : <> Login <LoginArrowIcon /> </>}
