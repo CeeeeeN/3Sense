@@ -10,6 +10,7 @@ import { ROLE_PERMISSIONS } from "../../services/permissions";
 import ServicePeaceOrder from "./ServicePeaceOrder";
 import ServiceLivelihood from "./ServiceLivelihood";
 import ServiceBswd from "./ServiceBswd";
+import ServiceVawc from "./ServiceVawc";
 
 // ── Today's date as YYYY-MM-DD (used for QR token) ───────────────────────────
 const getTodayStr = () => new Date().toISOString().split("T")[0];
@@ -23,6 +24,7 @@ export default function ManageServices() {
   const [peaceStats, setPeaceStats]           = useState({ total: 0, byStatus: {}, latest: null });
   const [livelihoodStats, setLivelihoodStats] = useState({ total: 0, byStatus: {}, latest: null });
   const [bswdStats, setBswdStats]             = useState({ total: 0, byStatus: {}, latest: null });
+  const [vawcStats, setVawcStats]             = useState({ total: 0, byStatus: {}, latest: null });
 
   const computeStats = (snapshot, dateField = "submittedAt") => {
     const docs     = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -32,7 +34,7 @@ export default function ManageServices() {
     docs.forEach((doc) => {
       const s = doc.status || "unknown";
       byStatus[s] = (byStatus[s] || 0) + 1;
-      const ts = doc[dateField];
+      const ts = doc[dateField] || doc.createdAt;
       if (ts) {
         const d = ts.toDate ? ts.toDate() : new Date(ts);
         if (!latest || d > latest) latest = d;
@@ -58,15 +60,12 @@ export default function ManageServices() {
     const unsubPeace      = onSnapshot(collection(db, "incidentReports"),        (snap) => setPeaceStats(computeStats(snap, "submittedAt")));
     const unsubLivelihood = onSnapshot(collection(db, "livelihoodRegistrations"), (snap) => setLivelihoodStats(computeStats(snap, "submittedAt")));
     const unsubBswd       = onSnapshot(collection(db, "bswdReports"),             (snap) => setBswdStats(computeStats(snap, "submittedAt")));
+    const unsubVawc       = onSnapshot(collection(db, "vawcCases"),               (snap) => setVawcStats(computeStats(snap, "createdAt")));
 
-    return () => { unsubscribeAuth(); unsubPeace(); unsubLivelihood(); unsubBswd(); };
+    return () => { unsubscribeAuth(); unsubPeace(); unsubLivelihood(); unsubBswd(); unsubVawc(); };
   }, []);
 
   // ── QR Generation ─────────────────────────────────────────────────────────────
-  // QR URL includes:
-  //   dt   = today's date (YYYY-MM-DD) — rotates every 24 hours
-  //   type = "service"
-  // No startDate/endDate for services — they are ongoing (no expiry beyond the daily token)
   const handleGenerateQR = (serviceName, category) => {
     const today = getTodayStr();
     const base  = "https://3-sense.vercel.app/";
@@ -97,20 +96,22 @@ export default function ManageServices() {
   };
 
   // ── Sub-page routing ─────────────────────────────────────────────────────────
-  if (activeDashboard === "peace")      return <ServicePeaceOrder onBack={() => setActiveDashboard(null)} />;
-  if (activeDashboard === "livelihood") return <ServiceLivelihood onBack={() => setActiveDashboard(null)} />;
-  if (activeDashboard === "bswd")       return <ServiceBswd onBack={() => setActiveDashboard(null)} />;
+  if (activeDashboard === "peace")      return <ServicePeaceOrder onBack={() => setActiveDashboard(null)} userRole={userRole} />;
+  if (activeDashboard === "livelihood") return <ServiceLivelihood onBack={() => setActiveDashboard(null)} userRole={userRole} />;
+  if (activeDashboard === "bswd")       return <ServiceBswd onBack={() => setActiveDashboard(null)} userRole={userRole} />;
+  if (activeDashboard === "vawc")       return <ServiceVawc onBack={() => setActiveDashboard(null)} userRole={userRole} />;
 
   // ── Stat bar component ───────────────────────────────────────────────────────
   const StatBar = ({ stats }) => {
     const statusColors = {
-      pending:   { bg: "#fef3c7", text: "#92400e" },
-      received:  { bg: "#fef3c7", text: "#92400e" },
-      responded: { bg: "#e0e7ff", text: "#3730a3" },
-      resolved:  { bg: "#dcfce7", text: "#166534" },
-      approved:  { bg: "#dcfce7", text: "#166534" },
-      rejected:  { bg: "#fee2e2", text: "#991b1b" },
-      analyzed:  { bg: "#e0e7ff", text: "#3730a3" },
+      pending:      { bg: "#fef3c7", text: "#92400e" },
+      received:     { bg: "#fef3c7", text: "#92400e" },
+      responded:    { bg: "#e0e7ff", text: "#3730a3" },
+      resolved:     { bg: "#dcfce7", text: "#166534" },
+      approved:     { bg: "#dcfce7", text: "#166534" },
+      rejected:     { bg: "#fee2e2", text: "#991b1b" },
+      analyzed:     { bg: "#e0e7ff", text: "#3730a3" },
+      "acted upon": { bg: "#dcfce7", text: "#166534" },
     };
     return (
       <div style={{ marginTop: "12px", padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
@@ -134,10 +135,10 @@ export default function ManageServices() {
   };
 
   const allowedServices   = ROLE_PERMISSIONS[userRole]?.services || [];
-  const hasWorkspaceServices = allowedServices.some((s) => ["Peace & Order", "Livelihood", "BSWD"].includes(s));
-  const hasInfoServices      = allowedServices.some((s) => ["BADAC", "VAWC", "BOSCA"].includes(s));
+  const hasWorkspaceServices = allowedServices.some((s) => ["Peace & Order", "Livelihood", "BSWD", "VAWC"].includes(s));
+  const hasInfoServices      = allowedServices.some((s) => ["BADAC", "BOSCA"].includes(s));
 
-  // ── Shared QR modal (reused for all services) ────────────────────────────────
+  // ── Shared QR modal ─────────────────────────────────────────────────────────
   const QRModal = () => (
     <div className="as-modal-overlay">
       <div className="as-modal-content" style={{ maxWidth: "450px" }}>
@@ -149,7 +150,6 @@ export default function ManageServices() {
           <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
           <h3>{selectedServiceQR.name}</h3>
 
-          {/* Daily rotation notice */}
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "8px", padding: "10px 14px", marginBottom: "12px", fontSize: "0.82rem", color: "#92400e", textAlign: "left" }}>
             ⚠️ <strong>This QR is valid for today only ({getTodayStr()}).</strong> A new QR must be generated each day.
           </div>
@@ -171,8 +171,7 @@ export default function ManageServices() {
   return (
     <>
       <div className="as-container">
-
-        {/* ── Workspace Services ── */}
+        {/* ── Services Hub Workspace Services ── */}
         {hasWorkspaceServices && (
           <>
             <div className="as-header-section">
@@ -183,8 +182,7 @@ export default function ManageServices() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-
-              {/* Peace & Order */}
+              {/* 1. Peace & Order */}
               {allowedServices.includes("Peace & Order") && (
                 <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
@@ -205,7 +203,7 @@ export default function ManageServices() {
                 </div>
               )}
 
-              {/* Livelihood */}
+              {/* 2. Livelihood */}
               {allowedServices.includes("Livelihood") && (
                 <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
@@ -226,7 +224,7 @@ export default function ManageServices() {
                 </div>
               )}
 
-              {/* BSWD */}
+              {/* 3. BSWD */}
               {allowedServices.includes("BSWD") && (
                 <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
@@ -246,11 +244,32 @@ export default function ManageServices() {
                   </div>
                 </div>
               )}
+
+              {/* 4. VAWC - Promoted */}
+              {allowedServices.includes("VAWC") && (
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#fff1f2", color: "#e11d48", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>VAWC</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Case Management &amp; Desk Intake</span>
+                    </div>
+                  </div>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Log VAC/VAW incident reports, manage protective actions, and track referrals.</p>
+                  <StatBar stats={vawcStats} />
+                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("vawc")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("VAWC", "Services")}>
+                      <Manage_IconQR /> Generate QR Code
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
 
-        {/* ── Informational Services ── */}
+        {/* ── Informational Services (VAWC cleanly removed) ── */}
         {hasInfoServices && (
           <>
             <div className="as-header-section" style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
@@ -263,7 +282,6 @@ export default function ManageServices() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
               {[
                 { name: "BADAC", color: { bg: "#fef3c7", text: "#b45309" }, desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures." },
-                { name: "VAWC",  color: { bg: "#fce7f3", text: "#be185d" }, desc: "Violence Against Women and their Children guides, support numbers, and help." },
                 { name: "BOSCA", color: { bg: "#e0e7ff", text: "#4338ca" }, desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines." },
               ]
                 .filter((svc) => allowedServices.includes(svc.name))
