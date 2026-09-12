@@ -9,6 +9,12 @@ const InputField = ({
   placeholder,
   value,
   onChange,
+  inputMode,
+  pattern,
+  maxLength,
+  min,
+  max,
+  readOnly,
   fullWidth,
   children
 }) => {
@@ -28,6 +34,12 @@ const InputField = ({
           placeholder={placeholder}
           value={value}
           onChange={onChange}
+          inputMode={inputMode}
+          pattern={pattern}
+          maxLength={maxLength}
+          min={min}
+          max={max}
+          readOnly={readOnly}
           required={required}
         />
 
