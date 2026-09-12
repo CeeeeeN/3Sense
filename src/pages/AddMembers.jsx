@@ -874,7 +874,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   }, []);
 
   const set = (field) => (e) => {
-    const val = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    const val = e.target.type === "checkbox"
+      ? e.target.checked
+      : ["contactNumber", "residingSinceYear"].includes(field)
+        ? e.target.value.replace(/\D/g, "").slice(0, field === "residingSinceYear" ? 4 : 15)
+        : e.target.value;
     manuallyEdited.current.add(field);
     setAutofilledFields(prev => { const s = new Set(prev); s.delete(field); return s; });
     setForm(f => {
@@ -916,8 +920,9 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       if (!form.birthPlace.trim()) missing.push("Birth Place");
       if (!form.civilStatus) missing.push("Civil Status");
       if (!form.residingSinceYear) missing.push("Residing Since Year");
+      else if (!/^\d{4}$/.test(form.residingSinceYear)) missing.push("4-digit Residing Since Year");
       if (!form.contactNumber.trim()) missing.push("Contact Number");
-      else if (form.contactNumber.replace(/\D/g, "").length < 10) missing.push("Valid Contact Number");
+      else if (!/^\d{10,15}$/.test(form.contactNumber)) missing.push("Valid Contact Number");
       if (!form.email.trim()) missing.push("Email Address");
       else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
     }
@@ -1276,7 +1281,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       </Field>
                     </div>
                     <div className="am-form-grid cols-3">
-                      <Field label="Birth Date" required><InputField icon={IconCalendar} type="date" value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
+                      <Field label="Birth Date" required><InputField icon={IconCalendar} type="date" max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0]} value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
                       <Field label="Age"><InputField icon={IconClock} type="number" placeholder="Auto" value={form.age} readOnly /></Field>
                       <Field label="Birth Place" required><InputField icon={IconPin} type="text" placeholder="Valenzuela City" value={form.birthPlace} onChange={set("birthPlace")} /></Field>
                     </div>
@@ -1310,11 +1315,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       </Field>
                     )}
                     <div className="am-form-grid cols-2">
-                      <Field label="Contact Number" required><InputField icon={IconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
+                      <Field label="Contact Number" required><InputField icon={IconPhone} type="tel" inputMode="numeric" pattern="[0-9]*" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
                       <Field label="Email Address" required hint="Used for account notifications."><InputField icon={IconMail} type="email" placeholder="email@example.com" value={form.email} onChange={set("email")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
-                      <Field label="Residing Since (Year)" required><InputField icon={IconCalendar} type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
+                      <Field label="Residing Since (Year)" required><InputField icon={IconCalendar} type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                     </div>
 
                     {familyBranch === "BR-001" ? (

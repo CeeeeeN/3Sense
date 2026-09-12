@@ -827,7 +827,11 @@ export default function Registration({ onBack }) {
     setErrorMsg("");
     manuallyEdited.current.add(field);
     setAutofilledFields((prev) => { const s = new Set(prev); s.delete(field); return s; });
-    const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    const value = e.target.type === "checkbox"
+      ? e.target.checked
+      : ["contactNumber", "residingSinceYear"].includes(field)
+        ? e.target.value.replace(/\D/g, "").slice(0, field === "residingSinceYear" ? 4 : 15)
+        : e.target.value;
     setForm((f) => ({ ...f, [field]: value }));
     if (field === "birthDate" && e.target.value) {
       const dob = new Date(e.target.value); const today = new Date();
@@ -854,8 +858,9 @@ export default function Registration({ onBack }) {
       if (!form.civilStatus) missing.push("Civil Status");
       if (!form.citizenship.trim()) missing.push("Citizenship");
       if (!form.residingSinceYear) missing.push("Residing Since Year");
+      else if (!/^\d{4}$/.test(form.residingSinceYear)) missing.push("4-digit Residing Since Year");
       if (!form.contactNumber.trim()) missing.push("Contact Number");
-      else if (form.contactNumber.length < 10) missing.push("Valid Contact Number");
+      else if (!/^\d{10,15}$/.test(form.contactNumber)) missing.push("Valid Contact Number");
       if (showEmail) {
         if (!form.email.trim()) missing.push("Email Address");
         else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
@@ -1212,9 +1217,12 @@ export default function Registration({ onBack }) {
                       <Field label="Residing Since (Year)" required>
                         <InputField
                           icon={RegisIconCalendar}
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]{4}"
                           min="1900"
                           max={currentYear}
+                          maxLength={4}
                           placeholder="e.g. 2010"
                           value={form.residingSinceYear}
                           onChange={set("residingSinceYear")}
@@ -1227,7 +1235,7 @@ export default function Registration({ onBack }) {
                       </Field>
                     )}
                     <div className={`reg-form-grid ${showEmail ? "cols-2" : "cols-1"}`}>
-                      <Field label="Contact Number" required><InputField icon={RegisIconPhone} type="tel" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
+                      <Field label="Contact Number" required><InputField icon={RegisIconPhone} type="tel" inputMode="numeric" pattern="[0-9]*" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
                       {showEmail && (
                         <Field label="Email Address" required hint="We'll send your approval notification here.">
                           <InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} />
