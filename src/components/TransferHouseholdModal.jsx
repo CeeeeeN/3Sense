@@ -7,6 +7,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
   const [transferType, setTransferType] = useState(""); // "existing" or "new"
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [errors, setErrors] = useState({});
   
   // Dynamic Branch State (for existing households)
   const [availableBranches, setAvailableBranches] = useState([{ id: "BR-001", name: "BR-001 (Main)" }]);
@@ -31,6 +32,17 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
     proofFileName: "",
     proofFile: null
   });
+
+  const updateField = (key, val) => {
+    setForm(prev => ({ ...prev, [key]: val }));
+    setErrors(prev => {
+      if (!prev[key]) return prev;
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+    if (errorMsg) setErrorMsg("");
+  };
 
   // Debounced query to validate target household and fetch its branches (ONLY for existing)
   useEffect(() => {
@@ -73,38 +85,66 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
 
   const handleNext = () => {
     if (step === 1 && !transferType) return;
+    setErrors({});
+    setErrorMsg("");
     setStep(s => s + 1);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (targetError) return; 
 
     // --- STRICT INPUT VALIDATION ---
-    const currentHH = form.currentHouseholdID?.trim();
-    if (!currentHH) return setErrorMsg("Current Household ID is required.");
+    const errs = {};
 
     // Validation Branching based on Type
     if (transferType === "existing") {
       const targetHH = form.targetHouseholdID?.trim();
-      if (!targetHH) return setErrorMsg("Target Household ID is required.");
-      if (targetHH.length < 8) return setErrorMsg("Please enter a valid Target Household ID.");
+      if (!targetHH) {
+        errs.targetHouseholdID = "Target Household ID is required.";
+      } else if (targetHH.length < 8) {
+        errs.targetHouseholdID = "Please enter a valid Target Household ID.";
+      } else if (targetError) {
+        errs.targetHouseholdID = targetError;
+      }
     } else if (transferType === "new") {
       const hNum = form.newHouseNumber?.trim();
       const street = form.newStreet?.trim();
       const email = form.newEmail?.trim();
 
-      if (!hNum) return setErrorMsg("Please provide your new house or unit number.");
-      if (!street || street.length < 3) return setErrorMsg("Please provide your new street or purok name (min 3 chars).");
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setErrorMsg("A valid email address is required to receive your new Household ID.");
-    } else {
-       return setErrorMsg("Invalid transfer type.");
+      if (!hNum) {
+        errs.newHouseNumber = "Please provide your house or unit number.";
+      }
+      if (!street) {
+        errs.newStreet = "Please provide your street or purok name.";
+      } else if (street.length < 3) {
+        errs.newStreet = "Street or purok name must be at least 3 characters.";
+      }
+      if (!email) {
+        errs.newEmail = "Contact email is required.";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errs.newEmail = "A valid email address is required to receive your new Household ID.";
+      }
     }
 
     const reasonText = form.reason?.trim();
-    if (!reasonText || reasonText.length < 10) return setErrorMsg("Please provide a clearer reason for the transfer (minimum 10 characters).");
-    if (!form.proofFile) return setErrorMsg("Please upload a valid proof document or ID.");
+    if (!reasonText) {
+      errs.reason = "Please provide a reason for the transfer.";
+    } else if (reasonText.length < 10) {
+      errs.reason = "Please provide a clearer reason for the transfer (minimum 10 characters).";
+    }
+
+    if (!form.proofFile) {
+      errs.proofFile = "Please upload a valid proof document or ID.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      setErrorMsg("Please fill in all required fields.");
+      return;
+    }
     // -------------------------------
+
+    if (targetError) return;
 
     setIsSubmitting(true);
     setErrorMsg("");
@@ -187,7 +227,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>What would you like to do?</div>
 
               <button 
-                onClick={() => setTransferType("existing")}
+                onClick={() => { setTransferType("existing"); setErrors({}); setErrorMsg(""); }}
                 style={{
                   display: "flex", alignItems: "center", gap: "16px", padding: "16px", borderRadius: "10px", textAlign: "left",
                   background: transferType === "existing" ? "#f0fdf4" : "#f9fafb",
@@ -205,7 +245,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               </button>
 
               <button 
-                onClick={() => setTransferType("new")}
+                onClick={() => { setTransferType("new"); setErrors({}); setErrorMsg(""); }}
                 style={{
                   display: "flex", alignItems: "center", gap: "16px", padding: "16px", borderRadius: "10px", textAlign: "left",
                   background: transferType === "new" ? "#eff6ff" : "#f9fafb",
@@ -244,13 +284,17 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   <div className="pf-field" style={{ flex: 2 }}>
                     <label className="pf-lbl">Target Household ID <span className="req">*</span></label>
                     <input 
-                      className={`pf-inp ${targetError ? 'error' : ''}`} 
-                      style={targetError ? { borderColor: '#e03e3e', background: '#fef2f2' } : {}}
+                      className={`pf-inp ${errors.targetHouseholdID || targetError ? 'error' : ''}`} 
+                      style={(errors.targetHouseholdID || targetError) ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
                       placeholder="MAL-2026-XXXXX" 
                       value={form.targetHouseholdID} 
-                      onChange={e => setForm({...form, targetHouseholdID: e.target.value.toUpperCase()})} 
+                      onChange={e => updateField("targetHouseholdID", e.target.value.toUpperCase())} 
                     />
-                    {targetError && <div style={{ color: "#e03e3e", fontSize: "0.75rem", marginTop: "4px" }}>{targetError}</div>}
+                    {(errors.targetHouseholdID || targetError) && (
+                      <div style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "4px" }}>
+                        {errors.targetHouseholdID || targetError}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="pf-field" style={{ flex: 1 }}>
@@ -259,7 +303,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                       className="pf-inp" 
                       style={{ padding: "0.6rem", background: loadingBranches ? "#f1f5f9" : "#fff" }}
                       value={form.targetBranchID} 
-                      onChange={e => setForm({...form, targetBranchID: e.target.value})}
+                      onChange={e => setForm({...form, targetBranchID: e.target.value})} 
                       disabled={loadingBranches || availableBranches.length === 0}
                     >
                       {loadingBranches ? (
@@ -283,20 +327,32 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                     <div className="pf-field" style={{ flex: 1 }}>
                       <label className="pf-lbl">New House/Unit Number <span className="req">*</span></label>
                       <input 
-                        className="pf-inp" 
+                        className={`pf-inp ${errors.newHouseNumber ? 'error' : ''}`} 
+                        style={errors.newHouseNumber ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
                         placeholder="e.g. 142" 
                         value={form.newHouseNumber} 
-                        onChange={e => setForm({...form, newHouseNumber: e.target.value})} 
+                        onChange={e => updateField("newHouseNumber", e.target.value)} 
                       />
+                      {errors.newHouseNumber && (
+                        <div style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "4px" }}>
+                          {errors.newHouseNumber}
+                        </div>
+                      )}
                     </div>
                     <div className="pf-field" style={{ flex: 2 }}>
                       <label className="pf-lbl">New Street / Purok <span className="req">*</span></label>
                       <input 
-                        className="pf-inp" 
+                        className={`pf-inp ${errors.newStreet ? 'error' : ''}`} 
+                        style={errors.newStreet ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
                         placeholder="e.g. Malanday Street" 
                         value={form.newStreet} 
-                        onChange={e => setForm({...form, newStreet: e.target.value})} 
+                        onChange={e => updateField("newStreet", e.target.value)} 
                       />
+                      {errors.newStreet && (
+                        <div style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "4px" }}>
+                          {errors.newStreet}
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -304,11 +360,17 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                     <label className="pf-lbl">Contact Email <span className="req">*</span></label>
                     <input 
                       type="email"
-                      className="pf-inp" 
+                      className={`pf-inp ${errors.newEmail ? 'error' : ''}`} 
+                      style={errors.newEmail ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
                       placeholder="We will send your new Household ID here" 
                       value={form.newEmail} 
-                      onChange={e => setForm({...form, newEmail: e.target.value})} 
+                      onChange={e => updateField("newEmail", e.target.value)} 
                     />
+                    {errors.newEmail && (
+                      <div style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "4px" }}>
+                        {errors.newEmail}
+                      </div>
+                    )}
                     <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
                       This email will be used to activate your new household account.
                     </div>
@@ -320,24 +382,49 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               <div className="pf-field">
                 <label className="pf-lbl">Reason for Transfer <span className="req">*</span></label>
                 <textarea 
-                  className="pf-inp" 
+                  className={`pf-inp ${errors.reason ? 'error' : ''}`} 
                   rows="3" 
                   placeholder="Please briefly explain why you are requesting this transfer..."
                   value={form.reason}
-                  onChange={e => setForm({...form, reason: e.target.value})}
-                  style={{ resize: "vertical", minHeight: "80px" }}
+                  onChange={e => updateField("reason", e.target.value)}
+                  style={{ 
+                    resize: "vertical", 
+                    minHeight: "80px",
+                    ...(errors.reason ? { borderColor: '#dc2626', background: '#fef2f2' } : {})
+                  }}
                 />
+                {errors.reason && (
+                  <div style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "4px" }}>
+                    {errors.reason}
+                  </div>
+                )}
               </div>
 
               <div className="pf-field">
                 <label className="pf-lbl">Proof Document <span className="req">*</span></label>
-                <label className="dr-upload-box" style={{ padding: "20px", textAlign: "center", border: "2px dashed #cbd5e1", borderRadius: "8px", background: "#f8fafc", cursor: "pointer", display: "block" }}>
+                <label className="dr-upload-box" style={{ 
+                  padding: "20px", 
+                  textAlign: "center", 
+                  border: errors.proofFile ? "2px dashed #dc2626" : "2px dashed #cbd5e1", 
+                  borderRadius: "8px", 
+                  background: errors.proofFile ? "#fef2f2" : "#f8fafc", 
+                  cursor: "pointer", 
+                  display: "block" 
+                }}>
                   <input 
                     type="file" 
                     accept=".jpg,.jpeg,.png,.pdf" 
                     style={{ display: "none" }} 
                     onChange={e => {
-                      if(e.target.files[0]) setForm({...form, proofFile: e.target.files[0], proofFileName: e.target.files[0].name});
+                      if (e.target.files[0]) {
+                        setForm(f => ({ ...f, proofFile: e.target.files[0], proofFileName: e.target.files[0].name }));
+                        setErrors(prev => {
+                          const copy = { ...prev };
+                          delete copy.proofFile;
+                          return copy;
+                        });
+                        if (errorMsg) setErrorMsg("");
+                      }
                     }}
                   />
                   {form.proofFileName ? (
@@ -346,12 +433,17 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                     </div>
                   ) : (
                     <div>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 8px" }}><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-                      <div style={{ fontSize: "0.85rem", color: "#475569", fontWeight: 500 }}>Upload ID or Proof of Residency</div>
-                      <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "4px" }}>JPG, PNG or PDF (Max 5MB)</div>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={errors.proofFile ? "#dc2626" : "#64748b"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 8px" }}><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+                      <div style={{ fontSize: "0.85rem", color: errors.proofFile ? "#991b1b" : "#475569", fontWeight: 500 }}>Upload ID or Proof of Residency</div>
+                      <div style={{ fontSize: "0.75rem", color: errors.proofFile ? "#b91c1c" : "#94a3b8", marginTop: "4px" }}>JPG, PNG or PDF (Max 5MB)</div>
                     </div>
                   )}
                 </label>
+                {errors.proofFile && (
+                  <div style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "4px" }}>
+                    {errors.proofFile}
+                  </div>
+                )}
               </div>
 
               {errorMsg && (
