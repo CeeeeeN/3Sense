@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getTransferRequestDetails, respondToTransferConsent, verifyResidentPIN } from "../services/services";
+import ErrorMessage from "./ErrorMessage"; // <-- IMPORT ERROR MESSAGE
 
 export default function TransferConsentModal({ transferID, householdID, currentHeadID, onClose, onHandled }) {
   const [request, setRequest] = useState(null);
@@ -24,15 +25,19 @@ export default function TransferConsentModal({ transferID, householdID, currentH
 
   const handleConfirmAction = async () => {
     if (!actionType) return;
-    if (actionType === "Approved" && !pin) {
-      setErrorMsg("Please enter your PIN to authorize this transfer.");
-      return;
-    }
-
-    if (pin.length !== 4) {
-        setErrorMsg("Please enter your exact 4-digit PIN.");
+    
+    // ── STRICT INPUT VALIDATION ──
+    if (actionType === "Approved") {
+      if (!pin || pin.trim().length !== 4) {
+        setErrorMsg("Please enter your exact 4-digit PIN to authorize this transfer.");
         return;
+      }
+      if (!/^\d{4}$/.test(pin)) {
+        setErrorMsg("PIN must contain only numbers.");
+        return;
+      }
     }
+    // ─────────────────────────────
 
     setIsSubmitting(true);
     setErrorMsg("");
@@ -62,7 +67,12 @@ export default function TransferConsentModal({ transferID, householdID, currentH
             <h3>Household Transfer Authorization</h3>
             <p>A resident requested to join your household</p>
           </div>
-          <button className="pf-modal-close" onClick={onClose} disabled={isSubmitting}>&times;</button>
+          <button className="pf-modal-close" onClick={onClose} disabled={isSubmitting}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         <div className="pf-modal-body" style={{ padding: "1.5rem" }}>
@@ -164,38 +174,61 @@ export default function TransferConsentModal({ transferID, householdID, currentH
                     inputMode="numeric"
                     placeholder="••••"
                     value={pin}
-                    onChange={(e) => setPin(e.target.value)}
+                    onChange={(e) => {
+                      // Prevent non-numeric input
+                      const val = e.target.value.replace(/[^0-9]/g, "");
+                      setPin(val);
+                      if (errorMsg) setErrorMsg("");
+                    }}
+                    disabled={isSubmitting}
                     style={{
                       width: "100%",
-                      padding: "10px",
+                      padding: "12px",
                       borderRadius: "8px",
-                      border: "1px solid #cbd5e1",
-                      fontSize: "1.1rem",
-                      letterSpacing: "4px",
+                      border: errorMsg ? "2px solid #dc2626" : "2px solid #cbd5e1",
+                      background: errorMsg ? "#fef2f2" : "#fff",
+                      color: errorMsg ? "#991b1b" : "var(--text)",
+                      fontSize: "1.5rem",
+                      letterSpacing: "8px",
                       textAlign: "center",
+                      outline: "none",
+                      transition: "all 0.2s ease-in-out"
                     }}
                   />
                 </div>
               )}
 
+              {/* <-- NEW: Display the custom ErrorMessage component --> */}
               {errorMsg && (
-                <div style={{ color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", padding: "8px 12px", borderRadius: "6px", fontSize: "0.8rem", marginTop: "1rem" }}>
-                  {errorMsg}
-                </div>
+                <ErrorMessage 
+                  message={errorMsg} 
+                  onDismiss={() => setErrorMsg("")} 
+                  style={{ marginTop: "0.5rem" }} 
+                />
               )}
             </div>
           )}
         </div>
 
-        <div className="pf-modal-foot" style={{ justifyContent: "space-between" }}>
-          <button className="pf-btn-ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-          <button
-            className="pf-btn-primary"
-            onClick={handleConfirmAction}
-            disabled={isSubmitting || !actionType || (actionType === "Approved" && !pin) || request?.headApproval !== "Pending"}
-          >
-            {isSubmitting ? "Submitting..." : "Confirm Decision"}
-          </button>
+        <div className="pf-modal-foot" style={{ justifyContent: request?.headApproval === "Pending" ? "space-between" : "center" }}>
+          {request?.headApproval === "Pending" ? (
+            <>
+              <button className="pf-btn-ghost" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </button>
+              <button
+                className="pf-btn-primary"
+                onClick={handleConfirmAction}
+                disabled={isSubmitting || !actionType || (actionType === "Approved" && pin.length !== 4)}
+              >
+                {isSubmitting ? "Submitting..." : "Confirm Decision"}
+              </button>
+            </>
+          ) : (
+            <button className="pf-btn-ghost" onClick={onClose} style={{ width: "100%", justifyContent: "center" }}>
+              Close
+            </button>
+          )}
         </div>
       </div>
     </div>

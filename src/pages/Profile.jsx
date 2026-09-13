@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import TransferHouseholdModal from "../components/TransferHouseholdModal";
 import TransferHeadModal from "../components/TransferHeadModal";
 import TransferBranchHeadModal from "../components/TransferBranchHeadModal";
+import RemoveMemberModal from "../components/RemoveMemberModal";
 
 const QR_PAT = [
   true, true, true, false, true,
@@ -1001,6 +1002,15 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                   onClick={() => setActiveModal('transferHead')} 
                 />
               )}
+              {/* Remove Member Button */}
+              {isHead && (
+                <SettingRow 
+                  icon={IconTrash} 
+                  title="Remove Member" 
+                  description="Permanently delete a member from this household" 
+                  onClick={() => setActiveModal('removeMember')} 
+                />
+              )}
               {isBranchHead && (
                 <SettingRow 
                   icon={ProfileIconUser} 
@@ -1079,6 +1089,15 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           currentHouseholdID={householdID} 
           userData={data}
           memberID={memberID} 
+        />
+      )}
+
+      {/* Remove Member Modal */}
+      {activeModal === 'removeMember' && (
+        <RemoveMemberModal 
+          householdID={householdID}
+          currentHeadID={memberID}
+          onClose={() => setActiveModal(null)}
         />
       )}
 

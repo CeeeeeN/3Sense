@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { submitHouseholdTransfer, fetchHouseholdBranchesForTransfer } from "../services/services";
-//import ErrorMessage from "../components/ErrorMessage";
+import ErrorMessage from "../components/ErrorMessage";
 
 export default function TransferHouseholdModal({ onClose, currentHouseholdID, userData, memberID, onNavigate }) {
   const [step, setStep] = useState(1);
@@ -79,20 +79,32 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (targetError) return; 
-    
-    if (!form.currentHouseholdID.trim()) return setErrorMsg("Current Household ID is required.");
+
+    // --- STRICT INPUT VALIDATION ---
+    const currentHH = form.currentHouseholdID?.trim();
+    if (!currentHH) return setErrorMsg("Current Household ID is required.");
 
     // Validation Branching based on Type
     if (transferType === "existing") {
-      if (!form.targetHouseholdID.trim()) return setErrorMsg("Target Household ID is required.");
+      const targetHH = form.targetHouseholdID?.trim();
+      if (!targetHH) return setErrorMsg("Target Household ID is required.");
+      if (targetHH.length < 8) return setErrorMsg("Please enter a valid Target Household ID.");
+    } else if (transferType === "new") {
+      const hNum = form.newHouseNumber?.trim();
+      const street = form.newStreet?.trim();
+      const email = form.newEmail?.trim();
+
+      if (!hNum) return setErrorMsg("Please provide your new house or unit number.");
+      if (!street || street.length < 3) return setErrorMsg("Please provide your new street or purok name (min 3 chars).");
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setErrorMsg("A valid email address is required to receive your new Household ID.");
     } else {
-      if (!form.newHouseNumber.trim()) return setErrorMsg("Please provide your new house or unit number.");
-      if (!form.newStreet.trim() || form.newStreet.trim().length < 3) return setErrorMsg("Please provide your new street or purok name.");
-      if (!form.newEmail.trim() || !/\S+@\S+\.\S+/.test(form.newEmail)) return setErrorMsg("A valid email address is required to receive your new Household ID.");
+       return setErrorMsg("Invalid transfer type.");
     }
 
-    if (!form.reason || form.reason.trim().length < 10) return setErrorMsg("Please provide a clearer reason for the transfer (min 10 chars).");
+    const reasonText = form.reason?.trim();
+    if (!reasonText || reasonText.length < 10) return setErrorMsg("Please provide a clearer reason for the transfer (minimum 10 characters).");
     if (!form.proofFile) return setErrorMsg("Please upload a valid proof document or ID.");
+    // -------------------------------
 
     setIsSubmitting(true);
     setErrorMsg("");
@@ -127,8 +139,8 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       const userUID = userData?.UID || "";
       const userName = [userData?.firstName, userData?.lastName].filter(Boolean).join(" ");
 
-      // Submits to the same backend pipeline!
-      await submitHouseholdTransfer(form.currentHouseholdID, residentID, userUID, userName, submissionData);
+      // Submits to the backend pipeline
+      await submitHouseholdTransfer(currentHH, residentID, userUID, userName, submissionData);
       
       setStep(3); 
     } catch (error) {
@@ -383,7 +395,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
             <button 
               className="pf-btn-primary" 
               onClick={handleSubmit} 
-              disabled={isSubmitting || !form.reason || !form.proofFile || !form.currentHouseholdID || (transferType === "existing" && (targetError !== "" || loadingBranches))}
+              disabled={isSubmitting || loadingBranches}
             >
               {isSubmitting ? "Submitting..." : "Submit Request"}
             </button>

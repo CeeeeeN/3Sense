@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { getHouseholdResidents, transferHouseholdHeadRole, verifyResidentPIN } from "../services/services";
+import ErrorMessage from "./ErrorMessage"; // <-- IMPORT ERROR MESSAGE
 
 export default function TransferHeadModal({ onClose, householdID, currentHeadID, onLogout }) {
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTargetID, setSelectedTargetID] = useState("");
-  const [pin, setPin] = useState(""); // <-- Added PIN state
+  const [pin, setPin] = useState(""); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -30,12 +31,21 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
   }, [householdID, currentHeadID]);
 
   const handleSubmit = async () => {
-    if (!selectedTargetID || !pin) return;
+    if (!selectedTargetID) {
+      setErrorMsg("Please select a new Household Head.");
+      return;
+    }
 
-    if (pin.length !== 4) {
+    // ── STRICT INPUT VALIDATION ──
+    if (!pin || pin.trim().length !== 4) {
       setErrorMsg("Please enter your exact 4-digit PIN.");
       return;
     }
+    if (!/^\d{4}$/.test(pin)) {
+      setErrorMsg("PIN must contain only numbers.");
+      return;
+    }
+    // ─────────────────────────────
     
     if (!window.confirm("Are you sure? You will lose all administrative privileges for this household and will be logged out immediately.")) {
       return;
@@ -117,9 +127,10 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
             )}
           </div>
 
-          {/* <-- NEW PIN INPUT FIELD --> */}
           <div className="pf-field">
-            <label className="pf-lbl">Enter PIN to Confirm <span className="req">*</span></label>
+            <label className="pf-lbl" style={{ textAlign: "center", display: "block" }}>
+              Enter PIN to Confirm <span className="req">*</span>
+            </label>
             <input 
               type="password" 
               className="pf-inp" 
@@ -127,16 +138,36 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
               inputMode="numeric"
               maxLength={4}
               value={pin}
-              onChange={e => setPin(e.target.value)}
+              onChange={e => {
+                // Prevent any non-numeric characters
+                const val = e.target.value.replace(/[^0-9]/g, "");
+                setPin(val);
+                // Auto-clear error state when user types
+                if (errorMsg) setErrorMsg("");
+              }}
               disabled={isSubmitting || residents.length === 0}
-              style={{ letterSpacing: "4px", fontSize: "1.1rem" }}
+              style={{ 
+                width: "100%",
+                padding: "12px",
+                borderRadius: "8px",
+                border: errorMsg ? "2px solid #dc2626" : "1px solid #cbd5e1",
+                background: errorMsg ? "#fef2f2" : "#fff",
+                color: errorMsg ? "#991b1b" : "var(--text)",
+                letterSpacing: "8px", 
+                fontSize: "1.5rem", 
+                textAlign: "center",
+                transition: "all 0.2s ease-in-out"
+              }}
             />
           </div>
 
+          {/* <-- NEW: Display the custom ErrorMessage component --> */}
           {errorMsg && (
-            <div style={{ color: "#e03e3e", fontSize: "0.85rem", background: "#fef2f2", padding: "10px", borderRadius: "8px", border: "1px solid #fecaca", marginTop: "1rem" }}>
-              {errorMsg}
-            </div>
+            <ErrorMessage 
+              message={errorMsg} 
+              onDismiss={() => setErrorMsg("")} 
+              style={{ marginTop: "1rem" }} 
+            />
           )}
         </div>
 
@@ -147,9 +178,9 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
           
           <button 
             className="pf-btn-primary" 
-            style={{ background: "#dc2626" }}
+            style={{ background: "#dc2626", borderColor: "#dc2626" }}
             onClick={handleSubmit} 
-            disabled={isSubmitting || residents.length === 0 || !selectedTargetID || !pin}
+            disabled={isSubmitting || residents.length === 0 || !selectedTargetID || pin.length !== 4}
           >
             {isSubmitting ? "Verifying..." : "Confirm Transfer"}
           </button>

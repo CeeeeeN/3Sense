@@ -2,7 +2,7 @@ import { db } from "../firebase/firebase";
 import {
   collection, addDoc, getDocs,
   query, where, orderBy, serverTimestamp, limit, or,
-  getDoc, doc, writeBatch, updateDoc
+  getDoc, doc, writeBatch, updateDoc, deleteDoc
 } from "firebase/firestore";
 import { generateHouseholdID, sendApprovalEmail } from "./admin";
 
@@ -548,6 +548,25 @@ export async function verifyResidentPIN(householdID, residentID, inputPin) {
   if (savedPinHash !== hashedInput) {
     throw new Error("Incorrect PIN. Please try again.");
   }
+  
+  return true;
+}
+
+
+/**
+ * Removes a member from the household after verifying their personal PIN.
+ */
+export async function removeHouseholdMember(householdID, targetResidentID, targetPin) {
+  if (!householdID || !targetResidentID || !targetPin) {
+    throw new Error("Missing required information to remove member.");
+  }
+
+  // 1. Verify the TARGET member's PIN using your existing function
+  await verifyResidentPIN(householdID, targetResidentID, targetPin);
+
+  // 2. If verification passes, delete the member document
+  const residentRef = doc(db, "households", householdID, "residents", targetResidentID);
+  await deleteDoc(residentRef);
   
   return true;
 }
