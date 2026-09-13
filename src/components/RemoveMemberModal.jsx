@@ -40,7 +40,11 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
   };
 
   const handleRemove = async () => {
-    if (!pin || pin.trim().length !== 4) {
+    if (!pin || pin.trim().length === 0) {
+      setErrorMsg("PIN is required. Please enter the 4-digit PIN.");
+      return;
+    }
+    if (pin.trim().length !== 4) {
       setErrorMsg("Please enter the exact 4-digit PIN.");
       return;
     }
@@ -217,7 +221,7 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
             <button 
               className="pf-btn-primary" 
               onClick={handleRemove} 
-              disabled={isSubmitting || pin.length !== 4}
+              disabled={isSubmitting}
               style={{ background: "#dc2626", borderColor: "#dc2626" }}
             >
               {isSubmitting ? "Removing..." : "Confirm Removal"}

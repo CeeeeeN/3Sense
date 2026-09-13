@@ -28,7 +28,11 @@ export default function TransferConsentModal({ transferID, householdID, currentH
     
     // ── STRICT INPUT VALIDATION ──
     if (actionType === "Approved") {
-      if (!pin || pin.trim().length !== 4) {
+      if (!pin || pin.trim().length === 0) {
+        setErrorMsg("PIN is required. Please enter your 4-digit PIN to authorize this transfer.");
+        return;
+      }
+      if (pin.trim().length !== 4) {
         setErrorMsg("Please enter your exact 4-digit PIN to authorize this transfer.");
         return;
       }
@@ -219,7 +223,7 @@ export default function TransferConsentModal({ transferID, householdID, currentH
               <button
                 className="pf-btn-primary"
                 onClick={handleConfirmAction}
-                disabled={isSubmitting || !actionType || (actionType === "Approved" && pin.length !== 4)}
+                disabled={isSubmitting || !actionType}
               >
                 {isSubmitting ? "Submitting..." : "Confirm Decision"}
               </button>

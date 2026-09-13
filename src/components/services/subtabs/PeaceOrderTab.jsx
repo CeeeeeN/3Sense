@@ -30,7 +30,20 @@ const getSaved = (key, fallback) => {
 };
 
 // ── Helper: returns today's date string "YYYY-MM-DD" ──────────────────────────
-const getTodayStr = () => new Date().toISOString().split("T")[0];
+const getTodayStr = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getCurrentTimeStr = () => {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
 
 export default function PeaceOrderTab({ userData, householdID }) {
   const [view, setView] = useState("home");
@@ -61,10 +74,20 @@ export default function PeaceOrderTab({ userData, householdID }) {
 
   const validate = () => {
     const e = {};
+    const today = getTodayStr();
+    const nowTime = getCurrentTimeStr();
     if (!form.incidentType) e.incidentType = "Please select an incident type.";
     if (!form.location.trim()) e.location = "Location is required.";
-    if (!form.date) e.date = "Date is required.";
-    if (!form.time) e.time = "Time is required.";
+    if (!form.date) {
+      e.date = "Date is required.";
+    } else if (form.date > today) {
+      e.date = "Incident date cannot be in the future.";
+    }
+    if (!form.time) {
+      e.time = "Time is required.";
+    } else if (form.date === today && form.time > nowTime) {
+      e.time = "Incident time cannot be in the future.";
+    }
     if (!form.description.trim()) e.description = "Please describe what happened.";
     if (!form.urgency) e.urgency = "Please select urgency level.";
     return e;
@@ -270,14 +293,48 @@ export default function PeaceOrderTab({ userData, householdID }) {
                 className={`sv-input${errors.date ? " sv-input--error" : ""}`}
                 type="date"
                 value={form.date}
-                min={getTodayStr()}
-                onChange={e => set("date", e.target.value)}
+                max={getTodayStr()}
+                onChange={e => {
+                  const val = e.target.value;
+                  const today = getTodayStr();
+                  const targetDate = val > today ? today : val;
+                  set("date", targetDate);
+                  setErrors(errs => {
+                    const { date, ...rest } = errs;
+                    return rest;
+                  });
+                  if (targetDate === today && form.time && form.time > getCurrentTimeStr()) {
+                    set("time", "");
+                  }
+                }}
               />
               {errors.date && <span className="sv-error-msg">{errors.date}</span>}
             </div>
             <div className="dr-field">
               <label className="sv-label">Time <span className="sv-required">*</span></label>
-              <input className={`sv-input${errors.time ? " sv-input--error" : ""}`} type="time" value={form.time} onChange={e => set("time", e.target.value)} />
+              <input
+                className={`sv-input${errors.time ? " sv-input--error" : ""}`}
+                type="time"
+                value={form.time}
+                max={form.date === getTodayStr() ? getCurrentTimeStr() : undefined}
+                onChange={e => {
+                  const val = e.target.value;
+                  const today = getTodayStr();
+                  if (form.date === today) {
+                    const nowTime = getCurrentTimeStr();
+                    if (val > nowTime) {
+                      set("time", nowTime);
+                      setErrors(errs => ({ ...errs, time: "Incident time cannot be in the future." }));
+                      return;
+                    }
+                  }
+                  setErrors(errs => {
+                    const { time, ...rest } = errs;
+                    return rest;
+                  });
+                  set("time", val);
+                }}
+              />
               {errors.time && <span className="sv-error-msg">{errors.time}</span>}
             </div>
           </div>

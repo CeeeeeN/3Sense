@@ -37,7 +37,11 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
     }
 
     // ── STRICT INPUT VALIDATION ──
-    if (!pin || pin.trim().length !== 4) {
+    if (!pin || pin.trim().length === 0) {
+      setErrorMsg("PIN is required. Please enter your 4-digit PIN.");
+      return;
+    }
+    if (pin.trim().length !== 4) {
       setErrorMsg("Please enter your exact 4-digit PIN.");
       return;
     }
@@ -180,7 +184,7 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
             className="pf-btn-primary" 
             style={{ background: "#dc2626", borderColor: "#dc2626" }}
             onClick={handleSubmit} 
-            disabled={isSubmitting || residents.length === 0 || !selectedTargetID || pin.length !== 4}
+            disabled={isSubmitting || residents.length === 0 || !selectedTargetID}
           >
             {isSubmitting ? "Verifying..." : "Confirm Transfer"}
           </button>
