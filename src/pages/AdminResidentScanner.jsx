@@ -30,8 +30,9 @@ const fmtDate = (ts) => {
   if (!ts) return "-";
   try {
     const d = typeof ts.toDate === "function" ? ts.toDate() : new Date(ts);
+    if (isNaN(d.getTime())) return typeof ts === "string" ? ts : "-";
     return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
-  } catch { return "-"; }
+  } catch { return typeof ts === "string" ? ts : "-"; }
 };
 
 const statusColors = (status = "") => {
@@ -206,96 +207,197 @@ function ResidentModal({ profile, onClose, onScanAnother }) {
 
   useEffect(() => {
     if (!profile) return;
-    const { residentID, UID, userID, role, householdID } = profile;
+
+    const fetchCollection = async (colName, mapper) => {
+      const { residentID, householdID, UID } = profile;
+      const docMap = new Map();
+      const queries = [];
+
+      if (householdID && residentID) {
+        queries.push(query(
+          collection(db, colName),
+          where("householdID", "==", householdID),
+          where("residentID", "==", residentID),
+          limit(100)
+        ));
+      } else if (householdID) {
+        queries.push(query(collection(db, colName), where("householdID", "==", householdID), limit(100)));
+      } else if (residentID) {
+        queries.push(query(collection(db, colName), where("residentID", "==", residentID), limit(100)));
+      }
+
+      if (UID) {
+        queries.push(query(collection(db, colName), where("UID", "==", UID), limit(100)));
+      }
+
+      for (const q of queries) {
+        try {
+          const snap = await getDocs(q);
+          snap.forEach(d => {
+            if (!docMap.has(d.id)) {
+              docMap.set(d.id, d.data());
+            }
+          });
+        } catch (e) {
+          console.warn(`[ResidentModal] Query error for ${colName}:`, e);
+        }
+      }
+
+      return Array.from(docMap.entries()).map(([id, data]) => mapper(id, data));
+    };
+
+    const getEquipmentStatus = (data) => {
+      const raw = data.status || "Pending";
+      const resolved = ["Returned", "Unreturned", "Rejected"].includes(raw);
+      if (!resolved && raw === "Claimed" && data.returnDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (new Date(data.returnDate + "T00:00:00") < today) return "Overdue";
+      }
+      return raw;
+    };
+
+    const safeDate = (item) => {
+      const raw = item?.date || item?.submittedAt || item?.createdAt || item?._ts;
+      if (!raw) return 0;
+      try {
+        if (typeof raw.toMillis === "function") return raw.toMillis();
+        if (typeof raw.toDate === "function") return raw.toDate().getTime();
+        const t = new Date(raw).getTime();
+        return isNaN(t) ? 0 : t;
+      } catch {
+        return 0;
+      }
+    };
+
+    const sortByDateDesc = (arr) => [...arr].sort((a, b) => safeDate(b) - safeDate(a));
 
     const fetchAll = async () => {
       setLoading(true);
       setFetchError("");
       try {
-        let txList = [];
-        try {
-          txList = await fetchUserTransactions(
-            householdID,
-            residentID,
-            userID,
-            role || "Member",
-            UID
-          );
-        } catch (err) {
-          console.warn("[ResidentModal] fetchUserTransactions error:", err);
-        }
+        const [
+          docReqs,
+          facReqs,
+          eqReqs,
+          incReqs,
+          bswdReqs,
+          feedReqs,
+          progRegs,
+          livRegs,
+        ] = await Promise.all([
+          fetchCollection("document_requests", (id, d) => ({
+            id,
+            category: "Document",
+            type: "Document Request",
+            name: d.documentType || d.name || "Document Request",
+            status: d.status || "Pending",
+            refNum: d.requestID || d.refNum || "",
+            date: d.submittedAt || d.createdAt || null,
+          })),
+          fetchCollection("facility_reservations", (id, d) => ({
+            id,
+            category: "Facility",
+            type: "Facility Reservation",
+            name: d.facilityName || "Facility Reservation",
+            status: d.status || "Pending",
+            refNum: d.reservationID || d.refNum || "",
+            date: d.submittedAt || d.createdAt || d.date || null,
+          })),
+          fetchCollection("equipment_rentals", (id, d) => ({
+            id,
+            category: "Equipment",
+            type: "Equipment Rental",
+            name: d.equipmentName || "Equipment Rental",
+            status: getEquipmentStatus(d),
+            refNum: d.rentalID || d.refNum || "",
+            date: d.submittedAt || d.createdAt || null,
+          })),
+          fetchCollection("incidentReports", (id, d) => ({
+            id,
+            category: "Peace & Order",
+            type: "Incident Report",
+            name: d.incidentType || "Incident Report",
+            status: d.status || "Submitted",
+            refNum: d.refNum || "",
+            date: d.submittedAt || d.createdAt || d.date || null,
+          })),
+          fetchCollection("bswdReports", (id, d) => ({
+            id,
+            category: "BSWD",
+            type: d.type === "tip" ? "BSWD Tip" : "BSWD Report",
+            name: d.type === "tip" ? "Anonymous Tip" : (d.type || "BSWD Report"),
+            status: d.status || "Submitted",
+            refNum: d.refNum || "",
+            date: d.submittedAt || d.createdAt || null,
+          })),
+          fetchCollection("feedback", (id, d) => ({
+            id,
+            category: "Feedback",
+            type: "Feedback",
+            name: d.facilityName ? `${d.facilityName} (Feedback)` : (d.category ? `${d.category} Feedback` : "Feedback"),
+            status: d.status || "Submitted",
+            refNum: d.referenceID || d.refNum || "",
+            date: d.createdAt || d.submittedAt || null,
+          })),
+          fetchCollection("programRegistrations", (id, d) => ({
+            id,
+            category: "Program",
+            type: "Barangay Program",
+            name: d.programName || d.title || "Barangay Program",
+            status: d.status || "Registered",
+            refNum: d.regNum || d.refNum || "",
+            date: d.programDate || d.submittedAt || d.createdAt || null,
+          })),
+          fetchCollection("livelihoodRegistrations", (id, d) => ({
+            id,
+            category: "Livelihood",
+            type: "Livelihood Skills Training",
+            name: d.programName || d.title || "Livelihood Program",
+            status: d.status || "Registered",
+            refNum: d.regNum || d.refNum || "",
+            date: d.programDate || d.submittedAt || d.createdAt || null,
+          })),
+        ]);
 
         let attendees = [];
         try {
-          if (UID) {
-            const attSnap = await getDocs(query(
-              collectionGroup(db, "attendees"),
-              where("UID", "==", UID),
-              limit(50)
-            ));
-            attendees = attSnap.docs.map(d => ({
-              id: d.id,
-              category: "Program",
-              serviceName: d.data().programName || d.data().eventName || "Barangay Program",
-              date: d.data().registeredAt || d.data().createdAt,
-              status: d.data().status || "Registered",
-              refNum: d.data().refNum || "",
-            }));
-          }
-          if (attendees.length === 0 && residentID && residentID !== "head") {
-            const attSnap = await getDocs(query(
-              collectionGroup(db, "attendees"),
-              where("residentID", "==", residentID),
-              limit(50)
-            ));
-            attendees = attSnap.docs
-              .filter(d => !householdID || !d.data().householdID || d.data().householdID === householdID)
-              .map(d => ({
-                id: d.id,
-                category: "Program",
-                serviceName: d.data().programName || d.data().eventName || "Barangay Program",
-                date: d.data().registeredAt || d.data().createdAt,
-                status: d.data().status || "Registered",
-                refNum: d.data().refNum || "",
-              }));
-          }
-        } catch (err) {
-          console.warn("[ResidentModal] attendees query error:", err);
+          const attSnap = await getDocs(collectionGroup(db, "attendees"));
+          const seenProgramNames = new Set(
+            [...progRegs, ...livRegs].map(p => (p.name || "").toLowerCase().trim())
+          );
+          attSnap.forEach(d => {
+            const data = d.data();
+            const docResID = (data.residentID || d.id || "").trim();
+            const docHH = (data.householdID || "").trim();
+            const docUID = (data.UID || "").trim();
+
+            const match = (profile.UID && docUID === profile.UID) ||
+              (profile.residentID && docResID === profile.residentID && (!docHH || !profile.householdID || docHH === profile.householdID));
+
+            if (match) {
+              const progName = data.programName || data.eventName || "Barangay Program";
+              if (!seenProgramNames.has(progName.toLowerCase().trim())) {
+                attendees.push({
+                  id: d.id,
+                  category: "Program",
+                  type: "Barangay Program",
+                  name: progName,
+                  status: data.status || "Registered",
+                  refNum: data.refNum || data.regNum || "",
+                  date: data.programDate || data.registeredAt || data.createdAt || null,
+                });
+                seenProgramNames.add(progName.toLowerCase().trim());
+              }
+            }
+          });
+        } catch (e) {
+          console.warn("[ResidentModal] Attendees query error:", e);
         }
 
-        const safeDate = (item) => {
-          const raw = item?.date || item?._ts;
-          if (!raw) return 0;
-          try {
-            if (typeof raw.toDate === "function") return raw.toDate().getTime();
-            const t = new Date(raw).getTime();
-            return isNaN(t) ? 0 : t;
-          } catch {
-            return 0;
-          }
-        };
-
-        const sortByDateDesc = (arr) => [...arr].sort((a, b) => safeDate(b) - safeDate(a));
-
-        const mappedTx = (Array.isArray(txList) ? txList : []).map(t => ({
-          ...t,
-          name: t.serviceName || t.name || t.type || "Record",
-          type: t.category || t.type || "",
-        }));
-
-        const programs = sortByDateDesc([
-          ...mappedTx.filter(t => t.category === "Livelihood"),
-          ...attendees.map(a => ({ ...a, name: a.serviceName, type: "Program" })),
-        ]);
-
-        const services = sortByDateDesc(
-          mappedTx.filter(t => ["Document", "Facility", "Equipment", "Peace & Order", "BSWD"].includes(t.category))
-        );
-
-        const transactions = sortByDateDesc([
-          ...mappedTx,
-          ...attendees.map(a => ({ ...a, name: a.serviceName, type: "Program" })),
-        ]);
+        const programs = sortByDateDesc([...progRegs, ...livRegs, ...attendees]);
+        const services = sortByDateDesc([...docReqs, ...facReqs, ...eqReqs, ...incReqs, ...bswdReqs, ...feedReqs]);
+        const transactions = sortByDateDesc([...programs, ...services]);
 
         setRecords({
           programs,
