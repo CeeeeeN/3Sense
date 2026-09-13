@@ -617,48 +617,55 @@ export async function respondToTransferConsent(transferDocID, headDecision) {
 // ══════════════════════════════
 // 📋 USER TRANSACTION HISTORY
 // ══════════════════════════════
-// DECOUPLED FROM HOUSEHOLD ID: Uses the permanent UID or Resident ID
 export async function fetchUserTransactions(householdID, residentID, userID, role = "Member", userUID = null) {
-  if (!residentID && !userUID) return []; // Need at least one valid identity anchor
+  if (!residentID && !userUID && !householdID) return [];
 
-  // Build the unified Hybrid Query
-  const conditions = [];
-  if (userUID) conditions.push(where("UID", "==", userUID));
-  if (residentID) conditions.push(where("residentID", "==", residentID));
-  if (userID) conditions.push(where("userID", "==", userID));
-  
-  const identityQuery = or(...conditions);
+  const fetchCollection = async (collectionName, mapper, limitCount = 50) => {
+    const docMap = new Map();
+    const queries = [];
 
-  const fetchWithFallback = async (collectionName, dateField, mapper, limitCount = 50) => {
-    try {
-      const q = query(
-        collection(db, collectionName), 
-        identityQuery,
-        orderBy(dateField, "desc"),
+    if (householdID && residentID) {
+      queries.push(query(
+        collection(db, collectionName),
+        where("householdID", "==", householdID),
+        where("residentID", "==", residentID),
         limit(limitCount)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map(mapper);
-    } catch (err) {
-      console.warn(`[${collectionName}] Index missing. Falling back to unindexed query.`, err);
-      // Firebase triggers this fallback if the `or()` composite index hasn't been built yet
-      const fallbackQ = query(
-        collection(db, collectionName), 
-        identityQuery
-      );
-      const fallbackSnap = await getDocs(fallbackQ);
-      const docs = fallbackSnap.docs.map(mapper);
-      // Sort manually since orderBy was dropped in the fallback
-      docs.sort((a, b) => {
-        const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-        const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-        return tb - ta;
-      });
-      return docs.slice(0, limitCount);
+      ));
+    } else if (householdID) {
+      queries.push(query(collection(db, collectionName), where("householdID", "==", householdID), limit(limitCount)));
+    } else if (residentID) {
+      queries.push(query(collection(db, collectionName), where("residentID", "==", residentID), limit(limitCount)));
     }
+
+    if (userUID) {
+      queries.push(query(collection(db, collectionName), where("UID", "==", userUID), limit(limitCount)));
+    }
+
+    for (const q of queries) {
+      try {
+        const snap = await getDocs(q);
+        snap.forEach(d => {
+          if (!docMap.has(d.id)) {
+            docMap.set(d.id, d.data());
+          }
+        });
+      } catch (err) {
+        console.warn(`[${collectionName}] query error:`, err);
+      }
+    }
+
+    const results = Array.from(docMap.entries()).map(([id, data]) => mapper({ id, data: () => data }));
+
+    results.sort((a, b) => {
+      const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+      const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+      return tb - ta;
+    });
+
+    return results.slice(0, limitCount);
   };
 
-  const docs = await fetchWithFallback("document_requests", "submittedAt", d => ({
+  const docs = await fetchCollection("document_requests", d => ({
     id: d.id,
     category: "Document",
     serviceName: d.data().documentType || "Document Request",
@@ -668,17 +675,17 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   }));
 
-  const facs = await fetchWithFallback("facility_reservations", "submittedAt", d => ({
+  const facs = await fetchCollection("facility_reservations", d => ({
     id: d.id,
     category: "Facility",
     serviceName: d.data().facilityName || "Facility Reservation",
     refNum: d.data().reservationID || d.data().refNum || "",
     status: d.data().status || "Pending",
-    date: d.data().submittedAt,
+    date: d.data().submittedAt || d.data().date,
     ...d.data(),
   }));
 
-  const eqs = await fetchWithFallback("equipment_rentals", "submittedAt", d => {
+  const eqs = await fetchCollection("equipment_rentals", d => {
     const rawData = d.data();
     const rawStatus = rawData.status || "Pending";
     let effectiveStatus = rawStatus;
@@ -704,27 +711,27 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     };
   });
 
-  const fbs = await fetchWithFallback("feedback", "createdAt", d => ({
+  const fbs = await fetchCollection("feedback", d => ({
     id: d.id,
     category: d.data().category || "Feedback",
     serviceName: d.data().facilityName || "Feedback",
     refNum: d.data().referenceID || d.data().refNum || "",
     status: d.data().status || "Submitted",
-    date: d.data().createdAt,
+    date: d.data().createdAt || d.data().submittedAt,
     ...d.data(),
   }));
 
-  const pos = await fetchWithFallback("incidentReports", "submittedAt", d => ({
+  const pos = await fetchCollection("incidentReports", d => ({
     id: d.id,
     category: "Peace & Order",
     serviceName: d.data().incidentType || "Incident Report",
     refNum: d.data().refNum || "",
     status: d.data().status || "Submitted",
-    date: d.data().submittedAt,
+    date: d.data().submittedAt || d.data().date,
     ...d.data(),
   }));
 
-  const bswds = await fetchWithFallback("bswdReports", "submittedAt", d => ({
+  const bswds = await fetchCollection("bswdReports", d => ({
     id: d.id,
     category: "BSWD",
     serviceName: d.data().type === "tip" ? "Anonymous Tip" : "BSWD Report",
@@ -734,7 +741,17 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   }));
 
-  const lhs = await fetchWithFallback("livelihoodRegistrations", "submittedAt", d => ({
+  const progs = await fetchCollection("programRegistrations", d => ({
+    id: d.id,
+    category: "Program",
+    serviceName: d.data().programName || "Barangay Program",
+    refNum: d.data().regNum || d.data().refNum || "",
+    status: d.data().status || "Registered",
+    date: d.data().programDate || d.data().submittedAt,
+    ...d.data(),
+  }));
+
+  const lhs = await fetchCollection("livelihoodRegistrations", d => ({
     id: d.id,
     category: "Livelihood",
     serviceName: d.data().programName || "Registration",
@@ -745,7 +762,7 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
   }));
 
   // Merge all arrays and sort by date descending
-  const all = [...docs, ...facs, ...eqs, ...fbs, ...pos, ...bswds, ...lhs];
+  const all = [...docs, ...facs, ...eqs, ...fbs, ...pos, ...bswds, ...progs, ...lhs];
   all.sort((a, b) => {
     const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
     const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
