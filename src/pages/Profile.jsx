@@ -300,12 +300,20 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   }, [householdID, memberID, userID, userRole, data.UID]);
 
   useEffect(() => {
-    if (!memberID) return;
+    let uid = data.UID;
+    if (!uid) {
+      try {
+        const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+        uid = session.UID;
+      } catch {}
+    }
+    const residentIdentifier = uid || memberID;
+    if (!residentIdentifier) return;
 
-    QRCode.toDataURL(memberID, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
+    QRCode.toDataURL(residentIdentifier, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
       .then(url => setQrUrl(url))
       .catch(console.error);
-  }, [memberID]);
+  }, [data.UID, memberID]);
 
   // Camera cleanup & control
   const stopCamera = useCallback(() => {
