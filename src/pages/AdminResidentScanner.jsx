@@ -9,10 +9,10 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
+  doc,
   orderBy,
   limit,
-  or,
-  FieldPath,
 } from "firebase/firestore";
 
 const loadJsQR = () =>
@@ -609,13 +609,34 @@ function ResidentScanner() {
   const onQRDetected = async (rawData) => {
     scanning.current = false;
 
-    const memberID = rawData.trim();
-
-    if (!memberID || memberID.startsWith("{") || memberID.startsWith("http")) {
+    let input = (rawData || "").trim();
+    if (!input || input.startsWith("http")) {
       setScanError("Unrecognized QR format. Please scan a valid Resident Profile QR.");
       scanning.current = true;
       tick();
       return;
+    }
+
+    let identifier = input;
+    let directHouseholdID = null;
+    let directResidentID = null;
+
+    if (input.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(input);
+        if (parsed.householdID && parsed.residentID) {
+          directHouseholdID = parsed.householdID;
+          directResidentID = parsed.residentID;
+        }
+        if (parsed.UID) {
+          identifier = parsed.UID;
+        }
+      } catch {
+        setScanError("Unrecognized QR format. Please scan a valid Resident Profile QR.");
+        scanning.current = true;
+        tick();
+        return;
+      }
     }
 
     setFlash(true);
@@ -626,30 +647,90 @@ function ResidentScanner() {
     setCamState("idle");
 
     try {
-      const snap = await getDocs(query(
-        collectionGroup(db, "residents"),
-        where(FieldPath.documentId(), "==", memberID),
-        limit(1)
-      ));
+      let resDoc = null;
+      let householdID = null;
 
-      if (snap.empty) {
+      if (directHouseholdID && directResidentID) {
+        try {
+          const dSnap = await getDoc(doc(db, "households", directHouseholdID, "residents", directResidentID));
+          if (dSnap.exists()) {
+            resDoc = dSnap;
+            householdID = directHouseholdID;
+          }
+        } catch {}
+      }
+
+      if (!resDoc && identifier) {
+        try {
+          const uidSnap = await getDocs(query(
+            collectionGroup(db, "residents"),
+            where("UID", "==", identifier),
+            limit(1)
+          ));
+          if (!uidSnap.empty) {
+            resDoc = uidSnap.docs[0];
+            householdID = resDoc.ref.parent.parent?.id;
+          }
+        } catch {}
+      }
+
+      if (!resDoc && identifier) {
+        try {
+          const resSnap = await getDocs(query(
+            collectionGroup(db, "residents"),
+            where("residentID", "==", identifier),
+            limit(1)
+          ));
+          if (!resSnap.empty) {
+            resDoc = resSnap.docs[0];
+            householdID = resDoc.ref.parent.parent?.id;
+          }
+        } catch {}
+      }
+
+      if (!resDoc && identifier) {
+        try {
+          const userSnap = await getDocs(query(
+            collectionGroup(db, "residents"),
+            where("userID", "==", identifier),
+            limit(1)
+          ));
+          if (!userSnap.empty) {
+            resDoc = userSnap.docs[0];
+            householdID = resDoc.ref.parent.parent?.id;
+          }
+        } catch {}
+      }
+
+      if (!resDoc && identifier) {
+        try {
+          const allSnap = await getDocs(collectionGroup(db, "residents"));
+          const match = allSnap.docs.find(d => d.id === identifier || d.data().UID === identifier);
+          if (match) {
+            resDoc = match;
+            householdID = resDoc.ref.parent.parent?.id;
+          }
+        } catch {}
+      }
+
+      if (!resDoc) {
         setScanError("Resident not found. The QR may be outdated or the account may have been removed.");
         setFetching(false);
         return;
       }
 
-      const resDoc = snap.docs[0];
-      const householdID = resDoc.ref.parent.parent?.id;
-      if (!householdID) {
+      const resolvedHouseholdID = householdID || resDoc.data().householdID || resDoc.ref.parent.parent?.id;
+      if (!resolvedHouseholdID) {
         setScanError("Could not resolve the resident's household. Please try again.");
         setFetching(false);
         return;
       }
 
       const d = resDoc.data();
+      const resolvedMemberID = resDoc.id || d.residentID || identifier;
       setResidentProfile({
-        residentID: memberID,
-        householdID,
+        residentID: resolvedMemberID,
+        householdID: resolvedHouseholdID,
         UID: d.UID || "",
         userID: d.userID || "",
         role: d.role || "Member",
