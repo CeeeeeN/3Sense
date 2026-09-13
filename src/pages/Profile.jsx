@@ -307,7 +307,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         uid = session.UID;
       } catch {}
     }
-    const residentIdentifier = uid || memberID;
+    const residentIdentifier = uid || (memberID && memberID !== "head" ? memberID : null);
     if (!residentIdentifier) return;
 
     QRCode.toDataURL(residentIdentifier, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
