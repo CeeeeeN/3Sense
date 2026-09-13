@@ -8,6 +8,7 @@ const NOTIF_ICONS = {
   bswd: { icon: "🤝", bg: "rgba(59,130,246,0.12)" },
   incident: { icon: "⚠️", bg: "rgba(239,68,68,0.12)" },
   general: { icon: "🔔", bg: "rgba(100,100,200,0.12)" },
+  transfer_approval: { icon: "🔄", bg: "rgba(45,177,123,0.15)" },
 };
 
 function formatModalTime(timestamp) {

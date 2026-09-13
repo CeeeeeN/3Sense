@@ -359,7 +359,6 @@ function Step4({ refNum, onReset }) {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
           <span>Processing time: 2–3 business days.</span>
         </div>
-        {/* ── FIXED: wrapped text in <span> so flex layout doesn't break "6 months" ── */}
         <div className="dr-success-info-item" style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "8px 10px", marginTop: "4px" }}>
           <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -375,6 +374,8 @@ function Step4({ refNum, onReset }) {
 
 export default function DocumentsTab({ userData, householdID, userName }) {
   const residentID = userData?.residentID || getSaved("memberID", null);
+  const userUID = userData?.UID || getSaved("UID", null); // <-- RETRIEVE UID
+  
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -389,8 +390,6 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   });
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the document types fetch. 
-    // A barangay will rarely have more than 20-30 document templates.
     const q = query(
       collection(db, "documents"),
       limit(50) 
@@ -476,7 +475,14 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         });
 
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-        const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
+        
+        // <-- INJECT UID INTO THE PAYLOAD HERE
+        const submissionForm = { 
+          ...form, 
+          purpose: effectivePurpose, 
+          validIdUrl: uploadedIdUrl,
+          UID: userUID 
+        };
 
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);

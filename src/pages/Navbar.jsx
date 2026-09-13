@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import barangayLogo from "./barangay-logo.jpg";
 import { IconBell, NavIconUser, IconProfile2, IconSettings, IconHelp, IconLogout } from "../components/Icons";
 import NotificationModal from "../components/NotificationModal";
+import TransferConsentModal from "../components/TransferConsentModal"; // <-- NEW IMPORT
 import {
   subscribeToUserNotifications,
   markNotificationAsRead,
@@ -24,6 +25,9 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [memberNotifs, setMemberNotifs] = useState([]);
   const [householdNotifs, setHouseholdNotifs] = useState([]);
+  
+  // <-- STATE FOR TRANSFER CONSENT MODAL -->
+  const [activeTransferConsentID, setActiveTransferConsentID] = useState(null);
 
   // Merge both streams, deduplicate by id, sort newest-first
   const notifications = [...memberNotifs, ...householdNotifs]
@@ -69,7 +73,7 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
   }, [showLogoutModal]);
 
   useEffect(() => {
-    if (showLogoutModal) {
+    if (showLogoutModal || activeTransferConsentID) {
       document.body.style.overflow = "hidden";
     } else if (window.innerWidth <= 768 && userOpen) {
       document.body.style.overflow = "hidden";
@@ -77,7 +81,7 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
-  }, [showLogoutModal, userOpen]);
+  }, [showLogoutModal, userOpen, activeTransferConsentID]);
 
   const clearAll = () => markAllNotificationsAsRead(notifications);
   const markRead = (id) => markNotificationAsRead(id);
@@ -89,9 +93,15 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
     markRead(n.id);
     setNotifOpen(false);
 
-    if (!onNavigate) return;
-
     const type = (n.type || "").toLowerCase();
+    
+    // <-- INTERCEPT TRANSFER APPROVAL NOTIFICATIONS -->
+    if (type === "transfer_approval" && n.refNum) {
+      setActiveTransferConsentID(n.refNum);
+      return;
+    }
+
+    if (!onNavigate) return;
     const text = [n.title || "", n.message || "", n.category || ""].join(" ").toLowerCase();
 
     // 1. Announcements -> Home popup
@@ -260,6 +270,20 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
           onMarkAllRead={clearAll}
           onDelete={handleDelete}
         />
+
+        {/* ── TRANSFER CONSENT POPUP MODAL ── */}
+        {activeTransferConsentID && (
+          <TransferConsentModal
+            transferID={activeTransferConsentID}
+            householdID={householdID}
+            currentHeadID={memberID}
+            onClose={() => setActiveTransferConsentID(null)}
+            onHandled={(decision) => {
+              // The action is recorded in DB. We just close the modal.
+              setActiveTransferConsentID(null);
+            }}
+          />
+        )}
 
         {/* ── LOGOUT MODAL ── */}
         {showLogoutModal && (

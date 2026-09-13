@@ -13,6 +13,12 @@ import {
 import { db } from "../../firebase/firebase";
 import { createNotification } from "../../services/notifications";
 
+// ── SESSION HELPER ────────────────────────────────────────────────────────────
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 // ── Reg number generator ──────────────────────────────────────────────────────
 const generateRegNum = () => {
   const year = new Date().getFullYear();
@@ -182,16 +188,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
   }, [programs]);
 
   // ── Real-time: My registrations ───────────────────────────────────
-  //
-  // ROOT CAUSE FIX: The previous code used `where("householdID", ...)` with
-  // a guard `if (!householdID) return`. If the householdID prop is null or
-  // undefined (common when the parent hasn't loaded it yet), the listener
-  // is silently skipped — myRegs stays [] — and "Already Registered" is
-  // never detected.
-  //
-  // Solution: derive the user's ID from userData (always available) and
-  // query by "userID" instead. householdID is kept as a fallback only.
-  // orderBy is also removed to avoid requiring a composite Firestore index.
   useEffect(() => {
     const activeUserId = userData?.userID || userData?.residentID || "";
     const hid = householdID || "";
@@ -228,7 +224,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     );
 
     return () => unsub();
-  }, [userData, householdID]); // re-run when either identity value changes
+  }, [userData, householdID]); 
 
   // ── Derived helpers ───────────────────────────────────────────────
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -283,15 +279,19 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     if (step === 3) {
       setSubmitting(true);
       try {
-        const reg = generateRegNum(); // local var — state `regNum` is still "" here
+        const reg = generateRegNum(); 
         const prog = selectedProgram;
         const timeLabel = [formatTime(prog?.startTime), formatTime(prog?.endTime)].filter(Boolean).join(" – ");
         const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ");
         const activeUserId = userData?.userID || userData?.residentID || "";
+        
+        // <-- EXTRACT PERMANENT UID HERE
+        const userUID = userData?.UID || getSaved("UID", null);
 
         // 1️⃣ Flat collection → "My Registrations" view
         await addDoc(collection(db, "programRegistrations"), {
-          regNum: reg,              // ← use local var, not stale state
+          regNum: reg,              
+          UID: userUID, // <--- INJECTED UID
           firstName: form.firstName,
           middleName: form.middleName || "",
           lastName: form.lastName,
@@ -319,6 +319,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
           await setDoc(
             doc(db, "Programs", prog.id, "attendees", activeUserId),
             {
+              UID: userUID, // <--- INJECTED UID
               userID: activeUserId,
               regNum: reg,
               userName: userName || fullName,

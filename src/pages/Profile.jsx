@@ -4,6 +4,10 @@ import { getMemberProfile, updateMemberProfile } from "../services/profile";
 import { fetchUserTransactions } from "../services/services";
 import QRCode from "qrcode";
 
+import TransferHouseholdModal from "../components/TransferHouseholdModal";
+import TransferHeadModal from "../components/TransferHeadModal";
+import TransferBranchHeadModal from "../components/TransferBranchHeadModal";
+
 const QR_PAT = [
   true, true, true, false, true,
   true, false, true, true, false,
@@ -33,7 +37,15 @@ const STATUS_MAP = {
   "Violation": { label: "Violation", cls: "violation", color: "#e03e3e", desc: "This resident has a recorded violation." },
 };
 
-// Icons
+// ── UID GENERATOR FALLBACK ──
+const generateResidentUID = () => {
+  const year = new Date().getFullYear();
+  const timeSlice = Date.now().toString().slice(-4);
+  const random4 = Math.floor(1000 + Math.random() * 9000).toString();
+  return `MAL-${year}-${timeSlice}${random4}`;
+};
+
+// ── Icons ──
 const IconQR = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3" /></svg>;
 const IconCamera = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>;
 const IconUpload = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" /></svg>;
@@ -52,6 +64,18 @@ const ProfileIconX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill=
 const ProfileIconArrow = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>;
 const IconSave = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
 
+// Settings Icons
+const IconSettings = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
+const IconBell = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>;
+const IconSupport = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line><line x1="14.83" y1="9.17" x2="18.36" y2="5.64"></line><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line></svg>;
+const IconHelp = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+const IconMessage = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>;
+const IconInfo = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+const IconShield2 = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>;
+const IconTransfer = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="14" x2="21" y2="3"></line><polyline points="8 21 3 21 3 16"></polyline><line x1="20" y1="10" x2="3" y2="21"></line></svg>;
+const IconChevronRight = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>;
+
+// ── Components ──
 function InfoItem({ label, value }) {
   return (
     <div className="pf-info-item">
@@ -95,6 +119,72 @@ function formatHistoryDate(isoString) {
   }
 }
 
+// ── Action Modals ──
+
+function HelpFaqModal({ onClose }) {
+  return (
+    <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+        <div className="pf-modal-head">
+          <div><h3>Help & FAQ</h3><p>Frequently asked questions</p></div>
+          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+        </div>
+        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+          Feature content to be added later.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactModal({ onClose }) {
+  return (
+    <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+        <div className="pf-modal-head">
+          <div><h3>Contact Barangay</h3><p>Get in touch with the local office</p></div>
+          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+        </div>
+        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+          Feature content to be added later.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AboutModal({ onClose }) {
+  return (
+    <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+        <div className="pf-modal-head">
+          <div><h3>About 3S+ Malanday</h3><p>System information and version</p></div>
+          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+        </div>
+        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+          Feature content to be added later.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PrivacyModal({ onClose }) {
+  return (
+    <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+        <div className="pf-modal-head">
+          <div><h3>Privacy Policy</h3><p>How we handle your data</p></div>
+          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+        </div>
+        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+          Feature content to be added later.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Profile({ onBack, onNavigate, householdID, memberID, userRole, userID }) {
   const [data, setData] = useState({ ...BLANK });
   const [draft, setDraft] = useState({ ...BLANK });
@@ -122,30 +212,60 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
+  // Settings State
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [activeModal, setActiveModal] = useState(null); // 'transfer', 'help', 'contact', 'about', 'privacy'
+
   const fullName = [data.firstName, data.middleName, data.lastName, data.suffix].filter(Boolean).join(" ");
   const addressFields = ["houseNumber", "street", "barangay", "city", "province", "region"];
 
+  const isHead = userRole === "Household Head" || userRole === "head";
+  const isBranchHead = userRole === "Branch Head";
+
   // Load member profile from Firestore on mount
   useEffect(() => {
-    console.log("[Profile] householdID:", householdID, "memberID:", memberID);
     let isMounted = true;
     if (!householdID || !memberID) {
-      console.warn("[Profile] Missing householdID or memberID — skipping load.");
       setLoading(false);
       return;
     }
 
     getMemberProfile(householdID, memberID)
-      .then(profile => {
+      .then(async profile => {
         if (!isMounted) return;
-        console.log("[Profile] Loaded:", profile);
-        setData(profile || { ...BLANK });
-        if (profile?.profilePhoto) {
-          setProfilePic(profile.profilePhoto);
+        
+        let loadedProfile = profile || { ...BLANK };
+        
+        // ── LAZY PATCH: Generate and save UID if the resident doesn't have one yet ──
+        if (!loadedProfile.UID) {
+          const newUID = generateResidentUID();
+          loadedProfile.UID = newUID;
+          try {
+            await updateMemberProfile(householdID, memberID, { ...loadedProfile, UID: newUID });
+            
+            // Sync with local storage
+            const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+            session.UID = newUID;
+            localStorage.setItem("brgy_session", JSON.stringify(session));
+          } catch (e) {
+            console.error("Failed to apply Lazy Patch UID:", e);
+          }
+        }
+
+        setData(loadedProfile);
+        if (loadedProfile?.profilePhoto) {
+          setProfilePic(loadedProfile.profilePhoto);
         }
       })
       .catch(err => {
         console.error("[Profile] Error:", err);
+
+        // Auto-logout if profile was transferred to a new household
+        if (err.message.includes("not found")) {
+          alert("Your profile has been transferred. Please log in again using your new Household ID.");
+          localStorage.removeItem("brgy_session"); // Wipe the dead session
+          if (onNavigate) onNavigate("logout");    // Kick back to login screen
+        }
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -162,7 +282,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       return;
     }
 
-    fetchUserTransactions(householdID, memberID, userID, userRole)
+    // Include data.UID to securely fetch their individual history
+    fetchUserTransactions(householdID, memberID, userID, userRole, data.UID)
       .then(txData => {
         if (!isMounted) return;
         setTransactions(txData || []);
@@ -175,12 +296,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       });
 
     return () => { isMounted = false; };
-  }, [householdID, memberID, userID, userRole]);
+  }, [householdID, memberID, userID, userRole, data.UID]);
 
   // Generate QR code whenever identity data changes
   useEffect(() => {
     if (!fullName && !householdID) return;
     const qrData = JSON.stringify({
+      UID: data.UID || "", // Inject UID into the payload
       householdID: householdID,
       residentID: memberID,
       name: fullName || "Resident",
@@ -193,7 +315,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
     QRCode.toDataURL(qrData, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
       .then(url => setQrUrl(url))
       .catch(console.error);
-  }, [fullName, householdID, memberID, userRole, data.branchID, data.branchName, data.barangay]);
+  }, [fullName, householdID, memberID, userRole, data.branchID, data.branchName, data.barangay, data.UID]);
 
   // Camera cleanup & control
   const stopCamera = useCallback(() => {
@@ -300,6 +422,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
     setSaving(true);
     try {
       const payload = { ...draft, sameAddress: computeSameAddress() };
+      // ensure we don't accidentally overwrite the UID with empty if draft missed it
+      payload.UID = data.UID; 
       await updateMemberProfile(householdID, memberID, payload);
       setData(payload);
       setOpen(false);
@@ -398,6 +522,32 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
   const totalPages = Math.ceil(transactions.length / txPerPage) || 1;
 
+  // ── Settings Row Component ──
+  const SettingRow = ({ icon: Icon, title, description, action, onClick }) => (
+    <div 
+      className="pf-setting-row" 
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", padding: "16px", cursor: onClick ? "pointer" : "default",
+        borderBottom: "1px solid #e5e7eb", transition: "background 0.2s"
+      }}
+    >
+      <div style={{
+        width: "36px", height: "36px", borderRadius: "8px", background: "rgba(49,125,137,0.1)",
+        display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", marginRight: "14px"
+      }}>
+        <Icon />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: "0.95rem", fontWeight: 500, color: "var(--text)" }}>{title}</div>
+        {description && <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "2px" }}>{description}</div>}
+      </div>
+      <div style={{ color: "var(--muted)", display: "flex", alignItems: "center" }}>
+        {action || (onClick && <IconChevronRight />)}
+      </div>
+    </div>
+  );
+
   return (
     <div className="pf-root" onClick={(e) => { if (picMenuOpen && !e.target.closest('.pf-avatar-wrap')) setPicMenuOpen(false); }}>
       <Navbar
@@ -481,11 +631,20 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             <div className="pf-hero-identity">
               <div className="pf-hero-name">{fullName || "Your Full Name"}</div>
               <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {userRole || "Member"}</div>
+              
+              {/* DISPLAY PERMANENT UID HERE */}
+              {data.UID && (
+                <div className="pf-hero-family-number" style={{ color: "#0d7a55", fontWeight: "600", marginTop: "4px", fontSize: "0.95rem" }}>
+                  Barangay UID: {data.UID}
+                </div>
+              )}
+
               {data.familyNumber && (
                 <div className="pf-hero-family-number">
                   Family Number: {data.familyNumber}
                 </div>
               )}
+              
               <div className="pf-hero-verified"><span className="pf-hero-dot" /> Verified Resident</div>
               <div className="pf-hero-divider" />
               <div className="pf-hero-meta">
@@ -831,9 +990,128 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             </div>
           </Card>
 
+          {/* ── SETTINGS AND PREFERENCES MENU (MOBILE APP MATCH) ── */}
+          <div style={{ marginBottom: "2rem" }}>
+            <Card icon={IconSettings} title="Preferences">
+              {isHead && (
+                <SettingRow 
+                  icon={ProfileIconUser} 
+                  title="Transfer Head Role" 
+                  description="Assign the Household Head role to another member" 
+                  onClick={() => setActiveModal('transferHead')} 
+                />
+              )}
+              {isBranchHead && (
+                <SettingRow 
+                  icon={ProfileIconUser} 
+                  title="Transfer Branch Head Role" 
+                  description="Assign the Branch Head role to another member" 
+                  onClick={() => setActiveModal('transferBranchHead')} 
+                />
+              )}
+              <SettingRow 
+                icon={IconBell} 
+                title="Push Notifications" 
+                description="Receive important updates & notifications" 
+                action={
+                  <label className="pf-toggle-switch" style={{ position: "relative", display: "inline-block", width: "40px", height: "24px" }}>
+                    <input 
+                      type="checkbox" 
+                      style={{ opacity: 0, width: 0, height: 0 }} 
+                      checked={pushEnabled} 
+                      onChange={e => setPushEnabled(e.target.checked)} 
+                    />
+                    <span style={{
+                      position: "absolute", cursor: "pointer", top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: pushEnabled ? "#317D89" : "#cbd5e1", transition: "0.4s", borderRadius: "24px"
+                    }}>
+                      <span style={{
+                        position: "absolute", content: '""', height: "18px", width: "18px", left: "3px", bottom: "3px",
+                        backgroundColor: "white", transition: "0.4s", borderRadius: "50%",
+                        transform: pushEnabled ? "translateX(16px)" : "translateX(0)"
+                      }} />
+                    </span>
+                  </label>
+                }
+              />
+              <SettingRow 
+                icon={IconTransfer} 
+                title="Transfer Household" 
+                description="Move your profile to a different household" 
+                onClick={() => setActiveModal('transfer')} 
+              />
+            </Card>
+          </div>
+
+          <div style={{ marginBottom: "2rem" }}>
+            <Card icon={IconSupport} title="Support">
+              <SettingRow 
+                icon={IconHelp} 
+                title="Help & FAQ" 
+                onClick={() => setActiveModal('help')} 
+              />
+              <SettingRow 
+                icon={IconMessage} 
+                title="Contact Barangay" 
+                onClick={() => setActiveModal('contact')} 
+              />
+              <SettingRow 
+                icon={IconInfo} 
+                title="About" 
+                onClick={() => setActiveModal('about')} 
+              />
+              <SettingRow 
+                icon={IconShield2} 
+                title="Privacy Policy" 
+                onClick={() => setActiveModal('privacy')} 
+              />
+            </Card>
+          </div>
+
           <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
         </div>
       )}
+
+      {/* ── SETTINGS ACTION MODALS ── */}
+      {activeModal === 'transfer' && (
+        <TransferHouseholdModal 
+          onClose={() => setActiveModal(null)} 
+          currentHouseholdID={householdID} 
+          userData={data}
+          memberID={memberID} 
+        />
+      )}
+
+      {activeModal === 'transferHead' && (
+        <TransferHeadModal 
+          onClose={() => setActiveModal(null)} 
+          householdID={householdID} 
+          currentHeadID={memberID} 
+          onLogout={() => {
+            localStorage.removeItem("brgy_session");
+            if (onNavigate) onNavigate("logout");
+          }}
+        />
+      )}
+
+      {activeModal === 'transferBranchHead' && (
+        <TransferBranchHeadModal 
+          onClose={() => setActiveModal(null)} 
+          householdID={householdID}
+          currentBranchID={data.branchID} // Pass their current branch so it filters correctly
+          currentHeadID={memberID} 
+          onLogout={() => {
+            localStorage.removeItem("brgy_session");
+            if (onNavigate) onNavigate("logout");
+          }}
+        />
+      )}
+
+      {activeModal === 'help' && <HelpFaqModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'contact' && <ContactModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'privacy' && <PrivacyModal onClose={() => setActiveModal(null)} />}
+
 
       {/* ── LIVE CAMERA MODAL (From Current Branch) ── */}
       {cameraModalOpen && (

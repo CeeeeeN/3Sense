@@ -52,7 +52,7 @@ export default function ServicePeaceOrder({ onBack }) {
   // ── Pagination & Filter State ─────────────────────────────────────
   const [currentPage, setCurrentPage]       = useState(1);
   const itemsPerPage                        = 7; 
-  
+
   const [filterStatus, setFilterStatus]     = useState("All");
   const [filterUrgency, setFilterUrgency]   = useState("All");
   const [filterType, setFilterType]         = useState("All");
@@ -84,10 +84,10 @@ export default function ServicePeaceOrder({ onBack }) {
           ...docData
         };
       });
-      
+
       setReports(data);
       setLoading(false);
-      
+
       setSelectedReport(prev => prev ? (data.find(r => r.id === prev.id) || prev) : null);
     });
     return () => unsub();
@@ -359,7 +359,7 @@ export default function ServicePeaceOrder({ onBack }) {
                   <option value="responded">Responded</option>
                   <option value="resolved">Resolved</option>
                 </select>
-                
+
                 <select className="filter-select" value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
                   <option value="All">All Urgencies</option>
                   <option value="emergency">Emergency</option>
@@ -425,7 +425,7 @@ export default function ServicePeaceOrder({ onBack }) {
                 );
               })}
             </div>
-            
+
             {filteredReports.length > 0 && (
               <div style={{
                 display: "flex",
@@ -535,7 +535,13 @@ export default function ServicePeaceOrder({ onBack }) {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                       <div>
                         <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Name</p>
-                        <p style={{ margin: 0 }}>{selectedReport.reporterName}</p>
+                        <p style={{ margin: 0, fontWeight: 500 }}>{selectedReport.reporterName}</p>
+                        {/* CONDITIONAL UID DISPLAY */}
+                        {selectedReport.UID && (
+                          <div style={{ fontSize: "0.85rem", color: "#317D89", marginTop: "4px", fontWeight: 600 }}>
+                            UID: {selectedReport.UID}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Contact</p>
@@ -627,14 +633,14 @@ export default function ServicePeaceOrder({ onBack }) {
       {showGroupModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(17, 24, 39, 0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
           <div style={{ background: "#fff", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
-            
+
             <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>Manage Tanod Groups</h2>
               <button onClick={() => setShowGroupModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}>&times;</button>
             </div>
 
             <div style={{ padding: "24px", overflowY: "auto", flex: 1, background: "#f9fafb" }}>
-              
+
               <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#fff", padding: "16px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: "block", fontSize: "0.8rem", color: "#6b7280", marginBottom: "6px", fontWeight: 600 }}>Create New Group</label>
@@ -661,7 +667,7 @@ export default function ServicePeaceOrder({ onBack }) {
                         <span style={{ fontWeight: 600, color: "#374151" }}>{group.groupName}</span>
                         <button onClick={() => handleDeleteGroup(group.id, group.groupName)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: "0.8rem", cursor: "pointer" }}>Delete Group</button>
                       </div>
-                      
+
                       <div style={{ padding: "16px" }}>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
                           {group.members && group.members.length > 0 ? (

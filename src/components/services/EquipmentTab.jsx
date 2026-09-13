@@ -15,6 +15,12 @@ const EquipmentIcon = () => (
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+// ── SESSION HELPER ──
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 function dateOffset(offsetDays) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -267,12 +273,21 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
     try {
       const finalPurpose = form.purpose === "Other" ? form.customPurpose : form.purpose;
       
+      // <-- INJECT UID HERE
+      const userUID = userData?.UID || getSaved("UID", null);
+      
+      const submissionForm = { 
+        ...form, 
+        purpose: finalPurpose,
+        UID: userUID 
+      };
+      
       const generatedRef = await submitEquipmentRental(
         householdID,
         userData?.residentID || userID || "",
         userName || "Unknown",
         equipment,
-        { ...form, purpose: finalPurpose },
+        submissionForm, // Passed the updated payload containing the UID
         {} // custom data if needed later
       );
       setRefNum(generatedRef || "");

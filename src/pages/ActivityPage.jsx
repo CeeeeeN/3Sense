@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
-import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, or } from "firebase/firestore";
 import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 
 // ── SESSION HELPER ──
@@ -55,7 +55,7 @@ function EmptyState({ message }) {
 }
 
 // ── MAIN ACTIVITY PAGE ──
-export default function ActivityPage({ onNavigate, memberID: propMemberID, householdID: propHouseholdID }) {
+export default function ActivityPage({ onNavigate, memberID: propMemberID, householdID: propHouseholdID, UID: propUID }) {
   const [activeTab, setActiveTab] = useState("programs");
   const [loading, setLoading] = useState(true);
 
@@ -63,7 +63,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const [programs, setPrograms] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [reservations, setReservations] = useState([]);
-  const [equipment, setEquipment] = useState([]); // 🆕 Added for Equipment Tab
+  const [equipment, setEquipment] = useState([]); 
   const [services, setServices] = useState([]);
   const [feedback, setFeedback] = useState([]);
 
@@ -71,29 +71,38 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const [progLimit, setProgLimit] = useState(5);
   const [docLimit, setDocLimit] = useState(5);
   const [resLimit, setResLimit] = useState(5);
-  const [eqLimit, setEqLimit] = useState(5); // 🆕 Limit for Equipment
+  const [eqLimit, setEqLimit] = useState(5); 
   const [servicesLimit, setServicesLimit] = useState(5);
   const [feedbackLimit, setFeedbackLimit] = useState(5);
 
-  // SECURE IDS: Get both residentID and householdID from props or session
+  // SECURE IDS: Get UID, residentID, and householdID from props or session
+  const userUID = propUID || getSaved("UID", null);
   const residentID = propMemberID || getSaved("memberID", null);
   const householdID = propHouseholdID || getSaved("householdID", null);
+
+  // Helper to build the hybrid query conditions
+  const buildIdentityQuery = () => {
+    const conditions = [where("residentID", "==", residentID)];
+    if (userUID) {
+      conditions.push(where("UID", "==", userUID));
+    }
+    return or(...conditions);
+  };
 
   // --- FIREBASE REAL-TIME LISTENERS ---
 
   // Initial Loading Check
   useEffect(() => {
-    if (!residentID || !householdID) { setLoading(true); return; }
+    if (!residentID) { setLoading(true); return; }
     setLoading(false);
-  }, [residentID, householdID]);
+  }, [residentID]);
 
   // A. Fetch Programs
   useEffect(() => {
-    if (!residentID || !householdID) return;
+    if (!residentID) return;
     const qPrograms = query(
       collection(db, "livelihoodRegistrations"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(progLimit)
     );
@@ -103,15 +112,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       })));
     });
     return () => unsubPrograms();
-  }, [residentID, householdID, progLimit]);
+  }, [userUID, residentID, progLimit]);
 
   // B. Fetch Documents
   useEffect(() => {
-    if (!residentID || !householdID) return;
+    if (!residentID) return;
     const qDocs = query(
       collection(db, "document_requests"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(docLimit)
     );
@@ -119,15 +127,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubDocs();
-  }, [residentID, householdID, docLimit]);
+  }, [userUID, residentID, docLimit]);
 
   // C. Fetch Reservations
   useEffect(() => {
-    if (!residentID || !householdID) return;
+    if (!residentID) return;
     const qReservations = query(
       collection(db, "facility_reservations"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(resLimit)
     );
@@ -135,15 +142,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubReservations();
-  }, [residentID, householdID, resLimit]);
+  }, [userUID, residentID, resLimit]);
 
-  // 🆕 D. Fetch Equipment Rentals
+  // D. Fetch Equipment Rentals
   useEffect(() => {
-    if (!residentID || !householdID) return;
+    if (!residentID) return;
     const qEquipment = query(
       collection(db, "equipment_rentals"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(eqLimit)
     );
@@ -151,24 +157,22 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setEquipment(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubEquipment();
-  }, [residentID, householdID, eqLimit]);
+  }, [userUID, residentID, eqLimit]);
 
   // E. Fetch Services (Combined: Peace & Order and BSWD)
   useEffect(() => {
-    if (!residentID || !householdID) return;
+    if (!residentID) return;
 
     const qIncidents = query(
       collection(db, "incidentReports"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(servicesLimit)
     );
     
     const qBswd = query(
       collection(db, "bswdReports"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(servicesLimit)
     );
@@ -208,15 +212,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     });
 
     return () => { unsubInc(); unsubBswd(); };
-  }, [residentID, householdID, servicesLimit]);
+  }, [userUID, residentID, servicesLimit]);
 
   // F. Fetch Feedback
   useEffect(() => {
-    if (!residentID || !householdID) return;
+    if (!residentID) return;
     const qFeedback = query(
       collection(db, "feedback"),
-      where("householdID", "==", householdID),
-      where("residentID", "==", residentID),
+      buildIdentityQuery(),
       orderBy("createdAt", "desc"),
       limit(feedbackLimit)
     );
@@ -224,12 +227,11 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setFeedback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubFeedback();
-  }, [residentID, householdID, feedbackLimit]);
+  }, [userUID, residentID, feedbackLimit]);
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
     if (!timestamp) return "Unknown Date";
-    // Check if it's already a string like "2026-08-25"
     if (typeof timestamp === 'string') return timestamp;
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -341,7 +343,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   };
 
-  // 🆕 6.4 Equipment Tab ──
+  // ── 6.4 Equipment Tab ──
   const EquipmentTab = () => {
     if (equipment.length === 0) return <EmptyState message="You have no equipment rentals yet." />;
     return (
@@ -478,7 +480,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   }
 
-  if (!residentID || !householdID) {
+  if (!residentID) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
         Please select a profile to view activity history.

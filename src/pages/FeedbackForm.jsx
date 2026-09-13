@@ -15,6 +15,12 @@ const generateRefId = () => {
   return `FB-${new Date().getFullYear()}-${num}`;
 };
 
+// ── SESSION HELPER ────────────────────────────────────────────────────────────
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getTodayStr = () => new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
@@ -188,7 +194,7 @@ function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function FeedbackForm({ onNavigate, service, userName = "Resident", householdID, userID }) {
+export default function FeedbackForm({ onNavigate, service, userName = "Resident", householdID, userID, userData }) {
   const [rating,       setRating]       = useState(0);
   const [hoverRating,  setHoverRating]  = useState(0);
   const [comment,      setComment]      = useState("");
@@ -235,7 +241,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       const scannedId   = urlParams.get("serviceId");
       const scannedName = urlParams.get("serviceName");
       const scannedCat  = urlParams.get("category");
-      ``
+      
       const alertRefId  = urlParams.get("refId");
       const alertTitle  = urlParams.get("title");
       const alertType   = urlParams.get("type");
@@ -252,7 +258,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         setCategory(alertType || "General");
         setQrValidation({ valid: true }); // Automatically approve alerts
         setAlertTxId(alertRefId);
-        setAlertTxType(alertType);``
+        setAlertTxType(alertType);
         return; 
       }
 
@@ -341,8 +347,13 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       }
 
       const ref    = generateRefId();
+      
+      // <-- EXTRACT & INJECT PERMANENT UID HERE
+      const userUID = userData?.UID || getSaved("UID", null);
+
       const docRef = await addDoc(collection(db, "feedback"), {
         referenceID:     ref,
+        UID:             userUID || "", // <-- INJECTED UID
         facilityID:      serviceId,
         facilityName:    serviceName,
         category,

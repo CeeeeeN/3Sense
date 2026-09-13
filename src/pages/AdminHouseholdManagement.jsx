@@ -19,16 +19,26 @@ import {
   orderBy,
   limit
 } from "firebase/firestore";
-import { approveRegistration } from "../services/admin";
+import { approveRegistration, generateResidentUID } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 import { getFamilyNumber } from "../utils/householdNumbers";
 
+
+import TransferRequestsTab from "../components/TransferRequestsTab"; 
+import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab"; 
+
 export default function HouseholdManagement() {
   const [residents, setResidents] = useState([]);
   const [hhRequests, setHhRequests] = useState([]);
+  
+  // ── NEW TRANSFER STATES ──
+  const [transfers, setTransfers] = useState([]);
+  const [newHouseholds, setNewHouseholds] = useState([]);
 
+  // ── TABS ──
+  // Options: "requests", "residents", "transfers", "new_households"
   const [activeTab, setActiveTab] = useState("requests");
 
   const [search, setSearch] = useState("");
@@ -101,6 +111,7 @@ export default function HouseholdManagement() {
     fetchAdmin();
   }, []);
 
+  // ── 1. REGISTRATION REQUESTS LISTENER ──
   useEffect(() => {
     const pendingQuery = query(
       collection(db, "pending_registrations"),
@@ -129,6 +140,7 @@ export default function HouseholdManagement() {
     return () => unsub();
   }, [adminRole]);
 
+  // ── 2. ACTIVE RESIDENTS LISTENER ──
   useEffect(() => {
     let latestActive = [];
     let latestPending = [];
@@ -217,6 +229,40 @@ export default function HouseholdManagement() {
       unsubHouseholds();
     };
   }, [adminRole]);
+
+  // ── 3. HOUSEHOLD TRANSFERS LISTENER ──
+  useEffect(() => {
+    const q = query(
+      collection(db, "household_transfers"),
+      orderBy("submittedAt", "desc"),
+      limit(200)
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const existingList = [];
+      const newList = [];
+
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const item = {
+          id: docSnap.id,
+          dateSubmitted: data.submittedAt ? data.submittedAt.toDate().toLocaleDateString() : "N/A",
+          ...data
+        };
+
+        if (data.transferType === "existing") {
+          existingList.push(item);
+        } else if (data.transferType === "new") {
+          newList.push(item);
+        }
+      });
+
+      setTransfers(existingList);
+      setNewHouseholds(newList);
+    });
+
+    return () => unsub();
+  }, []);
 
   const filteredHhRequests = useMemo(() => {
     return hhRequests
@@ -493,12 +539,33 @@ export default function HouseholdManagement() {
     }
   };
 
+  const handleViewResident = async (res) => {
+    setSelectedResident(res);
+    setShowResidentModal(true);
+
+    if (!res.isPendingActivation && !res.UID) {
+      try {
+        const newUID = generateResidentUID();
+        const residentRef = doc(db, "households", res.householdId, "residents", res.id);
+        
+        await updateDoc(residentRef, { 
+          UID: newUID,
+          updatedAt: serverTimestamp() 
+        });
+        
+        setSelectedResident(prev => ({ ...prev, UID: newUID }));
+      } catch (error) {
+        console.error("Silent UID patch failed:", error);
+      }
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="requests-container">
         <div className="requests-header">
           <h1 className="requests-title">Household Management</h1>
-          <p className="requests-subtitle">Manage household registration requests and resident records.</p>
+          <p className="requests-subtitle">Manage household registrations, residents, and transfer requests.</p>
         </div>
 
         <div className="req-tabs">
@@ -514,8 +581,21 @@ export default function HouseholdManagement() {
           >
             Resident Accounts
           </button>
+          <button
+            className={`req-tab ${activeTab === "transfers" ? "active" : ""}`}
+            onClick={() => setActiveTab("transfers")}
+          >
+            Household Transfers
+          </button>
+          <button
+            className={`req-tab ${activeTab === "new_households" ? "active" : ""}`}
+            onClick={() => setActiveTab("new_households")}
+          >
+            New Household Requests
+          </button>
         </div>
 
+        {/* ── TAB: REGISTRATION REQUESTS ── */}
         {activeTab === "requests" && (
           <>
             <div className="requests-controls">
@@ -683,6 +763,7 @@ export default function HouseholdManagement() {
           </>
         )}
 
+        {/* ── TAB: RESIDENT ACCOUNTS ── */}
         {activeTab === "residents" && (
           <>
             <div className="requests-controls">
@@ -793,7 +874,7 @@ export default function HouseholdManagement() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => { setSelectedResident(res); setShowResidentModal(true); }}>View</button>
+                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => handleViewResident(res)}>View</button>
                             {!res.isPendingActivation && (
                               <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
                             )}
@@ -869,8 +950,15 @@ export default function HouseholdManagement() {
             )}
           </>
         )}
+
+        {/* ── TAB: HOUSEHOLD TRANSFERS ── */}
+        {activeTab === "transfers" && <TransferRequestsTab transfers={transfers} />}
+
+        {/* ── TAB: NEW HOUSEHOLD REQUESTS ── */}
+        {activeTab === "new_households" && <NewHouseholdRequestsTab newHouseholds={newHouseholds} />}
       </div>
 
+      {/* ── MODALS (EXISTING) ── */}
       {showResidentModal && selectedResident && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "600px" }}>
@@ -890,6 +978,7 @@ export default function HouseholdManagement() {
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
               <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
+                  <strong>Barangay UID:</strong> <span style={{ color: "#0d7a55", fontWeight: "bold", letterSpacing: "0.5px" }}>{selectedResident.UID || "Generating..."}</span><br />
                   <strong>Household Number:</strong> <span>{selectedResident.householdId}</span><br />
                   <strong>Family Number:</strong> <span>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
                   <div style={{ marginTop: '8px' }}>

@@ -23,6 +23,12 @@ const STATUS_CONFIG = {
   resolved: { label: "Resolved", color: "#2DB17B", bg: "rgba(45,177,123,0.1)", icon: "✅" },
 };
 
+// ── SESSION HELPER ────────────────────────────────────────────────────────────
+const getSaved = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
+  catch { return fallback; }
+};
+
 // ── Helper: returns today's date string "YYYY-MM-DD" ──────────────────────────
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
@@ -90,7 +96,9 @@ export default function PeaceOrderTab({ userData, householdID }) {
         uploadedImageUrl = cloudinaryData.secure_url;
       }
 
-      const submissionData = { ...form, photoURL: uploadedImageUrl };
+      // <-- EXTRACT & INJECT PERMANENT UID HERE
+      const userUID = userData?.UID || getSaved("UID", null);
+      const submissionData = { ...form, photoURL: uploadedImageUrl, UID: userUID };
 
       const generatedRef = await submitIncidentReport(householdID, userData?.userID || "", userData?.residentID || "", submissionData);
       const finalRef = generatedRef || Array.from({ length: 8 }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(Math.floor(Math.random() * 36))).join("");
@@ -258,7 +266,6 @@ export default function PeaceOrderTab({ userData, householdID }) {
           <div className="dr-field-row" style={{ marginBottom: "0.85rem" }}>
             <div className="dr-field">
               <label className="sv-label">Date <span className="sv-required">*</span></label>
-              {/* ✅ FIX: min set to today — past dates are disabled */}
               <input
                 className={`sv-input${errors.date ? " sv-input--error" : ""}`}
                 type="date"

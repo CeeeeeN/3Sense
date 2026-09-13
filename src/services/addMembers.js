@@ -1,6 +1,14 @@
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
+// Fallback UID generator for all new dependents
+const generateResidentUID = () => {
+    const year = new Date().getFullYear();
+    const timeSlice = Date.now().toString().slice(-4);
+    const random4 = Math.floor(1000 + Math.random() * 9000).toString();
+    return `MAL-${year}-${timeSlice}${random4}`;
+};
+
 // Cloudinary Upload Helper (gracefully skips if given a remote URL or empty payload)
 const uploadToCloudinary = async (base64String, folder) => {
     if (!base64String || base64String.startsWith("http://") || base64String.startsWith("https://")) {
@@ -94,6 +102,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
         : (memberData.gender || memberData.genderOrientation || "");
 
     const resident = {
+        UID: generateResidentUID(), // <-- NEW: Permanent Barangay UID generated here
         residentID: residentID,
         householdID: cleanID,
         role: memberData.isBranchHead && branchID !== "BR-001" ? "Branch Head" : (memberData.role || "Member"),
