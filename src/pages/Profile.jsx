@@ -298,24 +298,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
     return () => { isMounted = false; };
   }, [householdID, memberID, userID, userRole, data.UID]);
 
-  // Generate QR code whenever identity data changes
   useEffect(() => {
-    if (!fullName && !householdID) return;
-    const qrData = JSON.stringify({
-      UID: data.UID || "", // Inject UID into the payload
-      householdID: householdID,
-      residentID: memberID,
-      name: fullName || "Resident",
-      role: userRole || "Member",
-      branchID: data.branchID || "",
-      branchName: data.branchName || "",
-      barangay: data.barangay || "Malanday",
-    });
+    if (!memberID) return;
 
-    QRCode.toDataURL(qrData, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
+    QRCode.toDataURL(memberID, { width: 180, margin: 1, color: { dark: "#0d7a55", light: "#ffffff" } })
       .then(url => setQrUrl(url))
       .catch(console.error);
-  }, [fullName, householdID, memberID, userRole, data.branchID, data.branchName, data.barangay, data.UID]);
+  }, [memberID]);
 
   // Camera cleanup & control
   const stopCamera = useCallback(() => {

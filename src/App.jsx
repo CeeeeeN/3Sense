@@ -24,6 +24,7 @@ import AdminAdminManagement from "./pages/AdminAdminManagement";
 import AdminHouseholdManagement from "./pages/AdminHouseholdManagement";
 import AdminReports from "./pages/AdminReports";
 import AdminProfile from "./pages/AdminProfile";
+import AdminResidentScanner from "./pages/AdminResidentScanner";
 import UserApp from "./pages/UserApp";
 
 
@@ -326,6 +327,21 @@ function App() {
               loading={loading}
             >
               <AdminProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/resident-scanner"
+          element={
+            <ProtectedRoute
+              user={user}
+              isApprovedAdmin={isApprovedAdmin}
+              userRole={userRole}
+              reqPath="/admin/resident-scanner"
+              loading={loading}
+            >
+              <AdminResidentScanner />
             </ProtectedRoute>
           }
         />

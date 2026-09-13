@@ -32,6 +32,7 @@ export default function AdminLayout({ children }) {
     "/admin/logs": "Audit Logs",
     "/admin/reports": "Reports",
     "/admin/profile": "My Profile",
+    "/admin/resident-scanner": "Resident Scanner",
   };
 
   const topBarTitle = titles[location.pathname] || "Dashboard";
@@ -312,7 +313,8 @@ export default function AdminLayout({ children }) {
     "/admin/manage",
     "/admin/requests",
     "/admin/feedback",
-    "/admin/profile"
+    "/admin/profile",
+    "/admin/resident-scanner"
   ];
 
   return (
@@ -432,6 +434,19 @@ export default function AdminLayout({ children }) {
               to="/admin/profile"
             >
               My Profile
+            </Link>
+          )}
+
+          {userPages.includes("/admin/resident-scanner") && (
+            <Link
+              onClick={handleLinkClick}
+              className={location.pathname === "/admin/resident-scanner" ? "active" : ""}
+              to="/admin/resident-scanner"
+              style={{
+                display: window.innerWidth >= 1024 ? "none" : undefined,
+              }}
+            >
+              Resident Scanner
             </Link>
           )}
         </div>
