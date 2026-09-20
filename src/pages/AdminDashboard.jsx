@@ -51,7 +51,7 @@ export default function AdminDashboard() {
  
       // 2. PARALLEL BOUNDED FETCHES: Download the data for charts (capped to prevent read spikes)
       const [
-        fbSnap, resSnap, docSnap, facSnap, attSnap, livSnap, incSnap, bswdSnap
+        fbSnap, resSnap, docSnap, facSnap, attSnap, livSnap, incSnap, bswdSnap, equSnap, invSnap
       ] = await Promise.all([
         getDocs(query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"), limit(300))),
         getDocs(query(collectionGroup(db, "residents"), limit(500))), // For demographic charts
@@ -121,24 +121,26 @@ export default function AdminDashboard() {
     retry: false,
   });
 
-  if (isLoading || !data) {
-    return (
-      <AdminLayout>
-        <div className="main-content" style={{ padding: "40px", textAlign: "center" }}>
-          <h2>Loading Analytics... (This may take a moment)</h2>
-        </div>
-      </AdminLayout>
-    );
-  }
-
+  // 1. Check for errors FIRST
   if (isError) {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center", color: "#b91c1c" }}>
           <h2>Analytics failed to load.</h2>
           <p style={{ background: "#fee2e2", padding: "16px", borderRadius: "8px", display: "inline-block" }}>
-            {error.message}
+            {error?.message || "Unknown error occurred"}
           </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  // 2. THEN check for loading or missing data
+  if (isLoading || !data) {
+    return (
+      <AdminLayout>
+        <div className="main-content" style={{ padding: "40px", textAlign: "center" }}>
+          <h2>Loading Analytics... (This may take a moment)</h2>
         </div>
       </AdminLayout>
     );
