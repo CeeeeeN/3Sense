@@ -40,7 +40,7 @@ export default function AdminDashboard() {
 
   // ── REACT QUERY: The centralized data fetcher ──
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['adminDashboardAnalytics'],
+    queryKey: ['adminDashboardAnalytics_v2'],
     queryFn: async () => {
       // 1. ULTRA-OPTIMIZED COUNTS: Get totals without downloading the actual documents (1 read each!)
       const [hhCount, resCount, pendingCount] = await Promise.all([
@@ -60,7 +60,9 @@ export default function AdminDashboard() {
         getDocs(query(collectionGroup(db, "attendees"), limit(400))),
         getDocs(query(collection(db, "livelihoodRegistrations"), limit(400))),
         getDocs(query(collection(db, "incidentReports"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(300)))
+        getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collection(db, "equipment_rentals"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(collection(db, "equipment"))
       ]);
 
       // 3. MAP DATA
@@ -83,6 +85,9 @@ export default function AdminDashboard() {
       const incidentData = incSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const bswdData = bswdSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+      const equipmentData = equSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const inventoryData = invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
       // 4. CALCULATE PENDING STATS
       const docPending = docRequestsData.filter(d => d.status === "Pending").length;
       const facPending = facilityRequestsData.filter(d => d.status === "Pending").length;
@@ -97,6 +102,8 @@ export default function AdminDashboard() {
         livelihoodAttendees,
         incidentData,
         bswdData,
+        equipmentData,
+        inventoryData,
         stats: {
           households: hhCount.data().count,
           residents: resCount.data().count,
@@ -110,9 +117,11 @@ export default function AdminDashboard() {
     staleTime: 1000 * 60 * 10,
     // Keep inactive data cached for 30 minutes
     gcTime: 1000 * 60 * 30,
+
+    retry: false,
   });
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center" }}>
@@ -138,7 +147,8 @@ export default function AdminDashboard() {
   // Destructure the data provided by React Query
   const { 
     feedbacks, residentsData, docRequestsData, facilityRequestsData, 
-    generalAttendees, livelihoodAttendees, incidentData, bswdData, stats 
+    generalAttendees, livelihoodAttendees, incidentData, bswdData, stats,
+    equipmentData, inventoryData, 
   } = data;
 
   return (
@@ -208,7 +218,9 @@ export default function AdminDashboard() {
           {activeTab === 'services' && (
             <ServiceFacilityAnalytics 
               docRequestsData={docRequestsData} 
-              facilityRequestsData={facilityRequestsData} 
+              facilityRequestsData={facilityRequestsData}
+              equipmentData={equipmentData}
+              inventoryData={inventoryData}
             />
           )}
 

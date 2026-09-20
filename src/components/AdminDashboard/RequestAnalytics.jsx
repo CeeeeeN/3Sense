@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-export default function RequestAnalytics({ docRequests, facilityRequests, timeFilter = 'Month' }) {
+// <-- NEW: Added equipmentRequests to props -->
+export default function RequestAnalytics({ docRequests = [], facilityRequests = [], equipmentRequests = [], timeFilter = 'Month' }) {
   const chartData = useMemo(() => {
-    if (!docRequests.length && !facilityRequests.length) return [];
+    // Check if ALL arrays are empty
+    if (!docRequests.length && !facilityRequests.length && !equipmentRequests.length) return [];
 
     const dateMap = {};
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -41,6 +43,7 @@ export default function RequestAnalytics({ docRequests, facilityRequests, timeFi
             name: timeKey, 
             Documents: 0, 
             Facilities: 0, 
+            Equipment: 0, // <-- NEW: Initialize Equipment count
             sortKey: sortKey
           };
         }
@@ -50,10 +53,11 @@ export default function RequestAnalytics({ docRequests, facilityRequests, timeFi
 
     processItems(docRequests, 'Documents');
     processItems(facilityRequests, 'Facilities');
+    processItems(equipmentRequests, 'Equipment'); // <-- NEW: Process Equipment data
 
     // Convert map to array and sort chronologically
     return Object.values(dateMap).sort((a, b) => a.sortKey - b.sortKey);
-  }, [docRequests, facilityRequests, timeFilter]);
+  }, [docRequests, facilityRequests, equipmentRequests, timeFilter]);
 
   if (chartData.length === 0) {
     return <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>No request data available yet.</div>;
@@ -73,6 +77,8 @@ export default function RequestAnalytics({ docRequests, facilityRequests, timeFi
           
           <Line type="monotone" dataKey="Documents" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
           <Line type="monotone" dataKey="Facilities" stroke="#ec4899" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+          {/* <-- NEW: Added Equipment Line (Emerald Green) --> */}
+          <Line type="monotone" dataKey="Equipment" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
