@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 
 export default function ServiceVawc({ onBack, userRole }) {
@@ -8,7 +8,13 @@ export default function ServiceVawc({ onBack, userRole }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Form State
+  // Selected case for status change modal / view details
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [newRemarks, setNewRemarks] = useState("");
+
+  // Intake Form State
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     gender: "F",
@@ -25,19 +31,22 @@ export default function ServiceVawc({ onBack, userRole }) {
     remarks: "",
   });
 
-  // Access check
   const isAuthorized = !userRole || ["Super Admin", "VAWC Head", "Kapitan", "Secretary"].includes(userRole);
 
   useEffect(() => {
     const q = query(collection(db, "vawcCases"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setCases(docs);
-      setLoading(false);
-    }, (err) => {
-      console.error("Error fetching VAWC cases:", err);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setCases(docs);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error fetching VAWC cases:", err);
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
@@ -83,9 +92,51 @@ export default function ServiceVawc({ onBack, userRole }) {
       });
     } catch (err) {
       console.error("Error saving VAWC case:", err);
-      alert("Failed to save VAWC Case. Please verify database connection.");
+      alert("Failed to save VAWC Case. Please check permissions.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ── Directly Update Status in Firestore ──
+  const handleQuickStatusChange = async (caseId, statusValue) => {
+    try {
+      const caseRef = doc(db, "vawcCases", caseId);
+      await updateDoc(caseRef, {
+        status: statusValue,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Error updating case status in database.");
+    }
+  };
+
+  // ── Open Detailed Status Update Modal ──
+  const openStatusModal = (item) => {
+    setSelectedCase(item);
+    setNewStatus(item.status || "Acted Upon");
+    setNewRemarks(item.remarks || "");
+  };
+
+  const handleSaveStatusModal = async (e) => {
+    e.preventDefault();
+    if (!selectedCase) return;
+    setUpdatingStatus(true);
+
+    try {
+      const caseRef = doc(db, "vawcCases", selectedCase.id);
+      await updateDoc(caseRef, {
+        status: newStatus,
+        remarks: newRemarks.trim(),
+        updatedAt: serverTimestamp(),
+      });
+      setSelectedCase(null);
+    } catch (err) {
+      console.error("Failed to update case details:", err);
+      alert("Error saving updated status and remarks.");
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -109,6 +160,7 @@ export default function ServiceVawc({ onBack, userRole }) {
   const maleCount = cases.filter((c) => c.gender === "M").length;
   const actedUponCount = cases.filter((c) => c.status === "Acted Upon").length;
   const pendingCount = cases.filter((c) => c.status === "Pending").length;
+  const closedCount = cases.filter((c) => c.status === "Closed / Resolved").length;
 
   return (
     <div className="as-container">
@@ -135,7 +187,7 @@ export default function ServiceVawc({ onBack, userRole }) {
           <div>
             <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "#111827", margin: 0 }}>VAWC Case Management</h1>
             <p style={{ fontSize: "0.85rem", color: "#6b7280", margin: "4px 0 0 0" }}>
-              Monitoring of incidence on Violence Against Children &amp; Women (Barangay Malanday).
+              Violence Against Women &amp; Children monitoring workspace and case intake.
             </p>
           </div>
           <button
@@ -153,11 +205,11 @@ export default function ServiceVawc({ onBack, userRole }) {
         <div className="card" style={{ padding: "16px 20px" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>VAC Victims (Total)</span>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#111827", marginTop: "4px" }}>{totalVictims}</div>
-          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Total No. of VAC Victims (1)</span>
+          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Running count of all logged cases</span>
         </div>
 
         <div className="card" style={{ padding: "16px 20px" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#be185d", textTransform: "uppercase" }}>Gender Distribution (2)</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#be185d", textTransform: "uppercase" }}>Gender Distribution</span>
           <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#be185d", marginTop: "4px" }}>
             F: {femaleCount} | M: {maleCount}
           </div>
@@ -180,7 +232,10 @@ export default function ServiceVawc({ onBack, userRole }) {
       {/* Case Directory Table */}
       <div className="section" style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-          <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1f2937", margin: 0 }}>VAWC Incident Logs</h2>
+          <div>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1f2937", margin: 0 }}>VAWC Incident Logs</h2>
+            <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "2px 0 0 0" }}>Click on any status badge to update or change casework status.</p>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>Filter Status:</span>
             <select
@@ -203,17 +258,17 @@ export default function ServiceVawc({ onBack, userRole }) {
           <div style={{ textAlign: "center", padding: "50px", color: "#9ca3af" }}>No VAWC records found.</div>
         ) : (
           <div className="req-table-wrapper" style={{ overflowX: "auto" }}>
-            <table className="req-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: "850px" }}>
+            <table className="req-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
                   <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>REF #</th>
                   <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>DATE LOGGED</th>
-                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>GENDER (2)</th>
-                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>AGE (3)</th>
-                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>TYPE OF VIOLENCE (4)</th>
-                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>PERPETRATOR (5)</th>
-                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS TAKEN (6)</th>
-                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>STATUS</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>GENDER</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>AGE</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>NATURE OF VIOLENCE</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>PERPETRATOR</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS TAKEN</th>
+                  <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>STATUS (CLICK TO EDIT)</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,21 +283,32 @@ export default function ServiceVawc({ onBack, userRole }) {
                     <td style={{ padding: "10px 12px", fontSize: "0.82rem", fontWeight: 500, color: "#0f172a" }}>{c.typeOfViolence}</td>
                     <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#475569" }}>{c.perpetrator}</td>
                     <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#0d9488", fontWeight: 500 }}>{c.actionTaken}</td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span
+                    <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                      {/* Interactive clickable status badge */}
+                      <button
+                        type="button"
+                        onClick={() => openStatusModal(c)}
+                        title="Click to update status"
                         style={{
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: "12px",
+                          cursor: "pointer",
+                          border: "1px solid transparent",
+                          padding: "4px 10px",
+                          borderRadius: "14px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          transition: "all 0.15s ease-in-out",
                           background:
                             c.status === "Acted Upon" ? "#dcfce7" : c.status === "Pending" ? "#fef3c7" : "#f1f5f9",
                           color:
                             c.status === "Acted Upon" ? "#166534" : c.status === "Pending" ? "#92400e" : "#475569",
                         }}
                       >
-                        {c.status}
-                      </span>
+                        <span>{c.status || "Pending"}</span>
+                        <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>✎</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -252,7 +318,74 @@ export default function ServiceVawc({ onBack, userRole }) {
         )}
       </div>
 
-      {/* ── MODAL: Add New VAWC Case (Form criteria matching Screenshot 1) ── */}
+      {/* ── MODAL 1: Quick Status & Case Update Modal (Fix for A13) ── */}
+      {selectedCase && (
+        <div className="as-modal-overlay">
+          <div className="as-modal-content" style={{ maxWidth: "460px", padding: 0, overflow: "hidden" }}>
+            <div className="as-modal-header" style={{ background: "#317D89", color: "#fff", padding: "14px 18px" }}>
+              <div>
+                <h3 style={{ color: "#fff", margin: 0, fontSize: "1.05rem" }}>Update Case Status</h3>
+                <p style={{ color: "#ccfbf1", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
+                  Ref: {selectedCase.referenceNumber || selectedCase.id}
+                </p>
+              </div>
+              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setSelectedCase(null)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveStatusModal} style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  CHANGE STATUS *
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="filter-select"
+                  style={{ width: "100%", padding: "8px 12px", fontSize: "0.85rem" }}
+                  required
+                >
+                  <option value="Acted Upon">Acted Upon</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Closed / Resolved">Closed / Resolved</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  CASE REMARKS / NOTES
+                </label>
+                <textarea
+                  rows="3"
+                  value={newRemarks}
+                  onChange={(e) => setNewRemarks(e.target.value)}
+                  placeholder="Enter details on latest actions taken, referrals made, or status changes..."
+                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem", resize: "vertical" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px", paddingTop: "12px", borderTop: "1px solid #e5e7eb" }}>
+                <button
+                  type="button"
+                  className="as-btn-ghost"
+                  onClick={() => setSelectedCase(null)}
+                  disabled={updatingStatus}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="as-btn-aqua"
+                  disabled={updatingStatus}
+                >
+                  {updatingStatus ? "Updating..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 2: Add New VAWC Case Intake Form ── */}
       {isModalOpen && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}>
@@ -267,7 +400,7 @@ export default function ServiceVawc({ onBack, userRole }) {
             </div>
 
             <form onSubmit={handleSaveCase} style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", maxHeight: "75vh", overflowY: "auto" }}>
-              {/* Gender (2) */}
+              {/* Gender */}
               <div>
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   GENDER (2) *
@@ -290,7 +423,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 )}
               </div>
 
-              {/* Age (3) */}
+              {/* Age Bracket */}
               <div>
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   AGE (3) *
@@ -316,7 +449,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 )}
               </div>
 
-              {/* Types of Violence (4) */}
+              {/* Types of Violence */}
               <div>
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   TYPES OF VIOLENCE (4) *
@@ -341,7 +474,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 )}
               </div>
 
-              {/* Perpetrators (5) */}
+              {/* Perpetrators */}
               <div>
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   PERPETRATORS (5) *
@@ -368,7 +501,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 )}
               </div>
 
-              {/* Actions Taken by Barangay / BCPC (6) */}
+              {/* Actions Taken */}
               <div>
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
