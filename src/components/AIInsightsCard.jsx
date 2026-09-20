@@ -7,22 +7,24 @@ import { db } from "../firebase/firebase";
 const HF_ACCESS_TOKEN = import.meta.env.VITE_HUGGINGFACE_TOKEN; 
 const MODEL_URL = "https://router.huggingface.co/v1/chat/completions";
 
-export default function AIInsightsCard({ documentData, facilityData, dateRange }) {
+// <-- NEW: Added equipmentData to props -->
+export default function AIInsightsCard({ documentData = [], facilityData = [], equipmentData = [], dateRange }) {
   const [insight, setInsight] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!documentData?.length && !facilityData?.length) {
+    // <-- NEW: Ensure it checks all three data streams -->
+    if (!documentData?.length && !facilityData?.length && !equipmentData?.length) {
       setInsight("Insufficient data available for the selected date range to generate insights.");
       return;
     }
 
     const generateAIInsight = async () => {
       // Create a unique Dynamic Cache Key
-      // If a new request is added, the length changes, and the cache invalidates automatically!
-      const safeDateRange = dateRange.replace(/\s+/g, ''); // Removes spaces
-      const cacheKey = `insight_${safeDateRange}_doc${documentData.length}_fac${facilityData.length}`;
+      const safeDateRange = dateRange.replace(/\s+/g, ''); 
+      // <-- NEW: Added equipment length to the cache key to invalidate old summaries -->
+      const cacheKey = `insight_${safeDateRange}_doc${documentData.length}_fac${facilityData.length}_eq${equipmentData.length}`;
 
       // ==========================================
       // TIER 1: Check Browser Session Storage
@@ -56,12 +58,15 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
         // ==========================================
         // TIER 3: Call Hugging Face AI API
         // ==========================================
+        // <-- NEW: Added equipment totals and breakdown to the AI's context -->
         const rawData = {
           dateRange: dateRange,
-          totalDocumentRequests: documentData.reduce((acc, curr) => acc + curr.count, 0),
-          totalFacilityRequests: facilityData.reduce((acc, curr) => acc + curr.count, 0),
+          totalDocumentRequests: documentData.reduce((acc, curr) => acc + (curr.count || 0), 0),
+          totalFacilityRequests: facilityData.reduce((acc, curr) => acc + (curr.count || 0), 0),
+          totalEquipmentRequests: equipmentData.reduce((acc, curr) => acc + (curr.count || 0), 0),
           documentDailyBreakdown: documentData, 
           facilityDailyBreakdown: facilityData, 
+          equipmentDailyBreakdown: equipmentData, 
         };
 
         const response = await fetch(MODEL_URL, {
@@ -74,8 +79,9 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
             model: "deepseek-ai/DeepSeek-V3-0324", 
             messages: [
               {
+                // <-- NEW: Updated prompt to explicitly mention equipment -->
                 role: "system",
-                content: "You are an expert data analyst for Barangay Malanday. Provide a concise, professional 3-sentence summary highlighting the overall request volume, peak dates, and a brief conclusion. Do not use bold text, asterisks, or markdown. Output plain text only."
+                content: "You are an expert data analyst for Barangay Malanday. Provide a concise, professional 3-sentence summary highlighting the overall request volume across documents, facilities, and equipment, noting any peak dates, and providing a brief conclusion. Do not use bold text, asterisks, or markdown. Output plain text only."
               },
               {
                 role: "user",
@@ -119,7 +125,7 @@ export default function AIInsightsCard({ documentData, facilityData, dateRange }
     };
 
     generateAIInsight();
-  }, [documentData, facilityData, dateRange]);
+  }, [documentData, facilityData, equipmentData, dateRange]);
 
   return (
     <div style={{
