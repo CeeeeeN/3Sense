@@ -1196,7 +1196,8 @@ export default function Registration({ onBack, branchingPayload }) {
                       <Field label="Gender">
                         <SelectField value={form.gender} onChange={set("gender")}>
                           <option value="">Select gender</option>
-                          <option>Cisgender</option>
+                          <option>Cisgender (Male)</option>
+                          <option>Cisgender (Female)</option>
                           <option>Non-binary</option>
                           <option>Transgender Man</option>
                           <option>Transgender Woman</option>
