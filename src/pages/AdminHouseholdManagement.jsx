@@ -24,12 +24,14 @@ import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 import { getFamilyNumber } from "../utils/householdNumbers";
-
+import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
 
 import TransferRequestsTab from "../components/TransferRequestsTab"; 
 import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab"; 
 
 export default function HouseholdManagement() {
+  const { showAlert, showConfirm } = useAlert(); // <-- INITIALIZE HOOK
+
   const [residents, setResidents] = useState([]);
   const [hhRequests, setHhRequests] = useState([]);
   
@@ -49,9 +51,6 @@ export default function HouseholdManagement() {
   const [selectedResident, setSelectedResident] = useState(null);
   const [showResidentModal, setShowResidentModal] = useState(false);
 
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [residentToDelete, setResidentToDelete] = useState(null);
-
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [hhRowsPerPage, setHhRowsPerPage] = useState(10);
@@ -65,8 +64,6 @@ export default function HouseholdManagement() {
   const [sortHhRequest, setSortHhRequest] = useState("date_desc");
   const [selectedHhRequest, setSelectedHhRequest] = useState(null);
   const [showHhViewModal, setShowHhViewModal] = useState(false);
-  const [showHhApproveModal, setShowHhApproveModal] = useState(false);
-  const [showHhRejectModal, setShowHhRejectModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
   const [adminName, setAdminName] = useState("");
@@ -301,98 +298,117 @@ export default function HouseholdManagement() {
     setHhRequestPage(1);
   }, [searchHhRequest, filterHhStatus, sortHhRequest, hhRowsPerPage]);
 
-  const handleHhApprove = async () => {
-    if (!selectedHhRequest) return;
+  const handleHhApprove = async (req) => {
+    const isConfirmed = await showConfirm(
+      "Approve Resident Registration",
+      "Approving will create a Household ID and email the resident. They will appear in the Account Management tab."
+    );
+
+    if (!isConfirmed) return;
     if (isApproving) return;
+
     setIsApproving(true);
     try {
-      await approveRegistration(selectedHhRequest.id);
-      setSelectedHhRequest(null);
-      setShowHhApproveModal(false);
+      await approveRegistration(req.id);
       logTransaction(
         adminName,
         adminRole,
         "Approved Registration",
-        `Approved household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId})`
+        `Approved household registration for ${req.fullName} (Household ID: ${req.householdId})`
       );
-      alert("Registration approved successfully. An email has been sent to the head.");
+      // REPLACED ALERT
+      await showAlert("Success", "Registration approved successfully. An email has been sent to the head.");
     } catch (error) {
       console.error("Error approving registration:", error);
       logTransaction(
         adminName,
         adminRole,
         "Failed to Approve Registration",
-        `Failed to approve household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId}). Error: ${error.message}`
+        `Failed to approve household registration for ${req.fullName} (Household ID: ${req.householdId}). Error: ${error.message}`
       );
-      alert("Error approving registration: " + error.message);
+      // REPLACED ALERT
+      await showAlert("Error", "Error approving registration: " + error.message);
     } finally {
       setIsApproving(false);
     }
   };
 
-  const handleHhReject = async () => {
-    if (!selectedHhRequest) return;
+  const handleHhReject = async (req) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Rejection",
+      "Are you sure you want to reject this resident registration? This will delete the request permanently."
+    );
+
+    if (!isConfirmed) return;
+
     try {
-      await deleteDoc(doc(db, "pending_registrations", selectedHhRequest.id));
+      await deleteDoc(doc(db, "pending_registrations", req.id));
       logTransaction(
         adminName,
         adminRole,
         "Rejected Registration",
-        `Rejected household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId})`
+        `Rejected household registration for ${req.fullName} (Household ID: ${req.householdId})`
       );
-      setSelectedHhRequest(null);
-      setShowHhRejectModal(false);
+      // REPLACED ALERT
+      await showAlert("Success", "Registration rejected successfully.");
     } catch (error) {
       console.error("Error rejecting registration:", error);
       logTransaction(
         adminName,
         adminRole,
         "Failed to Reject Registration",
-        `Failed to reject household registration for ${selectedHhRequest.fullName} (Household ID: ${selectedHhRequest.householdId}). Error: ${error.message}`
+        `Failed to reject household registration for ${req.fullName} (Household ID: ${req.householdId}). Error: ${error.message}`
       );
-      alert("Error rejecting registration: " + error.message);
+      // REPLACED ALERT
+      await showAlert("Error", "Error rejecting registration: " + error.message);
     }
   };
 
-  const handleDeleteResident = async () => {
-    if (!residentToDelete) return;
+  const handleDeleteResident = async (res) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `Are you sure you want to delete the resident ${res.fullName}? This action cannot be undone.`
+    );
+
+    if (!isConfirmed) return;
+
     try {
-      if (residentToDelete.isPendingActivation) {
-        await deleteDoc(doc(db, "households", residentToDelete.householdId));
+      if (res.isPendingActivation) {
+        await deleteDoc(doc(db, "households", res.householdId));
         logTransaction(
           adminName,
           adminRole,
           "Deleted Unactivated Household",
-          `Deleted unactivated household with ID: ${residentToDelete.householdId} (Head: ${residentToDelete.fullName})`
+          `Deleted unactivated household with ID: ${res.householdId} (Head: ${res.fullName})`
         );
       } else {
-        const residentsQuery = query(collection(db, "households", residentToDelete.householdId, "residents"));
+        const residentsQuery = query(collection(db, "households", res.householdId, "residents"));
         const residentsSnapshot = await getDocs(residentsQuery);
 
-        await deleteDoc(doc(db, "households", residentToDelete.householdId, "residents", residentToDelete.id));
+        await deleteDoc(doc(db, "households", res.householdId, "residents", res.id));
 
         logTransaction(
           adminName,
           adminRole,
           "Deleted Resident",
-          `Deleted resident ${residentToDelete.fullName} (ID: ${residentToDelete.id}) from household ${residentToDelete.householdId}`
+          `Deleted resident ${res.fullName} (ID: ${res.id}) from household ${res.householdId}`
         );
         if (residentsSnapshot.size <= 1) {
-          await deleteDoc(doc(db, "households", residentToDelete.householdId));
+          await deleteDoc(doc(db, "households", res.householdId));
         }
       }
-      setShowDeleteModal(false);
-      setResidentToDelete(null);
-      alert("Resident deleted successfully.");
+      // REPLACED ALERT
+      await showAlert("Success", "Resident deleted successfully.");
     } catch (error) {
       console.error("Error deleting resident:", error);
       logTransaction(
         adminName,
         adminRole,
         "Failed to Delete Resident",
-        `Failed to delete resident ${residentToDelete.fullName} (ID: ${residentToDelete.id}) from household ${residentToDelete.householdId}. Error: ${error.message}`
+        `Failed to delete resident ${res.fullName} (ID: ${res.id}) from household ${res.householdId}. Error: ${error.message}`
       );
-      alert("Error deleting resident: " + error.message);
+      // REPLACED ALERT
+      await showAlert("Error", "Error deleting resident: " + error.message);
     }
   };
 
@@ -487,7 +503,8 @@ export default function HouseholdManagement() {
     if (!statusData) return;
 
     if (statusData.isPendingActivation) {
-      alert("Cannot update status of accounts that are pending activation. Wait for the user to activate their profile.");
+      // REPLACED ALERT
+      await showAlert("Action Denied", "Cannot update status of accounts that are pending activation. Wait for the user to activate their profile.");
       return;
     }
 
@@ -535,7 +552,8 @@ export default function HouseholdManagement() {
         "Failed to Update Resident Status",
         `Failed to update status for resident ${statusData.fullName} (ID: ${statusData.id}) in household ${statusData.householdId}. Error: ${error.message}`
       );
-      alert("Failed to update status.");
+      // REPLACED ALERT
+      await showAlert("Error", "Failed to update status.");
     }
   };
 
@@ -687,8 +705,8 @@ export default function HouseholdManagement() {
                             <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhViewModal(true); }}>View</button>
                             {req.status === "pending" && (
                               <>
-                                <button className="as-btn-aqua" style={{ background: '#0d7a55', padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhApproveModal(true); }}>Approve</button>
-                                <button className="as-btn-aqua" style={{ background: '#ef4444', padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhRejectModal(true); }}>Reject</button>
+                                <button className="as-btn-aqua" style={{ background: '#0d7a55', padding: '6px 12px' }} onClick={() => handleHhApprove(req)}>Approve</button>
+                                <button className="as-btn-aqua" style={{ background: '#ef4444', padding: '6px 12px' }} onClick={() => handleHhReject(req)}>Reject</button>
                               </>
                             )}
                           </div>
@@ -878,7 +896,7 @@ export default function HouseholdManagement() {
                             {!res.isPendingActivation && (
                               <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
                             )}
-                            <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#ef4444', color: 'white', borderColor: '#ef4444' }} onClick={() => { setResidentToDelete(res); setShowDeleteModal(true); }}>Delete</button>
+                            <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#ef4444', color: 'white', borderColor: '#ef4444' }} onClick={() => handleDeleteResident(res)}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -958,7 +976,7 @@ export default function HouseholdManagement() {
         {activeTab === "new_households" && <NewHouseholdRequestsTab newHouseholds={newHouseholds} />}
       </div>
 
-      {/* ── MODALS (EXISTING) ── */}
+      {/* ── DATA VIEW MODALS (KEPT INTACT) ── */}
       {showResidentModal && selectedResident && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "600px" }}>
@@ -1155,86 +1173,6 @@ export default function HouseholdManagement() {
         </div>
       )}
 
-      {showHhApproveModal && (
-        <div className="as-modal-overlay">
-          <div className="modal">
-            <h3 className="modal-title">Approve Resident Registration</h3>
-            <p style={{ textAlign: "center" }}>
-              Approving will create a Household ID and email the resident. They will appear in the Account Management tab.
-            </p>
-            <div className="modal-actions">
-              <button
-                className="approve-btn"
-                onClick={handleHhApprove}
-                disabled={isApproving}
-                style={{ opacity: isApproving ? 0.6 : 1, cursor: isApproving ? "not-allowed" : "pointer" }}
-              >
-                {isApproving ? "⏳ Approving…" : "Confirm Approval"}
-              </button>
-              <button
-                className="reject-btn"
-                onClick={() => {
-                  setShowHhApproveModal(false);
-                  setSelectedHhRequest(null);
-                }}
-                disabled={isApproving}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showHhRejectModal && (
-        <div className="as-modal-overlay">
-          <div className="modal">
-            <h3 className="modal-title">Confirm Rejection</h3>
-            <p style={{ textAlign: "center" }}>
-              Are you sure you want to reject this resident registration? This will delete the request permanently.
-            </p>
-            <div className="modal-actions">
-              <button className="reject-btn" onClick={handleHhReject}>
-                Reject
-              </button>
-              <button
-                className="approve-btn"
-                onClick={() => {
-                  setShowHhRejectModal(false);
-                  setSelectedHhRequest(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeleteModal && residentToDelete && (
-        <div className="as-modal-overlay">
-          <div className="modal">
-            <h3 className="modal-title">Confirm Deletion</h3>
-            <p style={{ textAlign: "center" }}>
-              Are you sure you want to delete the resident <strong>{residentToDelete.fullName}</strong>? This action cannot be undone.
-            </p>
-            <div className="modal-actions">
-              <button className="reject-btn" onClick={handleDeleteResident}>
-                Delete Resident
-              </button>
-              <button
-                className="approve-btn"
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setResidentToDelete(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </AdminLayout>
   );
 }

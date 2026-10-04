@@ -259,7 +259,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
     } finally {
       setLoading(false);
     }
-  }, [householdID]); 
+  }, [householdID, selected]); 
 
   useEffect(() => { if (householdID) fetchBranches(); }, [householdID, fetchBranches]);
 
@@ -816,6 +816,9 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
 
+  // ADDED: Loading state to prevent duplicate submissions
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -933,7 +936,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       if (!form.province.trim()) missing.push("Province");
     }
     
-    // <-- NEW: Tab 3 Validation for PWD Status -->
     if (tabNum === 3) {
       const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
       if (isPwd) {
@@ -964,11 +966,15 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const goBack = (prevTab) => { setMemberError(""); setTab(prevTab); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const addMember = async () => {
+    if (isSubmitting) return; // <-- ADDED: Prevent duplicate submissions
+
     // strictly validate in order, jumping to the first invalid tab
     if (!validateTab(1)) { setTab(1); return; }
     if (!validateTab(2)) { setTab(2); return; }
     if (!validateTab(3)) { setTab(3); return; }
     if (!validateTab(4)) { setTab(4); return; }
+
+    setIsSubmitting(true); // <-- ADDED: Lock the form
 
     const isBR001 = familyBranch === "BR-001";
     const isHead = !isBR001 && (needsHead || form.isBranchHead);
@@ -986,28 +992,33 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
         categories: form.categories || [],
         isBranchHead: isHead,
       });
-    } catch (err) { alert("Failed to save member: " + err.message); return; }
 
-    setMembers(m => [...m, {
-      fullName, initials, color,
-      familyBranch, branchDisplayName: branchName,
-      isBranchHead: isHead,
-      meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
-    }]);
+      setMembers(m => [...m, {
+        fullName, initials, color,
+        familyBranch, branchDisplayName: branchName,
+        isBranchHead: isHead,
+        meta: [form.sex, form.age ? `${form.age} yrs` : null, form.civilStatus].filter(Boolean).join(" · "),
+      }]);
 
-    setForm({ ...BLANK_FORM });
-    setIdImage(null);
-    setSelfieImage(null);
-    setFamilyBranch(null);
-    setBranchName("");
-    setNeedsHead(false);
-    setAutofilledFields(new Set());
-    manuallyEdited.current = new Set();
-    setTab(1);
-    setOuterStep(0);
-    setMemberError("");
-    setShowToast(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+      setForm({ ...BLANK_FORM });
+      setIdImage(null);
+      setSelfieImage(null);
+      setFamilyBranch(null);
+      setBranchName("");
+      setNeedsHead(false);
+      setAutofilledFields(new Set());
+      manuallyEdited.current = new Set();
+      setTab(1);
+      setOuterStep(0);
+      setMemberError("");
+      setShowToast(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+    } catch (err) { 
+      alert("Failed to save member: " + err.message); 
+    } finally {
+      setIsSubmitting(false); // <-- ADDED: Release the lock
+    }
   };
 
   const removeMember = (i) => setMembers(m => m.filter((_, idx) => idx !== i));
@@ -1243,7 +1254,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                     <div 
                       key={num} 
                       className={`am-inner-step ${status}`} 
-                      // <-- FIX: Only allow clicking past completed tabs so they can't skip validation -->
                       onClick={() => { if (status === "done") setTab(num); }} 
                     >
                       <div className="am-inner-step-num">{status === "done" ? "✓" : num}</div>
@@ -1475,8 +1485,16 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
                     <button className="am-btn am-btn-ghost" onClick={() => goBack(3)}>← Back</button>
-                    <button className="am-btn am-btn-primary" onClick={addMember} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                      <IconCheck /> Add Member
+                    
+                    {/* ADDED isSubmitting to disable the button and show a loading icon */}
+                    <button 
+                      className="am-btn am-btn-primary" 
+                      onClick={addMember} 
+                      disabled={isSubmitting}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+                    >
+                      {isSubmitting ? <SvgLoader size={15} /> : <IconCheck />}
+                      {isSubmitting ? "Adding..." : "Add Member"}
                     </button>
                   </div>
                 </div>

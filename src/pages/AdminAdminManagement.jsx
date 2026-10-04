@@ -19,11 +19,14 @@ import {
 } from "firebase/firestore";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
+import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
 
 export default function AdminManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+
+  const { showAlert, showConfirm } = useAlert(); // <-- INITIALIZE HOOK
 
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -32,7 +35,6 @@ export default function AdminManagement() {
   const [requests, setRequests] = useState([]);
 
   const [selectedAdmin, setSelectedAdmin] = useState(null);
-  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const [activeTab, setActiveTab] = useState("requests");
 
@@ -42,9 +44,6 @@ export default function AdminManagement() {
   const [sortRequest, setSortRequest] = useState("date_desc");
   const [sortAdmin, setSortAdmin] = useState("name_asc");
 
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
 
   const [editedRole, setEditedRole] = useState("Standard Admin");
@@ -176,22 +175,28 @@ export default function AdminManagement() {
     };
   }, [isSuperAdmin, adminRole, currentUser]);
 
-  const handleApprove = async () => {
-    if (!selectedRequest) return;
+  const handleApprove = async (req) => {
+    // 1. REPLACED custom modal trigger with global showConfirm hook
+    const isConfirmed = await showConfirm(
+      "Approve Admin Account",
+      `Are you sure you want to approve ${req.fullName}?`
+    );
+    
+    if (!isConfirmed) return;
 
     try {
       await addDoc(collection(db, "approvedAdmins"), {
-        uid: selectedRequest.uid,
-        fullName: selectedRequest.fullName,
-        email: selectedRequest.email,
-        contact: selectedRequest.contact,
-        position: selectedRequest.position,
+        uid: req.uid,
+        fullName: req.fullName,
+        email: req.email,
+        contact: req.contact,
+        position: req.position,
         role: "Standard Admin",
-        username: selectedRequest.username,
+        username: req.username,
         approvedAt: new Date(),
       });
 
-      await updateDoc(doc(db, "pendingAdmins", selectedRequest.docId), {
+      await updateDoc(doc(db, "pendingAdmins", req.docId), {
         status: "approved",
       });
 
@@ -199,28 +204,35 @@ export default function AdminManagement() {
         adminName,
         adminRole,
         "Approved Admin Request",
-        `Approved admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid})`
+        `Approved admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
-      setSelectedRequest(null);
-      setShowApproveModal(false);
+      // 2. REPLACED silent success with success popup
+      await showAlert("Success", "Admin approved successfully!");
     } catch (error) {
       console.error("Error approving admin:", error);
       logTransaction(
         adminName,
         adminRole,
         "Failed to Approve Admin",
-        `Failed to approve admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid}). Error: ${error.message}`
+        `Failed to approve admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid}). Error: ${error.message}`
       );
-      alert("Failed to approve admin. Please try again.");
+      // 3. REPLACED native alert with custom alert
+      await showAlert("Error", "Failed to approve admin. Please try again.");
     }
   };
 
-  const confirmReject = async () => {
-    if (!selectedRequest) return;
+  const handleReject = async (req) => {
+    // 1. REPLACED custom modal trigger with global showConfirm hook
+    const isConfirmed = await showConfirm(
+      "Confirm Rejection",
+      "Are you sure you want to reject this request?"
+    );
+
+    if (!isConfirmed) return;
 
     try {
-      await updateDoc(doc(db, "pendingAdmins", selectedRequest.docId), {
+      await updateDoc(doc(db, "pendingAdmins", req.docId), {
         status: "rejected",
       });
 
@@ -228,47 +240,55 @@ export default function AdminManagement() {
         adminName,
         adminRole,
         "Rejected Admin Request",
-        `Rejected admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid})`
+        `Rejected admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
-      setSelectedRequest(null);
-      setShowRejectModal(false);
+      // 2. REPLACED silent success with success popup
+      await showAlert("Success", "Admin request rejected.");
     } catch (error) {
       console.error("Error rejecting admin:", error);
       logTransaction(
         adminName,
         adminRole,
         "Failed to Reject Admin",
-        `Failed to reject admin registration for ${selectedRequest.fullName} (${selectedRequest.email}) (ID: ${selectedRequest.uid}). Error: ${error.message}`
+        `Failed to reject admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid}). Error: ${error.message}`
       );
-      alert("Failed to reject admin. Please try again.");
+      // 3. REPLACED native alert with custom alert
+      await showAlert("Error", "Failed to reject admin. Please try again.");
     }
   };
 
-  const confirmDeleteAdmin = async () => {
-    if (!selectedAdmin) return;
+  const handleDeleteAdmin = async (admin) => {
+    // 1. REPLACED custom modal trigger with global showConfirm hook
+    const isConfirmed = await showConfirm(
+      "Delete Admin",
+      `This action cannot be undone. Delete admin account for ${admin.fullName}?`
+    );
+
+    if (!isConfirmed) return;
 
     try {
-      await deleteDoc(doc(db, "approvedAdmins", selectedAdmin.docId));
+      await deleteDoc(doc(db, "approvedAdmins", admin.docId));
 
       logTransaction(
         adminName,
         adminRole,
         "Deleted Admin Account",
-        `Deleted admin account of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid})`
+        `Deleted admin account of ${admin.fullName} (${admin.email}) (ID: ${admin.uid})`
       );
 
-      setSelectedAdmin(null);
-      setShowDeleteModal(false);
+      // 2. REPLACED silent success with success popup
+      await showAlert("Success", "Admin account deleted successfully.");
     } catch (error) {
       console.error("Error deleting admin:", error);
       logTransaction(
         adminName,
         adminRole,
         "Failed to Delete Admin Account",
-        `Failed to delete admin account of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid}). Error: ${error.message}`
+        `Failed to delete admin account of ${admin.fullName} (${admin.email}) (ID: ${admin.uid}). Error: ${error.message}`
       );
-      alert("Failed to delete admin. Please try again.");
+      // 3. REPLACED native alert with custom alert
+      await showAlert("Error", "Failed to delete admin. Please try again.");
     }
   };
 
@@ -289,7 +309,9 @@ export default function AdminManagement() {
 
       setSelectedAdmin(null);
       setShowViewModal(false);
-      alert("Admin system role updated successfully!");
+      
+      // 4. REPLACED native alert with custom alert
+      await showAlert("Success", "Admin system role updated successfully!");
     } catch (error) {
       console.error("Error updating role:", error);
       logTransaction(
@@ -298,7 +320,8 @@ export default function AdminManagement() {
         "Failed to Update Admin Role",
         `Failed to update system role of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid}) to ${editedRole}. Error: ${error.message}`
       );
-      alert("Failed to update role. Please try again.");
+      // 5. REPLACED native alert with custom alert
+      await showAlert("Error", "Failed to update role. Please try again.");
     }
   };
 
@@ -530,19 +553,13 @@ export default function AdminManagement() {
                             <div className="btn-group" style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
                               <button
                                 className="approve-btn"
-                                onClick={() => {
-                                  setSelectedRequest(req);
-                                  setShowApproveModal(true);
-                                }}
+                                onClick={() => handleApprove(req)}
                               >
                                 Approve
                               </button>
                               <button
                                 className="reject-btn"
-                                onClick={() => {
-                                  setSelectedRequest(req);
-                                  setShowRejectModal(true);
-                                }}
+                                onClick={() => handleReject(req)}
                               >
                                 Reject
                               </button>
@@ -724,10 +741,7 @@ export default function AdminManagement() {
                           <button
                             className="reject-btn"
                             style={{ padding: "6px 12px" }}
-                            onClick={() => {
-                              setSelectedAdmin(admin);
-                              setShowDeleteModal(true);
-                            }}
+                            onClick={() => handleDeleteAdmin(admin)}
                           >
                             Delete
                           </button>
@@ -810,82 +824,6 @@ export default function AdminManagement() {
           </>
         )}
       </div>
-
-      {showApproveModal && (
-        <div className="as-modal-overlay">
-          <div className="modal">
-            <h3 className="modal-title">Approve Admin Account</h3>
-            <p style={{ textAlign: "center" }}>
-              Are you sure you want to approve{" "}
-              <strong>{selectedRequest?.fullName}</strong>?
-            </p>
-            <div className="modal-actions">
-              <button className="approve-btn" onClick={handleApprove}>
-                Confirm Approval
-              </button>
-              <button
-                className="reject-btn"
-                onClick={() => {
-                  setShowApproveModal(false);
-                  setSelectedRequest(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showRejectModal && (
-        <div className="as-modal-overlay">
-          <div className="modal">
-            <h3 className="modal-title">Confirm Rejection</h3>
-            <p style={{ textAlign: "center" }}>
-              Are you sure you want to reject this request?
-            </p>
-            <div className="modal-actions">
-              <button className="reject-btn" onClick={confirmReject}>
-                Reject
-              </button>
-              <button
-                className="approve-btn"
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setSelectedRequest(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeleteModal && (
-        <div className="as-modal-overlay">
-          <div className="modal">
-            <h3 className="modal-title">Delete Admin</h3>
-            <p style={{ textAlign: "center" }}>
-              This action cannot be undone. <br /> Delete this admin?
-            </p>
-            <div className="modal-actions">
-              <button className="reject-btn" onClick={confirmDeleteAdmin}>
-                Delete
-              </button>
-              <button
-                className="approve-btn"
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setSelectedAdmin(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showViewModal && selectedAdmin && (
         <div className="as-modal-overlay">

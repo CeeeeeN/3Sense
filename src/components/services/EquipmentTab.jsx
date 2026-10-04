@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitEquipmentRental } from "../../services/services"; 
 import { ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
+import { useAlert } from "../../context/AlertContext"; // <-- 1. IMPORT HOOK
 
 const EquipmentIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -223,6 +224,8 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
 }
 
 function RentalForm({ onBack, equipment, userData, householdID, userName, userID }) {
+  const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+
   const equipmentName = equipment?.equipmentName || equipment?.name || "Equipment";
   const maxQty = equipment?.quantity ? parseInt(equipment.quantity, 10) : 0;
   
@@ -273,7 +276,6 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
     try {
       const finalPurpose = form.purpose === "Other" ? form.customPurpose : form.purpose;
       
-      // <-- INJECT UID HERE
       const userUID = userData?.UID || getSaved("UID", null);
       
       const submissionForm = { 
@@ -287,14 +289,15 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
         userData?.residentID || userID || "",
         userName || "Unknown",
         equipment,
-        submissionForm, // Passed the updated payload containing the UID
-        {} // custom data if needed later
+        submissionForm, 
+        {} 
       );
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit rental:", error);
-      setErrors({ submit: "Failed to submit. Please try again." });
+      // <-- 3. REPLACE INLINE ERROR SETTING WITH ALERT POPUP
+      await showAlert("Submission Failed", error.message || "Failed to submit request. Please try again.");
     }
   };
 

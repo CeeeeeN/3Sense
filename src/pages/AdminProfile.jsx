@@ -4,8 +4,11 @@ import AdminLayout from "../components/AdminLayout"
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
 
 export default function AdminProfile() {
+  const { showAlert } = useAlert(); // <-- INITIALIZE HOOK
+
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -93,7 +96,8 @@ export default function AdminProfile() {
     e.preventDefault();
 
     if (!userDocId || !userCollection) {
-      alert("Could not find your profile. Please try again.");
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Could not find your profile. Please try again.");
       return;
     }
 
@@ -103,10 +107,12 @@ export default function AdminProfile() {
         username: form.username,
         contact: form.contact
       });
-      alert("Profile updated successfully!");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Profile updated successfully!");
       setIsEditingProfile(false);
     } catch (error) {
-      alert("Failed to update profile: " + error.message);
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to update profile: " + error.message);
     }
   };
 
@@ -115,11 +121,13 @@ export default function AdminProfile() {
     e.preventDefault();
 
     if (!form.password || !form.newPassword || !form.confirmPassword) {
-      alert("Please fill in all password fields");
+      // <-- REPLACED ALERT
+      await showAlert("Warning", "Please fill in all password fields");
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
-      alert("Passwords do not match");
+      // <-- REPLACED ALERT
+      await showAlert("Warning", "Passwords do not match");
       return;
     }
 
@@ -131,7 +139,8 @@ export default function AdminProfile() {
 
       await updatePassword(user, form.newPassword);
 
-      alert("Password updated successfully!");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Password updated successfully!");
       setForm(prev => ({ ...prev, password: "", newPassword: "", confirmPassword: "" }));
       setIsEditingPassword(false);
       setShowCurrent(false);
@@ -140,9 +149,11 @@ export default function AdminProfile() {
 
     } catch (error) {
       if (error.code === "auth/wrong-password") {
-        alert("Current password is incorrect.");
+        // <-- REPLACED ALERT
+        await showAlert("Error", "Current password is incorrect.");
       } else {
-        alert("Failed to update password: " + error.message);
+        // <-- REPLACED ALERT
+        await showAlert("Error", "Failed to update password: " + error.message);
       }
     }
   };

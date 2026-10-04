@@ -1,10 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { processHouseholdTransfer } from "../services/services";
+import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
 
 export default function NewHouseholdRequestsTab({ newHouseholds }) {
+  const { showAlert, showConfirm } = useAlert(); // <-- INITIALIZE HOOK
+
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // State for search, status filtering, and sorting
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortFilter, setSortFilter] = useState("Date: Newest First");
+
+  // State for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Reset to page 1 when any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, sortFilter]);
 
   const handleReview = (req) => {
     setSelectedRequest(req);
@@ -17,7 +34,12 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
   };
 
   const handleUpdateStatus = async (id, newStatus) => {
-    if (!window.confirm(`Are you sure you want to mark this request as ${newStatus}?`)) return;
+    // <-- REPLACED window.confirm
+    const isConfirmed = await showConfirm(
+      "Confirm Action",
+      `Are you sure you want to mark this request as ${newStatus}?`
+    );
+    if (!isConfirmed) return;
     
     setIsSaving(true);
     try {
@@ -26,16 +48,93 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
       
       // Update local modal state to reflect the change immediately
       setSelectedRequest(prev => ({ ...prev, status: newStatus }));
+
+      // <-- ADDED success alert
+      await showAlert("Success", `Request marked as ${newStatus}.`);
     } catch (error) {
       console.error("Error updating status:", error);
-      alert(error.message || "Failed to update status. Please try again.");
+      // <-- REPLACED native alert
+      await showAlert("Error", error.message || "Failed to update status. Please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Filter logic
+  const filteredHouseholds = newHouseholds.filter((req) => {
+    const matchesStatus = statusFilter === "All" || req.status === statusFilter;
+    
+    if (!searchTerm) return matchesStatus;
+
+    const searchLower = searchTerm.toLowerCase();
+    const addressString = `${req.newHouseNumber || ""} ${req.newStreet || ""}`.toLowerCase();
+    
+    const matchesSearch = 
+      (req.requesterName?.toLowerCase().includes(searchLower)) ||
+      (req.UID?.toLowerCase().includes(searchLower)) ||
+      (req.transferID?.toLowerCase().includes(searchLower)) ||
+      (req.id?.toLowerCase().includes(searchLower)) ||
+      (req.currentHouseholdID?.toLowerCase().includes(searchLower)) ||
+      (addressString.includes(searchLower));
+
+    return matchesStatus && matchesSearch;
+  });
+
+  // Sort logic
+  const sortedHouseholds = [...filteredHouseholds].sort((a, b) => {
+    if (sortFilter === "Date: Newest First") {
+      return new Date(b.dateSubmitted || 0) - new Date(a.dateSubmitted || 0);
+    } else if (sortFilter === "Date: Oldest First") {
+      return new Date(a.dateSubmitted || 0) - new Date(b.dateSubmitted || 0);
+    } else if (sortFilter === "Name: A to Z") {
+      return (a.requesterName || "").localeCompare(b.requesterName || "");
+    } else if (sortFilter === "Name: Z to A") {
+      return (b.requesterName || "").localeCompare(a.requesterName || "");
+    }
+    return 0;
+  });
+
+  // Pagination calculations
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = sortedHouseholds.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedHouseholds.length / itemsPerPage);
+
   return (
     <>
+      {/* Search, Sort, and Filter Bar */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
+        <input 
+          type="text" 
+          placeholder="Search requests..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: "250px", padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
+        />
+
+        <select 
+          value={sortFilter}
+          onChange={(e) => setSortFilter(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "#fff", fontSize: "0.9rem", minWidth: "160px" }}
+        >
+          <option value="Date: Newest First">Date: Newest First</option>
+          <option value="Date: Oldest First">Date: Oldest First</option>
+          <option value="Name: A to Z">Name: A to Z</option>
+          <option value="Name: Z to A">Name: Z to A</option>
+        </select>
+
+        <select 
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "#fff", fontSize: "0.9rem", minWidth: "150px" }}
+        >
+          <option value="All">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+
       <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <table className="req-table" style={{ minWidth: "850px" }}>
           <thead>
@@ -51,8 +150,8 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
             </tr>
           </thead>
           <tbody>
-            {newHouseholds.length > 0 ? (
-              newHouseholds.map((req) => (
+            {currentItems.length > 0 ? (
+              currentItems.map((req) => (
                 <tr key={req.id}>
                   <td>{req.dateSubmitted}</td>
                   <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>{req.transferID || req.id.slice(0, 8)}</td>
@@ -86,6 +185,46 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", padding: "12px 16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+          <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+            Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, sortedHouseholds.length)} of {sortedHouseholds.length} entries
+          </span>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="as-btn-ghost"
+              style={{ 
+                padding: "6px 12px", 
+                fontSize: "0.85rem", 
+                opacity: currentPage === 1 ? 0.5 : 1, 
+                cursor: currentPage === 1 ? "not-allowed" : "pointer" 
+              }}
+            >
+              Previous
+            </button>
+            <span style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", fontWeight: 500, padding: "0 8px", color: "#374151" }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="as-btn-ghost"
+              style={{ 
+                padding: "6px 12px", 
+                fontSize: "0.85rem", 
+                opacity: currentPage === totalPages ? 0.5 : 1, 
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer" 
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── NEW HOUSEHOLD REVIEW MODAL ── */}
       {showModal && selectedRequest && (
