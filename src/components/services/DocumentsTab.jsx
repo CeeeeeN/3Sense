@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
+import { useAlert } from "../../context/AlertContext"; // <-- IMPORT HOOK
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
@@ -122,14 +123,21 @@ function Step1({ docTypes, selected, onSelect }) {
 }
 
 function Step2({ docType, form, setForm, errors }) {
+  const { showAlert } = useAlert(); // <-- INITIALIZE HOOK HERE
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => { // <-- MAKE ASYNC
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB."); return; }
+    
+    if (file.size > 5 * 1024 * 1024) { 
+      await showAlert("File Too Large", "File must be under 5MB."); // <-- CUSTOM ALERT
+      return; 
+    }
+    
     set("validId", file.name);
     set("validIdFile", file);
   };
@@ -374,7 +382,7 @@ function Step4({ refNum, onReset }) {
 
 export default function DocumentsTab({ userData, householdID, userName }) {
   const residentID = userData?.residentID || getSaved("memberID", null);
-  const userUID = userData?.UID || getSaved("UID", null); // <-- RETRIEVE UID
+  const userUID = userData?.UID || getSaved("UID", null); 
   
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
@@ -476,7 +484,6 @@ export default function DocumentsTab({ userData, householdID, userName }) {
 
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
         
-        // <-- INJECT UID INTO THE PAYLOAD HERE
         const submissionForm = { 
           ...form, 
           purpose: effectivePurpose, 

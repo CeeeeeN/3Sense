@@ -11,6 +11,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "./firebase/firebase";
 
 import { ROLE_PERMISSIONS } from "./services/permissions";
+import { AlertProvider } from "./context/AlertContext";
 
 import AdminSignup from "./pages/AdminSignup";
 import ApprovalPending from "./pages/AdminApprovalPending";
@@ -160,199 +161,202 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <Routes>
-        {/* Default redirect */}
-        <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+    // <!-- WRAP ENTIRE APP IN ALERT PROVIDER -->
+    <AlertProvider>
+      <Router>
+        <Routes>
+          {/* Default redirect */}
+          <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
 
-        {/* ===== PUBLIC ROUTES ===== */}
-        <Route
-          path="/admin/login"
-          element={
-            <PublicRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              loading={loading}
-            >
-              <AdminLogin />
-            </PublicRoute>
-          }
-        />
+          {/* ===== PUBLIC ROUTES ===== */}
+          <Route
+            path="/admin/login"
+            element={
+              <PublicRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                loading={loading}
+              >
+                <AdminLogin />
+              </PublicRoute>
+            }
+          />
 
-        <Route
-          path="/admin/signup"
-          element={
-            <PublicRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              loading={loading}
-            >
-              <AdminSignup />
-            </PublicRoute>
-          }
-        />
+          <Route
+            path="/admin/signup"
+            element={
+              <PublicRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                loading={loading}
+              >
+                <AdminSignup />
+              </PublicRoute>
+            }
+          />
 
-        {/* Approval pending — always accessible */}
-        <Route path="/admin/approval-pending" element={<ApprovalPending />} />
+          {/* Approval pending — always accessible */}
+          <Route path="/admin/approval-pending" element={<ApprovalPending />} />
 
-        {/* ===== PROTECTED ROUTES (Now passing userRole and reqPath) ===== */}
-        <Route
-          path="/admin/dashboard"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/dashboard"
-              loading={loading}
-            >
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* ===== PROTECTED ROUTES (Now passing userRole and reqPath) ===== */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/dashboard"
+                loading={loading}
+              >
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/manage"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/manage"
-              loading={loading}
-            >
-              <AdminManage />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/manage"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/manage"
+                loading={loading}
+              >
+                <AdminManage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/requests"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/requests"
-              loading={loading}
-            >
-              <AdminRequests />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/requests"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/requests"
+                loading={loading}
+              >
+                <AdminRequests />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/feedback"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/feedback"
-              loading={loading}
-            >
-              <AdminFeedback />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/feedback"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/feedback"
+                loading={loading}
+              >
+                <AdminFeedback />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/admin-management"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/admin-management"
-              loading={loading}
-            >
-              <AdminAdminManagement />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/admin-management"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/admin-management"
+                loading={loading}
+              >
+                <AdminAdminManagement />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/household-management"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/household-management"
-              loading={loading}
-            >
-              <AdminHouseholdManagement />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/household-management"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/household-management"
+                loading={loading}
+              >
+                <AdminHouseholdManagement />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/reports"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/reports"
-              loading={loading}
-            >
-              <AdminReports />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/reports"
+                loading={loading}
+              >
+                <AdminReports />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/logs"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/logs"
-              loading={loading}
-            >
-              <AdminLogs />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/logs"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/logs"
+                loading={loading}
+              >
+                <AdminLogs />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/profile"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/profile"
-              loading={loading}
-            >
-              <AdminProfile />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/profile"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/profile"
+                loading={loading}
+              >
+                <AdminProfile />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/resident-scanner"
-          element={
-            <ProtectedRoute
-              user={user}
-              isApprovedAdmin={isApprovedAdmin}
-              userRole={userRole}
-              reqPath="/admin/resident-scanner"
-              loading={loading}
-            >
-              <AdminResidentScanner />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/resident-scanner"
+            element={
+              <ProtectedRoute
+                user={user}
+                isApprovedAdmin={isApprovedAdmin}
+                userRole={userRole}
+                reqPath="/admin/resident-scanner"
+                loading={loading}
+              >
+                <AdminResidentScanner />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* User side */}
-        <Route path="/*" element={<UserApp />} />
+          {/* User side */}
+          <Route path="/*" element={<UserApp />} />
 
-        {/* 404 */}
-        <Route path="*" element={<div>404 - Page Not Found</div>} />
-      </Routes>
-    </Router>
+          {/* 404 */}
+          <Route path="*" element={<div>404 - Page Not Found</div>} />
+        </Routes>
+      </Router>
+    </AlertProvider>
   );
 }
 

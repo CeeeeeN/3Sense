@@ -4,6 +4,7 @@ import { db } from "../../firebase/firebase";
 import { submitFacilityReservation, submitEquipmentRental } from "../../services/services";
 import { createNotification } from "../../services/notifications";
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
+import { useAlert } from "../../context/AlertContext"; // <-- 1. IMPORT HOOK
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -267,6 +268,8 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
 }
 
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
+  const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+
   const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
     ? `Reserve a time slot for ${facilityName}. Approval is required before confirmation.`
@@ -427,7 +430,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         if (form[f.id] !== undefined) customData[f.label] = form[f.id];
       });
 
-      // <-- INJECT UID HERE
       const userUID = userData?.UID || getSaved("UID", null);
       const submissionForm = { ...form, UID: userUID };
 
@@ -437,7 +439,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         userData?.residentID || userID || "",
         userName || "Unknown",
         facility,
-        submissionForm, // Passed the updated payload containing the UID
+        submissionForm, 
         customData
       );
 
@@ -456,7 +458,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             notes: `Bundled with facility reservation ${generatedRef}. ${form.notes}`,
             email: form.email,
             contactNumber: form.contactNumber,
-            UID: userUID // Inject UID into the equipment payload too
+            UID: userUID 
           },
           {}
         );
@@ -469,7 +471,8 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit reservation:", error);
-      setErrors({ submit: "Failed to submit. Please try again." });
+      // <-- 3. REPLACE INLINE ERROR SETTING WITH ALERT POPUP
+      await showAlert("Submission Failed", error.message || "Failed to submit reservation. Please try again.");
     }
   };
 

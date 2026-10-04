@@ -9,10 +9,13 @@ import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
 import { formatDisplayEmail } from '../utils/maskEmail';
 import { getFamilyNumber } from '../utils/householdNumbers';
+import { useAlert } from '../context/AlertContext'; // <-- IMPORT HOOK
 
 export default function AdminRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const { showAlert } = useAlert(); // <-- INITIALIZE HOOK
 
   // For logging purposes
   const [adminName, setAdminName] = useState("");
@@ -307,7 +310,8 @@ export default function AdminRequests() {
       });
 
       if (hasOverlap) {
-        alert("Cannot approve: The selected time slot conflicts with an existing approved reservation.");
+        // <-- REPLACED ALERT
+        await showAlert("Conflict", "Cannot approve: The selected time slot conflicts with an existing approved reservation.");
         return;
       }
     }
@@ -341,11 +345,13 @@ export default function AdminRequests() {
         );
       }
 
-      alert("Request Approved Successfully!");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Request Approved Successfully!");
       closeModal();
     } catch (error) {
       console.error("Error approving request: ", error);
-      alert("Failed to approve request.");
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to approve request.");
     }
   };
 
@@ -377,11 +383,13 @@ export default function AdminRequests() {
         );
       }
 
-      alert("Request Marked as Ready for Pickup.");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Request Marked as Ready for Pickup.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      alert("Failed to update request.");
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to update request.");
     }
   };
 
@@ -425,11 +433,13 @@ export default function AdminRequests() {
         );
       }
 
-      alert("Request Marked as Claimed.");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Request Marked as Claimed.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      alert("Failed to update request.");
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to update request.");
     }
   };
 
@@ -472,11 +482,13 @@ export default function AdminRequests() {
         );
       }
 
-      alert("Equipment Marked as Returned.");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Equipment Marked as Returned.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      alert("Failed to update request.");
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to update request.");
     }
   };
 
@@ -513,17 +525,20 @@ export default function AdminRequests() {
         );
       }
 
-      alert('Equipment reported as Unreturned.');
+      // <-- REPLACED ALERT
+      await showAlert("Reported", "Equipment reported as Unreturned.");
       closeModal();
     } catch (error) {
       console.error('Error reporting unreturned:', error);
-      alert('Failed to report equipment as unreturned.');
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to report equipment as unreturned.");
     }
   };
 
   const handleConfirmReject = async () => {
     if (rejectReason.trim() === '') {
-      alert("Please provide a reason for rejection.");
+      // <-- REPLACED ALERT
+      await showAlert("Required Field", "Please provide a reason for rejection.");
       return;
     }
 
@@ -557,11 +572,13 @@ export default function AdminRequests() {
         );
       }
 
-      alert("Request Rejected.");
+      // <-- REPLACED ALERT
+      await showAlert("Success", "Request Rejected.");
       closeModal();
     } catch (error) {
       console.error("Error rejecting request: ", error);
-      alert("Failed to reject request.");
+      // <-- REPLACED ALERT
+      await showAlert("Error", "Failed to reject request.");
     }
   };
 
