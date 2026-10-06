@@ -1531,6 +1531,18 @@ h4,
   color: var(--text);
 }
 
+.pin-key:disabled:not(.empty) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pin-key:disabled:not(.empty):hover {
+  background: white;
+  border-color: var(--border);
+  color: var(--text);
+  transform: none;
+}
+
 .pin-label {
   text-align: center;
   font-size: 0.82rem;

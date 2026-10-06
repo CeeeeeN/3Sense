@@ -175,7 +175,6 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         idImage: head.idImage || head.idImageUrl || "",
         selfieImage: head.selfieImage || head.selfieImageUrl || "",
 
-        pinHash:   null,
         createdAt: serverTimestamp(),
         addedAt:   serverTimestamp(),
         updatedAt: serverTimestamp(),

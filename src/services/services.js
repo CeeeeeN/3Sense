@@ -5,6 +5,7 @@ import {
   getDoc, doc, writeBatch, updateDoc, deleteDoc
 } from "firebase/firestore";
 import { generateHouseholdID, sendApprovalEmail } from "./admin";
+import { verifyMemberPin } from "./login";
 
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
@@ -516,39 +517,18 @@ export async function transferBranchHeadRole(householdID, currentHeadID, newHead
 // ══════════════════════════════
 // 🔒 PIN VERIFICATION
 // ══════════════════════════════
-const hashPin = async (pin) => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pin);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-};
-
 export async function verifyResidentPIN(householdID, residentID, inputPin) {
   if (!inputPin) throw new Error("Please enter your PIN.");
-  
-  const residentRef = doc(db, "households", householdID, "residents", residentID);
-  const snap = await getDoc(residentRef);
-  
-  if (!snap.exists()) {
-    throw new Error("Resident profile not found.");
-  }
-  
-  const data = snap.data();
-  const savedPinHash = data.pinHash; 
-  
-  if (!savedPinHash) {
-    throw new Error("No PIN is set on your profile. Please set up a PIN in your settings first.");
+
+  const result = await verifyMemberPin(householdID, residentID, inputPin);
+
+  if (!result.ok) {
+    if (result.code === "NO_PIN") {
+      throw new Error("No PIN is set on your profile. Please set up a PIN in your settings first.");
+    }
+    throw new Error(result.message || "Incorrect PIN. Please try again.");
   }
 
-  // Hash the user's input using your exact SHA-256 logic
-  const hashedInput = await hashPin(inputPin);
-
-  // Compare the hashes
-  if (savedPinHash !== hashedInput) {
-    throw new Error("Incorrect PIN. Please try again.");
-  }
-  
   return true;
 }
 

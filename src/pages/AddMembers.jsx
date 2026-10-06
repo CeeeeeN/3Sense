@@ -1309,12 +1309,9 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       <Field label="Gender">
                         <SelectField icon={IconUser} value={form.gender} onChange={set("gender")}>
                           <option value="">Select gender</option>
-                          <option>Cisgender</option>
+                          <option>Man</option>
+                          <option>Woman</option>
                           <option>Non-binary</option>
-                          <option>Transgender Man</option>
-                          <option>Transgender Woman</option>
-                          <option>Genderqueer</option>
-                          <option>Others</option>
                           <option>Prefer not to say</option>
                         </SelectField>
                       </Field>

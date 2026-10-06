@@ -1,6 +1,6 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useCallback } from "react";
-import { loginWithHouseholdID, getMemberPin, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
+import { loginWithHouseholdID, getMemberPinStatus, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
 import { LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser } from "../components/Icons";
 import ErrorMessage from "../components/ErrorMessage";
 
@@ -71,6 +71,14 @@ function PinDot({ filled, error }) {
   return <div className={cls} />;
 }
 
+const LOCKED_MESSAGE = "Too many incorrect attempts. Your account has been temporarily locked. Please try again in 15 minutes.";
+
+function formatCountdown(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 // ADDED onAddMember to props
 export default function Login({ onBack, onForgotPassword, onSuccess, onRegister, onActivate, onAddMember }) {
   const [screen, setScreen] = useState("credentials");
@@ -91,6 +99,27 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   const [loginLoading, setLoginLoading] = useState(false);
   const [expandedBranches, setExpandedBranches] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
+  const [pinMessage, setPinMessage] = useState("");
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const lockRemaining = lockedUntil ? Math.max(0, Math.ceil((lockedUntil - now) / 1000)) : 0;
+  const isLocked = lockRemaining > 0;
+
+  function startLock(seconds) {
+    const t = Date.now();
+    setNow(t);
+    setLockedUntil(t + seconds * 1000);
+  }
+
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= lockedUntil) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
 
   function toggleBranch(branchId) {
     setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
@@ -167,35 +196,61 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   async function handleContinueToPin() {
     if (!selectedProfile) return;
     setPinValue(""); setFirstPin(""); setIsConfirmingPin(false);
-    // Check Firestore for existing PIN
-    const existingPinHash = await getMemberPin(hhNumber.trim(), selectedProfile.id);
-    if (existingPinHash) {
-      setHasExistingPin(true);
-      setPinLabel("Enter your PIN");
-    } else {
-      setHasExistingPin(false);
-      setPinLabel("Create your PIN");
+    setPinMessage(""); setPinError(false);
+    try {
+      const status = await getMemberPinStatus(hhNumber.trim(), selectedProfile.id);
+      if (status.hasPin) {
+        setHasExistingPin(true);
+        setPinLabel("Enter your PIN");
+      } else {
+        setHasExistingPin(false);
+        setPinLabel("Create your PIN");
+      }
+      if (status.locked) startLock(status.remainingSeconds);
+      else setLockedUntil(0);
+    } catch (err) {
+      alert(err.message || "Unable to continue right now. Please try again.");
+      return;
     }
     switchScreen("pin");
   }
 
   const handlePinPress = useCallback((digit) => {
+    if (isLocked) return;
+    setPinMessage("");
     setPinValue(prev => prev.length >= 4 ? prev : prev + digit);
-  }, []);
+  }, [isLocked]);
 
   const handlePinDelete = useCallback(() => {
     setPinValue(prev => prev.slice(0, -1));
   }, []);
 
   useEffect(() => {
-    if (pinValue.length === 4) {
+    if (pinValue.length === 4 && !isLocked) {
       const timer = setTimeout(async () => {
         if (hasExistingPin) {
-          // Returning user — verify against Firestore hash
-          const isCorrect = await verifyMemberPin(hhNumber.trim(), selectedProfile?.id, pinValue);
-          if (isCorrect) {
+          let result;
+          try {
+            result = await verifyMemberPin(hhNumber.trim(), selectedProfile?.id, pinValue);
+          } catch (err) {
+            setPinMessage(err.message || "Unable to verify your PIN. Please try again.");
+            setPinValue("");
+            return;
+          }
+
+          if (result.ok) {
             loginSuccess();
+          } else if (result.code === "NO_PIN") {
+            setHasExistingPin(false);
+            setPinValue("");
+            setPinLabel("Create your PIN");
           } else {
+            if (result.code === "LOCKED") {
+              setPinMessage("");
+              startLock(result.remainingSeconds || 15 * 60);
+            } else {
+              setPinMessage(result.message || "Incorrect PIN.");
+            }
             setPinError(true);
             setPinLabel("Wrong PIN. Try again.");
             setTimeout(() => {
@@ -213,8 +268,14 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
             setPinLabel("Confirm your PIN");
           } else {
             if (pinValue === firstPin) {
-              // Save hashed PIN to Firestore
-              await saveMemberPin(hhNumber.trim(), selectedProfile?.id, pinValue);
+              try {
+                await saveMemberPin(hhNumber.trim(), selectedProfile?.id, pinValue);
+              } catch (err) {
+                setPinMessage(err.message || "Unable to save your PIN. Please try again.");
+                setPinValue(""); setFirstPin("");
+                setIsConfirmingPin(false); setPinLabel("Create your PIN");
+                return;
+              }
               loginSuccess();
             } else {
               setPinError(true);
@@ -229,7 +290,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [pinValue, isConfirmingPin, firstPin, hasExistingPin, hhNumber, selectedProfile]);
+  }, [pinValue, isConfirmingPin, firstPin, hasExistingPin, hhNumber, selectedProfile, isLocked]);
 
   function loginSuccess() {
     switchScreen("success");
@@ -255,6 +316,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   }, [screen, handlePinPress, handlePinDelete]);
 
   async function handleForgotPin() {
+    if (isLocked) return;
     if (!window.confirm("Reset your PIN? A notification will be sent to your registered email.")) return;
     try {
       const masked = await resetMemberPin(hhNumber.trim(), selectedProfile?.id);
@@ -549,26 +611,45 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <span className="mini-name">{selectedProfile?.name}</span>
               </div>
 
-              <div className="pin-label">{pinLabel}</div>
+              <div className="pin-label">{isLocked ? "Account temporarily locked" : pinLabel}</div>
               <div className="pin-dots">
                 {[0, 1, 2, 3].map(i => (
                   <PinDot key={i} filled={i < pinValue.length} error={pinError} />
                 ))}
               </div>
 
+              {isLocked ? (
+                <div style={{ marginBottom: "1rem" }}>
+                  <ErrorMessage message={LOCKED_MESSAGE} />
+                  <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
+                    <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      Time remaining
+                    </div>
+                    <div
+                      role="timer"
+                      style={{ fontSize: "1.6rem", fontWeight: 700, color: "#b91c1c", fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {formatCountdown(lockRemaining)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                pinMessage && <ErrorMessage message={pinMessage} style={{ marginBottom: "1rem" }} />
+              )}
+
               <div className="pin-pad">
                 {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(d => (
-                  <button key={d} className="pin-key" onClick={() => handlePinPress(d)}>{d}</button>
+                  <button key={d} className="pin-key" disabled={isLocked} onClick={() => handlePinPress(d)}>{d}</button>
                 ))}
                 <button className="pin-key empty" disabled />
-                <button className="pin-key" onClick={() => handlePinPress("0")}>0</button>
-                <button className="pin-key del" onClick={handlePinDelete}>⌫</button>
+                <button className="pin-key" disabled={isLocked} onClick={() => handlePinPress("0")}>0</button>
+                <button className="pin-key del" disabled={isLocked} onClick={handlePinDelete}>⌫</button>
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "0.5rem" }}>
                 <button className="btn-ghost-sm" onClick={() => switchScreen("profiles")}>← Back to Profiles</button>
                 {hasExistingPin && (
-                  <button className="btn-ghost-sm" onClick={handleForgotPin}>Forgot PIN?</button>
+                  <button className="btn-ghost-sm" onClick={handleForgotPin} disabled={isLocked} style={isLocked ? { opacity: 0.45, cursor: "not-allowed" } : undefined}>Forgot PIN?</button>
                 )}
               </div>
             </div>

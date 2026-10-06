@@ -152,7 +152,6 @@ export const addHouseholdMember = async (householdID, memberData) => {
         selfieImageUrl: selfieImageUrl || "",
         idImage: idImageUrl || "",
         selfieImage: selfieImageUrl || "",
-        pinHash: null,
         createdAt: serverTimestamp(),
         addedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
