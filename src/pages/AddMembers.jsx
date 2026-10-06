@@ -23,7 +23,7 @@ async function validateIsGovernmentId(imageBase64) {
       setTimeout(() => resolve({
         isValid: true,
         reason: null,
-        detectedType: "Government ID",
+        detectedType: "National ID / Government ID",
         idNumber: null,
       }), 1000)
     );
@@ -63,9 +63,10 @@ async function performLiveOCR(imageBase64) {
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
+    // Match PhilSys / National ID PCN (4-4-4-4 format) or standard numeric IDs
+    const idMatch = text.match(/\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}/) || text.match(/\d{4}\s*\d{4}\s*\d{4}\s*\d{4}/);
     if (idMatch) {
-      data.idNumber = idMatch[0].replace(/\s/g, ''); 
+      data.idNumber = idMatch[0].replace(/[\s–]/g, '-'); 
     }
 
     const dobMatch = text.match(/(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2},?\s+\d{4}/i);
@@ -534,7 +535,7 @@ function AmIdScanStep({ onConfirm, onSkip }) {
           <h3 className="am-scan-title">
             Scan Your ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span>
           </h3>
-          <p className="am-scan-sub">Take a photo or upload a valid government-issued ID. Data will autofill the form.</p>
+          <p className="am-scan-sub">Scan or upload a PhilSys National ID or valid government ID to autofill the form.</p>
         </div>
       </div>
 
@@ -543,8 +544,8 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div className="am-dropzone">
             <div className="am-dropzone-icon"><SvgIdCard size={32} /></div>
-            <p className="am-dropzone-title">Position your ID within frame</p>
-            <p className="am-dropzone-sub">Accepted: PhilSys, Driver's License, Passport, Voter's ID, SSS, GSIS, PRC ID</p>
+            <p className="am-dropzone-title">Position National ID or Government ID within frame</p>
+            <p className="am-dropzone-sub">Accepted: National ID (PhilSys), Driver's License, Passport, Voter's ID, SSS, GSIS, PRC ID</p>
             <div className="am-btn-group">
               <button className="am-btn am-btn-primary" onClick={startCamera} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
                 <SvgCamera /> Use Camera
@@ -816,7 +817,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
 
-  // ADDED: Loading state to prevent duplicate submissions
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
@@ -966,15 +966,14 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const goBack = (prevTab) => { setMemberError(""); setTab(prevTab); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const addMember = async () => {
-    if (isSubmitting) return; // <-- ADDED: Prevent duplicate submissions
+    if (isSubmitting) return;
 
-    // strictly validate in order, jumping to the first invalid tab
     if (!validateTab(1)) { setTab(1); return; }
     if (!validateTab(2)) { setTab(2); return; }
     if (!validateTab(3)) { setTab(3); return; }
     if (!validateTab(4)) { setTab(4); return; }
 
-    setIsSubmitting(true); // <-- ADDED: Lock the form
+    setIsSubmitting(true);
 
     const isBR001 = familyBranch === "BR-001";
     const isHead = !isBR001 && (needsHead || form.isBranchHead);
@@ -1017,7 +1016,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     } catch (err) { 
       alert("Failed to save member: " + err.message); 
     } finally {
-      setIsSubmitting(false); // <-- ADDED: Release the lock
+      setIsSubmitting(false);
     }
   };
 
@@ -1267,7 +1266,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               {tab === 1 && (
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    <Field label="ID Number" hint="Extracted from your scanned ID. You may correct this if needed.">
+                    <Field label="ID Number" hint="Extracted from your scanned ID or National ID. You may correct this if needed.">
                       <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
                     </Field>
                     <div className="am-form-grid cols-3">
@@ -1483,7 +1482,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                   <div className="am-form-actions">
                     <button className="am-btn am-btn-ghost" onClick={() => goBack(3)}>← Back</button>
                     
-                    {/* ADDED isSubmitting to disable the button and show a loading icon */}
                     <button 
                       className="am-btn am-btn-primary" 
                       onClick={addMember} 
