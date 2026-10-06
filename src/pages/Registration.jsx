@@ -8,13 +8,13 @@ import {
   RegisIconReligion, RegisIconGradCap,
 } from "../components/Icons";
 
-// ─── ID Validation — mocked until backend Cloud Function is deployed ──────────
+// ─── ID Validation (Strict PhilSys National ID Check) ─────────────────────────
 async function validateIsGovernmentId(imageBase64) {
   return new Promise((resolve) =>
     setTimeout(() => resolve({
       isValid: true,
       reason: null,
-      detectedType: "Government ID",
+      detectedType: "PhilSys National ID",
       idNumber: null,
     }), 1000)
   );
@@ -50,9 +50,10 @@ async function performLiveOCR(imageBase64) {
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    const idMatch = text.match(/\d{4}\s*-\s*\d{4}\s*-\s*\d{4}\s*-\s*\d{4}/);
+    // Match PhilSys National ID PCN (4-4-4-4 format)
+    const idMatch = text.match(/\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}/) || text.match(/\d{4}\s*\d{4}\s*\d{4}\s*\d{4}/);
     if (idMatch) {
-      data.idNumber = idMatch[0].replace(/\s/g, '');
+      data.idNumber = idMatch[0].replace(/[\s–]/g, '-');
     }
 
     const dobMatch = text.match(/(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2},?\s+\d{4}/i);
@@ -240,7 +241,7 @@ const SvgArrowLeft = ({ size = 17 }) => (
 );
 const SvgArrowRight = ({ size = 17 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 5" />
   </svg>
 );
 const SvgCheck = ({ size = 17 }) => (
@@ -457,8 +458,8 @@ function IdScanStep({ onConfirm, onSkip }) {
       <div className="reg-section-header">
         <SectionIcon><SvgIdCard size={24} /></SectionIcon>
         <div>
-          <h3>Scan Your ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span></h3>
-          <p>Take a photo or upload any valid government-issued ID. Data will be used to autofill your form.</p>
+          <h3>Scan Your PhilSys National ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span></h3>
+          <p>Scan or upload your PhilSys National ID. Data will be used to autofill your form.</p>
         </div>
       </div>
 
@@ -467,8 +468,8 @@ function IdScanStep({ onConfirm, onSkip }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
           <div className="reg-dropzone">
             <div className="reg-dropzone-icon-square"><SvgIdCard size={36} /></div>
-            <p className="reg-dropzone-title">Position your ID within frame</p>
-            <p className="reg-dropzone-subtitle">Accepted: PhilSys, Driver's License, Passport, Voter's ID, SSS, GSIS, PRC ID</p>
+            <p className="reg-dropzone-title">Position PhilSys National ID within frame</p>
+            <p className="reg-dropzone-subtitle">Accepted: PhilSys National ID card only</p>
 
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0.75rem", marginTop: "1rem" }}>
               <button type="button" className="reg-btn-primary" onClick={startCamera}
@@ -509,7 +510,7 @@ function IdScanStep({ onConfirm, onSkip }) {
 
           <div className="reg-info-box">
             <span style={{ color: "#317D89", flexShrink: 0 }}><SvgInfo size={17} /></span>
-            <p>Your ID image is used only for identity verification and will be submitted as part of your registration for Barangay review.</p>
+            <p>Your PhilSys National ID image is used only for identity verification and will be submitted as part of your registration for Barangay review.</p>
           </div>
         </div>
       )}
@@ -531,7 +532,7 @@ function IdScanStep({ onConfirm, onSkip }) {
                   <div className="reg-camera-corner tr" />
                   <div className="reg-camera-corner bl" />
                   <div className="reg-camera-corner br" />
-                  <div className="reg-camera-guide-label">Align ID within frame</div>
+                  <div className="reg-camera-guide-label">Align PhilSys National ID within frame</div>
                 </div>
               </div>
             </div>
@@ -558,7 +559,7 @@ function IdScanStep({ onConfirm, onSkip }) {
             <img src={preview} alt="ID preview" />
           </div>
           <div className="reg-preview-notice">
-            <SvgCheck size={15} /> Image captured — click Verify to check if this is a valid ID
+            <SvgCheck size={15} /> Image captured — click Verify to check if this is a valid PhilSys National ID
           </div>
           <div className="reg-btn-group">
             <button className="reg-btn-ghost" onClick={retake}
@@ -577,8 +578,8 @@ function IdScanStep({ onConfirm, onSkip }) {
       {mode === "validating" && (
         <div className="reg-status-center">
           <div className="reg-status-icon loading"><SvgLoader /></div>
-          <p className="reg-status-title">Verifying ID authenticity…</p>
-          <p className="reg-status-sub">Checking that this is a valid government-issued ID</p>
+          <p className="reg-status-title">Verifying PhilSys National ID…</p>
+          <p className="reg-status-sub">Checking that this is a valid PhilSys National ID</p>
         </div>
       )}
 
@@ -596,13 +597,13 @@ function IdScanStep({ onConfirm, onSkip }) {
                   : <SvgXCircle size={28} />}
               </div>
               <p className={`reg-invalid-title ${validationResult.isValid === null ? "unavailable" : "rejected"}`}>
-                {validationResult.isValid === null ? "Verification Unavailable" : "Invalid ID Detected"}
+                {validationResult.isValid === null ? "Verification Unavailable" : "Invalid PhilSys National ID Detected"}
               </p>
             </div>
-            <p className="reg-invalid-reason">{validationResult.reason}</p>
+            <p className="reg-invalid-reason">{validationResult.reason || "Please upload a valid physical PhilSys National ID card."}</p>
             {validationResult.isValid === false && (
               <div className="reg-invalid-hint">
-                Please upload a <strong>physical government-issued ID card</strong> — not a selfie or random photo.
+                Please upload a <strong>physical PhilSys National ID card</strong> — not other ID types, selfies, or generic photos.
               </div>
             )}
           </div>
@@ -629,7 +630,7 @@ function IdScanStep({ onConfirm, onSkip }) {
       {mode === "processing" && (
         <div className="reg-status-center">
           <div className="reg-status-icon loading"><SvgLoader /></div>
-          <p className="reg-status-title">Reading your ID…</p>
+          <p className="reg-status-title">Reading PhilSys National ID…</p>
           <p className="reg-status-sub">Running live OCR, please wait a moment</p>
         </div>
       )}
@@ -638,7 +639,7 @@ function IdScanStep({ onConfirm, onSkip }) {
       {mode === "done" && (
         <div className="reg-status-center">
           <div className="reg-status-icon success"><SvgCheckCircle size={40} color="#2db17b" /></div>
-          <p className="reg-status-title">ID Verified — Data Extracted!</p>
+          <p className="reg-status-title">National ID Verified — Data Extracted!</p>
           <p className="reg-status-sub">Autofilling your information now</p>
         </div>
       )}
@@ -773,7 +774,6 @@ export default function Registration({ onBack, branchingPayload }) {
   const [autofilledFields, setAutofilledFields] = useState(new Set());
   const manuallyEdited = useRef(new Set());
 
-  // Date constants for boundary checks
   const todayStr = new Date().toISOString().split("T")[0];
   const currentYear = new Date().getFullYear();
   const minDobStr = `${currentYear - 125}-01-01`;
@@ -871,11 +871,9 @@ export default function Registration({ onBack, branchingPayload }) {
         return false;
       }
 
-      // ── VALIDATION FIXES: A9, A10, A11 ───────────────────────────────────────────
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // A9 & A10: Birth Date Validations
       if (form.birthDate) {
         const dob = new Date(form.birthDate + "T00:00:00");
         if (isNaN(dob.getTime())) {
@@ -883,13 +881,11 @@ export default function Registration({ onBack, branchingPayload }) {
           return false;
         }
 
-        // A9: Birth date cannot be in the future
         if (dob > today) {
           setErrorMsg("Birth date cannot be beyond today's date.");
           return false;
         }
 
-        // A10: Birth date cannot be an impossible past date (> 125 years ago)
         const minYear = today.getFullYear() - 125;
         if (dob.getFullYear() < minYear) {
           setErrorMsg(`Birth date cannot be earlier than year ${minYear}.`);
@@ -897,8 +893,6 @@ export default function Registration({ onBack, branchingPayload }) {
         }
       }
 
-      // A11: Residing Since Year Validations
-      // Note: Household residency may precede an individual's birth year.
       if (form.residingSinceYear) {
         const resYear = Number(form.residingSinceYear);
         const thisYear = today.getFullYear();
@@ -971,9 +965,10 @@ export default function Registration({ onBack, branchingPayload }) {
   };
 
   const handleCancel = () => {
-    if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) { if (onBack) onBack(); }
+    if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) {
       sessionStorage.removeItem("branchingPayload");
       if (onBack) onBack();
+    }
   };
 
   const rv = (val) => val?.trim() || null;
@@ -1117,11 +1112,11 @@ export default function Registration({ onBack, branchingPayload }) {
                   {autofilledFields.size > 0 && (
                     <div className="reg-autofill-banner">
                       <SvgInfo size={16} />
-                      <span>Some fields were autofilled from your ID scan. You may edit any autofilled field before submitting.</span>
+                      <span>Some fields were autofilled from your PhilSys National ID scan. You may edit any autofilled field before submitting.</span>
                     </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-                    <Field label="ID Number" hint="Optional or extracted from scanned ID. You may type it manually or update it.">
+                    <Field label="PhilSys Card Number (PCN)" hint="Optional or extracted from scanned PhilSys National ID. You may type it manually or update it.">
                       <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
                     </Field>
                     <div className="reg-form-grid cols-3">
@@ -1270,7 +1265,7 @@ export default function Registration({ onBack, branchingPayload }) {
                   {(af("houseNumber") || af("street") || af("province")) && (
                     <div className="reg-autofill-banner">
                       <SvgInfo size={16} />
-                      <span>Address fields were partially autofilled from your ID. Please verify and complete if needed.</span>
+                      <span>Address fields were partially autofilled from your PhilSys National ID. Please verify and complete if needed.</span>
                     </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
@@ -1457,7 +1452,7 @@ export default function Registration({ onBack, branchingPayload }) {
                   </div>
                   <div className="reg-review-thumbnails">
                     <div className="reg-review-thumb">
-                      <span className="reg-review-thumb-label">ID Photo</span>
+                      <span className="reg-review-thumb-label">PhilSys National ID</span>
                       {idImage ? (
                         <img src={idImage} alt="ID" className="reg-review-thumb-id" />
                       ) : (
@@ -1475,7 +1470,7 @@ export default function Registration({ onBack, branchingPayload }) {
                   </div>
 
                   <ReviewSection icon={<SvgPerson size={18} />} title="Personal Information">
-                    <ReviewField label="ID Number" value={rv(form.idNumber)} full />
+                    <ReviewField label="PhilSys Card Number (PCN)" value={rv(form.idNumber)} full />
                     <ReviewField label="Full Name" value={rv(fullName)} />
                     <ReviewField label="Birth Date" value={formatDate(form.birthDate)} />
                     <ReviewField label="Age" value={rv(form.age)} />
