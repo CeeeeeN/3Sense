@@ -123,15 +123,73 @@ function formatHistoryDate(isoString) {
 // ── Action Modals ──
 
 function HelpFaqModal({ onClose }) {
+  const faqs = [
+    {
+      q: "How do I request a Barangay Clearance?",
+      a: "Go to Services → Barangay Clearance, fill in the form, and submit. Your request will be processed within 1–3 working days."
+    },
+    {
+      q: "What documents are accepted as valid ID?",
+      a: "PhilSys ID, Passport, Driver's License, SSS/GSIS ID, Voter's ID, and other government-issued IDs are accepted."
+    },
+    {
+      q: "How do I report an emergency?",
+      a: "Use the Emergency tab in the app to alert the Barangay or call the emergency hotline directly."
+    }
+  ];
+
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+      <div className="pf-modal" style={{ maxWidth: '540px' }}>
         <div className="pf-modal-head">
-          <div><h3>Help & FAQ</h3><p>Frequently asked questions</p></div>
+          <div>
+            <h3>Help & FAQ</h3>
+            <p>Frequently asked questions</p>
+          </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-          Feature content to be added later.
+        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem', fontFamily: 'Poppins, sans-serif' }}>
+            Frequently Asked Questions
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {faqs.map((faq, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '10px',
+                  padding: '1rem',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
+                  {faq.q}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.5' }}>
+                  {faq.a}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              borderRadius: '12px',
+              backgroundColor: 'rgba(49, 125, 137, 0.08)',
+              border: '1px solid rgba(49, 125, 137, 0.25)',
+              padding: '1rem',
+              marginTop: '1.25rem'
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--teal)', marginBottom: '0.25rem' }}>
+              Still need help?
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: '1.45' }}>
+              Visit the Barangay Hall during office hours<br />
+              Mon – Fri, 8:00 AM – 5:00 PM
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -139,15 +197,116 @@ function HelpFaqModal({ onClose }) {
 }
 
 function ContactModal({ onClose }) {
+  const contacts = [
+    {
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      ),
+      label: "Address",
+      value: "MH Del Pilar St. Malanday, 1444 Valenzuela, Philippines"
+    },
+    {
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+        </svg>
+      ),
+      label: "Hotline",
+      value: "(02) 8-962-7327"
+    },
+    {
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          <polyline points="22,6 12,13 2,6" />
+        </svg>
+      ),
+      label: "Email",
+      value: "malanday.valenzuelacity@gmail.com"
+    },
+    {
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      ),
+      label: "Office Hours",
+      value: "Monday – Friday, 8:00 AM – 5:00 PM"
+    }
+  ];
+
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+      <div className="pf-modal" style={{ maxWidth: '540px' }}>
         <div className="pf-modal-head">
-          <div><h3>Contact Barangay</h3><p>Get in touch with the local office</p></div>
+          <div>
+            <h3>Contact Barangay</h3>
+            <p>Get in touch with the local office</p>
+          </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-          Feature content to be added later.
+        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem', fontFamily: 'Poppins, sans-serif' }}>
+            Get in Touch
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {contacts.map((row, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '14px',
+                  padding: '12px 0',
+                  borderBottom: i === contacts.length - 1 ? 'none' : '1px solid var(--border)'
+                }}
+              >
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(49, 125, 137, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  {row.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {row.label}
+                  </div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text)', lineHeight: '1.4' }}>
+                    {row.value}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              borderRadius: '12px',
+              backgroundColor: '#fff8e6',
+              border: '1px solid rgba(232, 160, 32, 0.35)',
+              padding: '1rem',
+              marginTop: '1.25rem'
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#b45309', marginBottom: '0.25rem' }}>
+              ⚠ For Emergencies
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: '1.45' }}>
+              Use the Emergency tab in the app for immediate assistance or call 911.
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -155,15 +314,89 @@ function ContactModal({ onClose }) {
 }
 
 function AboutModal({ onClose }) {
+  const details = [
+    { label: "Developer", value: "3S+ Sense Dev" },
+    { label: "Jurisdiction", value: "Brgy. Malanday, Valenzuela City" },
+    { label: "Build", value: "2026 Release" },
+    { label: "Platform", value: "Web & PWA" },
+  ];
+
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+      <div className="pf-modal" style={{ maxWidth: '520px' }}>
         <div className="pf-modal-head">
-          <div><h3>About 3S+ Malanday</h3><p>System information and version</p></div>
+          <div>
+            <h3>About 3S+ Malanday</h3>
+            <p>System information and version</p>
+          </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-          Feature content to be added later.
+        <div className="pf-modal-body" style={{ padding: '1.75rem', maxHeight: '68vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingBottom: '1.25rem' }}>
+            <div
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '18px',
+                backgroundColor: 'rgba(49, 125, 137, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '10px',
+                border: '1.5px solid rgba(49, 125, 137, 0.25)',
+                color: 'var(--teal)'
+              }}
+            >
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '1.15rem', color: 'var(--text)' }}>
+              3S+ Sense
+            </div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted)', marginTop: '2px' }}>
+              Barangay Service Management System
+            </div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginTop: '8px',
+                backgroundColor: 'rgba(49, 125, 137, 0.12)',
+                padding: '4px 12px',
+                borderRadius: '999px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--teal)'
+              }}
+            >
+              Version 1.0.0
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+            {details.map((row, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 0',
+                  borderBottom: i === details.length - 1 ? 'none' : '1px solid var(--border)'
+                }}
+              >
+                <span style={{ fontSize: '0.82rem', color: 'var(--muted)', fontWeight: 500 }}>{row.label}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text)', fontWeight: 600 }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: '0.75rem', color: 'var(--muted)', textAlign: 'center', marginTop: '1.5rem', lineHeight: '1.5' }}>
+            © 2026 Barangay 3S+ Malanday.<br />
+            All rights reserved.
+          </div>
         </div>
       </div>
     </div>
@@ -173,13 +406,42 @@ function AboutModal({ onClose }) {
 function PrivacyModal({ onClose }) {
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '500px' }}>
+      <div className="pf-modal" style={{ maxWidth: '560px' }}>
         <div className="pf-modal-head">
-          <div><h3>Privacy Policy</h3><p>How we handle your data</p></div>
+          <div>
+            <h3>Privacy Policy</h3>
+            <p>How we handle your data</p>
+          </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-          Feature content to be added later.
+        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '0.98rem', color: 'var(--text)', marginBottom: '0.45rem' }}>
+            Data Privacy Notice
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
+            Barangay 3S+ Malanday collects your personal information in compliance with Republic Act No. 10173, also known as the Data Privacy Act of 2012.
+          </p>
+
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
+            What We Collect
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
+            We collect personal details including your name, address, contact information, and household data solely for the purpose of delivering barangay services.
+          </p>
+
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
+            How We Use It
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
+            Your data is used to process barangay clearances, certificates, and other service requests. We do not share your data with third parties without your consent.
+          </p>
+
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
+            Your Rights
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '0' }}>
+            You have the right to access, correct, and request deletion of your personal data. For concerns, contact the Barangay Secretary at Barangay Hall.
+          </p>
         </div>
       </div>
     </div>
@@ -1224,12 +1486,9 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                     <div className="pf-sel-wrap">
                       <select className="pf-sel" value={draft.gender} onChange={set("gender")}>
                         <option value="">Select gender</option>
-                        <option>Cisgender</option>
+                        <option>Man</option>
+                        <option>Woman</option>
                         <option>Non-binary</option>
-                        <option>Transgender Man</option>
-                        <option>Transgender Woman</option>
-                        <option>Genderqueer</option>
-                        <option>Others</option>
                         <option>Prefer not to say</option>
                       </select>
                     </div>
