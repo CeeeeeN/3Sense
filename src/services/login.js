@@ -12,14 +12,6 @@ import {
 } from "firebase/auth";
 import { db, auth } from "../firebase/firebase";
 
-const hashPin = async (pin) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-};
-
 export const loginWithHouseholdID = async (householdID, password) => {
     if (!householdID || !password) {
         throw new Error("Please enter your Household ID and password.");
@@ -137,25 +129,65 @@ export const forgotHouseholdPassword = async (householdID) => {
     return user[0] + "***@" + domain;
 };
 
-export const getMemberPin = async (householdID, residentID) => {
-    const ref = doc(db, "households", householdID, "residents", residentID);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return null;
-    // pin is stored as a hash under the field `pinHash`
-    return snap.data().pinHash || null;
+const pinRequest = async (action, householdID, residentID, pin) => {
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error("Your session has expired. Please log in again.");
+    }
+
+    let response;
+    try {
+        const token = await user.getIdToken();
+        response = await fetch("/api/pin-auth", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action, householdID, residentID, pin }),
+        });
+    } catch {
+        throw new Error("Unable to reach the server. Please check your connection and try again.");
+    }
+
+    let data = {};
+    try {
+        data = await response.json();
+    } catch {}
+
+    const known = ["LOCKED", "INCORRECT_PIN", "NO_PIN"];
+    if (!response.ok && !known.includes(data.code)) {
+        throw new Error(data.message || "Something went wrong. Please try again.");
+    }
+    return data;
 };
 
 export const saveMemberPin = async (householdID, residentID, pin) => {
-    const pinHash = await hashPin(pin);
-    const ref = doc(db, "households", householdID, "residents", residentID);
-    await updateDoc(ref, { pinHash, updatedAt: new Date() });
+    const data = await pinRequest("create", householdID, residentID, pin);
+    if (!data.success) {
+        throw new Error(data.message || "Unable to save your PIN. Please try again.");
+    }
+};
+
+export const getMemberPinStatus = async (householdID, residentID) => {
+    const data = await pinRequest("status", householdID, residentID);
+    return {
+        hasPin: !!data.hasPin,
+        locked: !!data.locked,
+        remainingSeconds: data.remainingSeconds || 0,
+    };
 };
 
 export const verifyMemberPin = async (householdID, residentID, enteredPin) => {
-    const storedHash = await getMemberPin(householdID, residentID);
-    if (!storedHash) return false;
-    const enteredHash = await hashPin(enteredPin);
-    return enteredHash === storedHash;
+    const data = await pinRequest("verify", householdID, residentID, enteredPin);
+    if (data.success) return { ok: true };
+    return {
+        ok: false,
+        code: data.code,
+        message: data.message,
+        attemptsRemaining: data.attemptsRemaining,
+        remainingSeconds: data.remainingSeconds,
+    };
 };
 
 export const resetMemberPin = async (householdID, residentID) => {
@@ -173,7 +205,10 @@ export const resetMemberPin = async (householdID, residentID) => {
         );
     }
 
-    await updateDoc(ref, { pinHash: null, updatedAt: new Date() });
+    const result = await pinRequest("reset", householdID, residentID);
+    if (!result.success) {
+        throw new Error(result.message || "Unable to reset your PIN right now.");
+    }
 
     try {
         await fetch("/api/resend-email", {
