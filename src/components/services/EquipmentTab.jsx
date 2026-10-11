@@ -34,12 +34,13 @@ function AdvanceRentalBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-    <div style={{
-      display: "flex", alignItems: "flex-start", gap: "12px",
-      background: "#eff6ff", border: "1px solid #93c5fd",
-      borderRadius: "10px", padding: "14px 16px", marginBottom: "18px",
-      fontSize: "14px", color: "#1e40af",
-    }}>
+  <div style={{
+    display: "flex", alignItems: "flex-start", gap: "12px",
+    background: "#eff6ff", border: "1px solid #93c5fd",
+    borderRadius: "10px", padding: "14px 16px",
+    margin: "20px 28px 18px",   // was: marginBottom: "18px"
+    fontSize: "14px", color: "#1e40af",
+  }}>
       <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" />
@@ -105,7 +106,7 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
               <div className="sv-facility-card__right">
                 <span className={`sv-avail-badge${isAvailable ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
                   <span className="sv-avail-dot" />
-                  {isAvailable ? "Available" : (isOutOfStock ? "Unavailable (Out of Stock)" : "Unavailable")}
+                  {isAvailable ? "Available" : (isOutOfStock ? "Out of Stock" : "Unavailable")}
                 </span>
                 {isAvailable && (
                   <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>

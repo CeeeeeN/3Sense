@@ -382,7 +382,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
               Barangay Programs
             </div>
             <h2 className="svc-hero__title">Community Programs</h2>
-            <p className="svc-hero__abbr">OPEN TO ALL BARANGAY RESIDENTS</p>
             <p className="svc-hero__sub">
               Join barangay-organized programs designed to uplift and strengthen the community.
               Register now to secure your slot before they fill up.
