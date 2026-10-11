@@ -12,6 +12,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/resend/, ""),
       },
+      '/api': {
+        target: 'http://localhost:3000', // Points to your new local-server.js
+        changeOrigin: true,
+      },
     },
   },
 })

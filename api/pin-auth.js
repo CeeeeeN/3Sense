@@ -1,5 +1,9 @@
 import admin from 'firebase-admin';
 import crypto from 'node:crypto';
+import dotenv from 'dotenv';
+
+// Load environment variables from the .env file
+dotenv.config();
 
 if (!admin.apps.length) {
   try {
