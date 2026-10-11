@@ -37,6 +37,7 @@ export default function AdminFeedback() {
   // States for 'Action Required' tab filtering & sorting
   const [actionSearchTerm, setActionSearchTerm] = useState('');
   const [actionFilterStatus, setActionFilterStatus] = useState('All');
+  const [actionFilterUrgency, setActionFilterUrgency] = useState('All'); // <-- NEW: Overdue filter
   const [actionSortOrder, setActionSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc
 
   // States for 'All Feedback' tab filtering & sorting
@@ -44,11 +45,6 @@ export default function AdminFeedback() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterSentiment, setFilterSentiment] = useState('All');
   const [sortOrder, setSortOrder] = useState('date_desc');
-
-  // Analytics States
-  const [wordCloud, setWordCloud] = useState([]);
-  const [stats, setStats] = useState({ total: 0, avgRating: 0, negative: 0, pending: 0 });
-  const [heatmapData, setHeatmapData] = useState({});
 
   // Modal State
   const [selectedFeedback, setSelectedFeedback] = useState(null);
@@ -113,58 +109,11 @@ export default function AdminFeedback() {
       });
 
       setFeedbacks(fbData);
-      generateAnalytics(fbData);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
-
-  // --- ANALYTICS ENGINE ---
-  const generateAnalytics = (data) => {
-    if (data.length === 0) return;
-
-    let totalRating = 0;
-    let negativeCount = 0;
-    let pendingCount = 0;
-
-    data.forEach(fb => {
-      totalRating += Number(fb.rating || 0);
-      if (String(fb.sentiment).toLowerCase() === 'negative') negativeCount++;
-      if (['pending', 'analyzed', 'under review'].includes(String(fb.status).toLowerCase())) pendingCount++;
-    });
-
-    setStats({
-      total: data.length,
-      avgRating: (totalRating / data.length).toFixed(1),
-      negative: negativeCount,
-      pending: pendingCount
-    });
-
-    const stopWords = ['ang', 'are', 'mga', 'too', 'but', 'kaso', 'niyo', 'niya', 'sa', 'ng', 'na', 'po', 'at', 'ay', 'ito', 'yung', 'the', 'to', 'and', 'a', 'is', 'in', 'of', 'for', 'it', 'was', 'that', 'with'];
-    const wordCounts = {};
-    data.forEach(fb => {
-      if (fb.comment) {
-        const words = fb.comment.toLowerCase().replace(/[^\w\s\u0900-\u097F]/gi, '').split(/\s+/);
-        words.forEach(word => {
-          if (word.length > 2 && !stopWords.includes(word)) wordCounts[word] = (wordCounts[word] || 0) + 1;
-        });
-      }
-    });
-    setWordCloud(Object.entries(wordCounts).map(([text, count]) => ({ text, count })).sort((a, b) => b.count - a.count).slice(0, 30));
-
-    const hData = {};
-    data.forEach(fb => {
-      const facility = fb.facilityName || "General";
-      const sentiment = fb.sentiment || "Neutral";
-      if (!hData[facility]) hData[facility] = { Positive: 0, Neutral: 0, Negative: 0, Total: 0 };
-      if (hData[facility][sentiment] !== undefined) {
-        hData[facility][sentiment]++;
-        hData[facility].Total++;
-      }
-    });
-    setHeatmapData(hData);
-  };
 
   // --- BASE ACTION REQUIRED LIST (FOR BADGE COUNT) ---
   const actionRequiredFeedbacks = useMemo(() => {
@@ -174,9 +123,36 @@ export default function AdminFeedback() {
     );
   }, [feedbacks]);
 
-  // --- ACTION REQUIRED FILTERING, SORTING, & TIMERS LOGIC ---
+  // --- PRE-PROCESS TIMERS ---
+  const processedActionRequired = useMemo(() => {
+    return actionRequiredFeedbacks.map(fb => {
+      let timerText = "N/A";
+      let isOverdue = false;
+
+      if (fb.rawDate > 0) {
+        const deadline = fb.rawDate + SLA_MS;
+        const diff = deadline - currentTime;
+        isOverdue = diff < 0;
+
+        const absDiff = Math.abs(diff);
+        const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((absDiff / (1000 * 60 * 60)) % 24);
+        
+        if (days > 0) timerText = `${days}d ${hours}h`;
+        else timerText = `${hours}h`;
+      }
+
+      return {
+        ...fb,
+        isOverdue,
+        timerText: timerText === "N/A" ? timerText : (isOverdue ? `Overdue by ${timerText}` : `Due in ${timerText}`)
+      };
+    });
+  }, [actionRequiredFeedbacks, currentTime]);
+
+  // --- ACTION REQUIRED FILTERING & SORTING LOGIC ---
   const filteredActionRequiredFeedbacks = useMemo(() => {
-    return actionRequiredFeedbacks
+    return processedActionRequired
       .filter(fb => {
         const searchStr = String(actionSearchTerm).toLowerCase();
         const matchesSearch =
@@ -189,7 +165,12 @@ export default function AdminFeedback() {
           actionFilterStatus === 'All' ||
           String(fb.status).toLowerCase() === actionFilterStatus.toLowerCase();
 
-        return matchesSearch && matchesStatus;
+        // <-- NEW: Filter by Overdue Urgency
+        const matchesUrgency = 
+          actionFilterUrgency === 'All' || 
+          (actionFilterUrgency === 'Overdue' && fb.isOverdue);
+
+        return matchesSearch && matchesStatus && matchesUrgency;
       })
       .sort((a, b) => {
         if (actionSortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
@@ -197,32 +178,8 @@ export default function AdminFeedback() {
         if (actionSortOrder === "name_asc") return (a.userName || "").localeCompare(b.userName || "");
         if (actionSortOrder === "name_desc") return (b.userName || "").localeCompare(a.userName || "");
         return 0;
-      })
-      .map(fb => {
-        // Calculate the Due Date and Timer dynamically
-        let timerText = "N/A";
-        let isOverdue = false;
-
-        if (fb.rawDate > 0) {
-          const deadline = fb.rawDate + SLA_MS;
-          const diff = deadline - currentTime;
-          isOverdue = diff < 0;
-
-          const absDiff = Math.abs(diff);
-          const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((absDiff / (1000 * 60 * 60)) % 24);
-          
-          if (days > 0) timerText = `${days}d ${hours}h`;
-          else timerText = `${hours}h`;
-        }
-
-        return {
-          ...fb,
-          isOverdue,
-          timerText: timerText === "N/A" ? timerText : (isOverdue ? `Overdue by ${timerText}` : `Due in ${timerText}`)
-        };
       });
-  }, [actionRequiredFeedbacks, actionSearchTerm, actionFilterStatus, actionSortOrder, currentTime]);
+  }, [processedActionRequired, actionSearchTerm, actionFilterStatus, actionFilterUrgency, actionSortOrder]);
 
   // --- ALL FEEDBACK FILTERING & SORTING LOGIC ---
   const allFilteredFeedbacks = useMemo(() => {
@@ -374,7 +331,7 @@ export default function AdminFeedback() {
         ) : (
           <>
             {activeTab === 'summary' && (
-              <SummaryDashboard stats={stats} heatmapData={heatmapData} wordCloud={wordCloud} />
+              <SummaryDashboard feedbacks={feedbacks} />
             )}
 
             {activeTab === 'action' && (
@@ -426,6 +383,15 @@ export default function AdminFeedback() {
 
                     <select
                       className="filter-select"
+                      value={actionFilterUrgency}
+                      onChange={(e) => setActionFilterUrgency(e.target.value)}
+                    >
+                      <option value="All">All Timers</option>
+                      <option value="Overdue">Overdue Only</option>
+                    </select>
+
+                    <select
+                      className="filter-select"
                       value={actionSortOrder}
                       onChange={(e) => setActionSortOrder(e.target.value)}
                     >
@@ -440,7 +406,7 @@ export default function AdminFeedback() {
                 <FeedbackTable
                   dataList={filteredActionRequiredFeedbacks}
                   emptyMessage={
-                    actionSearchTerm || actionFilterStatus !== 'All'
+                    actionSearchTerm || actionFilterStatus !== 'All' || actionFilterUrgency !== 'All'
                       ? "No action-required feedback matches your search criteria."
                       : "Hooray! No negative feedback requires admin action right now."
                   }
