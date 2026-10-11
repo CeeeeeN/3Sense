@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import SeverityBadge from './SeverityBadge';
+import { Clock, AlertCircle } from 'lucide-react';
 
-export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
+export default function FeedbackTable({ dataList, emptyMessage, onReview, isActionTab }) {
   // --- PAGINATION STATES ---
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10); // Default to 10 rows
@@ -58,7 +59,7 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
       ) : (
         <>
           <div className="req-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="req-table" style={{ minWidth: '900px' }}>
+            <table className="req-table" style={{ minWidth: '1000px' }}>
             <thead>
               <tr>
                 <th>Date</th>
@@ -67,12 +68,12 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
                 <th style={{ width: '30%' }}>Comment</th>
                 <th>Sentiment</th>
                 <th>Severity</th>
+                {isActionTab && <th>Time Remaining</th>}
                 <th>Status</th>
                 <th style={{ textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {/* Note: Mapping over currentData instead of dataList */}
               {currentData.map((fb) => (
                 <tr key={fb.docId}>
                   <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{fb.createdAt}</td>
@@ -89,6 +90,32 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview }) {
                     </span>
                   </td>
                   <td><SeverityBadge severity={fb.severity} /></td>
+                  
+                  {isActionTab && (
+                    <td>
+                      {fb.timerText && fb.timerText !== "N/A" ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background: fb.isOverdue ? '#fef2f2' : '#f0fdf4',
+                          color: fb.isOverdue ? '#dc2626' : '#16a34a',
+                          border: `1px solid ${fb.isOverdue ? '#fecaca' : '#bbf7d0'}`,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {fb.isOverdue ? <AlertCircle size={12} /> : <Clock size={12} />}
+                          {fb.timerText}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>N/A</span>
+                      )}
+                    </td>
+                  )}
+
                   <td>
                     <span className={`status-badge ${String(fb.status || "pending").replace(' ', '_').toLowerCase()}`}>
                       {String(fb.status || "Pending").charAt(0).toUpperCase() + String(fb.status || "pending").slice(1).replace('_', ' ')}

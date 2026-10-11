@@ -6,15 +6,29 @@ import { auth, db } from '../firebase/firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs, limit } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { logTransaction } from '../services/logger';
+import { useAlert } from '../context/AlertContext';
 
 import SummaryDashboard from '../components/Feedback/SummaryDashboard';
 import FeedbackTable from '../components/Feedback/FeedbackTable';
 import ReviewModal from '../components/Feedback/ReviewModal';
 
+// Set standard SLA deadline for negative feedback (e.g., 72 hours)
+const SLA_HOURS = 72;
+const SLA_MS = SLA_HOURS * 60 * 60 * 1000;
+
 export default function AdminFeedback() {
+  const { showAlert } = useAlert();
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('summary');
+
+  // Real-time clock for the countdown timers (updates every minute)
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // For logging purposes
   const [adminName, setAdminName] = useState("");
@@ -160,7 +174,7 @@ export default function AdminFeedback() {
     );
   }, [feedbacks]);
 
-  // --- ACTION REQUIRED FILTERING & SORTING LOGIC ---
+  // --- ACTION REQUIRED FILTERING, SORTING, & TIMERS LOGIC ---
   const filteredActionRequiredFeedbacks = useMemo(() => {
     return actionRequiredFeedbacks
       .filter(fb => {
@@ -178,21 +192,37 @@ export default function AdminFeedback() {
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
-        if (actionSortOrder === "date_desc") {
-          return (b.rawDate || 0) - (a.rawDate || 0);
-        }
-        if (actionSortOrder === "date_asc") {
-          return (a.rawDate || 0) - (b.rawDate || 0);
-        }
-        if (actionSortOrder === "name_asc") {
-          return (a.userName || "").localeCompare(b.userName || "");
-        }
-        if (actionSortOrder === "name_desc") {
-          return (b.userName || "").localeCompare(a.userName || "");
-        }
+        if (actionSortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (actionSortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (actionSortOrder === "name_asc") return (a.userName || "").localeCompare(b.userName || "");
+        if (actionSortOrder === "name_desc") return (b.userName || "").localeCompare(a.userName || "");
         return 0;
+      })
+      .map(fb => {
+        // Calculate the Due Date and Timer dynamically
+        let timerText = "N/A";
+        let isOverdue = false;
+
+        if (fb.rawDate > 0) {
+          const deadline = fb.rawDate + SLA_MS;
+          const diff = deadline - currentTime;
+          isOverdue = diff < 0;
+
+          const absDiff = Math.abs(diff);
+          const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((absDiff / (1000 * 60 * 60)) % 24);
+          
+          if (days > 0) timerText = `${days}d ${hours}h`;
+          else timerText = `${hours}h`;
+        }
+
+        return {
+          ...fb,
+          isOverdue,
+          timerText: timerText === "N/A" ? timerText : (isOverdue ? `Overdue by ${timerText}` : `Due in ${timerText}`)
+        };
       });
-  }, [actionRequiredFeedbacks, actionSearchTerm, actionFilterStatus, actionSortOrder]);
+  }, [actionRequiredFeedbacks, actionSearchTerm, actionFilterStatus, actionSortOrder, currentTime]);
 
   // --- ALL FEEDBACK FILTERING & SORTING LOGIC ---
   const allFilteredFeedbacks = useMemo(() => {
@@ -215,24 +245,12 @@ export default function AdminFeedback() {
         return matchesSearch && matchesStatus && matchesSentiment;
       })
       .sort((a, b) => {
-        if (sortOrder === "date_desc") {
-          return (b.rawDate || 0) - (a.rawDate || 0);
-        }
-        if (sortOrder === "date_asc") {
-          return (a.rawDate || 0) - (b.rawDate || 0);
-        }
-        if (sortOrder === "name_asc") {
-          return (a.userName || "").localeCompare(b.userName || "");
-        }
-        if (sortOrder === "name_desc") {
-          return (b.userName || "").localeCompare(a.userName || "");
-        }
-        if (sortOrder === "rating_desc") {
-          return (b.rating || 0) - (a.rating || 0);
-        }
-        if (sortOrder === "rating_asc") {
-          return (a.rating || 0) - (b.rating || 0);
-        }
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortOrder === "name_asc") return (a.userName || "").localeCompare(b.userName || "");
+        if (sortOrder === "name_desc") return (b.userName || "").localeCompare(a.userName || "");
+        if (sortOrder === "rating_desc") return (b.rating || 0) - (a.rating || 0);
+        if (sortOrder === "rating_asc") return (a.rating || 0) - (b.rating || 0);
         return 0;
       });
   }, [feedbacks, searchTerm, filterStatus, filterSentiment, sortOrder]);
@@ -252,17 +270,17 @@ export default function AdminFeedback() {
         processedRole: adminRole,
         processedAt: new Date()
       });
-      alert("Feedback updated successfully!");
+      await showAlert("Success", "Feedback updated successfully!");
       setIsModalOpen(false);
       logTransaction(
         adminName,
         adminRole,
         "Update Feedback",
-        `Updated feedback (Ref: ${selectedFeedback?.referenceID || docId}) - New Status: ${newStatus} - Admin Note: ${adminNote.substring(0, 50)}...`
+        `Updated feedback (Ref: ${selectedFeedback?.referenceID || docId}) - New Status: ${newStatus}Admin Note: ${adminNote.substring(0, 50)}...`
       );
     } catch (error) {
       console.error("Error updating feedback:", error);
-      alert("Failed to update feedback.");
+      await showAlert("Error", "Failed to update feedback.");
       logTransaction(
         adminName,
         adminRole,
@@ -361,7 +379,6 @@ export default function AdminFeedback() {
 
             {activeTab === 'action' && (
               <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
-                {/* Search & Filter Controls matching AdminManagement format */}
                 <div className="requests-controls">
                   <div className="search-wrapper" style={{ position: "relative" }}>
                     <Search
@@ -428,6 +445,8 @@ export default function AdminFeedback() {
                       : "Hooray! No negative feedback requires admin action right now."
                   }
                   onReview={handleReviewClick}
+                  // Identify we are currently passing action tab data containing timer logic
+                  isActionTab={true}
                 />
               </div>
             )}
@@ -510,6 +529,7 @@ export default function AdminFeedback() {
                   dataList={allFilteredFeedbacks}
                   emptyMessage="No feedback matches your search criteria."
                   onReview={handleReviewClick}
+                  isActionTab={false}
                 />
               </div>
             )}
