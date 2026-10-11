@@ -877,6 +877,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   }, []);
 
   const set = (field) => (e) => {
+    // REMOVED setMemberError(""); so validation errors stay visible while typing
     const val = e.target.type === "checkbox"
       ? e.target.checked
       : ["contactNumber", "residingSinceYear"].includes(field)
@@ -1442,6 +1443,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       </div>
                     )}
                   </div>
+                  {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
                     <button className="am-btn am-btn-ghost" onClick={() => goBack(2)}>← Back</button>
                     <button className="am-btn am-btn-primary" onClick={() => goNext(4)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Next: Education <IconArrow /></button>
