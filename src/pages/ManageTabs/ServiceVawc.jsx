@@ -15,7 +15,7 @@ import { db } from "../../firebase/firebase";
 export default function ServiceVawc({ onBack, userRole }) {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Search & Filtering State
   const [searchQuery, setSearchQuery] = useState("");
@@ -27,17 +27,29 @@ export default function ServiceVawc({ onBack, userRole }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Selected case for status change modal / view details
-  const [selectedCase, setSelectedCase] = useState(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [newRemarks, setNewRemarks] = useState("");
+  // Complete Case Edit Modal State
+  const [editingCase, setEditingCase] = useState(null);
+  const [updating, setUpdating] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    gender: "F",
+    genderOther: "",
+    ageBracket: "15-17 (3d)",
+    ageBracketOther: "",
+    typeOfViolence: "Physical Abuse (4a)",
+    typeOfViolenceOther: "",
+    perpetrator: "Immediate Family Member (5a)",
+    perpetratorOther: "",
+    actionTaken: "Referred to LSWDO (6a)",
+    actionTakenOther: "",
+    status: "Acted Upon",
+    remarks: "",
+  });
 
   // Delete Confirmation State
   const [caseToDelete, setCaseToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Intake Form State
+  // New Intake Form State
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     gender: "F",
@@ -57,6 +69,39 @@ export default function ServiceVawc({ onBack, userRole }) {
   const isAuthorized =
     !userRole || ["Super Admin", "VAWC Head", "Kapitan", "Secretary"].includes(userRole);
 
+  // Standard dropdown options lists
+  const GENDER_OPTIONS = ["F", "M"];
+  const AGE_OPTIONS = [
+    "0-4 (3a)",
+    "5-9 (3b)",
+    "10-14 (3c)",
+    "15-17 (3d)",
+    "18 & above w/ disability",
+  ];
+  const VIOLENCE_OPTIONS = [
+    "Physical Abuse (4a)",
+    "Sexual Abuse (4b)",
+    "Psychological/Emotional Abuse (4c)",
+    "Neglect (4d)",
+  ];
+  const PERPETRATOR_OPTIONS = [
+    "Immediate Family Member (5a)",
+    "Close Relative (5b)",
+    "Acquaintance (5c)",
+    "Stranger (5d)",
+    "Local Office (5e)",
+    "Law Enforcer (5f)",
+    "Others (ex: Guardian) (5g)",
+  ];
+  const ACTION_OPTIONS = [
+    "Referred to LSWDO (6a)",
+    "Referred to PNP (6b)",
+    "Referred to NBI (6c)",
+    "Referred for Medical Treatment (6d)",
+    "Referred to Legal Assistance (6e)",
+    "Others (Referred to NGO/FBO) (6f)",
+  ];
+
   useEffect(() => {
     const q = query(collection(db, "vawcCases"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(
@@ -75,17 +120,23 @@ export default function ServiceVawc({ onBack, userRole }) {
     return () => unsubscribe();
   }, []);
 
-  // Reset page when filtering or searching
+  // Reset pagination on filter or search change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, genderFilter, violenceFilter, rowsPerPage]);
 
-  const handleChange = (e) => {
+  const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveCase = async (e) => {
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ── Create New Case ──
+  const handleSaveNewCase = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
@@ -116,7 +167,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       };
 
       await addDoc(collection(db, "vawcCases"), payload);
-      setIsModalOpen(false);
+      setIsAddModalOpen(false);
       setFormData({
         gender: "F",
         genderOther: "",
@@ -133,41 +184,78 @@ export default function ServiceVawc({ onBack, userRole }) {
       });
     } catch (err) {
       console.error("Error saving VAWC case:", err);
-      alert("Failed to save VAWC Case. Please check permissions.");
+      alert("Failed to save VAWC Case. Please check database connection.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Open Detailed Status Update Modal
-  const openStatusModal = (item) => {
-    setSelectedCase(item);
-    setNewStatus(item.status || "Acted Upon");
-    setNewRemarks(item.remarks || "");
+  // ── Open Complete Edit Modal ──
+  const openEditModal = (item) => {
+    setEditingCase(item);
+
+    const isGenderStd = GENDER_OPTIONS.includes(item.gender);
+    const isAgeStd = AGE_OPTIONS.includes(item.ageBracket);
+    const isViolenceStd = VIOLENCE_OPTIONS.includes(item.typeOfViolence);
+    const isPerpStd = PERPETRATOR_OPTIONS.includes(item.perpetrator);
+    const isActionStd = ACTION_OPTIONS.includes(item.actionTaken);
+
+    setEditFormData({
+      gender: isGenderStd ? item.gender : "Others",
+      genderOther: isGenderStd ? "" : item.gender || "",
+      ageBracket: isAgeStd ? item.ageBracket : "Others",
+      ageBracketOther: isAgeStd ? "" : item.ageBracket || "",
+      typeOfViolence: isViolenceStd ? item.typeOfViolence : "Others",
+      typeOfViolenceOther: isViolenceStd ? "" : item.typeOfViolence || "",
+      perpetrator: isPerpStd ? item.perpetrator : "Others",
+      perpetratorOther: isPerpStd ? "" : item.perpetrator || "",
+      actionTaken: isActionStd ? item.actionTaken : "Others",
+      actionTakenOther: isActionStd ? "" : item.actionTaken || "",
+      status: item.status || "Acted Upon",
+      remarks: item.remarks || "",
+    });
   };
 
-  const handleSaveStatusModal = async (e) => {
+  // ── Save Full Case Edits ──
+  const handleSaveCaseEdits = async (e) => {
     e.preventDefault();
-    if (!selectedCase) return;
-    setUpdatingStatus(true);
+    if (!editingCase) return;
+    setUpdating(true);
 
     try {
-      const caseRef = doc(db, "vawcCases", selectedCase.id);
-      await updateDoc(caseRef, {
-        status: newStatus,
-        remarks: newRemarks.trim(),
+      const caseRef = doc(db, "vawcCases", editingCase.id);
+      const updatedPayload = {
+        gender: editFormData.gender === "Others" ? editFormData.genderOther.trim() : editFormData.gender,
+        ageBracket:
+          editFormData.ageBracket === "Others" ? editFormData.ageBracketOther.trim() : editFormData.ageBracket,
+        typeOfViolence:
+          editFormData.typeOfViolence === "Others"
+            ? editFormData.typeOfViolenceOther.trim()
+            : editFormData.typeOfViolence,
+        perpetrator:
+          editFormData.perpetrator === "Others"
+            ? editFormData.perpetratorOther.trim()
+            : editFormData.perpetrator,
+        actionTaken:
+          editFormData.actionTaken === "Others"
+            ? editFormData.actionTakenOther.trim()
+            : editFormData.actionTaken,
+        status: editFormData.status,
+        remarks: editFormData.remarks.trim(),
         updatedAt: serverTimestamp(),
-      });
-      setSelectedCase(null);
+      };
+
+      await updateDoc(caseRef, updatedPayload);
+      setEditingCase(null);
     } catch (err) {
       console.error("Failed to update case details:", err);
-      alert("Error saving updated status and remarks.");
+      alert("Error saving updated case information.");
     } finally {
-      setUpdatingStatus(false);
+      setUpdating(false);
     }
   };
 
-  // Delete Case Execution
+  // ── Delete Case ──
   const handleDeleteCase = async () => {
     if (!caseToDelete) return;
     setDeleting(true);
@@ -177,7 +265,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       setCaseToDelete(null);
     } catch (err) {
       console.error("Error deleting VAWC case:", err);
-      alert("Failed to delete case record. Please check your admin privileges.");
+      alert("Failed to delete case record.");
     } finally {
       setDeleting(false);
     }
@@ -311,7 +399,7 @@ export default function ServiceVawc({ onBack, userRole }) {
           </div>
           <button
             className="as-btn-aqua"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsAddModalOpen(true)}
             style={{
               padding: "9px 18px",
               fontSize: "0.88rem",
@@ -401,7 +489,7 @@ export default function ServiceVawc({ onBack, userRole }) {
               VAWC Incident Logs
             </h2>
             <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "2px 0 0 0" }}>
-              Filter by category, search keywords, click a status badge to edit, or delete a case.
+              Filter, search, edit full case details, or delete records.
             </p>
           </div>
 
@@ -494,7 +582,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>PERPETRATOR</th>
                     <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS TAKEN</th>
                     <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>STATUS</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTION</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -522,21 +610,13 @@ export default function ServiceVawc({ onBack, userRole }) {
                         {c.actionTaken}
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                        <button
-                          type="button"
-                          onClick={() => openStatusModal(c)}
-                          title="Click to update status and remarks"
+                        <span
                           style={{
-                            cursor: "pointer",
-                            border: "1px solid transparent",
                             padding: "4px 10px",
                             borderRadius: "14px",
                             fontSize: "0.75rem",
                             fontWeight: 700,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "5px",
-                            transition: "all 0.15s ease-in-out",
+                            display: "inline-block",
                             background:
                               c.status === "Acted Upon"
                                 ? "#dcfce7"
@@ -551,31 +631,55 @@ export default function ServiceVawc({ onBack, userRole }) {
                                 : "#475569",
                           }}
                         >
-                          <span>{c.status || "Pending"}</span>
-                          <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>✎</span>
-                        </button>
+                          {c.status || "Pending"}
+                        </span>
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                        <button
-                          type="button"
-                          onClick={() => setCaseToDelete(c)}
-                          title="Delete Case Record"
-                          style={{
-                            cursor: "pointer",
-                            background: "#fee2e2",
-                            border: "none",
-                            color: "#991b1b",
-                            padding: "5px 10px",
-                            borderRadius: "6px",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            transition: "background 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => (e.target.style.background = "#fca5a5")}
-                          onMouseLeave={(e) => (e.target.style.background = "#fee2e2")}
-                        >
-                          Delete
-                        </button>
+                        <div style={{ display: "flex", justifyContent: "center", gap: "6px" }}>
+                          {/* Edit Full Case Details Button */}
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(c)}
+                            title="Edit Full Case Details"
+                            style={{
+                              cursor: "pointer",
+                              background: "#e0f2fe",
+                              border: "none",
+                              color: "#0369a1",
+                              padding: "5px 10px",
+                              borderRadius: "6px",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              transition: "background 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.target.style.background = "#bae6fd")}
+                            onMouseLeave={(e) => (e.target.style.background = "#e0f2fe")}
+                          >
+                            Edit
+                          </button>
+
+                          {/* Delete Case Button */}
+                          <button
+                            type="button"
+                            onClick={() => setCaseToDelete(c)}
+                            title="Delete Case Record"
+                            style={{
+                              cursor: "pointer",
+                              background: "#fee2e2",
+                              border: "none",
+                              color: "#991b1b",
+                              padding: "5px 10px",
+                              borderRadius: "6px",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              transition: "background 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => (e.target.style.background = "#fca5a5")}
+                            onMouseLeave={(e) => (e.target.style.background = "#fee2e2")}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -646,7 +750,216 @@ export default function ServiceVawc({ onBack, userRole }) {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* ── MODAL 1: EDIT ALL CASE FIELDS (Fix for Team Request) ── */}
+      {editingCase && (
+        <div className="as-modal-overlay">
+          <div className="as-modal-content" style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}>
+            <div className="as-modal-header" style={{ background: "#317D89", color: "#fff", padding: "16px 20px" }}>
+              <div>
+                <h2 style={{ color: "#fff", margin: 0, fontSize: "1.15rem" }}>Edit VAWC Case</h2>
+                <p style={{ color: "#ccfbf1", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
+                  Ref: {editingCase.referenceNumber || editingCase.id}
+                </p>
+              </div>
+              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setEditingCase(null)}>
+                &times;
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveCaseEdits}
+              style={{
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px",
+                maxHeight: "75vh",
+                overflowY: "auto",
+              }}
+            >
+              {/* Edit Gender */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  GENDER (2) *
+                </label>
+                <select name="gender" value={editFormData.gender} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                  <option value="F">Female (F)</option>
+                  <option value="M">Male (M)</option>
+                  <option value="Others">Others (Please specify)</option>
+                </select>
+                {editFormData.gender === "Others" && (
+                  <input
+                    type="text"
+                    name="genderOther"
+                    placeholder="Specify gender"
+                    required
+                    value={editFormData.genderOther}
+                    onChange={handleEditFormChange}
+                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                  />
+                )}
+              </div>
+
+              {/* Edit Age Bracket */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  AGE (3) *
+                </label>
+                <select name="ageBracket" value={editFormData.ageBracket} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                  <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
+                  <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
+                  <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
+                  <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
+                  <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
+                  <option value="Others">Others (Please specify)</option>
+                </select>
+                {editFormData.ageBracket === "Others" && (
+                  <input
+                    type="text"
+                    name="ageBracketOther"
+                    placeholder="Specify age bracket"
+                    required
+                    value={editFormData.ageBracketOther}
+                    onChange={handleEditFormChange}
+                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                  />
+                )}
+              </div>
+
+              {/* Edit Types of Violence */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  TYPES OF VIOLENCE (4) *
+                </label>
+                <select name="typeOfViolence" value={editFormData.typeOfViolence} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                  <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
+                  <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
+                  <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
+                  <option value="Neglect (4d)">Neglect (4d)</option>
+                  <option value="Others">Others (Please specify)</option>
+                </select>
+                {editFormData.typeOfViolence === "Others" && (
+                  <input
+                    type="text"
+                    name="typeOfViolenceOther"
+                    placeholder="Specify type of violence"
+                    required
+                    value={editFormData.typeOfViolenceOther}
+                    onChange={handleEditFormChange}
+                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                  />
+                )}
+              </div>
+
+              {/* Edit Perpetrator */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  PERPETRATORS (5) *
+                </label>
+                <select name="perpetrator" value={editFormData.perpetrator} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                  <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
+                  <option value="Close Relative (5b)">Close Relative (5b)</option>
+                  <option value="Acquaintance (5c)">Acquaintance (5c)</option>
+                  <option value="Stranger (5d)">Stranger (5d)</option>
+                  <option value="Local Office (5e)">Local Office (5e)</option>
+                  <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
+                  <option value="Others">Others (ex: Guardian) (5g)</option>
+                </select>
+                {editFormData.perpetrator === "Others" && (
+                  <input
+                    type="text"
+                    name="perpetratorOther"
+                    placeholder="Specify perpetrator"
+                    required
+                    value={editFormData.perpetratorOther}
+                    onChange={handleEditFormChange}
+                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                  />
+                )}
+              </div>
+
+              {/* Edit Actions Taken */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                  ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
+                </label>
+                <select name="actionTaken" value={editFormData.actionTaken} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                  <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
+                  <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
+                  <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
+                  <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
+                  <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
+                  <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
+                  <option value="Others">Others (Please specify)</option>
+                </select>
+                {editFormData.actionTaken === "Others" && (
+                  <input
+                    type="text"
+                    name="actionTakenOther"
+                    placeholder="Specify action taken"
+                    required
+                    value={editFormData.actionTakenOther}
+                    onChange={handleEditFormChange}
+                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                  />
+                )}
+              </div>
+
+              {/* Edit Status & Remarks */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    STATUS
+                  </label>
+                  <select name="status" value={editFormData.status} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Acted Upon">Acted Upon</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Closed / Resolved">Closed / Resolved</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    REMARKS
+                  </label>
+                  <input
+                    type="text"
+                    name="remarks"
+                    placeholder="Optional case remarks"
+                    value={editFormData.remarks}
+                    onChange={handleEditFormChange}
+                    style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px",
+                  marginTop: "10px",
+                  paddingTop: "12px",
+                  borderTop: "1px solid #e5e7eb",
+                }}
+              >
+                <button
+                  type="button"
+                  className="as-btn-ghost"
+                  onClick={() => setEditingCase(null)}
+                  disabled={updating}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="as-btn-aqua" disabled={updating}>
+                  {updating ? "Saving..." : "Save Case Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 2: Delete Case Confirmation ── */}
       {caseToDelete && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "420px", padding: 0, overflow: "hidden" }}>
@@ -705,92 +1018,8 @@ export default function ServiceVawc({ onBack, userRole }) {
         </div>
       )}
 
-      {/* Status & Case Remarks Update Modal */}
-      {selectedCase && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "460px", padding: 0, overflow: "hidden" }}>
-            <div className="as-modal-header" style={{ background: "#317D89", color: "#fff", padding: "14px 18px" }}>
-              <div>
-                <h3 style={{ color: "#fff", margin: 0, fontSize: "1.05rem" }}>Update Case Status</h3>
-                <p style={{ color: "#ccfbf1", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
-                  Ref: {selectedCase.referenceNumber || selectedCase.id}
-                </p>
-              </div>
-              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setSelectedCase(null)}>
-                &times;
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleSaveStatusModal}
-              style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "12px" }}
-            >
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  CHANGE STATUS *
-                </label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  className="filter-select"
-                  style={{ width: "100%", padding: "8px 12px", fontSize: "0.85rem" }}
-                  required
-                >
-                  <option value="Acted Upon">Acted Upon</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Closed / Resolved">Closed / Resolved</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  CASE REMARKS / NOTES
-                </label>
-                <textarea
-                  rows="3"
-                  value={newRemarks}
-                  onChange={(e) => setNewRemarks(e.target.value)}
-                  placeholder="Enter details on latest actions taken, referrals made, or status changes..."
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "0.85rem",
-                    resize: "vertical",
-                  }}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "8px",
-                  marginTop: "8px",
-                  paddingTop: "12px",
-                  borderTop: "1px solid #e5e7eb",
-                }}
-              >
-                <button
-                  type="button"
-                  className="as-btn-ghost"
-                  onClick={() => setSelectedCase(null)}
-                  disabled={updatingStatus}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="as-btn-aqua" disabled={updatingStatus}>
-                  {updatingStatus ? "Updating..." : "Save Changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add New Case Modal */}
-      {isModalOpen && (
+      {/* ── MODAL 3: Add New Case Intake Form ── */}
+      {isAddModalOpen && (
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}>
             <div className="as-modal-header" style={{ background: "#317D89", color: "#fff", padding: "16px 20px" }}>
@@ -800,13 +1029,13 @@ export default function ServiceVawc({ onBack, userRole }) {
                   Recording Incident Form for Violence Against Children/Women
                 </p>
               </div>
-              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setIsModalOpen(false)}>
+              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setIsAddModalOpen(false)}>
                 &times;
               </button>
             </div>
 
             <form
-              onSubmit={handleSaveCase}
+              onSubmit={handleSaveNewCase}
               style={{
                 padding: "20px",
                 display: "flex",
@@ -821,7 +1050,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   GENDER (2) *
                 </label>
-                <select name="gender" value={formData.gender} onChange={handleChange} className="filter-select" style={{ width: "100%" }}>
+                <select name="gender" value={formData.gender} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
                   <option value="F">Female (F)</option>
                   <option value="M">Male (M)</option>
                   <option value="Others">Others (Please specify)</option>
@@ -833,7 +1062,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     placeholder="Specify gender"
                     required
                     value={formData.genderOther}
-                    onChange={handleChange}
+                    onChange={handleFormChange}
                     style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
                   />
                 )}
@@ -844,7 +1073,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   AGE (3) *
                 </label>
-                <select name="ageBracket" value={formData.ageBracket} onChange={handleChange} className="filter-select" style={{ width: "100%" }}>
+                <select name="ageBracket" value={formData.ageBracket} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
                   <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
                   <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
                   <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
@@ -859,7 +1088,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     placeholder="Specify age bracket"
                     required
                     value={formData.ageBracketOther}
-                    onChange={handleChange}
+                    onChange={handleFormChange}
                     style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
                   />
                 )}
@@ -870,7 +1099,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   TYPES OF VIOLENCE (4) *
                 </label>
-                <select name="typeOfViolence" value={formData.typeOfViolence} onChange={handleChange} className="filter-select" style={{ width: "100%" }}>
+                <select name="typeOfViolence" value={formData.typeOfViolence} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
                   <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
                   <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
                   <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
@@ -884,7 +1113,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     placeholder="Specify type of violence"
                     required
                     value={formData.typeOfViolenceOther}
-                    onChange={handleChange}
+                    onChange={handleFormChange}
                     style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
                   />
                 )}
@@ -895,7 +1124,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   PERPETRATORS (5) *
                 </label>
-                <select name="perpetrator" value={formData.perpetrator} onChange={handleChange} className="filter-select" style={{ width: "100%" }}>
+                <select name="perpetrator" value={formData.perpetrator} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
                   <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
                   <option value="Close Relative (5b)">Close Relative (5b)</option>
                   <option value="Acquaintance (5c)">Acquaintance (5c)</option>
@@ -911,7 +1140,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     placeholder="Specify perpetrator"
                     required
                     value={formData.perpetratorOther}
-                    onChange={handleChange}
+                    onChange={handleFormChange}
                     style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
                   />
                 )}
@@ -922,7 +1151,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                   ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
                 </label>
-                <select name="actionTaken" value={formData.actionTaken} onChange={handleChange} className="filter-select" style={{ width: "100%" }}>
+                <select name="actionTaken" value={formData.actionTaken} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
                   <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
                   <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
                   <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
@@ -938,7 +1167,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     placeholder="Specify action taken"
                     required
                     value={formData.actionTakenOther}
-                    onChange={handleChange}
+                    onChange={handleFormChange}
                     style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
                   />
                 )}
@@ -950,7 +1179,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
                     STATUS
                   </label>
-                  <select name="status" value={formData.status} onChange={handleChange} className="filter-select" style={{ width: "100%" }}>
+                  <select name="status" value={formData.status} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
                     <option value="Acted Upon">Acted Upon</option>
                     <option value="Pending">Pending</option>
                     <option value="Closed / Resolved">Closed / Resolved</option>
@@ -965,7 +1194,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     name="remarks"
                     placeholder="Optional case remarks"
                     value={formData.remarks}
-                    onChange={handleChange}
+                    onChange={handleFormChange}
                     style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
                   />
                 </div>
@@ -984,7 +1213,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <button
                   type="button"
                   className="as-btn-ghost"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => setIsAddModalOpen(false)}
                   disabled={submitting}
                 >
                   Cancel
