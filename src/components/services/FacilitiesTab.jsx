@@ -51,18 +51,18 @@ function AdvanceBookingBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "flex-start",
-      gap: "12px",
-      background: "#eff6ff",
-      border: "1px solid #93c5fd",
-      borderRadius: "10px",
-      padding: "14px 16px",
-      marginBottom: "18px",
-      fontSize: "14px",
-      color: "#1e40af",
-    }}>
+  <div style={{
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    background: "#eff6ff",
+    border: "1px solid #93c5fd",
+    borderRadius: "10px",
+    padding: "14px 16px",
+    margin: "20px 28px 18px",   // was: marginBottom: "18px"
+    fontSize: "14px",
+    color: "#1e40af",
+  }}>
       <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
