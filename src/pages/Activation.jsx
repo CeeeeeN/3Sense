@@ -20,7 +20,7 @@ function MobileHeader({ onBack }) {
 const GUIDE_STEPS = [
   { label: "Registration Submitted", status: "done" },
   { label: "Barangay Approval Received", status: "done" },
-  { label: "Activate Your Account ← You are here", status: "active" },
+  { label: "Activate Your Account", status: "active" },
   { label: "Add Household Members", status: "" },
   { label: "Log In to Your Account", status: "" },
 ];
@@ -73,19 +73,26 @@ export default function Activation({ onBack, onLoginClick, onSuccess }) {
         </div>
 
         <div className="act-left-content">
-          <h2>Almost there!<br/><span>Activate your account.</span></h2>
-          <p>Your registration has been approved by the Barangay. Complete the steps below to get started with your household account.</p>
+          <h2>Almost there! <span>Activate your account.</span></h2>
+          <p>Your registration is approved. Finish the steps below to get started.</p>
 
-          <div className="act-steps-guide">
+          <ol className="act-stepper">
             {GUIDE_STEPS.map((s, i) => (
-              <div key={i} className="act-guide-step">
-                <div className={`act-guide-num ${s.status}`}>
+              <li
+                key={i}
+                className={`act-step ${s.status}`}
+                aria-current={s.status === "active" ? "step" : undefined}
+              >
+                <span className="act-step-marker">
                   {s.status === "done" ? "✓" : i + 1}
-                </div>
-                <span className={`act-guide-text ${s.status}`}>{s.label}</span>
-              </div>
+                </span>
+                <span className="act-step-label">
+                  {s.label}
+                  {s.status === "active" && <span className="act-step-tag">You are here</span>}
+                </span>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
 
         <div className="act-left-footer">© 2026 Barangay 3S+ Malanday. All rights reserved.</div>

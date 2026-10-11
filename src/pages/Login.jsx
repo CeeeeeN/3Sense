@@ -4,6 +4,52 @@ import { loginWithHouseholdID, getMemberPinStatus, saveMemberPin, verifyMemberPi
 import { LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser } from "../components/Icons";
 import ErrorMessage from "../components/ErrorMessage";
 
+const LOGIN_FEATURES = [
+  {
+    title: "Manage your household",
+    desc: "Keep your household profile and members up to date.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    ),
+  },
+  {
+    title: "Track document requests",
+    desc: "Follow the status of clearances and certificates in real time.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    ),
+  },
+  {
+    title: "Stay informed",
+    desc: "Get barangay announcements relevant to your category.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+    ),
+  },
+  {
+    title: "Emergency access",
+    desc: "Reach hotlines and safety guidelines in one tap.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+    ),
+  },
+];
+
 function MobileHeader({ onBack }) {
   return (
     <div className="mobile-auth-header" onClick={onBack} style={{ cursor: "pointer" }}>
@@ -340,58 +386,22 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           </div>
         </div>
         <div className="left-content">
-          <h2>Your barangay,<br /><span style={{ color: "#D9E232" }}>at your fingertips.</span></h2>
-          <p>Sign in to manage your household, request documents, and access all barangay services — securely and conveniently.</p>
-
-          <div
-            className="feature-pills"
-            style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "1.5rem" }}
-          >
-            {[
-              [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
-                "Manage your household profile"
-              ],
-              [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>,
-                "Track document requests in real time"
-              ],
-              [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>,
-                "Stay updated with barangay announcements"
-              ],
-              [
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>,
-                "Quick access to emergency services"
-              ],
-            ].map(([icon, text]) => (
-              <div
-                className="pill"
-                key={text}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  borderRadius: "999px",
-                  padding: "0.45rem 0.85rem",
-                  fontSize: "0.78rem",
-                  color: "rgba(255,255,255,0.85)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <div
-                  className="pill-icon"
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-                >
-                  {icon}
-                </div>
-                {text}
-              </div>
-            ))}
+         <h2>Your barangay, <span style={{ color: "#D9E232" }}>at your fingertips.</span></h2>
+         <p>Sign in to manage your household, request documents, and access barangay services.</p>
+         
+            {/* REPLACE the old feature-pills div with this */}
+            <ul className="left-features">
+              {LOGIN_FEATURES.map((f) => (
+                <li className="left-feature" key={f.title}>
+                  <span className="left-feature-icon">{f.icon}</span>
+                  <div className="left-feature-text">
+                    <h4>{f.title}</h4>
+                    <p>{f.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
         <div className="left-footer">© 2026 Barangay 3S+ Malanday. All rights reserved.</div>
       </div>
 

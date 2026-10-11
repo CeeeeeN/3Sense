@@ -260,9 +260,6 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
           <a className="lp-hide-mobile" onClick={() => scrollTo("how-it-works")}>
             How It Works
           </a>
-          <button className="lp-btn-nav" onClick={onLoginClick}>
-            Login
-          </button>
         </div>
       </nav>
 
@@ -307,7 +304,7 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
                 </div>
               </div>
               <div className="lp-mockup-body">
-                <div className="lp-mockup-greeting">Good Morning!</div>
+                <div className="lp-mockup-greeting">Good Day!</div>
                 <div className="lp-mockup-sub">
                   Here's what's happening in your barangay today.
                 </div>
