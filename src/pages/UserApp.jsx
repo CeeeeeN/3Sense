@@ -70,6 +70,11 @@ export default function UserApp() {
     if (scannedServiceId) {
       return hasSession ? "feedback" : "login";
     }
+    
+    // <-- ADDED: Check sessionStorage to recover view after a page refresh
+    const savedView = sessionStorage.getItem("current_view");
+    if (savedView) return savedView;
+
     const fromPath = PATH_TO_PAGE[window.location.pathname];
     if (fromPath && hasSession) return fromPath;
     return "landing";
@@ -88,6 +93,13 @@ export default function UserApp() {
   const [feedbackService, setFeedbackService] = useState(
     scannedServiceId ? { id: scannedServiceId, name: scannedServiceName } : null,
   );
+
+  // <-- ADDED: Persist the current view to sessionStorage whenever the page changes
+  useEffect(() => {
+    if (page) {
+      sessionStorage.setItem("current_view", page);
+    }
+  }, [page]);
 
   // ── DETECT BRANCHING REQUEST ──
   useEffect(() => {
@@ -166,6 +178,7 @@ export default function UserApp() {
   const handleNav = (p, data) => {
     if (p === "logout") {
       localStorage.removeItem("brgy_session");
+      sessionStorage.removeItem("current_view"); // <-- Clear view state on logout
       window.history.pushState({}, "", "/");
       setPage("landing");
     } else if (p === "feedback" && data?.service) {

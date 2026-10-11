@@ -761,7 +761,12 @@ function SelfieStep({ onConfirm }) {
 
 // ─── Main Registration Component ──────────────────────────────────────────────
 export default function Registration({ onBack, branchingPayload }) {
-  const [step, setStep] = useState(0);
+  // Try to load saved state, default to step 0
+  const [step, setStep] = useState(() => {
+    const saved = sessionStorage.getItem("reg_step");
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState("");
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
@@ -769,26 +774,47 @@ export default function Registration({ onBack, branchingPayload }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [idImage, setIdImage] = useState(null);
-  const [selfieImage, setSelfieImage] = useState(null);
-  const [autofilledFields, setAutofilledFields] = useState(new Set());
-  const manuallyEdited = useRef(new Set());
+  const [idImage, setIdImage] = useState(() => sessionStorage.getItem("reg_idImage") || null);
+  const [selfieImage, setSelfieImage] = useState(() => sessionStorage.getItem("reg_selfieImage") || null);
+  
+  const [autofilledFields, setAutofilledFields] = useState(() => {
+    const saved = sessionStorage.getItem("reg_autofilled");
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+  
+  const manuallyEdited = useRef(
+    sessionStorage.getItem("reg_edited") ? new Set(JSON.parse(sessionStorage.getItem("reg_edited"))) : new Set()
+  );
 
   const todayStr = new Date().toISOString().split("T")[0];
   const currentYear = new Date().getFullYear();
   const minDobStr = `${currentYear - 125}-01-01`;
 
-  const [form, setForm] = useState({
-    idNumber: "",
-    firstName: "", middleName: "", lastName: "", suffix: "", religion: "", religionOther: "",
-    birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
-    citizenship: "Filipino", citizenshipOther: "", contactNumber: "", email: "", residingSinceYear: "",
-    houseNumber: "", street: "", subdivision: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
-    categories: [],
-    pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
-    educationAttainment: "", educationStatus: "", postGradLevel: "", occupation: "", employmentStatus: "",
-    totalMembers: "", householdClassification: "",
+  const [form, setForm] = useState(() => {
+    const saved = sessionStorage.getItem("reg_form");
+    if (saved) return JSON.parse(saved);
+    return {
+      idNumber: "",
+      firstName: "", middleName: "", lastName: "", suffix: "", religion: "", religionOther: "",
+      birthDate: "", age: "", birthPlace: "", sex: "Male", gender: "", genderOther: "", civilStatus: "",
+      citizenship: "Filipino", citizenshipOther: "", contactNumber: "", email: "", residingSinceYear: "",
+      houseNumber: "", street: "", subdivision: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday",
+      categories: [],
+      pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
+      educationAttainment: "", educationStatus: "", postGradLevel: "", occupation: "", employmentStatus: "",
+      totalMembers: "", householdClassification: "",
+    };
   });
+
+  // <-- ADDED: Effect to sync state to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem("reg_step", step.toString());
+    sessionStorage.setItem("reg_form", JSON.stringify(form));
+    sessionStorage.setItem("reg_autofilled", JSON.stringify(Array.from(autofilledFields)));
+    sessionStorage.setItem("reg_edited", JSON.stringify(Array.from(manuallyEdited.current)));
+    if (idImage) sessionStorage.setItem("reg_idImage", idImage);
+    if (selfieImage) sessionStorage.setItem("reg_selfieImage", selfieImage);
+  }, [step, form, autofilledFields, idImage, selfieImage]);
 
   const total = STEPS.length;
   const progress = submitted ? 100 : (step / (total - 1)) * 100;
@@ -943,6 +969,13 @@ export default function Registration({ onBack, branchingPayload }) {
 
       await submitRegistration({ ...form, idImage, selfieImage, branchingPayload });
 
+      // Clean up storage on successful submit
+      sessionStorage.removeItem("reg_step");
+      sessionStorage.removeItem("reg_form");
+      sessionStorage.removeItem("reg_autofilled");
+      sessionStorage.removeItem("reg_edited");
+      sessionStorage.removeItem("reg_idImage");
+      sessionStorage.removeItem("reg_selfieImage");
       sessionStorage.removeItem("branchingPayload");
 
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
@@ -965,9 +998,15 @@ export default function Registration({ onBack, branchingPayload }) {
   };
 
   const handleCancel = () => {
-    if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) {
+    if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) { 
+      sessionStorage.removeItem("reg_step");
+      sessionStorage.removeItem("reg_form");
+      sessionStorage.removeItem("reg_autofilled");
+      sessionStorage.removeItem("reg_edited");
+      sessionStorage.removeItem("reg_idImage");
+      sessionStorage.removeItem("reg_selfieImage");
       sessionStorage.removeItem("branchingPayload");
-      if (onBack) onBack();
+      if (onBack) onBack(); 
     }
   };
 
