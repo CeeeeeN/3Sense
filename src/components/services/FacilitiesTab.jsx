@@ -55,22 +55,27 @@ function AdvanceBookingBanner() {
     display: "flex",
     alignItems: "flex-start",
     gap: "12px",
-    background: "#eff6ff",
-    border: "1px solid #93c5fd",
+    background: "#fffbeb",
+    border: "1px solid #fcd34d",
     borderRadius: "10px",
     padding: "14px 16px",
-    margin: "20px 28px 18px",   // was: marginBottom: "18px"
+    margin: "20px 28px 18px",
     fontSize: "14px",
-    color: "#1e40af",
+    color: "#92400e",
   }}>
-      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+<svg
+        style={{ flexShrink: 0, marginTop: "1px" }}
+        width="18" height="18" viewBox="0 0 24 24" fill="none"
+        stroke="#d97706"                       
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      >
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
         <line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
       </svg>
       <div style={{ flex: 1 }}>
-        <strong style={{ display: "block", marginBottom: "2px", color: "#1e3a8a" }}>
+        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}> 
           Advance Booking Required
         </strong>
         Facility reservations must be submitted at least{" "}
@@ -84,7 +89,7 @@ function AdvanceBookingBanner() {
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: "#1e40af",
+          color: "#92400e",                
           padding: "0",
           flexShrink: 0,
           lineHeight: 1,
