@@ -806,7 +806,6 @@ export default function Registration({ onBack, branchingPayload }) {
     };
   });
 
-  // <-- ADDED: Effect to sync state to sessionStorage whenever it changes
   useEffect(() => {
     sessionStorage.setItem("reg_step", step.toString());
     sessionStorage.setItem("reg_form", JSON.stringify(form));
@@ -850,7 +849,7 @@ export default function Registration({ onBack, branchingPayload }) {
   }, []);
 
   const set = (field) => (e) => {
-    setErrorMsg("");
+    // REMOVED setErrorMsg("") to keep errors visible while typing
     manuallyEdited.current.add(field);
     setAutofilledFields((prev) => { const s = new Set(prev); s.delete(field); return s; });
     const value = e.target.type === "checkbox"
@@ -955,7 +954,9 @@ export default function Registration({ onBack, branchingPayload }) {
     }
     if (step === 7 && !privacyAgreed) { setErrorMsg("You must agree to the Privacy Policy before submitting."); return false; }
     if (missing.length > 0) { setErrorMsg(`Please fill in required fields: ${missing.join(", ")}`); return false; }
-    setErrorMsg(""); return true;
+    
+    setErrorMsg(""); // Clear errors only if validation completely passes
+    return true;
   };
 
   const goNext = async () => {
@@ -977,6 +978,9 @@ export default function Registration({ onBack, branchingPayload }) {
       sessionStorage.removeItem("reg_idImage");
       sessionStorage.removeItem("reg_selfieImage");
       sessionStorage.removeItem("branchingPayload");
+      
+      // Clear parent state if registered from branch flow
+      sessionStorage.removeItem("current_view"); 
 
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
       setRefNumber(ref);
@@ -1006,6 +1010,10 @@ export default function Registration({ onBack, branchingPayload }) {
       sessionStorage.removeItem("reg_idImage");
       sessionStorage.removeItem("reg_selfieImage");
       sessionStorage.removeItem("branchingPayload");
+      
+      // Clear parent state
+      sessionStorage.removeItem("current_view"); 
+      
       if (onBack) onBack(); 
     }
   };
@@ -1575,7 +1583,7 @@ export default function Registration({ onBack, branchingPayload }) {
                       <input
                         type="checkbox"
                         checked={privacyAgreed}
-                        onChange={(e) => { setPrivacyAgreed(e.target.checked); setErrorMsg(""); }}
+                        onChange={(e) => { setPrivacyAgreed(e.target.checked); }}
                         style={{ marginTop: "3px", accentColor: "#317D89", width: "16px", height: "16px", flexShrink: 0 }}
                       />
                       <span className="reg-privacy-check-text">
@@ -1672,7 +1680,7 @@ export default function Registration({ onBack, branchingPayload }) {
               </ul>
             </div>
             <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={() => { setPrivacyAgreed(true); setShowPrivacyModal(false); }}
+              <button onClick={() => { setPrivacyAgreed(true); setShowPrivacyModal(false); setErrorMsg(""); }}
                 style={{ background: "#317D89", color: "#fff", border: "none", borderRadius: "8px", padding: "0.6rem 1.4rem", fontWeight: 600, fontSize: "0.9rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <SvgCheck size={15} /> I Agree &amp; Close
               </button>
