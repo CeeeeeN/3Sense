@@ -363,23 +363,9 @@ export default function ServiceVawc({ onBack, userRole }) {
     <div className="as-container">
       {/* Top Header */}
       <div style={{ marginBottom: "20px" }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#6b7280",
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            cursor: "pointer",
-            marginBottom: "10px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
-          &larr; Back to Services Hub
-        </button>
+      <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
+        &larr; Back to Services Hub
+      </button>
         <div
           style={{
             display: "flex",
