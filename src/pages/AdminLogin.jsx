@@ -145,7 +145,7 @@ const LoginPage = () => {
     <div className="login-page">
       <div className="left-panel">
         <a className="left-logo">
-          <img src="icons/logo.png" className="logo-img" alt="Logo" />
+          <img src="/icons/logo.png" className="logo-img" alt="Logo" />
           <div className="left-logo-text">Barangay 3S+ Malanday</div>
         </a>
 
