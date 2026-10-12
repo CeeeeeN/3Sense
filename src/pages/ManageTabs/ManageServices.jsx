@@ -170,13 +170,13 @@ export default function ManageServices() {
 
   return (
     <>
-      <div className="as-container">
+      <div className="as-container" style={{ padding: 0 }}>
         {/* ── Services Hub Workspace Services ── */}
         {hasWorkspaceServices && (
           <>
             <div className="as-header-section">
               <div className="as-title-wrap">
-                <h1>Services Hub</h1>
+                <h1>Services</h1>
                 <p className="as-subtitle">Adaptive workspaces for handling different barangay services and departments</p>
               </div>
             </div>
@@ -194,9 +194,19 @@ export default function ManageServices() {
                   </div>
                   <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Monitor incoming incident reports, dispatch barangay tanods, and manage blotters.</p>
                   <StatBar stats={peaceStats} />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("peace")}>Workspace &rarr;</button>
-                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("Peace and Order", "Services")}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button 
+                      className="as-btn-aqua" 
+                      style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => setActiveDashboard("peace")}
+                    >
+                      Workspace &rarr;
+                    </button>
+                    <button 
+                      className="as-qr-btn" 
+                      style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => handleGenerateQR("Peace and Order", "Services")}
+                    >
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -215,9 +225,19 @@ export default function ManageServices() {
                   </div>
                   <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Approve or reject community registrations for training programs and assistance.</p>
                   <StatBar stats={livelihoodStats} />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("livelihood")}>Workspace &rarr;</button>
-                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("Livelihood", "Services")}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button 
+                      className="as-btn-aqua" 
+                      style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => setActiveDashboard("livelihood")}
+                    >
+                      Workspace &rarr;
+                    </button>
+                    <button 
+                      className="as-qr-btn" 
+                      style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => handleGenerateQR("Livelihood", "Services")}
+                    >
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -236,9 +256,19 @@ export default function ManageServices() {
                   </div>
                   <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Manage reports of displaced persons and community tips regarding resident welfare.</p>
                   <StatBar stats={bswdStats} />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("bswd")}>Workspace &rarr;</button>
-                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("BSWD", "Services")}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button 
+                      className="as-btn-aqua" 
+                      style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => setActiveDashboard("bswd")}
+                    >
+                      Workspace &rarr;
+                    </button>
+                    <button 
+                      className="as-qr-btn" 
+                      style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => handleGenerateQR("BSWD", "Services")}
+                    >
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -257,9 +287,19 @@ export default function ManageServices() {
                   </div>
                   <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Log VAC/VAW incident reports, manage protective actions, and track referrals.</p>
                   <StatBar stats={vawcStats} />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: 1 }} onClick={() => setActiveDashboard("vawc")}>Workspace &rarr;</button>
-                    <button className="as-qr-btn" style={{ flex: 1 }} onClick={() => handleGenerateQR("VAWC", "Services")}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button 
+                      className="as-btn-aqua" 
+                      style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => setActiveDashboard("vawc")}
+                    >
+                      Workspace &rarr;
+                    </button>
+                    <button 
+                      className="as-qr-btn" 
+                      style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} 
+                      onClick={() => handleGenerateQR("VAWC", "Services")}
+                    >
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>

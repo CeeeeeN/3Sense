@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../AdminStyle.css";
-import { UserIcon, EmailIcon, PhoneIcon, LockIcon, PositionIcon } from "../components/Icons";
+import { EmailIcon, PositionIcon } from "../components/Icons";
 import InputField from "../components/InputField";
 import { auth, db } from "../firebase/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -82,6 +82,33 @@ const AdminSignup = () => {
     }
   };
 
+  const FullNameIcon = (
+    <svg className="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+
+  const PhoneIcon = (
+    <svg className="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+
+  const UsernameIcon = (
+    <svg className="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94" />
+    </svg>
+  );
+
+  const LockIcon = (
+    <svg className="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+
   // Password strength
   const hasUpper = /[A-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
@@ -115,7 +142,7 @@ const AdminSignup = () => {
             <InputField
               label="Full Name"
               required
-              icon={UserIcon}
+              icon={FullNameIcon}
               placeholder="Juan Dela Cruz"
               fullWidth
               value={fullName}
@@ -144,20 +171,41 @@ const AdminSignup = () => {
             <InputField
               label="Username"
               required
-              icon={UserIcon}
+              icon={UsernameIcon}
               placeholder="JDC123"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
 
-            <InputField
-              label="Position"
-              required
-              icon={PositionIcon}
-              placeholder="Barangay Staff"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-            />
+            <div className="field">
+              <label className="labelSignup">
+                Position <span className="req">*</span>
+              </label>
+              <div className="input-wrap">
+                {PositionIcon}
+                <select
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Select Position</option>
+                  <option value="Standard Admin">Standard Admin</option>
+                  <option value="Secretary">Secretary</option>
+                  <option value="BSWD Head">BSWD Head</option>
+                  <option value="BSWD Staff">BSWD Staff</option>
+                  <option value="VAWC Head">VAWC Head</option>
+                  <option value="VAWC Staff">VAWC Staff</option>
+                  <option value="BOSCA Head">BOSCA Head</option>
+                  <option value="BOSCA Staff">BOSCA Staff</option>
+                  <option value="Peace&Order Head">Peace&Order Head</option>
+                  <option value="Peace&Order Staff">Peace&Order Staff</option>
+                  <option value="BADAC Head">BADAC Head</option>
+                  <option value="BADAC Staff">BADAC Staff</option>
+                  <option value="Livelihood Head">Livelihood Head</option>
+                  <option value="Livelihood Staff">Livelihood Staff</option>
+                </select>
+              </div>
+            </div>
 
             {/* PASSWORD */}
             <div className="password-container">

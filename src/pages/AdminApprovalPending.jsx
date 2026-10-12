@@ -108,7 +108,7 @@ const ApprovalPending = () => {
           notified once your account is reviewed.
         </p>
 
-        <Link to="/login" className="btn-pending">
+        <Link to="/admin/login" className="btn-pending">
           Back to Login
         </Link>
       </div>
