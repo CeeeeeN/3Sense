@@ -842,7 +842,6 @@ nav {
   @apply text-xs font-semibold px-3 py-1 rounded-full;
 }
 
-/* Figma Status Colors */
 .as-badge.on-going {
   @apply bg-green-100 text-green-600;
 }
@@ -1175,10 +1174,32 @@ nav {
   @apply bg-amber-100 text-amber-700 text-amber-700 border border-amber-100 border-solid;
 }
 
+.status-badge.ready-for-pickup,
+.status-ready-for-pickup,
+.status-badge[class*="ready for pickup"] {
+  @apply bg-blue-50 text-blue-700 border border-blue-200 before:bg-blue-500;
+}
+
+.status-badge.responded {
+  @apply bg-indigo-50 text-indigo-700 border border-indigo-200 before:bg-indigo-500;
+}
+
+.status-badge.resolved {
+  @apply bg-emerald-50 text-emerald-700 border border-emerald-200 before:bg-emerald-500;
+}
+
+.status-badge.acted-upon,
+.status-badge[class*="acted upon"] {
+  @apply bg-emerald-50 text-emerald-700 border border-emerald-200 before:bg-emerald-500;
+}
+
+.status-badge.received {
+@apply bg-teal-50 text-teal-800 border border-teal-200 before:bg-teal-600;
+}
+
 /* Action Buttons */
 .btn-view {
-  @apply text-blue-600 font-medium text-sm cursor-pointer inline-flex items-center justify-center gap-1.5 rounded transition-[background-color] duration-[0.2s] px-3 py-1.5 border-[none] hover:bg-blue-50 hover:text-blue-700 text-[color:var(--text)] border border-[color:var(--border)] border-solid hover:border-[color:var(--teal)] hover:text-[color:var(--teal)];
-  background: none;
+@apply bg-white text-blue-600 border-[1.5px] border-slate-400 font-semibold shadow-xs transition-all duration-150 hover:bg-blue-50 hover:border-blue-600 hover:text-blue-700 hover:shadow-[0_2px_4px_rgba(37,99,235,0.15)];  background: none;
 }
 
 /* =========================================
@@ -1242,7 +1263,7 @@ nav {
 
 /* Modal Footer */
 .modal-footer {
-  @apply bg-gray-50 flex justify-end gap-3 px-6 py-4 border-t border-solid border-t-slate-100 flex justify-end gap-3 px-8 py-5 border-t border-solid;
+  @apply bg-slate-50 flex justify-end items-center gap-2.5 px-6 py-3 border-t border-slate-100;
 }
 .modal-footer button {
   @apply text-sm font-medium cursor-pointer flex items-center gap-2 transition-all duration-[0.2s] px-4 py-2 rounded-md border-[none];
@@ -1579,7 +1600,7 @@ nav {
   @apply w-full text-left border-collapse;
 }
 .req-table th {
-  @apply text-[0.85rem] font-bold text-slate-500 uppercase tracking-wider border-b-[color:var(--border)] px-6 py-5 border-b-2 border-solid;
+  @apply text-[0.95rem] font-bold text-slate-500 uppercase tracking-wider border-b-[color:var(--border)] px-6 py-5 border-b-2 border-solid;
   background: #f8fafc;
   font-family: "Poppins", sans-serif;
 }
