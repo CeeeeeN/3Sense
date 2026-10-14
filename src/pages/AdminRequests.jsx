@@ -138,7 +138,11 @@ export default function AdminRequests() {
           dateRequested: formatDate(rawDate),
           rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
           dateNeeded: data.date ? `${formatDate(data.date)} (${formatTime(data.startTime)} - ${formatTime(data.endTime)})` : (formatDate(data.reservationDate) + time),
-          status: data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1).toLowerCase() : 'Pending',
+          status: (() => {
+            const raw = (data.status || 'Pending').trim().toLowerCase();
+            if (raw === 'completed') return 'Approved';
+            return raw.charAt(0).toUpperCase() + raw.slice(1);
+          })(),
           allData: { ...data, email: sanitizedEmail }
         };
       });
@@ -572,12 +576,10 @@ export default function AdminRequests() {
         );
       }
 
-      // <-- REPLACED ALERT
       await showAlert("Success", "Request Rejected.");
       closeModal();
     } catch (error) {
       console.error("Error rejecting request: ", error);
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to reject request.");
     }
   };
@@ -700,26 +702,25 @@ export default function AdminRequests() {
           ) : (
             <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
-                <tr>
+                <tr style={{ textAlign: 'center' }}>
                   <th>Ref Number</th>
                   <th>Requester</th>
                   <th>Type</th>
                   <th>{activeTab === 'Equipment' ? 'Pick-up / Date Needed' : 'Scheduled Date'}</th>
                   <th>Date Submitted</th>
-                  <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {currentRequests.map((req) => (
-                  <tr key={req.docId} onClick={() => openViewModal(req)} style={{ cursor: 'pointer' }}>
+                  <tr key={req.docId} onClick={() => openViewModal(req)} style={{ cursor: 'pointer', textAlign: 'center' }} >
                     <td style={{ fontWeight: 600, color: '#64748b', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                       {String(req.id).toUpperCase()}
                     </td>
                     <td>
                       <div className="req-res-info">
                         <span className="req-res-name">{req.residentName}</span>
-                        <span className="req-res-email">{formatDisplayEmail(req.contact, adminRole)}</span>
                       </div>
                     </td>
                     <td>
@@ -738,56 +739,17 @@ export default function AdminRequests() {
                         {String(req.status || "Pending").charAt(0).toUpperCase() + String(req.status || "Pending").slice(1).toLowerCase()}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div className="req-actions" style={{ justifyContent: 'flex-end' }}>
-                        {String(req.status || "").toLowerCase() === 'pending' && (
-                          <>
-                            <button className="btn-approve" title="Approve" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>
-                              <CheckCircle size={16} /> Approve
-                            </button>
-                            <button className="btn-reject" title="Reject" onClick={(e) => { e.stopPropagation(); openRejectModal(req); }}>
-                              <XCircle size={16} /> Reject
-                            </button>
-                          </>
-                        )}
-                        {String(req.status || "").toLowerCase() === 'approved' && (req.category === 'Document' || req.category === 'Equipment') && (
-                          <button className="btn-approve" title="Ready for Pickup" onClick={(e) => { e.stopPropagation(); handleReadyForPickup(req); }}>
-                            <CheckCircle size={16} /> Mark Ready
-                          </button>
-                        )}
-                        {String(req.status || "").toLowerCase() === 'ready for pickup' && (req.category === 'Document' || req.category === 'Equipment') && (
-                          <button className="btn-approve" title="Claimed" onClick={(e) => { e.stopPropagation(); handleClaimed(req); }}>
-                            <CheckCircle size={16} /> Mark Claimed
-                          </button>
-                        )}
-                        {(['claimed', 'overdue', 'unreturned'].includes(String(req.status || '').toLowerCase())) && req.category === 'Equipment' && (
-                          <button className="btn-approve" title="Returned" onClick={(e) => { e.stopPropagation(); handleReturned(req); }}>
-                            <CheckCircle size={16} /> Mark Returned
-                          </button>
-                        )}
-                        {String(req.status || "").toLowerCase() === 'overdue' && req.category === 'Equipment' && (
-                          <button
-                            title="Report Unreturned"
-                            onClick={(e) => { e.stopPropagation(); openUnreturnedModal(req); }}
-                            style={{
-                              height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
-                              fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              gap: '6px', padding: '0 14px', borderRadius: '8px',
-                              background: '#fff7ed', color: '#c2410c',
-                              border: '1.5px solid #fed7aa',
-                            }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                            </svg>
-                            Report Unreturned
-                          </button>
-                        )}
-                        <button className="btn-view" title="View Details" onClick={(e) => { e.stopPropagation(); openViewModal(req); }}>
-                          <Eye size={16} /> View
-                        </button>
-                      </div>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="btn-view"
+                        style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openViewModal(req);
+                        }}
+                      >
+                        More Details
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1062,50 +1024,59 @@ export default function AdminRequests() {
               </div>
               
               <div className="modal-footer">
-                <button className="btn-view" onClick={closeModal}>Close</button>
-                {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
-                  <>
-                    <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
-                      <XCircle size={16} /> Reject
-                    </button>
-                    <button className="btn-approve" onClick={() => handleApprove()}>
-                      <CheckCircle size={16} /> Approve
-                    </button>
-                  </>
-                )}
-                {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-                  <button className="btn-approve" onClick={() => handleReadyForPickup()}>
-                    <CheckCircle size={16} /> Mark Ready for Pickup
-                  </button>
-                )}
-                {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-                  <button className="btn-approve" onClick={() => handleClaimed()}>
-                    <CheckCircle size={16} /> Mark Claimed
-                  </button>
-                )}
-                {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
-                  <button className="btn-approve" onClick={() => handleReturned()}>
-                    <CheckCircle size={16} /> Mark Returned
-                  </button>
-                )}
-                {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
-                  <button
-                    onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
-                    style={{
-                      height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
-                      fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      gap: '6px', padding: '0 16px', borderRadius: '8px',
-                      background: '#fff7ed', color: '#c2410c',
-                      border: '1.5px solid #fed7aa',
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    Report Unreturned
-                  </button>
-                )}
+{(
+  String(selectedRequest.status || "").toLowerCase() === 'pending' ||
+  (String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment')) ||
+  (String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment')) ||
+  ((['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment') ||
+  (String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment')
+) && (
+  <div className="modal-footer">
+    {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
+      <>
+        <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
+          <XCircle size={16} /> Reject
+        </button>
+        <button className="btn-approve" onClick={() => handleApprove()}>
+          <CheckCircle size={16} /> Approve
+        </button>
+      </>
+    )}
+    {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+      <button className="btn-approve" onClick={() => handleReadyForPickup()}>
+        <CheckCircle size={16} /> Mark Ready for Pickup
+      </button>
+    )}
+    {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+      <button className="btn-approve" onClick={() => handleClaimed()}>
+        <CheckCircle size={16} /> Mark Claimed
+      </button>
+    )}
+    {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
+      <button className="btn-approve" onClick={() => handleReturned()}>
+        <CheckCircle size={16} /> Mark Returned
+      </button>
+    )}
+    {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
+      <button
+        onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
+        style={{
+          height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+          fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          gap: '6px', padding: '0 16px', borderRadius: '8px',
+          background: '#fff7ed', color: '#c2410c',
+          border: '1.5px solid #fed7aa',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        Report Unreturned
+      </button>
+    )}
+  </div>
+)}
               </div>
             </div>
           </div>

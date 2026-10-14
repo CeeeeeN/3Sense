@@ -64,41 +64,110 @@ function DescriptionPreview({ text }) {
 }
 
 function StatusBadge({ status }) {
-  const s = (status || "pending").toLowerCase();
+  const raw = status || "Pending";
+  const s = raw.toLowerCase().trim();
+
   const map = {
-    approved: { bg: "#dcfce7", color: "#166534" },
-    pending: { bg: "#fef3c7", color: "#92400e" },
-    rejected: { bg: "#fee2e2", color: "#991b1b" },
-    registered: { bg: "#dbeafe", color: "#1e40af" },
+    approved:   { bg: "#dcfce7", color: "#166534", dot: "#16a34a" }, // emerald
+    pending:    { bg: "#fef3c7", color: "#92400e", dot: "#d97706" }, // amber
+    rejected:   { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" }, // red
+    registered: { bg: "#dbeafe", color: "#1e40af", dot: "#2563eb" }, // blue
   };
+
   const c = map[s] || map.pending;
+
+  // Capitalize first letter of each word
+  const capitalizedStatus = raw
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+
   return (
-    <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 600, background: c.bg, color: c.color }}>
-      {status || "pending"}
+    <span
+      style={{
+        padding: "4px 10px",
+        borderRadius: "12px",
+        fontSize: "0.75rem",
+        fontWeight: 600,
+        background: c.bg,
+        color: c.color,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+      }}
+    >
+      <span
+        style={{
+          width: "6px",
+          height: "6px",
+          minWidth: "6px",
+          minHeight: "6px",
+          borderRadius: "50%",
+          backgroundColor: c.dot,
+          display: "inline-block",
+          flexShrink: 0,
+        }}
+      />
+      {capitalizedStatus}
     </span>
   );
 }
 
 function StatBar({ stats }) {
   const statusColors = {
-    pending: { bg: "#fef3c7", text: "#92400e" },
-    approved: { bg: "#dcfce7", text: "#166534" },
-    rejected: { bg: "#fee2e2", text: "#991b1b" },
-    registered: { bg: "#dbeafe", text: "#1e40af" },
-    analyzed: { bg: "#e0e7ff", text: "#3730a3" },
+    pending:    { bg: "#fef3c7", text: "#92400e", dot: "#d97706" }, // amber
+    approved:   { bg: "#dcfce7", text: "#166534", dot: "#16a34a" }, // emerald
+    rejected:   { bg: "#fee2e2", text: "#991b1b", dot: "#dc2626" }, // red
+    registered: { bg: "#dbeafe", text: "#1e40af", dot: "#2563eb" }, // blue
+    analyzed:   { bg: "#e0e7ff", text: "#3730a3", dot: "#4f46e5" }, // indigo
   };
+
   return (
     <div style={{ marginTop: "12px", padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
         <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>Total registrations</span>
         <span style={{ fontSize: "1rem", fontWeight: 700, color: "#111827" }}>{stats.total}</span>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px" }}>
         {Object.entries(stats.byStatus).map(([status, count]) => {
-          const c = statusColors[status.toLowerCase()] || { bg: "#f3f4f6", text: "#4b5563" };
+          const key = status.toLowerCase().trim();
+          const c = statusColors[key] || { bg: "#f3f4f6", text: "#4b5563", dot: "#9ca3af" };
+          
+          // Capitalize each word (e.g. "registered" -> "Registered", "pending" -> "Pending")
+          const capitalizedStatus = status
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(" ");
+
           return (
-            <span key={status} style={{ fontSize: "0.72rem", padding: "2px 7px", borderRadius: "10px", background: c.bg, color: c.text, fontWeight: 600 }}>
-              {status}: {count}
+            <span
+              key={status}
+              style={{
+                fontSize: "0.72rem",
+                padding: "3px 8px",
+                borderRadius: "10px",
+                background: c.bg,
+                color: c.text,
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+              }}
+            >
+              {/* Visible Status Dot */}
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  minWidth: "6px",
+                  minHeight: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: c.dot,
+                  display: "inline-block",
+                  flexShrink: 0,
+                }}
+              />
+              {capitalizedStatus}: {count}
             </span>
           );
         })}
