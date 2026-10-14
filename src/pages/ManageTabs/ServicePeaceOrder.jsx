@@ -413,12 +413,8 @@ export default function ServicePeaceOrder({ onBack }) {
                       {r.location} — {r.description}
                     </div>
                     <div style={{ marginTop: "6px" }}>
-                      <span style={{
-                        fontSize: "0.72rem", padding: "2px 7px", borderRadius: "10px", fontWeight: 600,
-                        background: (r.status || "").toLowerCase() === "resolved" ? "#dcfce7" : (r.status || "").toLowerCase() === "responded" ? "#e0e7ff" : "#fef3c7",
-                        color:      (r.status || "").toLowerCase() === "resolved" ? "#166534" : (r.status || "").toLowerCase() === "responded" ? "#3730a3" : "#92400e",
-                      }}>
-                        {r.status || "received"}
+                      <span className={`status-badge ${(r.status || "pending").toLowerCase()}`}>
+                        {(r.status || "received").charAt(0).toUpperCase() + (r.status || "received").slice(1).toLowerCase()}
                       </span>
                     </div>
                   </div>
@@ -475,9 +471,9 @@ export default function ServicePeaceOrder({ onBack }) {
                     <h2 style={{ margin: "0 0 6px 0" }}>Incident Details</h2>
                     <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>Ref: {selectedReport.refNum || selectedReport.id}</span>
                   </div>
-                  <span className={`as-badge ${(selectedReport.status || "received").toLowerCase()}`}>
-                    {selectedReport.status || "received"}
-                  </span>
+                    <span className={`status-badge ${(selectedReport.status || "received").toLowerCase()}`}>
+                      {(selectedReport.status || "received").charAt(0).toUpperCase() + (selectedReport.status || "received").slice(1).toLowerCase()}
+                    </span>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>

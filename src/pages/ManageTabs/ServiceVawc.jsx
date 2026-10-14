@@ -332,7 +332,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       } else if (currentPage >= totalPages - 2) {
         pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
       } else {
-        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+        pages.push(1, "...", currentPage, "...", totalPages);
       }
     }
 
@@ -363,9 +363,9 @@ export default function ServiceVawc({ onBack, userRole }) {
     <div className="as-container">
       {/* Top Header */}
       <div style={{ marginBottom: "20px" }}>
-      <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-        &larr; Back to Services Hub
-      </button>
+        <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
+          &larr; Back to Services Hub
+        </button>
         <div
           style={{
             display: "flex",
@@ -509,7 +509,7 @@ export default function ServiceVawc({ onBack, userRole }) {
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ padding: "6px 10px", fontSize: "0.82rem" }}
             >
-              <option value="all">All Statuses</option>
+              <option value="all">All Status</option>
               <option value="Acted Upon">Acted Upon</option>
               <option value="Pending">Pending</option>
               <option value="Closed / Resolved">Closed / Resolved</option>
@@ -559,113 +559,63 @@ export default function ServiceVawc({ onBack, userRole }) {
                 style={{ width: "100%", borderCollapse: "collapse", minWidth: "980px" }}
               >
                 <thead>
-                  <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>REF #</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>DATE LOGGED</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>GENDER</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>AGE</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>NATURE OF VIOLENCE</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>PERPETRATOR</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS TAKEN</th>
+                  <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", textAlign: "center" }}>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>REF #</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>DATE LOGGED</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>GENDER</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>AGE</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>NATURE OF VIOLENCE</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>PERPETRATOR</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS TAKEN</th>
                     <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>STATUS</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedCases.map((c) => (
-                    <tr key={c.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      <td style={{ padding: "10px 12px", fontFamily: "monospace", fontWeight: 600, color: "#0f172a" }}>
+                    <tr
+                      key={c.id}
+                      onClick={() => openEditModal(c)}
+                      style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}
+                    >
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", fontWeight: 600, color: "#0f172a", textAlign: "center" }}>
                         {c.referenceNumber || c.id.substring(0, 8)}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#64748b" }}>
+                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#64748b", textAlign: "center" }}>
                         {c.loggedDate || "—"}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", fontWeight: 600 }}>
+                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", fontWeight: 600, textAlign: "center" }}>
                         {c.gender}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#334155" }}>
+                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#334155", textAlign: "center" }}>
                         {c.ageBracket}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", fontWeight: 500, color: "#0f172a" }}>
+                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", fontWeight: 500, color: "#0f172a", textAlign: "center" }}>
                         {c.typeOfViolence}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#475569" }}>
+                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#475569", textAlign: "center" }}>
                         {c.perpetrator}
                       </td>
-                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#0d9488", fontWeight: 500 }}>
+                      <td style={{ padding: "10px 12px", fontSize: "0.82rem", color: "#0d9488", fontWeight: 500, textAlign: "center" }}>
                         {c.actionTaken}
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "14px",
-                            fontSize: "0.75rem",
-                            fontWeight: 700,
-                            display: "inline-block",
-                            background:
-                              c.status === "Acted Upon"
-                                ? "#dcfce7"
-                                : c.status === "Pending"
-                                ? "#fef3c7"
-                                : "#f1f5f9",
-                            color:
-                              c.status === "Acted Upon"
-                                ? "#166534"
-                                : c.status === "Pending"
-                                ? "#92400e"
-                                : "#475569",
-                          }}
-                        >
+                        <span className={`status-badge ${(c.status || "pending").toLowerCase().replace(/\s+/g, '-')}`}>
                           {c.status || "Pending"}
                         </span>
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                        <div style={{ display: "flex", justifyContent: "center", gap: "6px" }}>
-                          {/* Edit Full Case Details Button */}
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(c)}
-                            title="Edit Full Case Details"
-                            style={{
-                              cursor: "pointer",
-                              background: "#e0f2fe",
-                              border: "none",
-                              color: "#0369a1",
-                              padding: "5px 10px",
-                              borderRadius: "6px",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                              transition: "background 0.15s ease",
-                            }}
-                            onMouseEnter={(e) => (e.target.style.background = "#bae6fd")}
-                            onMouseLeave={(e) => (e.target.style.background = "#e0f2fe")}
-                          >
-                            Edit
-                          </button>
-
-                          {/* Delete Case Button */}
-                          <button
-                            type="button"
-                            onClick={() => setCaseToDelete(c)}
-                            title="Delete Case Record"
-                            style={{
-                              cursor: "pointer",
-                              background: "#fee2e2",
-                              border: "none",
-                              color: "#991b1b",
-                              padding: "5px 10px",
-                              borderRadius: "6px",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                              transition: "background 0.15s ease",
-                            }}
-                            onMouseEnter={(e) => (e.target.style.background = "#fca5a5")}
-                            onMouseLeave={(e) => (e.target.style.background = "#fee2e2")}
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          className="btn-view"
+                          style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(c);
+                          }}
+                        >
+                          More Details
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -736,18 +686,23 @@ export default function ServiceVawc({ onBack, userRole }) {
         )}
       </div>
 
-      {/* ── MODAL 1: EDIT ALL CASE FIELDS (Fix for Team Request) ── */}
+      {/* ── MODAL 1: EDIT ALL CASE FIELDS ── */}
       {editingCase && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}>
-            <div className="as-modal-header" style={{ background: "#317D89", color: "#fff", padding: "16px 20px" }}>
+        <div className="as-modal-overlay" onClick={() => setEditingCase(null)}>
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Neutral/gray header (#f9fafb), NOT blue */}
+            <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
               <div>
-                <h2 style={{ color: "#fff", margin: 0, fontSize: "1.15rem" }}>Edit VAWC Case</h2>
-                <p style={{ color: "#ccfbf1", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Case Details</h2>
+                <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
                   Ref: {editingCase.referenceNumber || editingCase.id}
                 </p>
               </div>
-              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setEditingCase(null)}>
+              <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setEditingCase(null)}>
                 &times;
               </button>
             </div>
@@ -755,186 +710,199 @@ export default function ServiceVawc({ onBack, userRole }) {
             <form
               onSubmit={handleSaveCaseEdits}
               style={{
-                padding: "20px",
                 display: "flex",
                 flexDirection: "column",
-                gap: "14px",
                 maxHeight: "75vh",
-                overflowY: "auto",
               }}
             >
-              {/* Edit Gender */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  GENDER (2) *
-                </label>
-                <select name="gender" value={editFormData.gender} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="F">Female (F)</option>
-                  <option value="M">Male (M)</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {editFormData.gender === "Others" && (
-                  <input
-                    type="text"
-                    name="genderOther"
-                    placeholder="Specify gender"
-                    required
-                    value={editFormData.genderOther}
-                    onChange={handleEditFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Edit Age Bracket */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  AGE (3) *
-                </label>
-                <select name="ageBracket" value={editFormData.ageBracket} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
-                  <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
-                  <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
-                  <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
-                  <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {editFormData.ageBracket === "Others" && (
-                  <input
-                    type="text"
-                    name="ageBracketOther"
-                    placeholder="Specify age bracket"
-                    required
-                    value={editFormData.ageBracketOther}
-                    onChange={handleEditFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Edit Types of Violence */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  TYPES OF VIOLENCE (4) *
-                </label>
-                <select name="typeOfViolence" value={editFormData.typeOfViolence} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
-                  <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
-                  <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
-                  <option value="Neglect (4d)">Neglect (4d)</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {editFormData.typeOfViolence === "Others" && (
-                  <input
-                    type="text"
-                    name="typeOfViolenceOther"
-                    placeholder="Specify type of violence"
-                    required
-                    value={editFormData.typeOfViolenceOther}
-                    onChange={handleEditFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Edit Perpetrator */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  PERPETRATORS (5) *
-                </label>
-                <select name="perpetrator" value={editFormData.perpetrator} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
-                  <option value="Close Relative (5b)">Close Relative (5b)</option>
-                  <option value="Acquaintance (5c)">Acquaintance (5c)</option>
-                  <option value="Stranger (5d)">Stranger (5d)</option>
-                  <option value="Local Office (5e)">Local Office (5e)</option>
-                  <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
-                  <option value="Others">Others (ex: Guardian) (5g)</option>
-                </select>
-                {editFormData.perpetrator === "Others" && (
-                  <input
-                    type="text"
-                    name="perpetratorOther"
-                    placeholder="Specify perpetrator"
-                    required
-                    value={editFormData.perpetratorOther}
-                    onChange={handleEditFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Edit Actions Taken */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
-                </label>
-                <select name="actionTaken" value={editFormData.actionTaken} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
-                  <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
-                  <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
-                  <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
-                  <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
-                  <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {editFormData.actionTaken === "Others" && (
-                  <input
-                    type="text"
-                    name="actionTakenOther"
-                    placeholder="Specify action taken"
-                    required
-                    value={editFormData.actionTakenOther}
-                    onChange={handleEditFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Edit Status & Remarks */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div
+                style={{
+                  padding: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                  overflowY: "auto",
+                  flex: 1,
+                }}
+              >
+                {/* Edit Gender */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    STATUS
+                    GENDER (2) *
                   </label>
-                  <select name="status" value={editFormData.status} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Acted Upon">Acted Upon</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Closed / Resolved">Closed / Resolved</option>
+                  <select name="gender" value={editFormData.gender} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="F">Female (F)</option>
+                    <option value="M">Male (M)</option>
+                    <option value="Others">Others (Please specify)</option>
                   </select>
+                  {editFormData.gender === "Others" && (
+                    <input
+                      type="text"
+                      name="genderOther"
+                      placeholder="Specify gender"
+                      required
+                      value={editFormData.genderOther}
+                      onChange={handleEditFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
                 </div>
+
+                {/* Edit Age Bracket */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    REMARKS
+                    AGE (3) *
                   </label>
-                  <input
-                    type="text"
-                    name="remarks"
-                    placeholder="Optional case remarks"
-                    value={editFormData.remarks}
-                    onChange={handleEditFormChange}
-                    style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
+                  <select name="ageBracket" value={editFormData.ageBracket} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
+                    <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
+                    <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
+                    <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
+                    <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
+                    <option value="Others">Others (Please specify)</option>
+                  </select>
+                  {editFormData.ageBracket === "Others" && (
+                    <input
+                      type="text"
+                      name="ageBracketOther"
+                      placeholder="Specify age bracket"
+                      required
+                      value={editFormData.ageBracketOther}
+                      onChange={handleEditFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Edit Types of Violence */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    TYPES OF VIOLENCE (4) *
+                  </label>
+                  <select name="typeOfViolence" value={editFormData.typeOfViolence} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
+                    <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
+                    <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
+                    <option value="Neglect (4d)">Neglect (4d)</option>
+                    <option value="Others">Others (Please specify)</option>
+                  </select>
+                  {editFormData.typeOfViolence === "Others" && (
+                    <input
+                      type="text"
+                      name="typeOfViolenceOther"
+                      placeholder="Specify type of violence"
+                      required
+                      value={editFormData.typeOfViolenceOther}
+                      onChange={handleEditFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Edit Perpetrator */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    PERPETRATORS (5) *
+                  </label>
+                  <select name="perpetrator" value={editFormData.perpetrator} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
+                    <option value="Close Relative (5b)">Close Relative (5b)</option>
+                    <option value="Acquaintance (5c)">Acquaintance (5c)</option>
+                    <option value="Stranger (5d)">Stranger (5d)</option>
+                    <option value="Local Office (5e)">Local Office (5e)</option>
+                    <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
+                    <option value="Others">Others (ex: Guardian) (5g)</option>
+                  </select>
+                  {editFormData.perpetrator === "Others" && (
+                    <input
+                      type="text"
+                      name="perpetratorOther"
+                      placeholder="Specify perpetrator"
+                      required
+                      value={editFormData.perpetratorOther}
+                      onChange={handleEditFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Edit Actions Taken */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
+                  </label>
+                  <select name="actionTaken" value={editFormData.actionTaken} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
+                    <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
+                    <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
+                    <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
+                    <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
+                    <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
+                    <option value="Others">Others (Please specify)</option>
+                  </select>
+                  {editFormData.actionTaken === "Others" && (
+                    <input
+                      type="text"
+                      name="actionTakenOther"
+                      placeholder="Specify action taken"
+                      required
+                      value={editFormData.actionTakenOther}
+                      onChange={handleEditFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Edit Status & Remarks */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                      STATUS
+                    </label>
+                    <select name="status" value={editFormData.status} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
+                      <option value="Acted Upon">Acted Upon</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Closed / Resolved">Closed / Resolved</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                      REMARKS
+                    </label>
+                    <input
+                      type="text"
+                      name="remarks"
+                      placeholder="Optional case remarks"
+                      value={editFormData.remarks}
+                      onChange={handleEditFormChange}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* Modal footer has Delete on left, Save on right, NO Cancel button */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "10px",
-                  marginTop: "10px",
-                  paddingTop: "12px",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 20px",
                   borderTop: "1px solid #e5e7eb",
+                  background: "#f9fafb",
                 }}
               >
                 <button
                   type="button"
-                  className="as-btn-ghost"
-                  onClick={() => setEditingCase(null)}
+                  className="btn-reject"
+                  onClick={() => {
+                    const target = editingCase;
+                    setEditingCase(null);
+                    setCaseToDelete(target);
+                  }}
                   disabled={updating}
                 >
-                  Cancel
+                  Delete Case
                 </button>
                 <button type="submit" className="as-btn-aqua" disabled={updating}>
                   {updating ? "Saving..." : "Save Case Changes"}
@@ -947,11 +915,15 @@ export default function ServiceVawc({ onBack, userRole }) {
 
       {/* ── MODAL 2: Delete Case Confirmation ── */}
       {caseToDelete && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "420px", padding: 0, overflow: "hidden" }}>
-            <div className="as-modal-header" style={{ background: "#dc2626", color: "#fff", padding: "14px 18px" }}>
-              <h3 style={{ color: "#fff", margin: 0, fontSize: "1.05rem" }}>Confirm Deletion</h3>
-              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setCaseToDelete(null)}>
+        <div className="as-modal-overlay" onClick={() => setCaseToDelete(null)}>
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "420px", padding: 0, overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "14px 18px" }}>
+              <h3 style={{ color: "#dc2626", margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Confirm Deletion</h3>
+              <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setCaseToDelete(null)}>
                 &times;
               </button>
             </div>
@@ -973,14 +945,6 @@ export default function ServiceVawc({ onBack, userRole }) {
                   borderTop: "1px solid #e5e7eb",
                 }}
               >
-                <button
-                  type="button"
-                  className="as-btn-ghost"
-                  onClick={() => setCaseToDelete(null)}
-                  disabled={deleting}
-                >
-                  Cancel
-                </button>
                 <button
                   type="button"
                   onClick={handleDeleteCase}
@@ -1006,16 +970,21 @@ export default function ServiceVawc({ onBack, userRole }) {
 
       {/* ── MODAL 3: Add New Case Intake Form ── */}
       {isAddModalOpen && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}>
-            <div className="as-modal-header" style={{ background: "#317D89", color: "#fff", padding: "16px 20px" }}>
+        <div className="as-modal-overlay" onClick={() => setIsAddModalOpen(false)}>
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Neutral/gray header (#f9fafb), NOT blue */}
+            <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
               <div>
-                <h2 style={{ color: "#fff", margin: 0, fontSize: "1.15rem" }}>Add New VAWC Case</h2>
-                <p style={{ color: "#ccfbf1", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Add New VAWC Case</h2>
+                <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
                   Recording Incident Form for Violence Against Children/Women
                 </p>
               </div>
-              <button className="as-modal-close" style={{ color: "#fff" }} onClick={() => setIsAddModalOpen(false)}>
+              <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setIsAddModalOpen(false)}>
                 &times;
               </button>
             </div>
@@ -1023,187 +992,188 @@ export default function ServiceVawc({ onBack, userRole }) {
             <form
               onSubmit={handleSaveNewCase}
               style={{
-                padding: "20px",
                 display: "flex",
                 flexDirection: "column",
-                gap: "14px",
                 maxHeight: "75vh",
-                overflowY: "auto",
               }}
             >
-              {/* Gender */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  GENDER (2) *
-                </label>
-                <select name="gender" value={formData.gender} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="F">Female (F)</option>
-                  <option value="M">Male (M)</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {formData.gender === "Others" && (
-                  <input
-                    type="text"
-                    name="genderOther"
-                    placeholder="Specify gender"
-                    required
-                    value={formData.genderOther}
-                    onChange={handleFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Age Bracket */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  AGE (3) *
-                </label>
-                <select name="ageBracket" value={formData.ageBracket} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
-                  <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
-                  <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
-                  <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
-                  <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {formData.ageBracket === "Others" && (
-                  <input
-                    type="text"
-                    name="ageBracketOther"
-                    placeholder="Specify age bracket"
-                    required
-                    value={formData.ageBracketOther}
-                    onChange={handleFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Types of Violence */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  TYPES OF VIOLENCE (4) *
-                </label>
-                <select name="typeOfViolence" value={formData.typeOfViolence} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
-                  <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
-                  <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
-                  <option value="Neglect (4d)">Neglect (4d)</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {formData.typeOfViolence === "Others" && (
-                  <input
-                    type="text"
-                    name="typeOfViolenceOther"
-                    placeholder="Specify type of violence"
-                    required
-                    value={formData.typeOfViolenceOther}
-                    onChange={handleFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Perpetrators */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  PERPETRATORS (5) *
-                </label>
-                <select name="perpetrator" value={formData.perpetrator} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
-                  <option value="Close Relative (5b)">Close Relative (5b)</option>
-                  <option value="Acquaintance (5c)">Acquaintance (5c)</option>
-                  <option value="Stranger (5d)">Stranger (5d)</option>
-                  <option value="Local Office (5e)">Local Office (5e)</option>
-                  <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
-                  <option value="Others">Others (ex: Guardian) (5g)</option>
-                </select>
-                {formData.perpetrator === "Others" && (
-                  <input
-                    type="text"
-                    name="perpetratorOther"
-                    placeholder="Specify perpetrator"
-                    required
-                    value={formData.perpetratorOther}
-                    onChange={handleFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Actions Taken */}
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                  ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
-                </label>
-                <select name="actionTaken" value={formData.actionTaken} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                  <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
-                  <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
-                  <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
-                  <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
-                  <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
-                  <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
-                  <option value="Others">Others (Please specify)</option>
-                </select>
-                {formData.actionTaken === "Others" && (
-                  <input
-                    type="text"
-                    name="actionTakenOther"
-                    placeholder="Specify action taken"
-                    required
-                    value={formData.actionTakenOther}
-                    onChange={handleFormChange}
-                    style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
-                )}
-              </div>
-
-              {/* Status and Remarks */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div
+                style={{
+                  padding: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                  overflowY: "auto",
+                  flex: 1,
+                }}
+              >
+                {/* Gender */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    STATUS
+                    GENDER (2) *
                   </label>
-                  <select name="status" value={formData.status} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Acted Upon">Acted Upon</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Closed / Resolved">Closed / Resolved</option>
+                  <select name="gender" value={formData.gender} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="F">Female (F)</option>
+                    <option value="M">Male (M)</option>
+                    <option value="Others">Others (Please specify)</option>
                   </select>
+                  {formData.gender === "Others" && (
+                    <input
+                      type="text"
+                      name="genderOther"
+                      placeholder="Specify gender"
+                      required
+                      value={formData.genderOther}
+                      onChange={handleFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
                 </div>
+
+                {/* Age Bracket */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    REMARKS
+                    AGE (3) *
                   </label>
-                  <input
-                    type="text"
-                    name="remarks"
-                    placeholder="Optional case remarks"
-                    value={formData.remarks}
-                    onChange={handleFormChange}
-                    style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
-                  />
+                  <select name="ageBracket" value={formData.ageBracket} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
+                    <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
+                    <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
+                    <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
+                    <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
+                    <option value="Others">Others (Please specify)</option>
+                  </select>
+                  {formData.ageBracket === "Others" && (
+                    <input
+                      type="text"
+                      name="ageBracketOther"
+                      placeholder="Specify age bracket"
+                      required
+                      value={formData.ageBracketOther}
+                      onChange={handleFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Types of Violence */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    TYPES OF VIOLENCE (4) *
+                  </label>
+                  <select name="typeOfViolence" value={formData.typeOfViolence} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
+                    <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
+                    <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
+                    <option value="Neglect (4d)">Neglect (4d)</option>
+                    <option value="Others">Others (Please specify)</option>
+                  </select>
+                  {formData.typeOfViolence === "Others" && (
+                    <input
+                      type="text"
+                      name="typeOfViolenceOther"
+                      placeholder="Specify type of violence"
+                      required
+                      value={formData.typeOfViolenceOther}
+                      onChange={handleFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Perpetrators */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    PERPETRATORS (5) *
+                  </label>
+                  <select name="perpetrator" value={formData.perpetrator} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
+                    <option value="Close Relative (5b)">Close Relative (5b)</option>
+                    <option value="Acquaintance (5c)">Acquaintance (5c)</option>
+                    <option value="Stranger (5d)">Stranger (5d)</option>
+                    <option value="Local Office (5e)">Local Office (5e)</option>
+                    <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
+                    <option value="Others">Others (ex: Guardian) (5g)</option>
+                  </select>
+                  {formData.perpetrator === "Others" && (
+                    <input
+                      type="text"
+                      name="perpetratorOther"
+                      placeholder="Specify perpetrator"
+                      required
+                      value={formData.perpetratorOther}
+                      onChange={handleFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Actions Taken */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                    ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
+                  </label>
+                  <select name="actionTaken" value={formData.actionTaken} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
+                    <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
+                    <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
+                    <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
+                    <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
+                    <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
+                    <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
+                    <option value="Others">Others (Please specify)</option>
+                  </select>
+                  {formData.actionTaken === "Others" && (
+                    <input
+                      type="text"
+                      name="actionTakenOther"
+                      placeholder="Specify action taken"
+                      required
+                      value={formData.actionTakenOther}
+                      onChange={handleFormChange}
+                      style={{ width: "100%", marginTop: "6px", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  )}
+                </div>
+
+                {/* Status and Remarks */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                      STATUS
+                    </label>
+                    <select name="status" value={formData.status} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
+                      <option value="Acted Upon">Acted Upon</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Closed / Resolved">Closed / Resolved</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
+                      REMARKS
+                    </label>
+                    <input
+                      type="text"
+                      name="remarks"
+                      placeholder="Optional case remarks"
+                      value={formData.remarks}
+                      onChange={handleFormChange}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* Modal footer has only the Save button, NO Cancel button */}
               <div
                 style={{
                   display: "flex",
                   justifyContent: "flex-end",
                   gap: "10px",
-                  marginTop: "10px",
-                  paddingTop: "12px",
+                  padding: "16px 20px",
                   borderTop: "1px solid #e5e7eb",
+                  background: "#f9fafb",
                 }}
               >
-                <button
-                  type="button"
-                  className="as-btn-ghost"
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
                 <button type="submit" className="as-btn-aqua" disabled={submitting}>
                   {submitting ? "Saving..." : "Save VAWC Case"}
                 </button>
