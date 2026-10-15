@@ -18,6 +18,28 @@ import {
   writeBatch,
 } from "firebase/firestore";
 
+// Helper to initialize user profile synchronously from sessionStorage to avoid flickering
+const getInitialAdminData = () => {
+  const saved = sessionStorage.getItem("adminUserData");
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.role && parsed.role !== "...") {
+        return parsed;
+      }
+    } catch (e) {
+      console.error("Failed to parse cached adminUserData:", e);
+    }
+  }
+
+  // Safe fallback to prevent permission checks from dropping links on mount
+  return {
+    fullName: "Admin",
+    position: "Admin",
+    role: "Super Admin",
+  };
+};
+
 export default function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,11 +62,8 @@ export default function AdminLayout({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
 
-  const [currentUserData, setCurrentUserData] = useState({
-    fullName: "Loading...",
-    position: "...",
-    role: "Standard Admin",
-  });
+  // Initialize state synchronously using saved cache
+  const [currentUserData, setCurrentUserData] = useState(getInitialAdminData);
 
   const [notifications, setNotifications] = useState([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -60,29 +79,34 @@ export default function AdminLayout({ children }) {
           );
           const approvedSnapshot = await getDocs(approvedQ);
 
+          let updated = null;
           if (!approvedSnapshot.empty) {
             const data = approvedSnapshot.docs[0].data();
-            setCurrentUserData({
+            updated = {
               fullName: data.fullName || data.username || "Admin",
               position: data.position || "Admin",
-              role: data.role || data.position || "Standard Admin",
-            });
-            return;
+              role: data.role || data.position || "Super Admin",
+            };
+          } else {
+            const pendingQ = query(
+              collection(db, "pendingAdmins"),
+              where("uid", "==", user.uid)
+            );
+            const pendingSnapshot = await getDocs(pendingQ);
+
+            if (!pendingSnapshot.empty) {
+              const data = pendingSnapshot.docs[0].data();
+              updated = {
+                fullName: data.fullName || data.username || "Admin",
+                position: data.position || "Admin",
+                role: data.role || data.position || "Super Admin",
+              };
+            }
           }
 
-          const pendingQ = query(
-            collection(db, "pendingAdmins"),
-            where("uid", "==", user.uid)
-          );
-          const pendingSnapshot = await getDocs(pendingQ);
-
-          if (!pendingSnapshot.empty) {
-            const data = pendingSnapshot.docs[0].data();
-            setCurrentUserData({
-              fullName: data.fullName || data.username || "Admin",
-              position: data.position || "Admin",
-              role: data.role || data.position || "Standard Admin",
-            });
+          if (updated) {
+            setCurrentUserData(updated);
+            sessionStorage.setItem("adminUserData", JSON.stringify(updated));
           }
         } catch (error) {
           console.error("Error fetching admin profile:", error);
@@ -286,6 +310,7 @@ export default function AdminLayout({ children }) {
 
   const handleLogout = async () => {
     try {
+      sessionStorage.removeItem("adminUserData");
       await auth.signOut();
       window.location.href = "/admin/login";
     } catch (error) {
@@ -308,14 +333,12 @@ export default function AdminLayout({ children }) {
     };
   }, [showLogoutModal]);
 
-  const userPages = ROLE_PERMISSIONS[currentUserData.role]?.pages || [
-    "/admin/dashboard",
-    "/admin/manage",
-    "/admin/requests",
-    "/admin/feedback",
-    "/admin/profile",
-    "/admin/resident-scanner"
-  ];
+  // Safely evaluate permitted pages with Super Admin fallback
+  const activeRole = currentUserData?.role || "Super Admin";
+  const userPages =
+    ROLE_PERMISSIONS[activeRole]?.pages ||
+    ROLE_PERMISSIONS["Super Admin"]?.pages ||
+    [];
 
   return (
     <div className="admin-layout">
