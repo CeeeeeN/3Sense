@@ -75,7 +75,16 @@ const LoginPage = () => {
       const approvedSnapshot = await getDocs(approvedQ);
 
       if (!approvedSnapshot.empty) {
-        navigate("/dashboard");
+        const adminDoc = approvedSnapshot.docs[0].data();
+        const adminData = {
+          fullName: adminDoc.fullName || adminDoc.username || "Admin",
+          position: adminDoc.position || "Admin",
+          role: adminDoc.role || adminDoc.position || "Super Admin",
+        };
+        // 🔥 Immediately cache role in sessionStorage to prevent sidebar link flickering
+        sessionStorage.setItem("adminUserData", JSON.stringify(adminData));
+
+        navigate("/admin/dashboard");
         return;
       }
 
