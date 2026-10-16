@@ -471,6 +471,7 @@ const translations = {
     feedback_confirm_footnote: 'This submission has been recorded for reference purposes.',
 
     // ─── Services Tab (ServicesTab.jsx) ───
+    svtab_peace: 'Peace & Order',
     svtab_peace_order: 'Peace & Order',
     svtab_vawc: 'VAWC',
     svtab_badac: 'BADAC',
@@ -1384,6 +1385,7 @@ const translations = {
     feedback_confirm_footnote: 'Ang pagsusumiteng ito ay naitala para sa layunin ng sanggunian.',
 
     // ─── Services Tab ───
+    svtab_peace: 'Peace & Order',
     svtab_peace_order: 'Peace & Order',
     svtab_vawc: 'VAWC',
     svtab_badac: 'BADAC',
@@ -1876,6 +1878,10 @@ export function LanguageProvider({ children }) {
       val = translations.en[key];
     }
     if (val === undefined) {
+      // If a default fallback string was provided, use it
+      if (args.length > 0 && typeof args[0] === 'string') {
+        return args[0];
+      }
       // Last resort: return key (prevents blank UI)
       if (process.env.NODE_ENV !== 'production') {
         console.warn(`[i18n] Missing translation key: "${key}"`);
