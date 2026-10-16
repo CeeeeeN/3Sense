@@ -187,6 +187,15 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
   const count = pendingItems.length;
   const firstItem = pendingItems[0];
 
+  const formatItemTitle = (item) => {
+    if (!item?.title) return "";
+    if (item.title === "Document Request") return t("feedback_modal_doc_label", "Document Request");
+    if (item.title === "Facility Reservation" || item.title === "Reservation") return t("feedback_modal_facility_label", "Facility Reservation");
+    if (item.title === "Equipment Rental") return t("feedback_modal_equip_label", "Equipment Rental");
+    if (item.title === "Barangay Program") return t("feedback_modal_prog_label", "Barangay Program");
+    return item.title;
+  };
+
   return (
     <>
       <div style={{ marginBottom: "20px" }}>
@@ -218,8 +227,8 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
 
             <p style={{ margin: 0, fontSize: "0.8rem", color: "#b45309", fontFamily: "'Poppins', sans-serif" }}>
               {count > 1
-                ? <>{t('feedback_review_queue_prefix', 'Please review your recently completed ')}<strong>{firstItem.title}</strong>{t('feedback_review_queue_suffix', ' to continue clearing your queue.')}</>
-                : <>{t('feedback_provide_prefix', 'Please provide feedback for your recently completed ')}<strong>{firstItem.title}</strong>{t('feedback_provide_suffix', '.')}</>
+                ? <>{t('feedback_review_queue_prefix', 'Please review your recently completed ')}<strong>{formatItemTitle(firstItem)}</strong>{t('feedback_review_queue_suffix', ' to continue clearing your queue.')}</>
+                : <>{t('feedback_provide_prefix', 'Please provide feedback for your recently completed ')}<strong>{formatItemTitle(firstItem)}</strong>{t('feedback_provide_suffix', '.')}</>
               }
             </p>
           </div>
