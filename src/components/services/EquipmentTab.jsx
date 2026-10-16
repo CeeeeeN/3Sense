@@ -32,6 +32,7 @@ function dateOffset(offsetDays) {
 const MIN_RENTAL_DATE = dateOffset(3);
 
 function AdvanceRentalBanner() {
+  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
@@ -59,14 +60,15 @@ function AdvanceRentalBanner() {
       </svg>
       <div style={{ flex: 1 }}>
         <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
-          Advance Request Required
+          {t("eq_advance_title", "Advance Request Required")}
         </strong>
-        Equipment rentals must be submitted at least{" "}
-        <strong>3 days before</strong> your intended pick-up date. Please plan accordingly.
+        {t("eq_advance_desc_prefix", "Equipment rentals must be submitted at least ")}
+        <strong>{t("eq_advance_desc_highlight", "3 days before")}</strong>
+        {t("eq_advance_desc_suffix", " your intended pick-up date. Please plan accordingly.")}
       </div>
       <button
         onClick={() => setDismissed(true)}
-        aria-label="Dismiss reminder"
+        aria-label={t("close", "Dismiss reminder")}
         style={{
           background: "none",
           border: "none",
@@ -242,7 +244,7 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
         <span style={{ flex: 1, lineHeight: "1.5" }}>
-          Select your <strong>Pick-up Date</strong>. Must be at least 3 days in advance.
+          {t("eq_cal_pickup_prefix", "Select your ")}<strong>{t("eq_cal_pickup_label", "Pick-up Date")}</strong>{t("eq_cal_pickup_suffix", ". Must be at least 3 days in advance.")}
         </span>
       </div>
     </div>
@@ -347,8 +349,8 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
       <div className="sv-form-header">
         <div className="sv-form-header-icon"><EquipmentIcon /></div>
         <div>
-          <div className="sv-form-header-title">{equipmentName} Rental</div>
-          <div className="sv-form-header-desc">Reserve equipment for your event. Approval is required before confirmation.</div>
+          <div className="sv-form-header-title">{t("eq_rental_header", equipmentName)}</div>
+          <div className="sv-form-header-desc">{t("eq_rental_sub", "Reserve equipment for your event. Approval is required before confirmation.")}</div>
         </div>
       </div>
 
@@ -361,7 +363,7 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
           <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
         </svg>
         <span style={{ flex: 1, lineHeight: "1.5" }}>
-          Requests must be submitted at least <strong>3 days before</strong> pick-up. Earliest available date is <strong>{MIN_RENTAL_DATE}</strong>.
+          {t("eq_notice_prefix", "Requests must be submitted at least ")}<strong>{t("eq_advance_desc_highlight", "3 days before")}</strong>{t("eq_notice_mid", " pick-up. Earliest available date is ")}<strong>{MIN_RENTAL_DATE}</strong>.
         </span>
       </div>
 
@@ -448,8 +450,8 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
       </div>
 
       <div className="sv-form-actions">
-        <button className="sv-btn-ghost" onClick={onBack}>Cancel</button>
-        <button className="sv-btn-primary" onClick={handleSubmit}>Submit Request</button>
+        <button className="sv-btn-ghost" onClick={onBack}>{t("cancel", "Cancel")}</button>
+        <button className="sv-btn-primary" onClick={handleSubmit}>{t("eq_submit_btn", "Submit Request")}</button>
       </div>
     </div>
   );

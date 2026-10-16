@@ -49,6 +49,7 @@ function isFullyCovered(approvedOnDate, openTime, closeTime) {
 }
 
 function AdvanceBookingBanner() {
+  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
@@ -77,15 +78,15 @@ function AdvanceBookingBanner() {
       </svg>
       <div style={{ flex: 1 }}>
         <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}> 
-          Advance Booking Required
+          {t("fac_advance_title", "Advance Booking Required")}
         </strong>
-        Facility reservations must be submitted at least{" "}
-        <strong>3 days before</strong> your intended date of use. Same-day
-        and next-day bookings are not accepted. Please plan accordingly.
+        {t("fac_advance_desc_prefix", "Facility reservations must be submitted at least ")}
+        <strong>{t("fac_advance_desc_highlight", "3 days before")}</strong>
+        {t("fac_advance_desc_suffix", " your intended date of use. Same-day and next-day bookings are not accepted. Please plan accordingly.")}
       </div>
       <button
         onClick={() => setDismissed(true)}
-        aria-label="Dismiss reminder"
+        aria-label={t("close", "Dismiss reminder")}
         style={{
           background: "none",
           border: "none",
@@ -245,8 +246,8 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         })}
       </div>
       <div className="sv-cal-legend">
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Fully Reserved</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />{t("fac_available", "Available")}</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />{t("fac_fully_reserved_dot", "Fully Reserved")}</span>
       </div>
 
       <div style={{
@@ -268,7 +269,7 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
         <span style={{ flex: 1, lineHeight: "1.5" }}>
-          Bookings must be made at least <strong>3 days in advance</strong>. Greyed-out dates are unavailable.
+          {t("fac_cal_prefix", "Bookings must be made at least ")}<strong>{t("fac_notice_highlight", "3 days in advance")}</strong>{t("fac_cal_suffix", ". Greyed-out dates are unavailable.")}
         </span>
       </div>
     </div>
@@ -722,8 +723,8 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       </div>
 
       <div className="sv-form-actions">
-        <button className="sv-btn-ghost" onClick={onBack}>Cancel</button>
-        <button className="sv-btn-primary" onClick={handleSubmit}>Submit Reservation</button>
+        <button className="sv-btn-ghost" onClick={onBack}>{t("cancel", "Cancel")}</button>
+        <button className="sv-btn-primary" onClick={handleSubmit}>{t("fac_submit_btn", "Submit Reservation")}</button>
       </div>
     </div>
   );

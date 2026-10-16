@@ -3,8 +3,10 @@ import { collection, query, where, onSnapshot, collectionGroup, orderBy, limit }
 import { db } from "../../firebase/firebase";
 import FeedbackModal from "./FeedbackModal";
 import { AlertCircleIcon } from "../Icons";
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function FeedbackAlerts({ householdID, residentID, onNavigate }) {
+  const { t } = useLanguage();
   const [pendingItems, setPendingItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -211,13 +213,13 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
         >
           <div style={{ flex: isMobile480 ? "unset" : 1, marginBottom: isMobile480 ? "10px" : "0" }}>
             <h4 style={{ margin: 0, fontSize: "0.9rem", color: "#92400e", fontFamily: "'Poppins', sans-serif" }}>
-              {count > 1 ? `Action Required: ${count} Feedback Surveys Pending` : `Action Required: Feedback Needed`}
+              {count > 1 ? t('feedback_action_pending', count) : t('feedback_action_needed', 'Action Required: Feedback Needed')}
             </h4>
 
             <p style={{ margin: 0, fontSize: "0.8rem", color: "#b45309", fontFamily: "'Poppins', sans-serif" }}>
               {count > 1
-                ? <>Please review your recently completed <strong>{firstItem.title}</strong> to continue clearing your queue.</>
-                : <>Please provide feedback for your recently completed <strong>{firstItem.title}</strong>.</>
+                ? <>{t('feedback_review_queue_prefix', 'Please review your recently completed ')}<strong>{firstItem.title}</strong>{t('feedback_review_queue_suffix', ' to continue clearing your queue.')}</>
+                : <>{t('feedback_provide_prefix', 'Please provide feedback for your recently completed ')}<strong>{firstItem.title}</strong>{t('feedback_provide_suffix', '.')}</>
               }
             </p>
           </div>
@@ -240,7 +242,7 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
               margin: isMobile480 ? "10px auto 0 auto" : "0"
             }}
           >
-            Review Now
+            {t('feedback_review_now_btn', 'Review Now')}
           </button>
         </div>
       </div>
