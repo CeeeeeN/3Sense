@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLanguage } from "../context/LanguageContext";
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, getCountFromServer, orderBy, limit } from "firebase/firestore";
@@ -30,6 +31,7 @@ function SectionCard({ icon, title, subtitle, action, children }) {
 }
 
 function UnifiedAnnouncementPopup({ ann, onClose }) {
+  const { t } = useLanguage();
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -59,21 +61,21 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
             <div className="db-popup-detail-item">
               <span className="db-popup-detail-icon"><CalendarIcon /></span>
               <div>
-                <div className="db-popup-detail-label">Date &amp; Time</div>
+                <div className="db-popup-detail-label">{t('dashboard_date_time')}</div>
                 <div className="db-popup-detail-value">{ann.time ? new Date(ann.time).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ann.date}</div>
               </div>
             </div>
             <div className="db-popup-detail-item">
               <span className="db-popup-detail-icon"><MapPinIcon /></span>
               <div>
-                <div className="db-popup-detail-label">Location</div>
-                <div className="db-popup-detail-value">{ann.location || "TBA"}</div>
+                <div className="db-popup-detail-label">{t('dashboard_location')}</div>
+                <div className="db-popup-detail-value">{ann.location || t('tba')}</div>
               </div>
             </div>
           </div>
           {ann.requirements && ann.requirements.length > 0 && (
             <div className="db-popup-section">
-              <div className="db-popup-section-title">Requirements</div>
+              <div className="db-popup-section-title">{t('dashboard_requirements')}</div>
               <ul className="db-popup-req-list">
                 {ann.requirements.map((r, i) => (
                   <li key={i} className="db-popup-req-item">
@@ -85,8 +87,8 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
             </div>
           )}
           <div className="db-popup-section">
-            <div className="db-popup-section-title">Posted by</div>
-            <div className="db-popup-posted-by">{ann.postedBy || "Barangay Admin"}</div>
+            <div className="db-popup-section-title">{t('dashboard_posted_by')}</div>
+            <div className="db-popup-posted-by">{ann.postedBy || t('dashboard_barangay_admin')}</div>
           </div>
         </div>
       </div>
@@ -95,6 +97,7 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
 }
 
 function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
+  const { t } = useLanguage();
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -112,8 +115,8 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
                 {announcements.length} Announcements
               </span>
             </div>
-            <h2 className="db-popup-title">All Announcements</h2>
-            <p className="db-popup-desc" style={{ marginBottom: 0 }}>Showing combined alerts and general announcements.</p>
+            <h2 className="db-popup-title">{t('dashboard_all_ann')}</h2>
+            <p className="db-popup-desc" style={{ marginBottom: 0 }}>{t('dashboard_all_ann_desc')}</p>
           </div>
           <div className="db-popup-ann-list">
             {announcements.map((ann) => (
@@ -144,6 +147,7 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
 }
 
 function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev, onNext }) {
+  const { t } = useLanguage();
   const rental = rentals[currentIdx];
   const isUnreturned = rental?.status === 'Unreturned';
 
@@ -206,8 +210,8 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Equipment Rental</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Return Reminder</div>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('dashboard_eq_rental')}</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{t('dashboard_return_reminder')}</div>
             </div>
           </div>
           <button
@@ -234,10 +238,10 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
               {[
-                { label: 'Equipment', value: rental.equipmentName || rental.type || 'N/A' },
-                { label: 'Quantity', value: `${rental.quantity || 1} unit${rental.quantity > 1 ? 's' : ''}` },
-                { label: 'Pickup Date', value: fmt(rental.pickUpDate) },
-                { label: 'Return Date', value: fmt(rental.returnDate), highlight: true },
+                { label: t('dashboard_equipment_label'), value: rental.equipmentName || rental.type || t('n_a') },
+                { label: t('dashboard_quantity_label'), value: `${rental.quantity || 1} ${(rental.quantity > 1) ? t('qty_units') : t('qty_unit')}` },
+                { label: t('dashboard_pickup_label'), value: fmt(rental.pickUpDate) },
+                { label: t('dashboard_return_label'), value: fmt(rental.returnDate), highlight: true },
               ].map(({ label, value, highlight }) => (
                 <div key={label}>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{label}</div>
@@ -247,7 +251,7 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
             </div>
 
             <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Status:</span>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>{t('dashboard_status_label')}:</span>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 padding: '3px 10px', borderRadius: '100px',
@@ -323,7 +327,7 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
             onMouseOver={(e) => e.currentTarget.style.opacity = '0.85'}
             onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
           >
-            I Understand
+            {t('dashboard_i_understand')}
           </button>
         </div>
       </div>
@@ -460,10 +464,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   }, []);
 
   const [widgets, setWidgets] = useState([
-    { icon: <VerifiedVisitIcon />, color: "teal", value: "...", label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
-    { icon: <DocumentIcon />, color: "amber", value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
-    { icon: <FeedbackIcon />, color: "green", value: "...", label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
-    { icon: <BarangayStatusIcon />, color: "purple", value: "...", label: "Barangay Status", sub: "current standing", badge: "Active", badgeIcon: <TrendUpIcon /> },
+    { icon: <VerifiedVisitIcon />, color: "teal", value: "...", labelKey: "widget_verified_visits", subKey: "widget_verified_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
+    { icon: <DocumentIcon />, color: "amber", value: "...", labelKey: "widget_docs", subKey: "widget_docs_sub", badgeKey: "widget_badge_loading", badgeIcon: <ClockIcon /> },
+    { icon: <FeedbackIcon />, color: "green", value: "...", labelKey: "widget_feedback", subKey: "widget_feedback_sub", badgeKey: "widget_badge_done", badgeIcon: <CheckSmallIcon /> },
+    { icon: <BarangayStatusIcon />, color: "purple", value: "...", labelKey: "widget_brgy_status", subKey: "widget_brgy_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
   ]);
 
   useEffect(() => {
@@ -575,10 +579,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           setUserCategories(uCats);
 
           setWidgets([
-            { icon: <VerifiedVisitIcon />, color: "teal", value: "...", label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
-            { icon: <DocumentIcon />, color: "amber", value: "...", label: "Document Requests", sub: "currently active", badge: "Loading", badgeIcon: <ClockIcon /> },
-            { icon: <FeedbackIcon />, color: "green", value: "...", label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
-            { icon: <BarangayStatusIcon />, color: "purple", value: adminStatus, label: "Barangay Status", sub: "current standing", badge: adminStatus === "Clear" ? "Active" : "Flagged", badgeIcon: <TrendUpIcon /> },
+            { icon: <VerifiedVisitIcon />, color: "teal", value: "...", labelKey: "widget_verified_visits", subKey: "widget_verified_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
+            { icon: <DocumentIcon />, color: "amber", value: "...", labelKey: "widget_docs", subKey: "widget_docs_sub", badgeKey: "widget_badge_loading", badgeIcon: <ClockIcon /> },
+            { icon: <FeedbackIcon />, color: "green", value: "...", labelKey: "widget_feedback", subKey: "widget_feedback_sub", badgeKey: "widget_badge_done", badgeIcon: <CheckSmallIcon /> },
+            { icon: <BarangayStatusIcon />, color: "purple", value: adminStatus, labelKey: "widget_brgy_status", subKey: "widget_brgy_sub", badgeKey: adminStatus === "Clear" ? "widget_badge_active" : "widget_badge_flagged", badgeIcon: <TrendUpIcon /> },
           ]);
         });
 
@@ -589,10 +593,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         ]);
 
         setWidgets([
-          { icon: <VerifiedVisitIcon />, color: "teal", value: frCount.data().count.toString(), label: "Verified Visits", sub: "via QR scans", badge: "Active", badgeIcon: <TrendUpIcon /> },
-          { icon: <DocumentIcon />, color: "amber", value: drCount.data().count.toString(), label: "Document Requests", sub: "currently active", badge: "Updated", badgeIcon: <ClockIcon /> },
-          { icon: <FeedbackIcon />, color: "green", value: fbCount.data().count.toString(), label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
-          { icon: <BarangayStatusIcon />, color: "purple", value: "...", label: "Barangay Status", sub: "current standing", badge: "Active", badgeIcon: <TrendUpIcon /> },
+          { icon: <VerifiedVisitIcon />, color: "teal", value: frCount.data().count.toString(), labelKey: "widget_verified_visits", subKey: "widget_verified_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
+          { icon: <DocumentIcon />, color: "amber", value: drCount.data().count.toString(), labelKey: "widget_docs", subKey: "widget_docs_sub", badgeKey: "widget_badge_updated", badgeIcon: <ClockIcon /> },
+          { icon: <FeedbackIcon />, color: "green", value: fbCount.data().count.toString(), labelKey: "widget_feedback", subKey: "widget_feedback_sub", badgeKey: "widget_badge_done", badgeIcon: <CheckSmallIcon /> },
+          { icon: <BarangayStatusIcon />, color: "purple", value: "...", labelKey: "widget_brgy_status", subKey: "widget_brgy_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
         ]);
 
       } catch (err) {
@@ -607,11 +611,13 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
     };
   }, [memberID]);
 
+  const { t } = useLanguage();
+
   const getGreeting = () => {
     const h = new Date().getHours();
-    if (h < 12) return "Good Morning";
-    if (h < 18) return "Good Afternoon";
-    return "Good Evening";
+    if (h < 12) return t('dashboard_greeting_morning');
+    if (h < 18) return t('dashboard_greeting_afternoon');
+    return t('dashboard_greeting_evening');
   };
 
   const mapAnnouncements = (data) => {
@@ -675,9 +681,9 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       <div className="db-welcome-banner">
         <div className="db-welcome-banner-inner">
           <div className="db-welcome-left">
-            <div className="db-welcome-eyebrow">My Dashboard</div>
+            <div className="db-welcome-eyebrow">{t('dashboard_eyebrow')}</div>
             <h1 className="db-welcome-heading">{getGreeting()}, <span>{realUserName}!</span></h1>
-            <p className="db-welcome-sub">Here's what's happening in your barangay today.</p>
+            <p className="db-welcome-sub">{t('dashboard_sub')}</p>
           </div>
         </div>
       </div>
@@ -713,8 +719,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                   fontFamily: "'Poppins', sans-serif"
                 }}>
                   {overdueRentals.some(r => r.status === 'Unreturned')
-                    ? (overdueRentals.length > 1 ? `Action Required: ${overdueRentals.length} Equipment Rentals Unreturned` : `Action Required: Equipment Reported as Unreturned`)
-                    : (overdueRentals.length > 1 ? `Action Required: ${overdueRentals.length} Equipment Rentals Overdue` : `Action Required: Overdue Equipment Return`)
+                    ? (overdueRentals.length > 1 ? t('dashboard_eq_unreturned_multi', overdueRentals.length) : t('dashboard_eq_unreturned_single'))
+                    : (overdueRentals.length > 1 ? t('dashboard_eq_overdue_multi', overdueRentals.length) : t('dashboard_eq_overdue_single'))
                   }
                 </h4>
 
@@ -725,8 +731,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                   fontFamily: "'Poppins', sans-serif"
                 }}>
                   {overdueRentals.length > 1
-                    ? <>Please return your rented <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || "Equipment"}</strong> and {overdueRentals.length - 1} other item(s) to the Barangay Hall.</>
-                    : <>Please return your rented <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || "Equipment"}</strong> to the Barangay Hall as soon as possible.</>
+                    ? t('dashboard_eq_return_multi', overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment', overdueRentals.length - 1)
+                    : t('dashboard_eq_return_single', overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment')
                   }
                 </p>
               </div>
@@ -748,7 +754,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                   margin: isMobile480 ? "10px auto 0 auto" : "0"
                 }}
               >
-                Review Now
+              {t('dashboard_review_now')}
               </button>
             </div>
           </div>
@@ -761,18 +767,18 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         />
 
         {/* ── 1. Your Summary ── */}
-        <SectionCard icon={<GridIcon />} title="Your Summary" subtitle="Overview of your barangay activity">
+        <SectionCard icon={<GridIcon />} title={t('dashboard_summary_title')} subtitle={t('dashboard_summary_sub')}>
           <div className="db-widgets-grid">
             {widgets.map((w, i) => (
               <div key={i} className={`summary-widget summary-widget--${w.color}`}>
                 <div className="summary-widget__header">
                   <div className="summary-widget__icon-wrap">{w.icon}</div>
-                  <span className="summary-widget__badge">{w.badgeIcon} {w.badge}</span>
+                  <span className="summary-widget__badge">{w.badgeIcon} {t(w.badgeKey)}</span>
                 </div>
                 <div className="summary-widget__value">{dataLoading ? "..." : w.value}</div>
                 <div className="summary-widget__divider" />
-                <div className="summary-widget__label">{w.label}</div>
-                <div className="summary-widget__sub">{w.sub}</div>
+                <div className="summary-widget__label">{t(w.labelKey)}</div>
+                <div className="summary-widget__sub">{t(w.subKey)}</div>
               </div>
             ))}
           </div>
@@ -781,24 +787,24 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         {/* ── 2. Alerts & Announcements ── */}
         <SectionCard
           icon={<BoltIcon />}
-          title="Alerts & Announcements"
-          subtitle="Personalized alerts and latest barangay news"
+          title={t('dashboard_ann_title')}
+          subtitle={t('dashboard_ann_sub')}
           action={
             <button className="db-view-all-btn" onClick={() => setShowAllAnns(true)}>
-              View All <ArrowRightIcon />
+              {t('view_all')} <ArrowRightIcon />
             </button>
           }
         >
           {/* Alerts */}
           <div style={{ padding: "0 1.5rem" }}>
-            <SubLabel icon={<BoltIcon />} label="Based on Your Profile Category" />
+            <SubLabel icon={<BoltIcon />} label={t('dashboard_alerts_label')} />
             {annLoading ? (
               <SkeletonCards />
             ) : smartAlertsList.length === 0 ? (
               <EmptyState
                 icon={<BoltIcon />}
-                title="You're all caught up"
-                text="Alerts matching your profile category will show up here."
+                title={t('dashboard_caught_up')}
+                text={t('dashboard_alerts_empty')}
               />
             ) : (
               <>
@@ -833,7 +839,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                             textOverflow: 'ellipsis'
                           }}>{a.description}</div>
                           <span className="alert-card__cta">
-                            View Details <ArrowRightIcon />
+                            {t('view_details')} <ArrowRightIcon />
                           </span>
                         </div>
                       </div>
@@ -847,7 +853,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
           {/* Barangay Announcements */}
           <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
-            <SubLabel icon={<BellIcon />} label="Barangay Announcements" />
+            <SubLabel icon={<BellIcon />} label={t('dashboard_ann_label')} />
 
             <div className="ann-toolbar">
               <div className="ann-search">
@@ -856,7 +862,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search announcements..."
+                  placeholder={t('dashboard_search_ann')}
                   value={annSearch}
                   onChange={(e) => { setAnnSearch(e.target.value); setAnnPage(1); }}
                 />
@@ -879,8 +885,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
             ) : filteredAnns.length === 0 ? (
               <EmptyState
                 icon={<BellIcon />}
-                title="No announcements found"
-                text={annSearch || annFilter !== "All" ? "Try a different search or category." : "Check back later for barangay updates."}
+                title={t('dashboard_no_ann')}
+                text={annSearch || annFilter !== "All" ? t('dashboard_no_ann_search') : t('dashboard_no_ann_empty')}
               />
             ) : (
               <>
@@ -941,14 +947,14 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
               <span className="db-footer-tagline">Community Management System</span>
             </div>
             <nav className="db-footer-links">
-              <a className="db-footer-link" href="#">Privacy Policy</a>
-              <a className="db-footer-link" href="#">Terms of Use</a>
-              <a className="db-footer-link" href="#">Contact Support</a>
+              <a className="db-footer-link" href="#">{t('footer_privacy')}</a>
+              <a className="db-footer-link" href="#">{t('footer_terms')}</a>
+              <a className="db-footer-link" href="#">{t('footer_support')}</a>
             </nav>
           </div>
           <div className="db-footer-bottom">
-            <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
-            <p>Powered by the Barangay 3S+ Community Management System</p>
+            <p>{t('footer_rights', new Date().getFullYear())}</p>
+            <p>{t('footer_powered')}</p>
           </div>
         </div>
       </footer>

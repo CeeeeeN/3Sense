@@ -3,7 +3,8 @@ import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitEquipmentRental } from "../../services/services"; 
 import { ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
-import { useAlert } from "../../context/AlertContext"; // <-- 1. IMPORT HOOK
+import { useAlert } from "../../context/AlertContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 const EquipmentIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -85,6 +86,7 @@ function AdvanceRentalBanner() {
 }
 
 export default function EquipmentTab({ userData, householdID, userName, userID }) {
+  const { t } = useLanguage();
   const [equipmentList, setEquipmentList] = useState([]);
   const [rentalEquipment, setRentalEquipment] = useState(null);
 
@@ -120,7 +122,7 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
                 <div>
                   <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
                   <div className="sv-facility-card__meta">
-                    <span>{eq.quantity !== undefined && eq.quantity !== "" ? `Total Inventory: ${eq.quantity} units` : "Quantity unlisted"}</span>
+                    <span>{eq.quantity !== undefined && eq.quantity !== "" ? t("eq_inventory_count", eq.quantity) : t("eq_qty_unlisted", "Quantity unlisted")}</span>
                   </div>
                   <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
                 </div>
@@ -128,10 +130,10 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
               <div className="sv-facility-card__right">
                 <span className={`sv-avail-badge${isAvailable ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
                   <span className="sv-avail-dot" />
-                  {isAvailable ? "Available" : (isOutOfStock ? "Out of Stock" : "Unavailable")}
+                  {isAvailable ? t("eq_available", "Available") : (isOutOfStock ? t("eq_out_of_stock", "Out of Stock") : t("eq_unavailable", "Unavailable"))}
                 </span>
                 {isAvailable && (
-                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>
+                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>{t("eq_rent", "Rent")} <ChevronRightIcon /></button>
                 )}
               </div>
             </div>
@@ -161,6 +163,7 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
 }
 
 function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
+  const { t } = useLanguage();
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -363,58 +366,58 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
 
       <div className="sv-form-body">
         <div className="sv-fields">
-          <div className="sv-field-section-label">Requester Information</div>
+          <div className="sv-field-section-label">{t("eq_requester_info", "Requester Information")}</div>
           <div className="sv-field-row">
             <div className="sv-field">
-              <label className="sv-label">Full Name</label>
+              <label className="sv-label">{t("doc_full_name", "Full Name")}</label>
               <input className="sv-input sv-input--readonly" value={form.fullName} readOnly />
             </div>
             <div className="sv-field">
-              <label className="sv-label">Contact Number</label>
+              <label className="sv-label">{t("profile_contact", "Contact Number")}</label>
               <input className="sv-input sv-input--readonly" value={form.contactNumber} readOnly />
             </div>
           </div>
           <div className="sv-field">
-            <label className="sv-label">Email Address <span className="sv-required">*</span></label>
+            <label className="sv-label">{t("profile_email", "Email Address")} <span className="sv-required">*</span></label>
             <input className={`sv-input${errors.email ? " sv-input--error" : ""}`} type="email" placeholder="your@email.com" value={form.email} onChange={e => { set("email", e.target.value); setErrors(p => ({ ...p, email: "" })); }} />
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
 
-          <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Rental Details</div>
+          <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>{t("eq_rental_details", "Rental Details")}</div>
           
           <div className="sv-field">
-            <label className="sv-label">Purpose of Rental <span className="sv-required">*</span></label>
+            <label className="sv-label">{t("eq_purpose_rental", "Purpose of Rental")} <span className="sv-required">*</span></label>
             <select 
               className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} 
               value={form.purpose} 
               onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }}
             >
-              <option value="" disabled>Select a purpose...</option>
+              <option value="" disabled>{t("eq_select_purpose_ph", "Select a purpose...")}</option>
               {(equipment?.purposeOptions || []).map((opt, i) => (
                 <option key={i} value={opt}>{opt}</option>
               ))}
-              <option value="Other">Other (Please specify)</option>
+              <option value="Other">{t("eq_other_specify", "Other (Please specify)")}</option>
             </select>
             {errors.purpose && <span className="sv-error-msg">{errors.purpose}</span>}
           </div>
 
           {form.purpose === "Other" && (
             <div className="sv-field">
-              <label className="sv-label">Specify Purpose <span className="sv-required">*</span></label>
+              <label className="sv-label">{t("eq_specify_purpose", "Specify Purpose")} <span className="sv-required">*</span></label>
               <input className={`sv-input${errors.customPurpose ? " sv-input--error" : ""}`} placeholder="e.g. Community Cleanup, Sportsfest" value={form.customPurpose} onChange={e => { set("customPurpose", e.target.value); setErrors(p => ({ ...p, customPurpose: "" })); }} />
               {errors.customPurpose && <span className="sv-error-msg">{errors.customPurpose}</span>}
             </div>
           )}
 
           <div className="sv-field">
-            <label className="sv-label">Quantity Requested <span className="sv-required">*</span> {maxQty > 0 && <span style={{ fontWeight: 400, fontSize: '0.8rem', color: '#64748b' }}>(Max: {maxQty})</span>}</label>
+            <label className="sv-label">{t("eq_qty_requested", "Quantity Requested")} <span className="sv-required">*</span> {maxQty > 0 && <span style={{ fontWeight: 400, fontSize: '0.8rem', color: '#64748b' }}>{t("eq_max_inventory", maxQty)}</span>}</label>
             <input className={`sv-input${errors.quantity ? " sv-input--error" : ""}`} type="number" min="1" max={maxQty || undefined} placeholder="e.g. 50" value={form.quantity} onChange={e => { set("quantity", e.target.value); setErrors(p => ({ ...p, quantity: "" })); }} />
             {errors.quantity && <span className="sv-error-msg">{errors.quantity}</span>}
           </div>
 
           <div className="sv-field-row" style={{ marginTop: "1rem" }}>
              <div className="sv-field">
-              <label className="sv-label">Return Date <span className="sv-required">*</span></label>
+              <label className="sv-label">{t("eq_return_date_label", "Return Date")} <span className="sv-required">*</span></label>
               <input 
                 className={`sv-input${errors.returnDate ? " sv-input--error" : ""}`} 
                 type="date" 
@@ -427,13 +430,13 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
           </div>
 
           <div className="sv-field">
-            <label className="sv-label">Additional Notes <span className="sv-optional">(Optional)</span></label>
-            <textarea className="sv-textarea" placeholder="Delivery requests, condition requirements, etc." rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
+            <label className="sv-label">{t("eq_additional_notes", "Additional Notes")} <span className="sv-optional">({t("optional", "Optional")})</span></label>
+            <textarea className="sv-textarea" placeholder={t("eq_notes_ph", "Delivery requests, condition requirements, etc.")} rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
           </div>
         </div>
 
         <div className="sv-calendar-col">
-          <div className="sv-field-section-label">Select Pick-up Date <span className="sv-required">*</span></div>
+          <div className="sv-field-section-label">{t("eq_select_pickup_label", "Select Pick-up Date")} <span className="sv-required">*</span></div>
           <Calendar
             selectedDate={form.pickUpDate}
             blockedDates={equipment?.blockedDates || []}

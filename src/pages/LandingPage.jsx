@@ -1,5 +1,6 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useEffect, useRef } from "react";
+import { useLanguage } from "../context/LanguageContext";
 
 // ── DATA ────────────────────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ function AnnouncementItem({ color, text, time }) {
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function LandingPage({ onLoginClick, onRegisterClick }) {
+  const { lang, setLang, t } = useLanguage();
   const navRef = useRef(null);
 
   useEffect(() => {
@@ -253,13 +255,36 @@ export default function LandingPage({ onLoginClick, onRegisterClick }) {
             <span className="lp-nav-logo-sub">Community Management System</span>
           </div>
         </div>
-        <div className="lp-nav-links">
+        <div className="lp-nav-links" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <a className="lp-hide-mobile" onClick={() => scrollTo("features")}>
-            Features
+            {t("landing_features", "Features")}
           </a>
           <a className="lp-hide-mobile" onClick={() => scrollTo("how-it-works")}>
-            How It Works
+            {t("landing_how_it_works", "How It Works")}
           </a>
+          <button
+            type="button"
+            className="lp-lang-toggle"
+            onClick={() => setLang(lang === "en" ? "fil" : "en")}
+            style={{
+              padding: "5px 12px",
+              borderRadius: "20px",
+              border: "1.5px solid rgba(255, 255, 255, 0.3)",
+              background: "rgba(255, 255, 255, 0.12)",
+              color: "#fff",
+              fontSize: "0.82rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "all 0.2s ease",
+            }}
+            title="Switch Language / Magpalit ng Wika"
+          >
+            <span>🌐</span>
+            <span>{lang === "en" ? "FIL" : "EN"}</span>
+          </button>
         </div>
       </nav>
 

@@ -4,6 +4,7 @@ import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
 import { useAlert } from "../../context/AlertContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
@@ -106,7 +107,7 @@ function StepIndicator({ step, onStepClick }) {
               </span>
               <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
             </Node>
-            {i < STEP_LABELS.length - 1 && (
+            {i < stepLabels.length - 1 && (
               <span className={`dr-step-line${done ? " dr-step-line--done" : ""}`} aria-hidden="true" />
             )}
           </li>
@@ -206,50 +207,50 @@ function Step2({ docType, form, setForm, errors }) {
         </div>
       )}
 
-      <div className="dr-section-label">Basic Information</div>
+      <div className="dr-section-label">{t("doc_basic_info", "Basic Information")}</div>
       <div className="dr-field-row">
         <div className="dr-field">
-          <label className="sv-label">First Name <span className="sv-required">*</span></label>
+          <label className="sv-label">{t("profile_first_name", "First Name")} <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
           {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
         </div>
         <div className="dr-field">
-          <label className="sv-label">Middle Name</label>
+          <label className="sv-label">{t("profile_middle_name", "Middle Name")}</label>
           <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
         </div>
         <div className="dr-field">
-          <label className="sv-label">Last Name <span className="sv-required">*</span></label>
+          <label className="sv-label">{t("profile_last_name", "Last Name")} <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
           {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
         </div>
       </div>
       <div className="dr-field-row">
         <div className="dr-field">
-          <label className="sv-label">Date of Birth <span className="sv-required">*</span></label>
+          <label className="sv-label">{t("profile_birthdate", "Date of Birth")} <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.dob ? " sv-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
           {errors.dob && <span className="sv-error-msg">{errors.dob}</span>}
         </div>
         <div className="dr-field">
-          <label className="sv-label">Civil Status</label>
+          <label className="sv-label">{t("profile_civil_status", "Civil Status")}</label>
           <select className="sv-input sv-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
             {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
         <div className="dr-field">
-          <label className="sv-label">Residing Since (Year) <span className="sv-required">*</span></label>
+          <label className="sv-label">{t("profile_residing_since", "Residing Since (Year)")} <span className="sv-required">*</span></label>
           <input className={`sv-input${errors.residingSince ? " sv-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="e.g. 2010" />
           {errors.residingSince && <span className="sv-error-msg">{errors.residingSince}</span>}
         </div>
       </div>
       <div className="dr-field">
-        <label className="sv-label">Complete Address <span className="sv-required">*</span></label>
+        <label className="sv-label">{t("doc_address", "Complete Address")} <span className="sv-required">*</span></label>
         <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
         {errors.address && <span className="sv-error-msg">{errors.address}</span>}
       </div>
 
       <div className="dr-field-row">
         <div className="dr-field">
-          <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
+          <label className="sv-label">{t("profile_contact", "Contact Number")} <span className="sv-required">*</span></label>
           <input
             className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
             type="tel"
@@ -263,19 +264,19 @@ function Step2({ docType, form, setForm, errors }) {
           {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
         </div>
         <div className="dr-field">
-          <label className="sv-label">Email Address</label>
+          <label className="sv-label">{t("profile_email", "Email Address")}</label>
           <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
         </div>
         <div className="dr-field">
-          <label className="sv-label">Purpose of Request <span className="sv-required">*</span></label>
+          <label className="sv-label">{t("doc_purpose", "Purpose of Request")} <span className="sv-required">*</span></label>
           <select
             className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
             value={form.purposeOption}
             onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
           >
-            <option value="">— Select purpose —</option>
+            <option value="">{t("doc_select_purpose", "— Select purpose —")}</option>
             {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            <option value="Other">Other</option>
+            <option value="Other">{t("doc_other", "Other")}</option>
           </select>
           {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
         </div>
@@ -286,21 +287,21 @@ function Step2({ docType, form, setForm, errors }) {
           <div />
           <div />
           <div className="dr-field dr-field--other-specify">
-            <label className="sv-label">Please specify <span className="sv-required">*</span></label>
+            <label className="sv-label">{t("doc_specify_purpose", "Please specify")} <span className="sv-required">*</span></label>
             <input
               className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
               value={form.purposeOther}
               onChange={e => set("purposeOther", e.target.value)}
-              placeholder="Describe your purpose..."
+              placeholder={t("doc_specify_placeholder", "Describe your purpose...")}
             />
             {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
           </div>
         </div>
       )}
 
-      <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>File Upload</div>
+      <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>{t("doc_file_upload", "File Upload")}</div>
       <div className="dr-field">
-        <label className="sv-label">Upload Valid ID <span className="sv-required">*</span></label>
+        <label className="sv-label">{t("doc_upload_id", "Upload Valid ID")} <span className="sv-required">*</span></label>
         <label className={`dr-upload-box${form.validId ? " dr-upload-box--filled" : ""}${errors.validId ? " dr-upload-box--error" : ""}`}>
           <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
           {form.validId ? (
@@ -315,7 +316,7 @@ function Step2({ docType, form, setForm, errors }) {
               <div className="dr-upload-file-meta">
                 <span className="dr-upload-file-name" title={form.validId}>{form.validId}</span>
                 <span className="dr-upload-file-sub">
-                  {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Click to replace
+                  {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · {t("doc_click_replace", "Click to replace")}
                 </span>
               </div>
               <button
@@ -331,8 +332,8 @@ function Step2({ docType, form, setForm, errors }) {
           ) : (
             <div className="dr-upload-placeholder">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-              <span>Click to upload</span>
-              <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
+              <span>{t("feedback_click_upload", "Click to upload")}</span>
+              <span className="dr-upload-hint">{t("doc_upload_hint", "JPG, PNG or PDF · Max 5MB")}</span>
             </div>
           )}
         </label>
@@ -341,7 +342,7 @@ function Step2({ docType, form, setForm, errors }) {
 
       {extraFields.length > 0 && (
         <>
-          <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>Additional Information</div>
+          <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>{t("doc_additional_info", "Additional Information")}</div>
           <div className="dr-field-row dr-field-row--wrap">
             {extraFields.map(f => {
               if (f.type === "checkbox") {
@@ -371,6 +372,7 @@ function Step2({ docType, form, setForm, errors }) {
 }
 
 function Step3({ docType, form }) {
+  const { t } = useLanguage();
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
     ? (form.purposeOther || "Other")
@@ -392,7 +394,7 @@ function Step3({ docType, form }) {
 
   return (
     <div className="dr-step3">
-      <p className="dr-step-hint">Please review your information before submitting. All fields are read-only.</p>
+      <p className="dr-step-hint">{t("doc_review_hint")}</p>
 
       <div style={{
         display: "flex",
@@ -410,7 +412,7 @@ function Step3({ docType, form }) {
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        <span>Reminder: This document will be valid for <strong>6 months</strong> from the date of issuance.</span>
+        <span>{t("doc_review_validity")}</span>
       </div>
 
       <div className="dr-review-grid">
@@ -462,6 +464,7 @@ function Step4({ refNum, onReset }) {
 }
 
 export default function DocumentsTab({ userData, householdID, userName }) {
+  const { t } = useLanguage();
   const residentID = userData?.residentID || getSaved("memberID", null);
   const userUID = userData?.UID || getSaved("UID", null);
 
@@ -625,9 +628,9 @@ export default function DocumentsTab({ userData, householdID, userName }) {
 
       {step < 4 && (
         <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-          {step > 1 && <button className="sv-btn-ghost" onClick={() => goToStep(step - 1)} disabled={isSubmitting}>Previous</button>}
+          {step > 1 && <button className="sv-btn-ghost" onClick={() => goToStep(step - 1)} disabled={isSubmitting}>{t("back", "Previous")}</button>}
           <button className="sv-btn-primary" onClick={handleNext} disabled={isSubmitting}>
-            {isSubmitting ? "Uploading ID..." : (step === 3 ? "Submit Request" : "Next")}
+            {isSubmitting ? t("doc_uploading", "Uploading ID...") : (step === 3 ? t("doc_submit_btn", "Submit Request") : t("doc_next", "Next"))}
           </button>
         </div>
       )}
