@@ -3,17 +3,16 @@ import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
-import { useAlert } from "../../context/AlertContext"; // <-- IMPORT HOOK
+import { useAlert } from "../../context/AlertContext";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
   catch { return fallback; }
 };
-
-const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 // Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
 const normalizePHMobile = (value) => {
@@ -24,6 +23,12 @@ const normalizePHMobile = (value) => {
 };
 
 const isValidPHMobile = (value) => /^09\d{9}$/.test(value);
+
+const formatSize = (bytes) => {
+  if (!bytes && bytes !== 0) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 function ValidityReminderBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -76,26 +81,38 @@ function ValidityReminderBanner() {
   );
 }
 
-function StepIndicator({ step }) {
+function StepIndicator({ step, onStepClick }) {
   return (
-    <div className="dr-steps">
+    <ol className="dr-steps" aria-label="Request progress">
       {STEP_LABELS.map((label, i) => {
         const num = i + 1;
-        const done = num < step;
-        const active = num === step;
+        const finished = step === 4;
+        const done = num < step || finished;
+        const active = num === step && !finished;
+        // Completed steps are clickable so people can jump back and edit (not after submission)
+        const clickable = done && !finished;
+        const Node = clickable ? "button" : "div";
+        const nodeProps = clickable
+          ? { type: "button", onClick: () => onStepClick(num), "aria-label": `Go back to ${label}` }
+          : {};
+
         return (
-          <div key={i} className="dr-step-item">
-            <div className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
-              {done
-                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                : num}
-            </div>
-            <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
-            {i < STEP_LABELS.length - 1 && <div className={`dr-step-line${done ? " dr-step-line--done" : ""}`} />}
-          </div>
+          <li key={label} className="dr-step-item" aria-current={active ? "step" : undefined}>
+            <Node className={`dr-step-node${clickable ? " dr-step-node--link" : ""}`} {...nodeProps}>
+              <span className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
+                {done
+                  ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  : num}
+              </span>
+              <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
+            </Node>
+            {i < STEP_LABELS.length - 1 && (
+              <span className={`dr-step-line${done ? " dr-step-line--done" : ""}`} aria-hidden="true" />
+            )}
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
@@ -133,24 +150,49 @@ function Step1({ docTypes, selected, onSelect }) {
 }
 
 function Step2({ docType, form, setForm, errors }) {
-  const { showAlert } = useAlert(); // <-- INITIALIZE HOOK HERE
+  const { showAlert } = useAlert();
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
 
-  const handleFile = async (e) => { // <-- MAKE ASYNC
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    if (file.size > 5 * 1024 * 1024) { 
-      await showAlert("File Too Large", "File must be under 5MB."); // <-- CUSTOM ALERT
-      return; 
+  // Thumbnail for image uploads; revoked when the file changes or the step unmounts
+  useEffect(() => {
+    const f = form.validIdFile;
+    if (f && f.type && f.type.startsWith("image/")) {
+      const url = URL.createObjectURL(f);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
-    
+    setPreviewUrl(null);
+  }, [form.validIdFile]);
+
+  const handleFile = async (e) => {
+    const input = e.target;
+    const file = input.files[0];
+    if (!file) return;
+
+    // Reset so choosing the same file again after removing it still fires onChange
+    input.value = "";
+
+    if (file.size > MAX_FILE_SIZE) {
+      await showAlert("File Too Large", "File must be under 5MB.");
+      return;
+    }
+
     set("validId", file.name);
     set("validIdFile", file);
   };
+
+  const removeFile = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    set("validId", "");
+    set("validIdFile", null);
+  };
+
+  const isPdf = form.validIdFile?.type === "application/pdf" || /\.pdf$/i.test(form.validId || "");
 
   return (
     <div className="dr-step2">
@@ -206,7 +248,7 @@ function Step2({ docType, form, setForm, errors }) {
       </div>
 
       <div className="dr-field-row">
-          <div className="dr-field">
+        <div className="dr-field">
           <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
           <input
             className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
@@ -259,12 +301,32 @@ function Step2({ docType, form, setForm, errors }) {
       <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>File Upload</div>
       <div className="dr-field">
         <label className="sv-label">Upload Valid ID <span className="sv-required">*</span></label>
-        <label className={`dr-upload-box${errors.validId ? " dr-upload-box--error" : ""}`}>
+        <label className={`dr-upload-box${form.validId ? " dr-upload-box--filled" : ""}${errors.validId ? " dr-upload-box--error" : ""}`}>
           <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
           {form.validId ? (
-            <div className="dr-upload-done">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-              <span>{form.validId}</span>
+            <div className="dr-upload-file">
+              {previewUrl ? (
+                <img className="dr-upload-thumb" src={previewUrl} alt="Uploaded ID preview" />
+              ) : (
+                <div className="dr-upload-file-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                </div>
+              )}
+              <div className="dr-upload-file-meta">
+                <span className="dr-upload-file-name" title={form.validId}>{form.validId}</span>
+                <span className="dr-upload-file-sub">
+                  {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Click to replace
+                </span>
+              </div>
+              <button
+                type="button"
+                className="dr-upload-remove"
+                onClick={removeFile}
+                aria-label="Remove uploaded ID"
+                title="Remove"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
             </div>
           ) : (
             <div className="dr-upload-placeholder">
@@ -401,8 +463,8 @@ function Step4({ refNum, onReset }) {
 
 export default function DocumentsTab({ userData, householdID, userName }) {
   const residentID = userData?.residentID || getSaved("memberID", null);
-  const userUID = userData?.UID || getSaved("UID", null); 
-  
+  const userUID = userData?.UID || getSaved("UID", null);
+
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -419,7 +481,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   useEffect(() => {
     const q = query(
       collection(db, "documents"),
-      limit(50) 
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -503,12 +565,12 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         });
 
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-        
-        const submissionForm = { 
-          ...form, 
-          purpose: effectivePurpose, 
+
+        const submissionForm = {
+          ...form,
+          purpose: effectivePurpose,
           validIdUrl: uploadedIdUrl,
-          UID: userUID 
+          UID: userUID
         };
 
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
@@ -540,9 +602,15 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setForm({ firstName: "", middleName: "", lastName: "", dob: "", civilStatus: "Single", address: "", contact: "", email: "", ctc: "", residingSince: "", purposeOption: "", purposeOther: "", validId: "", validIdFile: null });
   };
 
+  const goToStep = (n) => {
+    if (isSubmitting) return;
+    setErrors({});
+    setStep(n);
+  };
+
   return (
     <div className="dr-wizard">
-      <div className="dr-wizard-header"><StepIndicator step={step} /></div>
+      <div className="dr-wizard-header"><StepIndicator step={step} onStepClick={goToStep} /></div>
 
       <div className="dr-wizard-body">
         {(step === 1 || step === 2) && <ValidityReminderBanner />}
@@ -557,7 +625,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
 
       {step < 4 && (
         <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-          {step > 1 && <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }} disabled={isSubmitting}>Previous</button>}
+          {step > 1 && <button className="sv-btn-ghost" onClick={() => goToStep(step - 1)} disabled={isSubmitting}>Previous</button>}
           <button className="sv-btn-primary" onClick={handleNext} disabled={isSubmitting}>
             {isSubmitting ? "Uploading ID..." : (step === 3 ? "Submit Request" : "Next")}
           </button>
