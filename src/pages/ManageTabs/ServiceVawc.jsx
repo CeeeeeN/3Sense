@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   collection,
-  onSnapshot,
   query,
   orderBy,
   addDoc,
@@ -9,12 +8,17 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  getDocs,
+  limit,
+  where,
+  getCountFromServer,
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function ServiceVawc({ onBack, userRole }) {
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Search & Filtering State
@@ -102,23 +106,58 @@ export default function ServiceVawc({ onBack, userRole }) {
     "Others (Referred to NGO/FBO) (6f)",
   ];
 
-  useEffect(() => {
-    const q = query(collection(db, "vawcCases"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setCases(docs);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Error fetching VAWC cases:", err);
-        setLoading(false);
-      }
-    );
+  // ─── 1. OPTIMIZED: React Query for Table Cases (Bounded to 200) ───
+  const { data: cases = [], isLoading: loading } = useQuery({
+    queryKey: ["adminManage_vawcCases"],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "vawcCases"),
+        orderBy("createdAt", "desc"),
+        limit(200)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    },
+    enabled: isAuthorized,
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-    return () => unsubscribe();
-  }, []);
+  // ─── 2. OPTIMIZED: Server-Side Counts for Summary Cards ───
+  const {
+    data: stats = {
+      totalVictims: 0,
+      femaleCount: 0,
+      maleCount: 0,
+      actedUponCount: 0,
+      pendingCount: 0,
+    },
+  } = useQuery({
+    queryKey: ["adminManage_vawcStats"],
+    queryFn: async () => {
+      const vRef = collection(db, "vawcCases");
+      const [total, female, male, actedUpon, pending] = await Promise.all([
+        getCountFromServer(vRef),
+        getCountFromServer(query(vRef, where("gender", "==", "F"))),
+        getCountFromServer(query(vRef, where("gender", "==", "M"))),
+        getCountFromServer(
+          query(vRef, where("status", "in", ["Acted Upon", "acted upon"]))
+        ),
+        getCountFromServer(
+          query(vRef, where("status", "in", ["Pending", "pending"]))
+        ),
+      ]);
+
+      return {
+        totalVictims: total.data().count,
+        femaleCount: female.data().count,
+        maleCount: male.data().count,
+        actedUponCount: actedUpon.data().count,
+        pendingCount: pending.data().count,
+      };
+    },
+    enabled: isAuthorized,
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
   // Reset pagination on filter or search change
   useEffect(() => {
@@ -135,7 +174,7 @@ export default function ServiceVawc({ onBack, userRole }) {
     setEditFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ── Create New Case ──
+  // ── Create New Case (Zero-Read Local Cache Update) ──
   const handleSaveNewCase = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -166,7 +205,19 @@ export default function ServiceVawc({ onBack, userRole }) {
         loggedDate: new Date().toISOString().split("T")[0],
       };
 
-      await addDoc(collection(db, "vawcCases"), payload);
+      const docRef = await addDoc(collection(db, "vawcCases"), payload);
+
+      // Surgically prepend the new case to local memory (Saves 200 reads)
+      const newCaseWithId = { id: docRef.id, ...payload, createdAt: new Date() };
+      queryClient.setQueryData(["adminManage_vawcCases"], (old = []) => [
+        newCaseWithId,
+        ...old,
+      ]);
+
+      // Refresh lightweight server-side counts
+      queryClient.invalidateQueries({ queryKey: ["adminManage_vawcStats"] });
+      queryClient.invalidateQueries({ queryKey: ["adminManage_servicesStats"] });
+
       setIsAddModalOpen(false);
       setFormData({
         gender: "F",
@@ -216,7 +267,7 @@ export default function ServiceVawc({ onBack, userRole }) {
     });
   };
 
-  // ── Save Full Case Edits ──
+  // ── Save Full Case Edits (Zero-Read Local Cache Update) ──
   const handleSaveCaseEdits = async (e) => {
     e.preventDefault();
     if (!editingCase) return;
@@ -246,6 +297,16 @@ export default function ServiceVawc({ onBack, userRole }) {
       };
 
       await updateDoc(caseRef, updatedPayload);
+
+      // Surgically update the edited case in local memory (Saves 200 reads)
+      queryClient.setQueryData(["adminManage_vawcCases"], (old = []) =>
+        old.map((c) => (c.id === editingCase.id ? { ...c, ...updatedPayload } : c))
+      );
+
+      // Refresh lightweight server-side counts
+      queryClient.invalidateQueries({ queryKey: ["adminManage_vawcStats"] });
+      queryClient.invalidateQueries({ queryKey: ["adminManage_servicesStats"] });
+
       setEditingCase(null);
     } catch (err) {
       console.error("Failed to update case details:", err);
@@ -255,13 +316,23 @@ export default function ServiceVawc({ onBack, userRole }) {
     }
   };
 
-  // ── Delete Case ──
+  // ── Delete Case (Zero-Read Local Cache Update) ──
   const handleDeleteCase = async () => {
     if (!caseToDelete) return;
     setDeleting(true);
 
     try {
       await deleteDoc(doc(db, "vawcCases", caseToDelete.id));
+
+      // Surgically remove the deleted case from local memory (Saves 200 reads)
+      queryClient.setQueryData(["adminManage_vawcCases"], (old = []) =>
+        old.filter((c) => c.id !== caseToDelete.id)
+      );
+
+      // Refresh lightweight server-side counts
+      queryClient.invalidateQueries({ queryKey: ["adminManage_vawcStats"] });
+      queryClient.invalidateQueries({ queryKey: ["adminManage_servicesStats"] });
+
       setCaseToDelete(null);
     } catch (err) {
       console.error("Error deleting VAWC case:", err);
@@ -353,11 +424,7 @@ export default function ServiceVawc({ onBack, userRole }) {
     ));
   };
 
-  const totalVictims = cases.length;
-  const femaleCount = cases.filter((c) => c.gender === "F").length;
-  const maleCount = cases.filter((c) => c.gender === "M").length;
-  const actedUponCount = cases.filter((c) => c.status === "Acted Upon").length;
-  const pendingCount = cases.filter((c) => c.status === "Pending").length;
+  const { totalVictims, femaleCount, maleCount, actedUponCount, pendingCount } = stats;
 
   return (
     <div className="as-container">
@@ -694,7 +761,6 @@ export default function ServiceVawc({ onBack, userRole }) {
             style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Neutral/gray header (#f9fafb), NOT blue */}
             <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
               <div>
                 <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Case Details</h2>
@@ -881,7 +947,6 @@ export default function ServiceVawc({ onBack, userRole }) {
                 </div>
               </div>
 
-              {/* Modal footer has Delete on left, Save on right, NO Cancel button */}
               <div
                 style={{
                   display: "flex",
@@ -976,7 +1041,6 @@ export default function ServiceVawc({ onBack, userRole }) {
             style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Neutral/gray header (#f9fafb), NOT blue */}
             <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
               <div>
                 <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Add New VAWC Case</h2>
@@ -1163,7 +1227,6 @@ export default function ServiceVawc({ onBack, userRole }) {
                 </div>
               </div>
 
-              {/* Modal footer has only the Save button, NO Cancel button */}
               <div
                 style={{
                   display: "flex",
