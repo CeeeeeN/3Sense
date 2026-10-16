@@ -1,13 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-
-// ─────────────────────────────────────────────
-// STORAGE KEY
-// ─────────────────────────────────────────────
 const LANG_KEY = 'brgy_language';
 
-// ─────────────────────────────────────────────
 // HELPER: safe localStorage read
-// ─────────────────────────────────────────────
 const loadSavedLang = () => {
   try {
     const v = localStorage.getItem(LANG_KEY);
@@ -16,9 +10,7 @@ const loadSavedLang = () => {
   return 'en';
 };
 
-// ─────────────────────────────────────────────
 // TRANSLATION DICTIONARIES
-// ─────────────────────────────────────────────
 const translations = {
   en: {
     // ─── Navigation ───
@@ -1056,7 +1048,7 @@ const translations = {
     dashboard_posted_by: 'Inilathala ni',
     dashboard_target: 'Naka-target',
     dashboard_barangay_admin: 'Admin ng Barangay',
-    dashboard_review_now: 'Tingnan Ngayon',
+    dashboard_review_now: 'Suriin Ngayon',
     dashboard_i_understand: 'Naintindihan Ko',
     dashboard_eq_rental: 'Rental ng Kagamitan',
     dashboard_return_reminder: 'Paalala sa Pagbabalik',

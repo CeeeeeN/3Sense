@@ -21,7 +21,7 @@ const NAV_ITEMS_KEYS = [
 ];
 
 export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
-  const { t, language, toggleLanguage } = useLanguage();
+  const { t } = useLanguage();
   const NAV_ITEMS = NAV_ITEMS_KEYS.map(item => ({ ...item, label: t(item.labelKey) }));
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -200,24 +200,6 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
 
           <div className="nb-topbar-right">
 
-            {/* LANGUAGE SWITCHER BUTTON */}
-            <button
-              className="nb-icon-btn nb-lang-btn"
-              onClick={toggleLanguage}
-              title={language === 'en' ? 'Palitan sa Filipino' : 'Switch to English'}
-              style={{
-                fontWeight: 700,
-                fontSize: '0.78rem',
-                letterSpacing: '0.04em',
-                padding: '0 8px',
-                minWidth: '38px',
-                borderRadius: '8px',
-              }}
-              aria-label="Toggle language"
-            >
-              {language === 'en' ? 'FIL' : 'EN'}
-            </button>
-
             {/* BELL BUTTON */}
             <button
               className={`nb-icon-btn${notifOpen ? " active" : ""}`}
@@ -251,16 +233,6 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                     </div>
                   </div>
                   <button className="nb-dd-item" onClick={() => { nav("profile"); setUserOpen(false); }}><IconProfile2 /> {t('nav_profile')}</button>
-                  <button
-                    className="nb-dd-item"
-                    onClick={() => {
-                      toggleLanguage();
-                      setUserOpen(false);
-                    }}
-                  >
-                    <span style={{ fontSize: '1rem', marginRight: '8px' }}>🌐</span>
-                    {language === 'en' ? 'Filipino (Wika)' : 'English (Language)'}
-                  </button>
                   <div className="nb-dd-divider" />
                   <button
                     className="nb-dd-item danger"
