@@ -32,6 +32,7 @@ const formatSize = (bytes) => {
 };
 
 function ValidityReminderBanner() {
+  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
@@ -54,16 +55,13 @@ function ValidityReminderBanner() {
       </svg>
       <div style={{ flex: 1 }}>
         <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
-          Document Validity Reminder
+          {t("doc_validity_title", "Document Validity Reminder")}
         </strong>
-        Barangay documents issued through this system are valid for{" "}
-        <strong>6 months</strong> from the date of issuance. Please ensure
-        you use your document within this period. After expiry, a new
-        request will be required.
+        {t("doc_validity_desc", "Barangay documents issued through this system are valid for 6 months from the date of issuance. Please ensure you use your document within this period. After expiry, a new request will be required.")}
       </div>
       <button
         onClick={() => setDismissed(true)}
-        aria-label="Dismiss reminder"
+        aria-label={t("close", "Dismiss reminder")}
         style={{
           background: "none",
           border: "none",
@@ -83,9 +81,17 @@ function ValidityReminderBanner() {
 }
 
 function StepIndicator({ step, onStepClick }) {
+  const { t } = useLanguage();
+  const stepLabels = [
+    t("doc_step1", "Select Document"),
+    t("doc_step2", "Personal Details"),
+    t("doc_step3", "Review"),
+    t("doc_step4", "Done")
+  ];
+
   return (
-    <ol className="dr-steps" aria-label="Request progress">
-      {STEP_LABELS.map((label, i) => {
+    <ol className="dr-steps" aria-label={t("doc_request_progress", "Request progress")}>
+      {stepLabels.map((label, i) => {
         const num = i + 1;
         const finished = step === 4;
         const done = num < step || finished;
@@ -118,9 +124,10 @@ function StepIndicator({ step, onStepClick }) {
 }
 
 function Step1({ docTypes, selected, onSelect }) {
+  const { t } = useLanguage();
   return (
     <div className="dr-step1">
-      <p className="dr-step-hint">Select the document you need. You must choose one to proceed.</p>
+      <p className="dr-step-hint">{t("doc_step1_hint", "Select the document you need. You must choose one to proceed.")}</p>
       <div className="dr-doc-list">
         {docTypes.map(d => (
           <button
@@ -151,6 +158,7 @@ function Step1({ docTypes, selected, onSelect }) {
 }
 
 function Step2({ docType, form, setForm, errors }) {
+  const { t } = useLanguage();
   const { showAlert } = useAlert();
   const [previewUrl, setPreviewUrl] = useState(null);
 
@@ -178,7 +186,7 @@ function Step2({ docType, form, setForm, errors }) {
     input.value = "";
 
     if (file.size > MAX_FILE_SIZE) {
-      await showAlert("File Too Large", "File must be under 5MB.");
+      await showAlert(t("doc_err_file_large", "File Too Large"), t("doc_err_file_size", "File must be under 5MB."));
       return;
     }
 
@@ -378,18 +386,18 @@ function Step3({ docType, form }) {
     ? (form.purposeOther || "Other")
     : form.purposeOption;
   const rows = [
-    { label: "Document Type", value: docType?.documentName || docType?.title || docType?.name, full: true },
-    { label: "Full Name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
-    { label: "Date of Birth", value: form.dob },
-    { label: "Civil Status", value: form.civilStatus },
-    { label: "Residing Since", value: form.residingSince ? `${form.residingSince} up to present` : "—" },
-    { label: "Address", value: form.address, full: true },
-    { label: "Contact Number", value: form.contact },
-    { label: "Email", value: form.email || "—" },
-    { label: "Purpose", value: effectivePurpose || "—", full: true },
-    { label: "Valid ID Uploaded", value: form.validId || "—" },
+    { label: t("doc_type", "Document Type"), value: docType?.documentName || docType?.title || docType?.name, full: true },
+    { label: t("doc_full_name", "Full Name"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
+    { label: t("profile_birthdate", "Date of Birth"), value: form.dob },
+    { label: t("profile_civil_status", "Civil Status"), value: form.civilStatus },
+    { label: t("profile_residing_since", "Residing Since"), value: form.residingSince ? (typeof t("doc_residing_present") === "function" ? t("doc_residing_present", form.residingSince) : `${form.residingSince} up to present`) : "—" },
+    { label: t("doc_address", "Address"), value: form.address, full: true },
+    { label: t("profile_contact", "Contact Number"), value: form.contact },
+    { label: t("profile_email", "Email"), value: form.email || "—" },
+    { label: t("doc_purpose", "Purpose"), value: effectivePurpose || "—", full: true },
+    { label: t("doc_id_uploaded", "Valid ID Uploaded"), value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
-    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
+    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? t("doc_confirmed", "✓ Confirmed") : t("doc_not_confirmed", "Not confirmed") })),
   ];
 
   return (
@@ -428,6 +436,7 @@ function Step3({ docType, form }) {
 }
 
 function Step4({ refNum, onReset }) {
+  const { t } = useLanguage();
   return (
     <div className="sv-success-wrap">
       <div className="sv-success-icon" style={{ width: 64, height: 64 }}>
@@ -435,30 +444,30 @@ function Step4({ refNum, onReset }) {
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
         </svg>
       </div>
-      <h3 className="sv-success-title">Request Submitted!</h3>
-      <p className="sv-success-sub">Your document request has been received by the barangay.</p>
+      <h3 className="sv-success-title">{t("doc_submitted_title", "Request Submitted!")}</h3>
+      <p className="sv-success-sub">{t("doc_submitted_sub", "Your document request has been received by the barangay.")}</p>
       <div className="dr-ref-box">
-        <span className="dr-ref-label">Reference Number</span>
+        <span className="dr-ref-label">{t("reference_number", "Reference Number")}</span>
         <span className="dr-ref-num">{refNum}</span>
       </div>
       <div className="dr-success-info">
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></svg>
-          <span>You will receive an SMS notification once your request is processed.</span>
+          <span>{t("doc_sms_notif", "You will receive an SMS notification once your request is processed.")}</span>
         </div>
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          <span>Processing time: 2–3 business days.</span>
+          <span>{t("doc_processing_time", "Processing time: 2–3 business days.")}</span>
         </div>
         <div className="dr-success-info-item" style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "8px 10px", marginTop: "4px" }}>
           <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
-          <span>Your document will be valid for <strong>6 months</strong> from the date of issuance.</span>
+          <span>{t("doc_validity_note", "Your document will be valid for 6 months from the date of issuance.")}</span>
         </div>
       </div>
-      <button className="sv-btn-primary" onClick={onReset}>Submit Another Request</button>
+      <button className="sv-btn-primary" onClick={onReset}>{t("doc_submit_another", "Submit Another Request")}</button>
     </div>
   );
 }
@@ -513,27 +522,27 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   }, [userData]);
 
   const validateStep1 = () => {
-    if (!docType) { setErrors({ docType: "Please select a document type." }); return false; }
+    if (!docType) { setErrors({ docType: t("doc_err_select", "Please select a document type.") }); return false; }
     return true;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = "Required.";
-    if (!form.lastName.trim()) e.lastName = "Required.";
-    if (!form.dob) e.dob = "Required.";
-    if (!form.address.trim()) e.address = "Required.";
-    if (!String(form.contact || "").trim()) e.contact = "Required.";
-    else if (!isValidPHMobile(form.contact)) e.contact = "Enter a valid 11-digit mobile number (e.g. 09123456789).";
-    if (!form.residingSince) e.residingSince = "Required.";
-    if (!form.purposeOption) e.purposeOption = "Required.";
-    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
-    if (!form.validId) e.validId = "Please upload a valid ID.";
+    if (!form.firstName.trim()) e.firstName = t("doc_err_required", "Required.");
+    if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
+    if (!form.dob) e.dob = t("doc_err_required", "Required.");
+    if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
+    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
+    else if (!isValidPHMobile(form.contact)) e.contact = t("doc_err_mobile", "Enter a valid 11-digit mobile number (e.g. 09123456789).");
+    if (!form.residingSince) e.residingSince = t("doc_err_required", "Required.");
+    if (!form.purposeOption) e.purposeOption = t("doc_err_required", "Required.");
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = t("doc_err_specify_purpose", "Please specify your purpose.");
+    if (!form.validId) e.validId = t("doc_err_upload_id", "Please upload a valid ID.");
     const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
-      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
+      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = t("doc_err_confirm", "You must confirm this to proceed."); }
+      else { if (!form[f.id]?.toString().trim()) e[f.id] = t("doc_err_required", "Required."); }
     });
     setErrors(e);
     return Object.keys(e).length === 0;

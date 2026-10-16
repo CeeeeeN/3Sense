@@ -805,6 +805,10 @@ const translations = {
     doc_err_specify_purpose: 'Please specify your purpose.',
     doc_err_upload_id: 'Please upload a valid ID.',
     doc_err_confirm: 'You must confirm this to proceed.',
+    doc_type: 'Document Type',
+    doc_request_progress: 'Request progress',
+    doc_err_file_large: 'File Too Large',
+    doc_err_file_size: 'File must be under 5MB.',
 
     // ─── Equipment Tab Detailed ───
     eq_advance_title: 'Advance Request Required',
@@ -1719,6 +1723,10 @@ const translations = {
     doc_err_specify_purpose: 'Mangyaring tukuyin ang iyong layunin.',
     doc_err_upload_id: 'Mangyaring mag-upload ng wastong ID.',
     doc_err_confirm: 'Kailangan mong kumpirmahin ito upang magpatuloy.',
+    doc_type: 'Uri ng Dokumento',
+    doc_request_progress: 'Progreso ng kahilingan',
+    doc_err_file_large: 'Masyadong Malaki ang File',
+    doc_err_file_size: 'Ang file ay dapat mas mababa sa 5MB.',
 
     // ─── Equipment Tab Detailed ───
     eq_advance_title: 'Kailangan ng Paunang Kahilingan',
