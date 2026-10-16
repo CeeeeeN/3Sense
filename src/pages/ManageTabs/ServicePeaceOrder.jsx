@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, query, where, getDocs, addDoc, deleteDoc, orderBy, limit
+  collection, doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove, query, where, getDocs, addDoc, deleteDoc, orderBy, limit, getCountFromServer
 } from "firebase/firestore";
 import { ServiceAlertTriangleIcon } from "../../components/Icons";
 import { createUserNotification } from "../../services/userNotifications";
 import { logTransaction } from '../../services/logger';
 import { onAuthStateChanged } from "firebase/auth";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const URGENCY_MAP = {
   "Domestic Dispute":             "emergency",
@@ -37,14 +38,13 @@ const formatTime = (ts) => {
 };
 
 export default function ServicePeaceOrder({ onBack }) {
-  const [reports, setReports]               = useState([]);
-  const [loading, setLoading]               = useState(true);
+  const queryClient = useQueryClient();
+
   const [selectedReport, setSelectedReport] = useState(null);
   const [assignedTanod, setAssignedTanod]   = useState("Unassigned");
   const [saving, setSaving]                 = useState(false);
 
   // ── Tanod Groups State ────────────────────────────────────────────
-  const [tanodGroups, setTanodGroups]       = useState([]);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [newGroupName, setNewGroupName]     = useState("");
   const [newMemberInputs, setNewMemberInputs] = useState({});
@@ -66,16 +66,32 @@ export default function ServicePeaceOrder({ onBack }) {
     setCurrentPage(1);
   }, [filterStatus, filterUrgency, filterType, sortOrder]);
 
-  // ── Real-time listener for Reports ────────────────────────────────
+  // ─── 1. OPTIMIZED: Fetch Admin Profile from Session Cache (0 Reads) ───
   useEffect(() => {
-    const reportsQuery = query(
-      collection(db, "incidentReports"),
-      orderBy("submittedAt", "desc"),
-      limit(150)
-    );
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const unsub = onSnapshot(reportsQuery, (snap) => {
-      const data = snap.docs.map(d => {
+  // ─── 2. OPTIMIZED: React Query for Reports List ───
+  const { data: reports = [], isLoading: loading } = useQuery({
+    queryKey: ['adminManage_incidentReports'],
+    queryFn: async () => {
+      const reportsQuery = query(
+        collection(db, "incidentReports"),
+        orderBy("submittedAt", "desc"),
+        limit(200)
+      );
+      const snap = await getDocs(reportsQuery);
+      return snap.docs.map(d => {
         const docData = d.data();
         const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
         return {
@@ -84,71 +100,87 @@ export default function ServicePeaceOrder({ onBack }) {
           ...docData
         };
       });
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-      setReports(data);
-      setLoading(false);
-
-      setSelectedReport(prev => prev ? (data.find(r => r.id === prev.id) || prev) : null);
-    });
-    return () => unsub();
-  }, []);
-
+  // Keep selected report in sync with local cache updates
   useEffect(() => {
-    const q = query(
-      collection(db, "tanodGroups"), 
-      orderBy("createdAt", "asc"),
-      limit(50)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setTanodGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsub();
-  }, []);
+    setSelectedReport(prev => prev ? (reports.find(r => r.id === prev.id) || prev) : null);
+  }, [reports]);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
-        const snapshot = await getDocs(q);
+  // ─── 3. OPTIMIZED: React Query for Tanod Groups ───
+  const { data: tanodGroups = [] } = useQuery({
+    queryKey: ['adminManage_tanodGroups'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "tanodGroups"), 
+        orderBy("createdAt", "asc"),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    staleTime: 1000 * 60 * 30,
+  });
 
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  // ─── 4. OPTIMIZED: Case-Safe Server-Side Counts for Stats Cards ───
+  const { data: counts = { total: 0, pending: 0, responded: 0, resolved: 0 } } = useQuery({
+    queryKey: ['adminManage_peaceStats'],
+    queryFn: async () => {
+      const rRef = collection(db, "incidentReports");
+      const [total, pending, responded, resolved] = await Promise.all([
+        getCountFromServer(rRef),
+        getCountFromServer(query(rRef, where("status", "in", ["received", "Received", "pending", "Pending"]))),
+        getCountFromServer(query(rRef, where("status", "in", ["responded", "Responded"]))),
+        getCountFromServer(query(rRef, where("status", "in", ["resolved", "Resolved"])))
+      ]);
+      return {
+        total: total.data().count,
+        pending: pending.data().count,
+        responded: responded.data().count,
+        resolved: resolved.data().count
+      };
+    },
+    staleTime: 1000 * 60 * 30,
+  });
 
   useEffect(() => {
     if (selectedReport) setAssignedTanod(selectedReport.tanod || "Unassigned");
   }, [selectedReport?.id]);
 
+  // ─── 5. ZERO-READ LOCAL CACHE UPDATES FOR TANOD GROUPS ───
   const handleCreateGroup = async (e) => {
     e.preventDefault();
-    if (!newGroupName.trim()) return;
+    const trimmed = newGroupName.trim();
+    if (!trimmed) return;
     try {
-      await addDoc(collection(db, "tanodGroups"), {
-        groupName: newGroupName.trim(),
+      const docRef = await addDoc(collection(db, "tanodGroups"), {
+        groupName: trimmed,
         members: [],
         createdAt: serverTimestamp()
       });
       setNewGroupName("");
+      queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) => [
+        ...old,
+        { id: docRef.id, groupName: trimmed, members: [] }
+      ]);
     } catch (err) {
       console.error("Error creating group:", err);
     }
   };
 
   const handleAddMember = async (groupId) => {
-    const memberName = newMemberInputs[groupId];
-    if (!memberName || !memberName.trim()) return;
+    const memberName = newMemberInputs[groupId]?.trim();
+    if (!memberName) return;
     try {
       await updateDoc(doc(db, "tanodGroups", groupId), {
-        members: arrayUnion(memberName.trim())
+        members: arrayUnion(memberName)
       });
       setNewMemberInputs(prev => ({ ...prev, [groupId]: "" }));
+      queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
+        old.map(g => g.id === groupId ? { ...g, members: [...(g.members || []), memberName] } : g)
+      );
     } catch (err) {
       console.error("Error adding member:", err);
     }
@@ -159,6 +191,9 @@ export default function ServicePeaceOrder({ onBack }) {
       await updateDoc(doc(db, "tanodGroups", groupId), {
         members: arrayRemove(memberName)
       });
+      queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
+        old.map(g => g.id === groupId ? { ...g, members: (g.members || []).filter(m => m !== memberName) } : g)
+      );
     } catch (err) {
       console.error("Error removing member:", err);
     }
@@ -168,12 +203,16 @@ export default function ServicePeaceOrder({ onBack }) {
     if (window.confirm(`Are you sure you want to delete ${groupName}?`)) {
       try {
         await deleteDoc(doc(db, "tanodGroups", groupId));
+        queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
+          old.filter(g => g.id !== groupId)
+        );
       } catch (err) {
         console.error("Error deleting group:", err);
       }
     }
   };
 
+  // ─── 6. ZERO-READ LOCAL CACHE UPDATES FOR REPORTS ───
   const updateStatus = async (newStatus) => {
     if (!selectedReport) return;
     setSaving(true);
@@ -206,13 +245,28 @@ export default function ServicePeaceOrder({ onBack }) {
           selectedReport.refNum || selectedReport.id
         );
       }
+
+      // Surgically update the 1 modified report in memory (Saves 200 reads!)
+      queryClient.setQueryData(['adminManage_incidentReports'], (old = []) =>
+        old.map(r => r.id === selectedReport.id ? {
+          ...r,
+          status: newStatus,
+          tanod: assignedTanod,
+          updates: [...(r.updates || []), updateEntry]
+        } : r)
+      );
+
+      // Refresh lightweight server-side counts (only 4 aggregate reads)
+      queryClient.invalidateQueries({ queryKey: ['adminManage_peaceStats'] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_servicesStats'] });
+
     } catch (err) {
       console.error("Error updating status:", err);
       logTransaction(
         adminName,
         adminRole,
         "ERROR_UPDATING_REPORT_STATUS",
-        `Error updating report ${selectedReport.refNum || selectedReport.id} status to ${newStatus} - ${err.message}`,
+        `Error updating report ${selectedReport.refNum || selectedReport.id} status to ${newStatus}\n${err.message}`,
       );
     }
     setSaving(false);
@@ -232,13 +286,18 @@ export default function ServicePeaceOrder({ onBack }) {
         "UPDATED_REPORT_TANOD",
         `Updated report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName}`,
       );
+
+      // Surgically update the Tanod assignment in memory (Saves 200 reads!)
+      queryClient.setQueryData(['adminManage_incidentReports'], (old = []) =>
+        old.map(r => r.id === selectedReport.id ? { ...r, tanod: tanodName } : r)
+      );
     } catch (err) {
       console.error("Error assigning tanod:", err);
       logTransaction(
         adminName,
         adminRole,
         "ERROR_UPDATING_REPORT_TANOD",
-        `Error updating report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName} - ${err.message}`,
+        `Error updating report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName}\n${err.message}`,
       );
     }
   };
@@ -270,13 +329,6 @@ export default function ServicePeaceOrder({ onBack }) {
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReports = filteredReports.slice(startIndex, startIndex + itemsPerPage);
-
-  const counts = {
-    total:     reports.length,
-    pending:   reports.filter(r => (r.status || "").toLowerCase() === "received" || (r.status || "").toLowerCase() === "pending").length,
-    responded: reports.filter(r => (r.status || "").toLowerCase() === "responded").length,
-    resolved:  reports.filter(r => (r.status || "").toLowerCase() === "resolved").length,
-  };
 
   const renderPageNumbers = () => {
     const pages = [];
@@ -326,10 +378,10 @@ export default function ServicePeaceOrder({ onBack }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
         {[
-          { label: "Total Reports", value: counts.total,     bg: "#fff",     border: "#e5e7eb", color: "#111827" },
-          { label: "Pending",       value: counts.pending,   bg: "#fffbeb",  border: "#fde68a", color: "#a16207" },
-          { label: "Responded",     value: counts.responded, bg: "#eff6ff",  border: "#bfdbfe", color: "#1d4ed8" },
-          { label: "Resolved",      value: counts.resolved,  bg: "#f0fdf4",  border: "#bbf7d0", color: "#15803d" },
+          { label: "Total Reports", value: counts.total,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+          { label: "Pending",       value: counts.pending,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+          { label: "Responded",     value: counts.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+          { label: "Resolved",      value: counts.resolved,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
         ].map(s => (
           <div key={s.label} style={{ background: s.bg, padding: "16px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
             <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
@@ -532,7 +584,6 @@ export default function ServicePeaceOrder({ onBack }) {
                       <div>
                         <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Name</p>
                         <p style={{ margin: 0, fontWeight: 500 }}>{selectedReport.reporterName}</p>
-                        {/* CONDITIONAL UID DISPLAY */}
                         {selectedReport.UID && (
                           <div style={{ fontSize: "0.85rem", color: "#317D89", marginTop: "4px", fontWeight: 600 }}>
                             UID: {selectedReport.UID}
