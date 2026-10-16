@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
 
 const PREVIEW_LIMIT = 120;
 
@@ -32,7 +33,8 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageEquipment() {
-  const [equipmentList, setEquipmentList] = useState([]);
+  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("All");
   const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, qty_desc, qty_asc
@@ -60,30 +62,32 @@ export default function ManageEquipment() {
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const eqQuery = query(
-      collection(db, "equipment"),
-      orderBy("createdAt", "desc"),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(eqQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
+  // ─── OPTIMIZED: React Query instead of onSnapshot ───
+  const { data: equipmentList = [], isLoading } = useQuery({
+    queryKey: ['adminManage_equipment'],
+    queryFn: async () => {
+      const eqQuery = query(
+        collection(db, "equipment"),
+        orderBy("createdAt", "desc"),
+        limit(200) // Increased limit slightly to ensure all items load
+      );
+      const snapshot = await getDocs(eqQuery);
+      return snapshot.docs.map(doc => {
         const docData = doc.data();
         const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
         return {
@@ -92,11 +96,9 @@ export default function ManageEquipment() {
           ...docData
         };
       });
-      setEquipmentList(data);
-    });
-    
-    return () => unsubscribe();
-  }, []);
+    },
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -116,6 +118,8 @@ export default function ManageEquipment() {
     
     try {
       await updateDoc(doc(db, "equipment", selectedEquipment.id), { blockedDates: newBlocked });
+      // Refresh cache so UI stays in sync
+      queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
     } catch(err) {
       console.error(err);
     }
@@ -145,9 +149,11 @@ export default function ManageEquipment() {
       try {
         await deleteDoc(doc(db, "equipment", id));
         logTransaction(adminName, adminRole, "DELETED_EQUIPMENT", `Deleted equipment with ID: ${id}`);
+        // Refresh cache
+        queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
       } catch(error) {
         console.error("Error deleting equipment: ", error);
-        logTransaction(adminName, adminRole, "ERROR_DELETING_EQUIPMENT", `Error deleting equipment with ID: ${id} - ${error.message}`);
+        logTransaction(adminName, adminRole, "ERROR_DELETING_EQUIPMENT", `Error deleting equipment with ID: ${id}\n${error.message}`);
       }
     }
   };
@@ -173,6 +179,10 @@ export default function ManageEquipment() {
         await updateDoc(newRef, { equipmentID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_EQUIPMENT", `Added new equipment: ${equipmentPayload.equipmentName} (ID: ${newRef.id})`);
       }
+      
+      // Refresh cache so the new/edited item appears immediately
+      queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
+
       setNewEquipment({ equipmentName: "", quantity: "", description: "", available: true, purposeOptions: [] });
       setPurposeInput("");
       setEditingPurposeIdx(null);
@@ -290,6 +300,10 @@ export default function ManageEquipment() {
       </button>
     ));
   };
+
+  if (isLoading) {
+    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Equipment...</div>;
+  }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>

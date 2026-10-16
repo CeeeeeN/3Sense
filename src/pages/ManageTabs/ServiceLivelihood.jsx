@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
-  serverTimestamp, query, orderBy, limit
+  collection, addDoc, doc, updateDoc, deleteDoc,
+  serverTimestamp, query, orderBy, limit, getDocs, getCountFromServer, where
 } from "firebase/firestore";
 import FormBuilder from "../../components/FormBuilder";
 import { createUserNotification } from "../../services/userNotifications";
 import { runStatusMaintenance } from "../../services/statusUpdater";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildLivelihoodEmail } from "../../utils/emailTemplates";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
@@ -36,11 +37,7 @@ const BLANK = {
 };
 
 export default function ServiceLivelihood({ onBack }) {
-  const [programs, setPrograms] = useState([]);
-  const [loadingPrograms, setLoadingPrograms] = useState(true);
-
-  const [participants, setParticipants] = useState([]);
-  const [loadingParts, setLoadingParts] = useState(true);
+  const queryClient = useQueryClient(); // <-- For cache invalidation
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -62,15 +59,19 @@ export default function ServiceLivelihood({ onBack }) {
 
   useEffect(() => {
     runStatusMaintenance();
+  }, []);
 
-    const q = query(
-      collection(db, "Programs"), 
-      orderBy("updatedAt", "desc"),
-      limit(100)
-    );
-    
-    const unsub = onSnapshot(q, (snap) => {
-      setPrograms(snap.docs.map(d => {
+  // ─── 1. OPTIMIZED: React Query for Programs ───
+  const { data: programs = [], isLoading: loadingPrograms } = useQuery({
+    queryKey: ['adminManage_livelihoodPrograms'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "Programs"), 
+        orderBy("updatedAt", "desc"),
+        limit(100)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => {
         const r = d.data();
         return {
           id: d.id,
@@ -86,21 +87,22 @@ export default function ServiceLivelihood({ onBack }) {
           customFields: r.customFields || [],
           status: r.status || "Upcoming",
         };
-      }));
-      setLoadingPrograms(false);
-    });
-    return () => unsub();
-  }, []);
+      });
+    },
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "livelihoodRegistrations"), 
-      orderBy("submittedAt", "desc"),
-      limit(150)
-    );
-    
-    const unsub = onSnapshot(q, (snap) => {
-      setParticipants(snap.docs.map(d => {
+  // ─── 2. OPTIMIZED: React Query for Participants ───
+  const { data: participants = [], isLoading: loadingParts } = useQuery({
+    queryKey: ['adminManage_livelihoodRegistrations'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "livelihoodRegistrations"), 
+        orderBy("submittedAt", "desc"),
+        limit(200)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => {
         const docData = d.data();
         const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
         return {
@@ -108,11 +110,31 @@ export default function ServiceLivelihood({ onBack }) {
           rawDate,
           ...docData
         };
-      }));
-      setLoadingParts(false);
-    });
-    return () => unsub();
-  }, []);
+      });
+    },
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
+
+  // ─── 3. OPTIMIZED: Server-side Counts for Stats ───
+  const { data: stats = { total: 0, approved: 0, pending: 0, rejected: 0 } } = useQuery({
+    queryKey: ['adminManage_livelihoodStats'],
+    queryFn: async () => {
+      const pRef = collection(db, "livelihoodRegistrations");
+      const [total, approved, pending, rejected] = await Promise.all([
+        getCountFromServer(pRef),
+        getCountFromServer(query(pRef, where("status", "==", "approved"))),
+        getCountFromServer(query(pRef, where("status", "==", "pending"))),
+        getCountFromServer(query(pRef, where("status", "==", "rejected")))
+      ]);
+      return {
+        total: total.data().count,
+        approved: approved.data().count,
+        pending: pending.data().count,
+        rejected: rejected.data().count
+      };
+    },
+    staleTime: 1000 * 60 * 30,
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -153,6 +175,7 @@ export default function ServiceLivelihood({ onBack }) {
     if (!window.confirm(`Are you sure you want to delete "${progTitle}"?`)) return;
     try {
       await deleteDoc(doc(db, "Programs", id));
+      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodPrograms'] });
     } catch (error) {
       console.error("Error deleting program:", error);
       alert("Failed to delete program. Please try again.");
@@ -195,6 +218,9 @@ export default function ServiceLivelihood({ onBack }) {
           updatedAt: serverTimestamp(),
         });
       }
+      
+      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodPrograms'] });
+
       setNewProgram(BLANK);
       setEditingProgramId(null);
       setShowAddModal(false);
@@ -231,8 +257,11 @@ export default function ServiceLivelihood({ onBack }) {
         );
       }
       if (selectedParticipant && selectedParticipant.id === p.id) {
-        setSelectedParticipant(prev => ({ ...prev, status: "approved" }));
+        setSelectedItem(prev => ({ ...prev, status: "approved" }));
       }
+
+      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodRegistrations'] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodStats'] });
     } catch (err) { console.error(err); }
   };
 
@@ -260,31 +289,13 @@ export default function ServiceLivelihood({ onBack }) {
       if (selectedParticipant && selectedParticipant.id === rejectTarget) {
         setSelectedParticipant(prev => ({ ...prev, status: "rejected", rejectReason: rejectReason.trim() }));
       }
+      
+      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodRegistrations'] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodStats'] });
+
       setShowRejectModal(false); setRejectTarget(null); setRejectReason("");
     } catch (err) { console.error(err); }
     setSaving(false);
-  };
-
-  const handleConfirmRemove = async () => {
-    if (!removeTarget) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, "livelihoodRegistrations", removeTarget), {
-        status: "pending", rejectReason: "", updatedAt: serverTimestamp(),
-      });
-      if (selectedParticipant && selectedParticipant.id === removeTarget) {
-        setSelectedParticipant(prev => ({ ...prev, status: "pending", rejectReason: "" }));
-      }
-      setShowRemoveModal(false); setRemoveTarget(null);
-    } catch (err) { console.error(err); }
-    setSaving(false);
-  };
-
-  const stats = {
-    total: participants.length,
-    approved: participants.filter(p => (p.status || "").toLowerCase() === "approved").length,
-    pending: participants.filter(p => (p.status || "").toLowerCase() === "pending").length,
-    rejected: participants.filter(p => (p.status || "").toLowerCase() === "rejected").length,
   };
 
   const filteredParticipants = useMemo(() => {
@@ -914,33 +925,6 @@ export default function ServiceLivelihood({ onBack }) {
                     </button>
                   </div>
                 </form>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Remove Modal ── */}
-        {showRemoveModal && (
-          <div className="as-modal-overlay" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>
-            <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
-              <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Remove Approval</h2>
-                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>&times;</button>
-              </div>
-              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
-                <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
-                  This will move the registration back to <strong>Pending</strong>, freeing up the slot.
-                  The participant can then be re-approved or rejected.
-                </p>
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button
-                    style={{ padding: "8px 18px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
-                    onClick={handleConfirmRemove}
-                    disabled={saving}
-                  >
-                    {saving ? "Processing…" : "Yes, Remove Approval"}
-                  </button>
-                </div>
               </div>
             </div>
           </div>

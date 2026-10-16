@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { auth, db } from "../../firebase/firebase";
 import {
-  collection, onSnapshot, doc, updateDoc,
+  collection, doc, updateDoc,
   serverTimestamp, query, orderBy,
-  where, getDocs, limit
+  where, getDocs, limit, getCountFromServer
 } from "firebase/firestore";
 import { createUserNotification } from "../../services/userNotifications";
 import { logTransaction } from '../../services/logger';
 import { onAuthStateChanged } from "firebase/auth";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; 
 
 const formatTs = (ts) => {
   if (!ts) return "—";
@@ -38,13 +39,9 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function ServiceBswd({ onBack }) {
+  const queryClient = useQueryClient(); 
   const [activeTab, setActiveTab] = useState("reports");
 
-  // ── bswdReports ──────────────────────────────────────────────────
-  const [reports, setReports]         = useState([]);
-  const [loadingReports, setLoadingReports] = useState(true);
-  
-  // ── Pagination & Filter State ─────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [filterStatus, setFilterStatus] = useState("All");
@@ -54,60 +51,85 @@ export default function ServiceBswd({ onBack }) {
     setCurrentPage(1);
   }, [activeTab, filterStatus, sortOrder]);
 
-  // ── Modal State ──────────────────────────────────────────────────
   const [selectedItem, setSelectedItem] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // ── Real-time listener ───────────────────────────────────────────
   useEffect(() => {
-    const q = query(
-      collection(db, "bswdReports"), 
-      orderBy("submittedAt", "desc"),
-      limit(150)
-    );
-    
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => {
-        const docData = d.data();
-        const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
-        return {
-          id: d.id,
-          rawDate,
-          ...docData
-        };
-      });
-      setReports(data);
-      setLoadingReports(false);
-    }, (err) => {
-      console.error("bswdReports listener error:", err);
-      setLoadingReports(false);
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
-
     return () => unsubscribe();
   }, []);
+
+  // ─── 1. OPTIMIZED: React Query for Table Data (Limited to 200) ───
+  const { data: reports = [], isLoading: loadingReports } = useQuery({
+    queryKey: ['adminManage_bswdReports'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "bswdReports"), 
+        orderBy("submittedAt", "desc"),
+        limit(200)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => {
+        const docData = d.data();
+        const rawDate = docData.submittedAt?.toDate ? docData.submittedAt.toDate().getTime() : (docData.submittedAt ? new Date(docData.submittedAt).getTime() : 0);
+        return { id: d.id, rawDate, ...docData };
+      });
+    },
+    staleTime: 1000 * 60 * 30, 
+  });
+
+  // ─── 2. FULLY OPTIMIZED: Accurate Server-Side Stats ───
+  const { data: stats = { reports: {}, tips: {} } } = useQuery({
+    queryKey: ['adminManage_bswdStats'],
+    queryFn: async () => {
+      const rRef = collection(db, "bswdReports");
+      
+      const [
+        totalRep, pendingRep, respondedRep, resolvedRep,
+        totalTip, pendingTip, handledTip
+      ] = await Promise.all([
+        // Displacement Reports
+        getCountFromServer(query(rRef, where("type", "==", "homeless_report"))),
+        getCountFromServer(query(rRef, where("type", "==", "homeless_report"), where("status", "in", ["pending", "received"]))),
+        getCountFromServer(query(rRef, where("type", "==", "homeless_report"), where("status", "==", "responded"))),
+        getCountFromServer(query(rRef, where("type", "==", "homeless_report"), where("status", "==", "resolved"))),
+        // Community Tips
+        getCountFromServer(query(rRef, where("type", "==", "tip"))),
+        getCountFromServer(query(rRef, where("type", "==", "tip"), where("status", "==", "pending"))),
+        getCountFromServer(query(rRef, where("type", "==", "tip"), where("status", "in", ["resolved", "handled"])))
+      ]);
+
+      return {
+        reports: {
+          total: totalRep.data().count,
+          pending: pendingRep.data().count,
+          responded: respondedRep.data().count,
+          resolved: resolvedRep.data().count
+        },
+        tips: {
+          total: totalTip.data().count,
+          pending: pendingTip.data().count,
+          handled: handledTip.data().count
+        }
+      };
+    },
+    staleTime: 1000 * 60 * 30,
+  });
+
+  const reportsStats = stats.reports;
+  const tipsStats = stats.tips;
 
   // ── Update status ────────────────────────────────────────────────
   const updateStatus = async (id, newStatus) => {
@@ -145,14 +167,14 @@ export default function ServiceBswd({ onBack }) {
       if (selectedItem && selectedItem.id === id) {
         setSelectedItem(prev => ({ ...prev, status: newStatus }));
       }
+
+      // Refresh all caches
+      queryClient.invalidateQueries({ queryKey: ['adminManage_bswdReports'] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_bswdStats'] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_servicesStats'] });
+
     } catch (err) {
       console.error("Error updating status:", err);
-      logTransaction(
-        adminName,
-        adminRole,
-        "ERROR_UPDATING_BSWD_REPORT_STATUS",
-        `Error updating status of report ID ${id} to ${newStatus} - ${err.message}`,
-      );
     }
     setSaving(false);
   };
@@ -195,18 +217,6 @@ export default function ServiceBswd({ onBack }) {
   const totalPages = Math.ceil(currentData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = currentData.slice(startIndex, startIndex + itemsPerPage);
-
-  const reportsStats = {
-    total:    displacementReports.length,
-    pending:  displacementReports.filter(r => (r.status || "").toLowerCase() === "pending" || (r.status || "").toLowerCase() === "received").length,
-    responded:displacementReports.filter(r => (r.status || "").toLowerCase() === "responded").length,
-    resolved: displacementReports.filter(r => (r.status || "").toLowerCase().includes("resolved")).length,
-  };
-  const tipsStats = {
-    total:   communityTips.length,
-    pending: communityTips.filter(t => !(t.status || "").toLowerCase().includes("resolved") && (t.status || "").toLowerCase() !== "responded").length,
-    handled: communityTips.filter(t => (t.status || "").toLowerCase().includes("resolved") || (t.status || "").toLowerCase().includes("handled")).length,
-  };
 
   const renderPageNumbers = () => {
     const pages = [];
@@ -259,23 +269,23 @@ export default function ServiceBswd({ onBack }) {
           className={`req-tab ${activeTab === "reports" ? "active" : ""}`}
           onClick={() => { setActiveTab("reports"); setFilterStatus("All"); }}
         >
-          Displacement Reports ({displacementReports.length})
+          Displacement Reports ({reportsStats?.total || 0})
         </button>
         <button
           className={`req-tab ${activeTab === "tips" ? "active" : ""}`}
           onClick={() => { setActiveTab("tips"); setFilterStatus("All"); }}
         >
-          Community Tips ({communityTips.length})
+          Community Tips ({tipsStats?.total || 0})
         </button>
       </div>
 
       {activeTab === "reports" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
-            { label: "Total",     value: reportsStats.total,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
-            { label: "Pending",   value: reportsStats.pending,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-            { label: "Responded", value: reportsStats.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
-            { label: "Resolved",  value: reportsStats.resolved,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: "Total",     value: reportsStats?.total || 0,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+            { label: "Pending",   value: reportsStats?.pending || 0,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: "Responded", value: reportsStats?.responded || 0, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+            { label: "Resolved",  value: reportsStats?.resolved || 0,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, padding: "14px 18px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
               <div style={{ color: "#6b7280", fontSize: "0.82rem", marginBottom: "4px" }}>{s.label}</div>
@@ -287,9 +297,9 @@ export default function ServiceBswd({ onBack }) {
       {activeTab === "tips" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
-            { label: "Total Tips", value: tipsStats.total,   bg: "#fff",    border: "#e5e7eb", color: "#111827" },
-            { label: "Pending",    value: tipsStats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-            { label: "Handled",    value: tipsStats.handled, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: "Total Tips", value: tipsStats?.total || 0,   bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+            { label: "Pending",    value: tipsStats?.pending || 0, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: "Handled",    value: tipsStats?.handled || 0, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, padding: "14px 18px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
               <div style={{ color: "#6b7280", fontSize: "0.82rem", marginBottom: "4px" }}>{s.label}</div>
@@ -593,7 +603,6 @@ export default function ServiceBswd({ onBack }) {
                 )}
               </div>
 
-              {/* Modal footer has only the status updater, with the redundant Close button removed */}
               <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>Update Status:</span>

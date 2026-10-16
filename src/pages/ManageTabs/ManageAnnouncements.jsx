@@ -3,15 +3,15 @@ import { Manage_IconLocation, IconAdd } from "../../components/Icons";
 import { auth, db } from "../../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import {
-  subscribeToAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement
 } from "../../services/announcements";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildAnnouncementEmail } from "../../utils/emailTemplates";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
 
 const PREVIEW_LIMIT = 120;
 
@@ -39,7 +39,8 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageAnnouncements() {
-  const [announcements, setAnnouncements] = useState([]);
+  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, title_asc, title_desc
@@ -66,32 +67,43 @@ export default function ManageAnnouncements() {
     time: ""
   });
 
+  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = subscribeToAnnouncements((data) => {
-      setAnnouncements(data);
-    });
-    return () => unsubscribe();
-  }, []);
+  // ─── OPTIMIZED: React Query instead of onSnapshot listener ───
+  const { data: announcements = [], isLoading } = useQuery({
+    queryKey: ['adminManage_announcements'],
+    queryFn: async () => {
+      const annQuery = query(
+        collection(db, "announcements"),
+        orderBy("createdAt", "desc"),
+        limit(150)
+      );
+      const snapshot = await getDocs(annQuery);
+      return snapshot.docs.map((doc) => {
+        const docData = doc.data();
+        const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+        return {
+          id: doc.id,
+          rawDate,
+          ...docData
+        };
+      });
+    },
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -135,6 +147,8 @@ export default function ManageAnnouncements() {
           "DELETED_ANNOUNCEMENT",
           `Deleted announcement with ID: ${id}`,
         );
+        // Refresh cache
+        queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
       } catch (error) {
         console.error("Error deleting announcement:", error);
         alert("Failed to delete announcement.");
@@ -142,7 +156,7 @@ export default function ManageAnnouncements() {
           adminName,
           adminRole,
           "ERROR_DELETING_ANNOUNCEMENT",
-          `Error deleting announcement with ID: ${id} - ${error.message}`,
+          `Error deleting announcement with ID: ${id}\n${error.message}`,
         );
       }
     }
@@ -183,6 +197,9 @@ export default function ManageAnnouncements() {
           `Added new announcement: ${newAnnouncement.title}`,
         );
       }
+      
+      // Refresh cache so the new/edited item appears immediately
+      queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
 
       setNewAnnouncement({
         title: "", description: "", category: "All Residents", announcementCategory: "General", requirements: [""], location: "", time: ""
@@ -220,11 +237,8 @@ export default function ManageAnnouncements() {
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-
-        if (sortOrder === "date_desc") return dateB - dateA;
-        if (sortOrder === "date_asc") return dateA - dateB;
+        if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
         if (sortOrder === "title_asc") return (a.title || "").localeCompare(b.title || "");
         if (sortOrder === "title_desc") return (b.title || "").localeCompare(a.title || "");
         return 0;
@@ -272,6 +286,10 @@ export default function ManageAnnouncements() {
       </button>
     ));
   };
+
+  if (isLoading) {
+    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Announcements...</div>;
+  }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>

@@ -11,20 +11,19 @@ import FormBuilder from "../../components/FormBuilder";
 import { auth, db } from "../../firebase/firebase";
 import {
   collection,
-  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
   doc,
   serverTimestamp,
   query,
-  where,
   getDocs,
   orderBy,
   limit
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
 
 const PREVIEW_LIMIT = 120;
 
@@ -52,9 +51,10 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageDocuments() {
-  const [documents, setDocuments] = useState([]);
+  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortCatalog, setSortCatalog] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, fee_asc, fee_desc
+  const [sortCatalog, setSortCatalog] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -77,15 +77,32 @@ export default function ManageDocuments() {
   const [editingPurposeIdx, setEditingPurposeIdx] = useState(null);
   const [purposeFormError, setPurposeFormError] = useState("");
 
+  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
-    const docsQuery = query(
-      collection(db, "documents"),
-      orderBy("createdAt", "desc"),
-      limit(100)
-    );
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const unsubscribe = onSnapshot(docsQuery, (snapshot) => {
-      const data = snapshot.docs.map((doc) => {
+  // ─── OPTIMIZED: React Query instead of onSnapshot ───
+  const { data: documents = [], isLoading } = useQuery({
+    queryKey: ['adminManage_documents'],
+    queryFn: async () => {
+      const docsQuery = query(
+        collection(db, "documents"),
+        orderBy("createdAt", "desc"),
+        limit(150) // Adjust limit as needed
+      );
+      const snapshot = await getDocs(docsQuery);
+      return snapshot.docs.map((doc) => {
         const docData = doc.data();
         const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
         return {
@@ -94,31 +111,9 @@ export default function ManageDocuments() {
           ...docData
         };
       });
-      setDocuments(data);
-    });
-    
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+    },
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -151,13 +146,15 @@ export default function ManageDocuments() {
           "DELETED_DOCUMENT_TYPE",
           `Deleted document type with ID: ${id}`,
         );
+        // Refresh cache
+        queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
       } catch (error) {
         console.error("Error deleting document type: ", error);
         logTransaction(
           adminName,
           adminRole,
           "ERROR_DELETING_DOCUMENT_TYPE",
-          `Error deleting document type with ID: ${id} - ${error.message}`,
+          `Error deleting document type with ID: ${id}\n${error.message}`,
         );
       }
     }
@@ -183,6 +180,10 @@ export default function ManageDocuments() {
         await updateDoc(newRef, { documentID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_DOCUMENT_TYPE", `Added new document type: ${newDocument.documentName} (ID: ${newRef.id})`);
       }
+      
+      // Refresh cache so the new/edited item appears immediately
+      queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
+
       setNewDocument({
         documentName: "",
         processingTime: "",
@@ -203,7 +204,7 @@ export default function ManageDocuments() {
         adminName,
         adminRole,
         "ERROR_SAVING_DOCUMENT_TYPE",
-        `Error saving document type: ${newDocument.title} - ${error.message}`,
+        `Error saving document type: ${newDocument.documentName}\n${error.message}`,
       );
     }
   };
@@ -211,7 +212,7 @@ export default function ManageDocuments() {
   const openAddModal = () => {
     setEditingDocId(null);
     setNewDocument({
-      title: "",
+      documentName: "",
       processingTime: "",
       fee: "",
       description: "",
@@ -312,6 +313,10 @@ export default function ManageDocuments() {
       </button>
     ));
   };
+
+  if (isLoading) {
+    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Documents...</div>;
+  }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>
