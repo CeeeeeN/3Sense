@@ -19,16 +19,13 @@ const formatTs = (ts) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const s = (status || "pending").toLowerCase();
-  const map = {
-    approved: { bg: "#dcfce7", color: "#166534" },
-    pending: { bg: "#fef3c7", color: "#92400e" },
-    rejected: { bg: "#fee2e2", color: "#991b1b" },
-  };
-  const c = map[s] || map.pending;
+  const rawStatus = status || "Pending";
+  const statusClass = String(rawStatus).toLowerCase().replace(/\s+/g, '-');
+  const formattedText = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
+
   return (
-    <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 600, background: c.bg, color: c.color }}>
-      {status || "pending"}
+    <span className={`status-badge ${statusClass}`}>
+      {formattedText}
     </span>
   );
 };
@@ -51,6 +48,7 @@ export default function ServiceLivelihood({ onBack }) {
   const [sortOrder, setSortOrder] = useState("date_desc");
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
@@ -232,6 +230,9 @@ export default function ServiceLivelihood({ onBack }) {
           p.regNum || p.id
         );
       }
+      if (selectedParticipant && selectedParticipant.id === p.id) {
+        setSelectedParticipant(prev => ({ ...prev, status: "approved" }));
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -256,6 +257,9 @@ export default function ServiceLivelihood({ onBack }) {
           p.regNum || p.id
         );
       }
+      if (selectedParticipant && selectedParticipant.id === rejectTarget) {
+        setSelectedParticipant(prev => ({ ...prev, status: "rejected", rejectReason: rejectReason.trim() }));
+      }
       setShowRejectModal(false); setRejectTarget(null); setRejectReason("");
     } catch (err) { console.error(err); }
     setSaving(false);
@@ -268,6 +272,9 @@ export default function ServiceLivelihood({ onBack }) {
       await updateDoc(doc(db, "livelihoodRegistrations", removeTarget), {
         status: "pending", rejectReason: "", updatedAt: serverTimestamp(),
       });
+      if (selectedParticipant && selectedParticipant.id === removeTarget) {
+        setSelectedParticipant(prev => ({ ...prev, status: "pending", rejectReason: "" }));
+      }
       setShowRemoveModal(false); setRemoveTarget(null);
     } catch (err) { console.error(err); }
     setSaving(false);
@@ -495,7 +502,7 @@ export default function ServiceLivelihood({ onBack }) {
               onChange={(e) => setFilterStatus(e.target.value)}
               style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
             >
-              <option value="All">All Statuses</option>
+              <option value="All">All Status</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
@@ -534,12 +541,12 @@ export default function ServiceLivelihood({ onBack }) {
         {loadingParts ? (
           <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
         ) : (
-          <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
-            <table className="req-table" style={{ width: "100%", minWidth: "850px", borderCollapse: "collapse", textAlign: "left" }}>
-              <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <tr>
-                  {["Ref #", "Full Name", "Contact", "Program", "Slots Left", "Applied", "Status", "Actions"].map(h => (
-                    <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>
+          <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table className="req-table" style={{ width: "100%", minWidth: "850px" }}>
+              <thead>
+                <tr style={{ textAlign: "center" }}>
+                  {["Ref #", "Full Name", "Program", "Slots Left", "Applied", "Status", "Action"].map(h => (
+                    <th key={h} style={{ textAlign: "center" }}>
                       {h}
                     </th>
                   ))}
@@ -548,7 +555,7 @@ export default function ServiceLivelihood({ onBack }) {
               <tbody>
                 {filteredParticipants.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>
+                    <td colSpan={7} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>
                       No registrations match your criteria.
                     </td>
                   </tr>
@@ -556,21 +563,20 @@ export default function ServiceLivelihood({ onBack }) {
                 {paginatedParticipants.map(p => {
                   const prog = programs.find(pr => pr.id === p.programId);
                   const left = prog ? getSlotsLeft(prog) : null;
-                  const status = (p.status || "pending").toLowerCase();
-                  const slotsFull = left !== null && left <= 0 && status === "pending";
 
                   return (
-                    <tr key={p.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                      <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>
+                    <tr
+                      key={p.id}
+                      onClick={() => setSelectedParticipant(p)}
+                      style={{ cursor: "pointer", textAlign: "center" }}
+                    >
+                      <td style={{ fontSize: "0.8rem", color: "#6b7280" }}>
                         {p.regNum || p.id.slice(0, 8)}
                       </td>
-                      <td style={{ padding: "14px 16px", fontWeight: 500 }}>
+                      <td style={{ fontWeight: 500 }}>
                         {p.fullName || `${p.firstName || ""} ${p.lastName || ""}`.trim() || "—"}
                       </td>
-                      <td style={{ padding: "14px 16px", color: "#6b7280" }}>
-                        {p.contact || p.contactNumber || "—"}
-                      </td>
-                      <td style={{ padding: "14px 16px", maxWidth: "160px" }}>
+                      <td style={{ maxWidth: "160px" }}>
                         <div style={{ fontWeight: 500, color: "#111827", fontSize: "0.85rem" }}>
                           {p.programName || "—"}
                         </div>
@@ -578,7 +584,7 @@ export default function ServiceLivelihood({ onBack }) {
                           <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{p.programDate}</div>
                         )}
                       </td>
-                      <td style={{ padding: "14px 16px" }}>
+                      <td>
                         {left !== null ? (
                           <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166534" }}>
                             {left <= 0 ? "Full" : `${left} left`}
@@ -587,46 +593,23 @@ export default function ServiceLivelihood({ onBack }) {
                           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>
                         )}
                       </td>
-                      <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem" }}>
+                      <td style={{ color: "#6b7280", fontSize: "0.85rem" }}>
                         {formatTs(p.submittedAt)}
                       </td>
-                      <td style={{ padding: "14px 16px" }}>
+                      <td>
                         <StatusBadge status={p.status} />
                       </td>
-                      <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                        {status === "pending" && (
-                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                            <button
-                              style={{ padding: "5px 12px", background: slotsFull ? "#e5e7eb" : "#2DB17B", color: slotsFull ? "#9ca3af" : "#fff", border: "none", borderRadius: "6px", cursor: slotsFull ? "not-allowed" : "pointer", fontSize: "0.8rem" }}
-                              onClick={() => !slotsFull && handleApprove(p)}
-                              disabled={slotsFull}
-                              title={slotsFull ? "No slots available" : "Approve"}
-                            >Approve</button>
-                            <button
-                              style={{ padding: "5px 12px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
-                              onClick={() => { setRejectTarget(p.id); setRejectReason(""); setShowRejectModal(true); }}
-                            >Reject</button>
-                          </div>
-                        )}
-                        {status === "approved" && (
-                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
-                            <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Approved</span>
-                            <button
-                              style={{ padding: "5px 12px", background: "#fff", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
-                              onClick={() => { setRemoveTarget(p.id); setShowRemoveModal(true); }}
-                            >Remove</button>
-                          </div>
-                        )}
-                        {status === "rejected" && (
-                          <div style={{ textAlign: "right" }}>
-                            <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Rejected</span>
-                            {p.rejectReason && (
-                              <div style={{ color: "#ef4444", fontSize: "0.75rem", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "2px" }} title={p.rejectReason}>
-                                "{p.rejectReason}"
-                              </div>
-                            )}
-                          </div>
-                        )}
+                      <td style={{ textAlign: "center" }}>
+                        <button
+                          className="btn-view"
+                          style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedParticipant(p);
+                          }}
+                        >
+                          More Details
+                        </button>
                       </td>
                     </tr>
                   );
@@ -677,13 +660,15 @@ export default function ServiceLivelihood({ onBack }) {
 
         {/* ── Add / Edit Program Modal ── */}
         {showAddModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
-              <div className="as-modal-header">
-                <h2>{editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}</h2>
-                <button className="as-modal-close" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
+          <div className="as-modal-overlay" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }} onClick={e => e.stopPropagation()}>
+              <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
+                  {editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}
+                </h2>
+                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
               </div>
-              <div className="as-modal-body">
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleAddProgram}>
                   <div style={{ marginBottom: "15px" }}>
                     <label className="as-form-label">Program Title <span style={{ color: "red" }}>*</span></label>
@@ -813,18 +798,11 @@ export default function ServiceLivelihood({ onBack }) {
                     onChange={fields => setNewProgram({ ...newProgram, customFields: fields })}
                   />
 
-                  <div className="as-modal-actions" style={{ marginTop: "20px" }}>
-                    <button
-                      type="button"
-                      className="as-btn-ghost"
-                      onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}
-                    >
-                      Cancel
-                    </button>
+                  <div style={{ padding: "14px 0 0 0", marginTop: "20px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
                     <button
                       type="submit"
                       className="as-btn-aqua"
-                      style={{ padding: "8px 18px" }}
+                      style={{ padding: "8px 20px" }}
                       disabled={saving}
                     >
                       {saving ? "Saving…" : editingProgramId ? "Update Program" : "Save Program"}
@@ -836,15 +814,86 @@ export default function ServiceLivelihood({ onBack }) {
           </div>
         )}
 
+        {/* ── Participant Details Modal ── */}
+        {selectedParticipant && (() => {
+          const prog = programs.find(pr => pr.id === selectedParticipant.programId);
+          const left = prog ? getSlotsLeft(prog) : null;
+          const status = (selectedParticipant.status || "pending").toLowerCase();
+          const slotsFull = left !== null && left <= 0 && status === "pending";
+
+          return (
+            <div className="as-modal-overlay" onClick={() => setSelectedParticipant(null)}>
+              <div
+                className="as-modal-content"
+                style={{ maxWidth: "560px" }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                  <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>Registration Details</h2>
+                  <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setSelectedParticipant(null)}>&times;</button>
+                </div>
+
+                <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
+                  <div className="admin-details" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
+                      <div>
+                        <strong>Ref #:</strong> <span style={{ fontFamily: "monospace" }}>{selectedParticipant.regNum || selectedParticipant.id}</span>
+                      </div>
+                      <StatusBadge status={selectedParticipant.status} />
+                    </div>
+
+                    <p><strong>Full Name:</strong> <span>{selectedParticipant.fullName || `${selectedParticipant.firstName || ""} ${selectedParticipant.lastName || ""}`.trim() || "—"}</span></p>
+                    <p><strong>Program:</strong> <span>{selectedParticipant.programName || prog?.title || "—"}</span></p>
+                    <p><strong>Schedule:</strong> <span>{selectedParticipant.programDate || prog?.date || "—"}</span></p>
+                    <p><strong>Date Applied:</strong> <span>{formatTs(selectedParticipant.submittedAt)}</span></p>
+
+                    {selectedParticipant.rejectReason && (
+                      <div style={{ marginTop: "8px", background: "#fef2f2", padding: "10px", borderRadius: "6px", border: "1px solid #fecaca" }}>
+                        <strong style={{ color: "#991b1b" }}>Rejection Reason:</strong>
+                        <p style={{ margin: "4px 0 0 0", color: "#b91c1c" }}>{selectedParticipant.rejectReason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {status === "pending" && (
+                  <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                    <button
+                      className="btn-reject"
+                      onClick={() => {
+                        const targetId = selectedParticipant.id;
+                        setSelectedParticipant(null);
+                        setRejectTarget(targetId);
+                        setRejectReason("");
+                        setShowRejectModal(true);
+                      }}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      className="btn-approve"
+                      onClick={() => handleApprove(selectedParticipant)}
+                      disabled={slotsFull}
+                      style={{ opacity: slotsFull ? 0.6 : 1, cursor: slotsFull ? "not-allowed" : "pointer" }}
+                    >
+                      {slotsFull ? "Slots Full" : "Approve"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Reject Modal ── */}
         {showRejectModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
-              <div className="as-modal-header">
-                <h2>Reject Registration</h2>
-                <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
+          <div className="as-modal-overlay" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
+              <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Reject Registration</h2>
+                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
               </div>
-              <div className="as-modal-body">
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleConfirmReject}>
                   <label className="as-form-label">Reason for Rejection <span style={{ color: "red" }}>*</span></label>
                   <textarea
@@ -855,13 +904,10 @@ export default function ServiceLivelihood({ onBack }) {
                     value={rejectReason}
                     onChange={e => setRejectReason(e.target.value)}
                   />
-                  <div className="as-modal-actions" style={{ marginTop: "15px" }}>
-                    <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
-                      Cancel
-                    </button>
+                  <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end" }}>
                     <button
                       type="submit"
-                      style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                      style={{ padding: "8px 18px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
                       disabled={saving}
                     >
                       {saving ? "Processing…" : "Confirm Rejection"}
@@ -875,23 +921,20 @@ export default function ServiceLivelihood({ onBack }) {
 
         {/* ── Remove Modal ── */}
         {showRemoveModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
-              <div className="as-modal-header">
-                <h2>Remove Approval</h2>
-                <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>&times;</button>
+          <div className="as-modal-overlay" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
+              <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Remove Approval</h2>
+                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>&times;</button>
               </div>
-              <div className="as-modal-body">
+              <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
                   This will move the registration back to <strong>Pending</strong>, freeing up the slot.
                   The participant can then be re-approved or rejected.
                 </p>
-                <div className="as-modal-actions">
-                  <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>
-                    Cancel
-                  </button>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
-                    style={{ padding: "8px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                    style={{ padding: "8px 18px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
                     onClick={handleConfirmRemove}
                     disabled={saving}
                   >

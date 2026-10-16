@@ -267,7 +267,7 @@ export default function AdminLogs() {
           ) : (
             <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
-                <tr>
+                <tr style={{ textAlign: 'center' }}>
                   <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Date & Time</th>
                   <th style={{ width: '20%', whiteSpace: 'nowrap' }}>Admin</th>
                   <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Action Type</th>
@@ -278,7 +278,7 @@ export default function AdminLogs() {
                 {currentLogs.map((log) => {
                   const badge = getBadgeColor(log.actionType);
                   return (
-                    <tr key={log.id}>
+                    <tr key={log.id} style={{ textAlign: 'center' }}>
                       <td style={{ fontSize: '0.85rem', color: '#64748b', whiteSpace: 'nowrap' }}>
                         {formatDateTime(log.timestamp)}
                       </td>
@@ -297,7 +297,9 @@ export default function AdminLogs() {
                           background: badge.bg, 
                           color: badge.text,
                           display: 'inline-block',
-                          whiteSpace: 'nowrap'
+                          whiteSpace: 'nowrap',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em'
                         }}>
                           {log.actionType.replace(/_/g, ' ')}
                         </span>

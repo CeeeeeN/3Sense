@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { processHouseholdTransfer } from "../services/services";
-import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
+import { useAlert } from "../context/AlertContext";
+import { Search } from "lucide-react";
 
 export default function NewHouseholdRequestsTab({ newHouseholds }) {
-  const { showAlert, showConfirm } = useAlert(); // <-- INITIALIZE HOOK
+  const { showAlert, showConfirm } = useAlert(); 
 
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -102,43 +103,67 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
 
   return (
     <>
-      {/* Search, Sort, and Filter Bar */}
-      <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
-        <input 
-          type="text" 
-          placeholder="Search requests..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: "250px", padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
-        />
+      <div className="requests-controls">
+        <div className="search-wrapper" style={{ position: "relative" }}>
+          <Search
+            size={18}
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#94a3b8",
+              pointerEvents: "none",
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Search requests..."
+            className="search-input"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ paddingLeft: "36px" }}
+          />
+        </div>
 
-        <select 
-          value={sortFilter}
-          onChange={(e) => setSortFilter(e.target.value)}
-          style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "#fff", fontSize: "0.9rem", minWidth: "160px" }}
+        <div
+          className="filter-group"
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: "12px",
+            alignItems: "center",
+            flexWrap: "nowrap"
+          }}
         >
-          <option value="Date: Newest First">Date: Newest First</option>
-          <option value="Date: Oldest First">Date: Oldest First</option>
-          <option value="Name: A to Z">Name: A to Z</option>
-          <option value="Name: Z to A">Name: Z to A</option>
-        </select>
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="All">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
 
-        <select 
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "#fff", fontSize: "0.9rem", minWidth: "150px" }}
-        >
-          <option value="All">All Statuses</option>
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Rejected">Rejected</option>
-        </select>
+          <select
+            className="filter-select"
+            value={sortFilter}
+            onChange={(e) => setSortFilter(e.target.value)}
+          >
+            <option value="Date: Newest First">Date: Newest First</option>
+            <option value="Date: Oldest First">Date: Oldest First</option>
+            <option value="Name: A to Z">Name: A to Z</option>
+            <option value="Name: Z to A">Name: Z to A</option>
+          </select>
+        </div>
       </div>
 
       <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <table className="req-table" style={{ minWidth: "850px" }}>
           <thead>
-            <tr>
+            <tr style={{ textAlign: 'center' }}>
               <th>Date</th>
               <th>Request ID</th>
               <th>Requester Name</th>
@@ -146,13 +171,17 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
               <th>Current Household</th>
               <th>New Address Target</th>
               <th>Status</th>
-              <th style={{ textAlign: 'center' }}>Action</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {currentItems.length > 0 ? (
               currentItems.map((req) => (
-                <tr key={req.id}>
+                <tr 
+                  key={req.id} 
+                  onClick={() => handleReview(req)} 
+                  style={{ cursor: "pointer", textAlign: "center" }}
+                >
                   <td>{req.dateSubmitted}</td>
                   <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>{req.transferID || req.id.slice(0, 8)}</td>
                   <td>{req.requesterName}</td>
@@ -168,11 +197,14 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
                       {req.status}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td>
                     <button 
-                      className="as-btn-ghost" 
+                      className="btn-view" 
                       style={{ padding: '6px 12px' }}
-                      onClick={() => handleReview(req)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReview(req);
+                      }}
                     >
                       Review
                     </button>
@@ -228,9 +260,12 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
 
       {/* ── NEW HOUSEHOLD REVIEW MODAL ── */}
       {showModal && selectedRequest && (
-        <div className="as-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-          <div className="as-modal-content" style={{ maxWidth: "600px" }}>
-            
+        <div className="as-modal-overlay" onClick={closeModal}>
+          <div 
+            className="as-modal-content" 
+            style={{ maxWidth: "600px" }} 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="as-modal-header">
               <h2>Review New Household Request</h2>
               <button className="as-modal-close" onClick={closeModal} disabled={isSaving}>&times;</button>
@@ -307,35 +342,27 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
               </div>
             </div>
 
-            {/* Admin Action Footer */}
+           {selectedRequest.status === "Pending" && (
             <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              {selectedRequest.status === "Pending" ? (
-                <>
-                  <button 
-                    className="reject-btn" 
-                    onClick={() => handleUpdateStatus(selectedRequest.id, "Rejected")}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? "Processing..." : "Reject"}
-                  </button>
-                  <button 
-                    className="approve-btn" 
-                    onClick={() => handleUpdateStatus(selectedRequest.id, "Approved")}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? "Creating..." : "Approve & Create"}
-                  </button>
-                </>
-              ) : (
-                <button className="as-btn-ghost" onClick={closeModal} style={{ padding: "8px 24px" }}>
-                  Close
-                </button>
-              )}
+              <button 
+                className="reject-btn" 
+                onClick={() => handleUpdateStatus(selectedRequest.id, "Rejected")}
+                disabled={isSaving}
+              >
+                {isSaving ? "Processing..." : "Reject"}
+              </button>
+              <button 
+                className="approve-btn" 
+                onClick={() => handleUpdateStatus(selectedRequest.id, "Approved")}
+                disabled={isSaving}
+              >
+                {isSaving ? "Creating..." : "Approve & Create"}
+              </button>
             </div>
-
-          </div>
+          )}
         </div>
-      )}
+      </div>
+    )}
     </>
   );
 }

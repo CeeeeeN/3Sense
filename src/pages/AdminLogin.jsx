@@ -75,7 +75,16 @@ const LoginPage = () => {
       const approvedSnapshot = await getDocs(approvedQ);
 
       if (!approvedSnapshot.empty) {
-        navigate("/dashboard");
+        const adminDoc = approvedSnapshot.docs[0].data();
+        const adminData = {
+          fullName: adminDoc.fullName || adminDoc.username || "Admin",
+          position: adminDoc.position || "Admin",
+          role: adminDoc.role || adminDoc.position || "Super Admin",
+        };
+        // 🔥 Immediately cache role in sessionStorage to prevent sidebar link flickering
+        sessionStorage.setItem("adminUserData", JSON.stringify(adminData));
+
+        navigate("/admin/dashboard");
         return;
       }
 
@@ -145,7 +154,7 @@ const LoginPage = () => {
     <div className="login-page">
       <div className="left-panel">
         <a className="left-logo">
-          <img src="icons/logo.png" className="logo-img" alt="Logo" />
+          <img src="/icons/logo.png" className="logo-img" alt="Logo" />
           <div className="left-logo-text">Barangay 3S+ Malanday</div>
         </a>
 

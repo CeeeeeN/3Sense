@@ -341,14 +341,11 @@ export default function AdminManagement() {
       });
   }, [admins, searchAdmin, sortAdmin]);
 
-  const filteredRequests = useMemo(() => {
+const filteredRequests = useMemo(() => {
     return requests
       .filter((req) => {
         const searchText = searchRequest.toLowerCase();
-        const matchesSearch =
-          (req.fullName || "").toLowerCase().includes(searchText) ||
-          (req.email || "").toLowerCase().includes(searchText) ||
-          (req.username || "").toLowerCase().includes(searchText);
+        const matchesSearch = (req.fullName || "").toLowerCase().includes(searchText);
         const matchesStatus =
           filterStatus === "All" || req.status === filterStatus;
         return matchesSearch && matchesStatus;
@@ -519,61 +516,54 @@ export default function AdminManagement() {
             <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
-                  <tr>
+                  <tr style={{ textAlign: "center" }}>
                     <th>Full Name</th>
-                    <th>Email</th>
-                    <th>Contact</th>
                     <th>Position</th>
-                    <th>Username</th>
                     <th>Date Submitted</th>
                     <th>Status</th>
-                    <th style={{ textAlign: "center" }}>Action</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedRequests.length > 0 ? (
                     paginatedRequests.map((req) => (
-                      <tr key={req.docId}>
+                      <tr
+                        key={req.docId}
+                        onClick={() => {
+                          setSelectedAdmin(req);
+                          setShowViewModal(true);
+                        }}
+                        style={{ cursor: "pointer", textAlign: "center" }}
+                      >
                         <td>{req.fullName}</td>
-                        <td>{formatDisplayEmail(req.email, adminRole, currentUser?.uid === req.uid)}</td>
-                        <td>{req.contact}</td>
                         <td>{req.position}</td>
-                        <td>{req.username}</td>
                         <td>{req.dateSubmitted}</td>
                         <td>
                           <span
-                            className={`status-badge status-${req.status?.toLowerCase()}`}
+                            className={`status-badge ${(req.status || "pending").toLowerCase()}`}
                           >
-                            {req.status?.charAt(0).toUpperCase() +
-                              req.status?.slice(1)}
+                            {(req.status || "Pending").charAt(0).toUpperCase() + (req.status || "Pending").slice(1).toLowerCase()}
                           </span>
                         </td>
-                        <td>
-                          {req.status === "pending" ? (
-                            <div className="btn-group" style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                              <button
-                                className="approve-btn"
-                                onClick={() => handleApprove(req)}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                className="reject-btn"
-                                onClick={() => handleReject(req)}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="action-disabled" style={{ display: "block", textAlign: "center", color: "#9ca3af" }}>Completed</span>
-                          )}
+                        <td style={{ textAlign: "center" }}>
+                          <button
+                            className="btn-view"
+                            style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAdmin(req);
+                              setShowViewModal(true);
+                            }}
+                          >
+                            More Details
+                          </button>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={5}
                         style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}
                       >
                         No requests found.
@@ -697,53 +687,70 @@ export default function AdminManagement() {
             <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
-                  <tr>
+                  <tr style={{ textAlign: "center" }}>
                     <th>Full Name</th>
                     <th>Username</th>
                     <th>Position</th>
                     <th>System Role</th>
-                    <th style={{ textAlign: "center" }}>More Details</th>
-                    <th style={{ textAlign: "center" }}>Action</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedAdmins.length > 0 ? (
                     paginatedAdmins.map((admin) => (
-                      <tr key={admin.docId}>
+                      <tr
+                        key={admin.docId}
+                        onClick={() => {
+                          setSelectedAdmin(admin);
+                          setEditedRole(admin.role || "Standard Admin");
+                          setShowViewModal(true);
+                        }}
+                        style={{ cursor: "pointer", textAlign: "center" }}
+                      >
                         <td>{admin.fullName}</td>
                         <td>{admin.username}</td>
                         <td>{admin.position}</td>
                         <td>
-                          <span style={{
-                            background: admin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6',
-                            color: admin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            display: "inline-block"
-                          }}>
-                            {admin.role || "Standard Admin"}
+                          <span
+                            style={{
+                              background: admin.role === 'Super Admin' ? '#e0e7ff' : '#f1f5f9',
+                              color: admin.role === 'Super Admin' ? '#3730a3' : '#475569',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                minWidth: '6px',
+                                minHeight: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: admin.role === 'Super Admin' ? '#4f46e5' : '#94a3b8',
+                                display: 'inline-block',
+                                flexShrink: 0,
+                              }}
+                            />
+                            {admin.role || 'Standard Admin'}
                           </span>
                         </td>
                         <td style={{ textAlign: "center" }}>
                           <button
-                            className="as-btn-ghost"
-                            style={{ padding: "6px 12px" }}
-                            onClick={() => {
+                            className="btn-view"
+                            style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedAdmin(admin);
                               setEditedRole(admin.role || "Standard Admin");
                               setShowViewModal(true);
                             }}
                           >
-                            View
-                          </button>
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <button
-                            className="reject-btn"
-                            style={{ padding: "6px 12px" }}
-                            onClick={() => handleDeleteAdmin(admin)}
-                          >
-                            Delete
+                            More Details
                           </button>
                         </td>
                       </tr>
@@ -826,10 +833,10 @@ export default function AdminManagement() {
       </div>
 
       {showViewModal && selectedAdmin && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "420px" }}>
+        <div className="as-modal-overlay" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>
+          <div className="as-modal-content" style={{ maxWidth: "440px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>Admin Details</h2>
+              <h2>{activeTab === "requests" ? "Request Details" : "Admin Details"}</h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
             </div>
 
@@ -839,52 +846,94 @@ export default function AdminManagement() {
                 <p><strong>Email:</strong> {formatDisplayEmail(selectedAdmin.email, adminRole, currentUser?.uid === selectedAdmin.uid)}</p>
                 <p><strong>Contact:</strong> {selectedAdmin.contact}</p>
                 <p><strong>Position:</strong> {selectedAdmin.position}</p>
-                <p><strong>Username:</strong> {selectedAdmin.username}</p>
 
-                <div style={{ marginTop: "16px", borderTop: "1px dashed #ccc", paddingTop: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <strong>System Role:</strong>
+                {activeTab === "admins" && (
+                  <div style={{ marginTop: "16px", borderTop: "1px dashed #ccc", paddingTop: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <strong>System Role:</strong>
 
-                    {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid ? (
-                      <select
-                        value={editedRole}
-                        onChange={(e) => setEditedRole(e.target.value)}
-                        style={{ padding: "6px 10px", borderRadius: "4px", border: "1px solid #ccc", outline: "none", cursor: "pointer" }}
-                      >
-                        <option value="Super Admin">Super Admin</option>
-                        <option value="Standard Admin">Standard Admin</option>
-                        <option value="Secretary">Secretary</option>
-                        <option value="BSWD Head">BSWD Head</option>
-                        <option value="BSWD Staff">BSWD Staff</option>
-                        <option value="VAWC Head">VAWC Head</option>
-                        <option value="VAWC Staff">VAWC Staff</option>
-                        <option value="BOSCA Head">BOSCA Head</option>
-                        <option value="BOSCA Staff">BOSCA Staff</option>
-                        <option value="Peace&Order Head">Peace&Order Head</option>
-                        <option value="Peace&Order Staff">Peace&Order Staff</option>
-                        <option value="BADAC Head">BADAC Head</option>
-                        <option value="BADAC Staff">BADAC Staff</option>
-                        <option value="Livelihood Head">Livelihood Head</option>
-                        <option value="Livelihood Staff">Livelihood Staff</option>
-                      </select>
-                    ) : (
-                      <span style={{
-                        background: selectedAdmin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6',
-                        color: selectedAdmin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
-                        padding: "4px 12px",
-                        borderRadius: "20px"
-                      }}>
-                        {selectedAdmin.role || "Standard Admin"}
-                      </span>
-                    )}
+                      {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid ? (
+                        <select
+                          value={editedRole}
+                          onChange={(e) => setEditedRole(e.target.value)}
+                          style={{ padding: "6px 10px", borderRadius: "4px", border: "1px solid #ccc", outline: "none", cursor: "pointer" }}
+                        >
+                          <option value="Super Admin">Super Admin</option>
+                          <option value="Standard Admin">Standard Admin</option>
+                          <option value="Secretary">Secretary</option>
+                          <option value="BSWD Head">BSWD Head</option>
+                          <option value="BSWD Staff">BSWD Staff</option>
+                          <option value="VAWC Head">VAWC Head</option>
+                          <option value="VAWC Staff">VAWC Staff</option>
+                          <option value="BOSCA Head">BOSCA Head</option>
+                          <option value="BOSCA Staff">BOSCA Staff</option>
+                          <option value="Peace&Order Head">Peace&Order Head</option>
+                          <option value="Peace&Order Staff">Peace&Order Staff</option>
+                          <option value="BADAC Head">BADAC Head</option>
+                          <option value="BADAC Staff">BADAC Staff</option>
+                          <option value="Livelihood Head">Livelihood Head</option>
+                          <option value="Livelihood Staff">Livelihood Staff</option>
+                        </select>
+                      ) : (
+                        <span style={{
+                          background: selectedAdmin.role === 'Super Admin' ? '#e0e7ff' : '#f3f4f6',
+                          color: selectedAdmin.role === 'Super Admin' ? '#3730a3' : '#4b5563',
+                          padding: "4px 12px",
+                          borderRadius: "20px"
+                        }}>
+                          {selectedAdmin.role || "Standard Admin"}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
+            </div>
 
-              {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && editedRole !== (selectedAdmin.role || "Standard Admin") && (
-                <div className="modal-actions" style={{ marginTop: "20px", justifyContent: "flex-end", borderTop: "1px solid #eee", paddingTop: "16px" }}>
-                  <button className="approve-btn" onClick={handleSaveRole}>Save Role Changes</button>
-                </div>
+            {/* Footer with actions and no redundant Close button */}
+            <div className="modal-footer">
+              {activeTab === "requests" ? (
+                selectedAdmin.status === "pending" ? (
+                  <>
+                    <button
+                      className="btn-reject"
+                      onClick={() => {
+                        handleReject(selectedAdmin);
+                        setShowViewModal(false);
+                      }}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      className="btn-approve"
+                      onClick={() => {
+                        handleApprove(selectedAdmin);
+                        setShowViewModal(false);
+                      }}
+                    >
+                      Approve
+                    </button>
+                  </>
+                ) : null
+              ) : (
+                <>
+                  {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && (
+                    <button
+                      className="btn-reject"
+                      onClick={() => {
+                        handleDeleteAdmin(selectedAdmin);
+                        setShowViewModal(false);
+                      }}
+                    >
+                      Delete Account
+                    </button>
+                  )}
+                  {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && editedRole !== (selectedAdmin.role || "Standard Admin") && (
+                    <button className="btn-approve" onClick={handleSaveRole}>
+                      Save Role Changes
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

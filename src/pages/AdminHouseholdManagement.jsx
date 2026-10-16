@@ -44,7 +44,6 @@ export default function HouseholdManagement() {
   const [activeTab, setActiveTab] = useState("requests");
 
   const [search, setSearch] = useState("");
-  const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
   const [sortResident, setSortResident] = useState("name_asc");
 
@@ -429,18 +428,11 @@ export default function HouseholdManagement() {
         (r.householdId || "").toLowerCase().includes(searchText) ||
         (r.familyId || "").toLowerCase().includes(searchText);
 
-      const matchesCategory =
-        filterCategory === "All" ||
-        (Array.isArray(r.category) && r.category.some(cat => {
-          const cleaned = cat.replace(/[^\w\s]/g, "").trim();
-          return cleaned.toLowerCase().includes(filterCategory.toLowerCase());
-        }));
-
       const matchesStatus =
         filterStatus === "All" ||
         (r.status || "").toLowerCase() === filterStatus.toLowerCase();
 
-      return matchesSearch && matchesCategory && matchesStatus;
+      return matchesSearch && matchesStatus;
     }).sort((a, b) => {
       if (sortResident === "name_asc") {
         return a.fullName.localeCompare(b.fullName);
@@ -456,7 +448,7 @@ export default function HouseholdManagement() {
       }
       return 0;
     });
-  }, [residents, search, filterCategory, filterStatus, sortResident]);
+  }, [residents, search, filterStatus, sortResident]);
 
   const totalPages = Math.ceil(filteredResidents.length / rowsPerPage);
   const startIndex = (page - 1) * rowsPerPage;
@@ -464,7 +456,7 @@ export default function HouseholdManagement() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterCategory, filterStatus, sortResident, rowsPerPage]);
+  }, [search, filterStatus, sortResident, rowsPerPage]);
 
   const renderPageNumbers = (currentPage, totalPages, setPage) => {
     const pages = [];
@@ -676,45 +668,46 @@ export default function HouseholdManagement() {
             <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
-                  <tr>
+                  <tr style={{ textAlign: "center" }}>
                     <th>Full Name</th>
                     <th>Household Number</th>
                     <th>Family Number</th>
-                    <th>Category</th>
                     <th>Date Submitted</th>
-                    <th style={{ textAlign: 'center' }}>Action</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedHhRequests.length > 0 ? (
                     paginatedHhRequests.map((req) => (
-                      <tr key={req.id}>
+                      <tr
+                        key={req.id}
+                        onClick={() => {
+                          setSelectedHhRequest(req);
+                          setShowHhViewModal(true);
+                        }}
+                        style={{ cursor: "pointer", textAlign: "center" }}
+                      >
                         <td>{req.fullName}</td>
                         <td>{req.householdId}</td>
                         <td>{req.branchId ? getFamilyNumber(req.householdId, req.branchId) : "Pending"}</td>
-                        <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                            {req.category && req.category.map((c, i) => (
-                              <span key={i} style={{ background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
-                            ))}
-                          </div>
-                        </td>
                         <td>{req.dateSubmitted}</td>
                         <td>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => { setSelectedHhRequest(req); setShowHhViewModal(true); }}>View</button>
-                            {req.status === "pending" && (
-                              <>
-                                <button className="as-btn-aqua" style={{ background: '#0d7a55', padding: '6px 12px' }} onClick={() => handleHhApprove(req)}>Approve</button>
-                                <button className="as-btn-aqua" style={{ background: '#ef4444', padding: '6px 12px' }} onClick={() => handleHhReject(req)}>Reject</button>
-                              </>
-                            )}
-                          </div>
+                          <button
+                            className="btn-view"
+                            style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedHhRequest(req);
+                              setShowHhViewModal(true);
+                            }}
+                          >
+                            More Details
+                          </button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={6} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -815,20 +808,6 @@ export default function HouseholdManagement() {
                   alignItems: "center",
                   flexWrap: "nowrap"
                 }}>
-                <select
-                  className="filter-select"
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                >
-                  <option value="All">All Categories</option>
-                  <option value="Student">Student</option>
-                  <option value="Senior Citizen">Senior Citizen</option>
-                  <option value="Solo Parent">Solo Parent</option>
-                  <option value="OFW">OFW</option>
-                  <option value="LGBT">LGBT</option>
-                  <option value="Indigenous">Indigenous</option>
-                  <option value="PWD">PWD</option>
-                </select>
 
                 <select
                   className="filter-select"
@@ -858,51 +837,52 @@ export default function HouseholdManagement() {
             <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
-                  <tr>
+                  <tr style={{ textAlign: "center" }}>
                     <th>Full Name</th>
                     <th>Household Number</th>
                     <th>Family Number</th>
-                    <th>Category</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'center' }}>Action</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
-                      <tr key={`${res.householdId}__${res.id}`}>
+                      <tr
+                        key={`${res.householdId}__${res.id}`}
+                        onClick={() => handleViewResident(res)}
+                        style={{ cursor: "pointer", textAlign: "center" }}
+                      >
                         <td>{res.fullName}</td>
                         <td>{res.householdId}</td>
                         <td>{res.familyNumber || getFamilyNumber(res.householdId, res.branchID)}</td>
-                        <td style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                            {res.category && res.category.map((c, i) => (
-                              <span key={i} style={{ background: '#e5e7eb', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>{c}</span>
-                            ))}
-                          </div>
-                        </td>
                         <td>
                           <span className={`status-badge status-${res.status.toLowerCase().replace(/\s+/g, "")}`} style={{
                             padding: '4px 10px', borderRadius: '12px', display: 'inline-block',
                             background: res.status === 'Clear Case' ? '#dcfce7' : res.status === 'Pending Case' ? '#fef3c7' : res.status === 'Violation' ? '#fee2e2' : '#e5e7eb',
-                            color: res.status === 'Clear Case' ? '#166534' : res.status === 'Pending Case' ? '#92400e' : res.status === 'Violation' ? '#991b1b' : '#374151'
+                            color: res.status === 'Clear Case' ? '#166534' : res.status === 'Pending Case' ? '#92400e' : res.status === 'Violation' ? '#991b1b' : '#374151',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.03em'
                           }}>
                             {res.status}
                           </span>
                         </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="as-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => handleViewResident(res)}>View</button>
-                            {!res.isPendingActivation && (
-                              <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#eab308', color: 'white', borderColor: '#eab308' }} onClick={() => { setStatusData({ ...res }); setShowStatusModal(true); }}>Update Status</button>
-                            )}
-                            <button className="as-btn-aqua" style={{ padding: '6px 12px', background: '#ef4444', color: 'white', borderColor: '#ef4444' }} onClick={() => handleDeleteResident(res)}>Delete</button>
-                          </div>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            className="btn-view"
+                            style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewResident(res);
+                            }}
+                          >
+                            More Details
+                          </button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={6} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No results found.</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No results found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -976,24 +956,34 @@ export default function HouseholdManagement() {
         {activeTab === "new_households" && <NewHouseholdRequestsTab newHouseholds={newHouseholds} />}
       </div>
 
-      {/* ── DATA VIEW MODALS (KEPT INTACT) ── */}
-      {showResidentModal && selectedResident && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "600px" }}>
-            <div className="as-modal-header">
-              <h2>Resident Details</h2>
-              <button
-                className="as-modal-close"
-                onClick={() => {
-                  setShowResidentModal(false);
-                  setSelectedResident(null);
-                }}
-              >
-                &times;
-              </button>
-            </div>
+      {/* DATA VIEW MODALS */}
+  {showResidentModal && selectedResident && (
+    <div
+      className="as-modal-overlay"
+      onClick={() => {
+        setShowResidentModal(false);
+        setSelectedResident(null);
+      }}
+    >
+    <div
+      className="as-modal-content"
+      style={{ maxWidth: "600px" }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="as-modal-header">
+        <h2>Resident Details</h2>
+        <button
+          className="as-modal-close"
+          onClick={() => {
+            setShowResidentModal(false);
+            setSelectedResident(null);
+          }}
+        >
+          &times;
+        </button>
+      </div>
 
-            <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
+      <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
               <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
                   <strong>Barangay UID:</strong> <span style={{ color: "#0d7a55", fontWeight: "bold", letterSpacing: "0.5px" }}>{selectedResident.UID || "Generating..."}</span><br />
@@ -1012,8 +1002,21 @@ export default function HouseholdManagement() {
                 <div><strong>Civil Status:</strong><br />{selectedResident.civilStatus}</div>
                 <div><strong>Religion:</strong><br />{selectedResident.religion || "N/A"}</div>
                 <div><strong>Citizenship:</strong><br />{selectedResident.citizenship || "N/A"}</div>
+                <div>
+                  <strong>Category:</strong><br />
+                  {selectedResident.category && selectedResident.category.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                      {selectedResident.category.map((c, i) => (
+                        <span key={i} style={{ background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    "None"
+                  )}
+                </div>
                 <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>Address:</strong><br />{selectedResident.address}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong>Category:</strong><br />{selectedResident.category && selectedResident.category.length > 0 ? selectedResident.category.join(", ") : "None"}</div>
                 {selectedResident.pwdStatus && <div><strong>PWD Status:</strong><br />{selectedResident.pwdStatus}</div>}
                 {selectedResident.disabilityType && <div><strong>Disability Type:</strong><br />{selectedResident.disabilityType}</div>}
                 <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', marginTop: '-4px' }}></div>
@@ -1037,6 +1040,30 @@ export default function HouseholdManagement() {
                   </div>
                 )}
               </div>
+            </div>
+           <div className="modal-footer">
+              <button
+                className="btn-reject"
+                onClick={() => {
+                  handleDeleteResident(selectedResident);
+                  setShowResidentModal(false);
+                  setSelectedResident(null);
+                }}
+              >
+                Delete
+              </button>
+              {!selectedResident.isPendingActivation && (
+                <button
+                  className="btn-approve"
+                  onClick={() => {
+                    setStatusData({ ...selectedResident });
+                    setShowResidentModal(false);
+                    setShowStatusModal(true);
+                  }}
+                >
+                  Update Status
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1122,8 +1149,8 @@ export default function HouseholdManagement() {
       )}
 
       {showHhViewModal && selectedHhRequest && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "600px" }}>
+        <div className="as-modal-overlay" onClick={() => { setShowHhViewModal(false); setSelectedHhRequest(null); }}>
+          <div className="as-modal-content" style={{ maxWidth: "600px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>Household Request Details</h2>
               <button
@@ -1156,8 +1183,21 @@ export default function HouseholdManagement() {
                 <div><strong>Civil Status:</strong><br />{selectedHhRequest.civilStatus}</div>
                 <div><strong>Religion:</strong><br />{selectedHhRequest.religion || "N/A"}</div>
                 <div><strong>Citizenship:</strong><br />{selectedHhRequest.citizenship || "N/A"}</div>
+                <div>
+                  <strong>Category:</strong><br />
+                  {selectedHhRequest.category && selectedHhRequest.category.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                      {selectedHhRequest.category.map((c, i) => (
+                        <span key={i} style={{ background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    "None"
+                  )}
+                </div>
                 <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>Address:</strong><br />{selectedHhRequest.address}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong>Category:</strong><br />{selectedHhRequest.category && selectedHhRequest.category.length > 0 ? selectedHhRequest.category.join(", ") : "None"}</div>
                 {selectedHhRequest.pwdStatus && <div><strong>PWD Status:</strong><br />{selectedHhRequest.pwdStatus}</div>}
                 {selectedHhRequest.disabilityType && <div><strong>Disability Type:</strong><br />{selectedHhRequest.disabilityType}</div>}
                 <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', marginTop: '-4px' }}></div>
@@ -1169,6 +1209,31 @@ export default function HouseholdManagement() {
                 <div><strong>Household Class.:</strong><br />{selectedHhRequest.householdClassification || "N/A"}</div>
               </div>
             </div>
+
+            {selectedHhRequest.status === "pending" && (
+              <div className="modal-footer">
+                <button
+                  className="btn-reject"
+                  onClick={() => {
+                    handleHhReject(selectedHhRequest);
+                    setShowHhViewModal(false);
+                    setSelectedHhRequest(null);
+                  }}
+                >
+                  Reject
+                </button>
+                <button
+                  className="btn-approve"
+                  onClick={() => {
+                    handleHhApprove(selectedHhRequest);
+                    setShowHhViewModal(false);
+                    setSelectedHhRequest(null);
+                  }}
+                >
+                  Approve
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -16,16 +16,25 @@ const formatTs = (ts) => {
 };
 
 const StatusBadge = ({ status }) => {
-  const s = (status || "").toLowerCase();
-  const isResolved  = s.includes("resolved") || s === "resolved (handled)" || s === "resolved";
-  const isResponded = s === "responded";
-  const style = {
-    padding: "4px 12px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: 600,
-    background: isResolved ? "#dcfce7" : isResponded ? "#e0e7ff" : "#fef3c7",
-    color:      isResolved ? "#166534" : isResponded ? "#3730a3" : "#92400e",
-    display: "inline-block"
-  };
-  return <span style={style}>{status || "pending"}</span>;
+  const raw = (status || "Pending").trim();
+  const s = raw.toLowerCase();
+  
+  let statusClass = "pending";
+  if (s.includes("resolved") || s.includes("handled")) {
+    statusClass = "resolved";
+  } else if (s === "responded") {
+    statusClass = "responded";
+  } else if (s === "received") {
+    statusClass = "received";
+  }
+
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+
+  return (
+    <span className={`status-badge ${statusClass}`}>
+      {label}
+    </span>
+  );
 };
 
 export default function ServiceBswd({ onBack }) {
@@ -298,7 +307,7 @@ export default function ServiceBswd({ onBack }) {
           onChange={(e) => setFilterStatus(e.target.value)}
           style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
         >
-          <option value="All">All Statuses</option>
+          <option value="All">All Status</option>
           <option value="pending">Pending</option>
           <option value="received">Received</option>
           <option value="responded">Responded</option>
@@ -324,46 +333,55 @@ export default function ServiceBswd({ onBack }) {
       ) : activeTab === "reports" ? (
 
         /* ── Displacement Reports Table ── */
-        <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
-          <table className="req-table" style={{ width: "100%", minWidth: "750px", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              <tr>
-                {["Date", "Reporter Name", "Location", "Description", "Status", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>{h}</th>
+        <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <table className="req-table" style={{ width: "100%", minWidth: "750px" }}>
+            <thead>
+              <tr style={{ textAlign: 'center' }}>
+                {["Date", "Reporter Name", "Location", "Description", "Status", "Action"].map(h => (
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {currentData.length === 0 && (
+              {currentData.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No displacement reports match your criteria.</td></tr>
+              ) : (
+                paginatedData.map(r => {
+                  const hasPhoto = r.photoFileName && r.photoFileName !== "None" && r.photoFileName !== "";
+                  return (
+                    <tr 
+                      key={r.id} 
+                      onClick={() => setSelectedItem(r)} 
+                      style={{ cursor: "pointer", textAlign: "center" }}
+                    >
+                      <td style={{ color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(r.submittedAt)}</td>
+                      <td style={{ fontWeight: 500 }}>{r.reporterName || "Anonymous"}</td>
+                      <td style={{ color: "#111827", maxWidth: "150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.location || "—"}</td>
+                      <td style={{ color: "#4b5563", maxWidth: "220px" }}>
+                        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.description || "—"}</div>
+                        {hasPhoto && (
+                          <span style={{ fontSize: "0.75rem", color: "#317D89", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px", marginTop: "4px", display: "inline-block", fontWeight: 500 }}>
+                            📸 Photo Attached
+                          </span>
+                        )}
+                      </td>
+                      <td><StatusBadge status={r.status} /></td>
+                      <td style={{ textAlign: "center" }}>
+                        <button 
+                          className="btn-view"
+                          style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedItem(r);
+                          }}
+                        >
+                          More Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-              {paginatedData.map(r => {
-                const hasPhoto = r.photoFileName && r.photoFileName !== "None" && r.photoFileName !== "";
-                return (
-                  <tr key={r.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                    <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(r.submittedAt)}</td>
-                    <td style={{ padding: "14px 16px", fontWeight: 500 }}>{r.reporterName || "Anonymous"}</td>
-                    <td style={{ padding: "14px 16px", color: "#111827", maxWidth: "150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.location || "—"}</td>
-                    <td style={{ padding: "14px 16px", color: "#4b5563", maxWidth: "220px" }}>
-                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.description || "—"}</div>
-                      {hasPhoto && (
-                        <span style={{ fontSize: "0.75rem", color: "#317D89", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px", marginTop: "6px", display: "inline-block", fontWeight: 500 }}>
-                          📸 Photo Attached
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: "14px 16px" }}><StatusBadge status={r.status} /></td>
-                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                      <button 
-                        style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 500 }}
-                        onClick={() => setSelectedItem(r)}
-                      >
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
             </tbody>
           </table>
 
@@ -410,38 +428,47 @@ export default function ServiceBswd({ onBack }) {
       ) : (
 
         /* ── Community Tips Table ── */
-        <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
-          <table className="req-table" style={{ width: "100%", minWidth: "750px", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-              <tr>
-                {["Date", "Reporter Name", "Subject", "Tip Info", "Status", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "14px 16px", fontWeight: 600, color: "#4b5563", fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left" }}>{h}</th>
+        <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <table className="req-table" style={{ width: "100%", minWidth: "750px" }}>
+            <thead>
+              <tr style={{ textAlign: 'center' }}>
+                {["Date", "Reporter Name", "Subject", "Tip Info", "Status", "Action"].map(h => (
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {currentData.length === 0 && (
+              {currentData.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No community tips match your criteria.</td></tr>
+              ) : (
+                paginatedData.map(t => (
+                  <tr 
+                    key={t.id} 
+                    onClick={() => setSelectedItem(t)} 
+                    style={{ cursor: "pointer", textAlign: "center" }}
+                  >
+                    <td style={{ color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(t.submittedAt)}</td>
+                    <td style={{ fontWeight: 500 }}>{t.contact || "Anonymous"}</td>
+                    <td style={{ color: "#111827" }}>{t.about || "—"}</td>
+                    <td style={{ color: "#4b5563", maxWidth: "260px" }}>
+                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.tip || "—"}</div>
+                    </td>
+                    <td><StatusBadge status={t.status} /></td>
+                    <td style={{ textAlign: "center" }}>
+                      <button 
+                        className="btn-view"
+                        style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(t);
+                        }}
+                      >
+                        More Details
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
-              {paginatedData.map(t => (
-                <tr key={t.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                  <td style={{ padding: "14px 16px", color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(t.submittedAt)}</td>
-                  <td style={{ padding: "14px 16px", fontWeight: 500 }}>{t.contact || "Anonymous"}</td>
-                  <td style={{ padding: "14px 16px", color: "#111827" }}>{t.about || "—"}</td>
-                  <td style={{ padding: "14px 16px", color: "#4b5563", maxWidth: "260px" }}>
-                    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.tip || "—"}</div>
-                  </td>
-                  <td style={{ padding: "14px 16px" }}><StatusBadge status={t.status} /></td>
-                  <td style={{ padding: "14px 16px", textAlign: "right" }}>
-                    <button 
-                      style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 500 }}
-                      onClick={() => setSelectedItem(t)}
-                    >
-                      View Details
-                    </button>
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
 
@@ -488,21 +515,22 @@ export default function ServiceBswd({ onBack }) {
 
       {/* ── DETAIL MODAL POPUP ── */}
       {selectedItem && (() => {
-        // Calculate anonymity dynamically based on the modal's selected item
         const reporterName = selectedItem.reporterName || selectedItem.contact || "Anonymous";
         const isAnonymous = reporterName.trim().toLowerCase() === "anonymous";
 
         return (
           <div 
-            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(17, 24, 39, 0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} 
+            className="as-modal-overlay"
             onClick={() => setSelectedItem(null)}
           >
             <div 
-              style={{ background: "#fff", padding: "0", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }} 
+              className="as-modal-content"
+              style={{ maxWidth: "600px" }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
-                <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>
+              {/* Header is neutral/gray (#f9fafb), NOT blue */}
+              <div style={{ padding: "18px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
+                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700, color: "#111827" }}>
                   {selectedItem.type === "tip" ? "Community Tip Details" : "Displacement Report Details"}
                 </h2>
                 <button 
@@ -520,7 +548,6 @@ export default function ServiceBswd({ onBack }) {
                       {reporterName}
                     </div>
                     
-                    {/* Conditionally display the UID if the reporter is NOT anonymous */}
                     {!isAnonymous && selectedItem.UID && (
                       <div style={{ fontSize: "0.85rem", color: "#317D89", marginTop: "2px", fontWeight: 600 }}>
                         UID: {selectedItem.UID}
@@ -566,14 +593,15 @@ export default function ServiceBswd({ onBack }) {
                 )}
               </div>
 
-              <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {/* Modal footer has only the status updater, with the redundant Close button removed */}
+              <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>Update Status:</span>
                   <select
                     value={selectedItem.status || "pending"}
                     onChange={(e) => updateStatus(selectedItem.id, e.target.value)}
                     disabled={saving}
-                    style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem", cursor: "pointer", background: "#fff", fontWeight: 500 }}
+                    style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", cursor: "pointer", background: "#fff", fontWeight: 500 }}
                   >
                     <option value="pending">Pending</option>
                     <option value="received">Received</option>
@@ -581,12 +609,6 @@ export default function ServiceBswd({ onBack }) {
                     <option value="resolved">Resolved</option>
                   </select>
                 </div>
-                <button 
-                  onClick={() => setSelectedItem(null)}
-                  style={{ padding: "8px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 500, cursor: "pointer" }}
-                >
-                  Close
-                </button>
               </div>
 
             </div>

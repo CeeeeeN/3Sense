@@ -31,7 +31,7 @@ body {
   background: var(--bg);
 }
 .login-page {
-  @apply grid grid-cols-[minmax(380px,40%)_1fr] min-h-screen;
+  @apply grid grid-cols-[minmax(380px,40%)_1fr] h-screen overflow-hidden;
 }
 h1,
 h2,
@@ -40,7 +40,7 @@ h4 {
   font-family: "Poppins", sans-serif;
 }
 .login-page .left-panel {
-  @apply flex flex-col justify-between text-[white] relative overflow-hidden p-10;
+  @apply flex flex-col justify-between text-[white] relative overflow-hidden p-8 lg:p-10 h-full;
   background: #10292d;
 }
 .left-panel::before {
@@ -74,11 +74,11 @@ h4 {
   @apply text-[0.9rem] text-[rgba(255,255,255,0.65)] leading-[1.7] max-w-[360px] mb-8;
 }
 .feature-box {
-  @apply flex items-center gap-3 border text-[0.82rem] mb-[0.7rem] p-4 rounded-[10px] border-solid border-[rgba(255,255,255,0.12)];
+  @apply flex items-center gap-3 border text-[0.82rem] mb-[0.7rem] p-4 rounded-[10px] border-solid border-[rgba(255,255,255,0.12)] self-center my-auto flex items-center justify-center;
   background: rgba(255, 255, 255, 0.06);
 }
 .feature-icon {
-  @apply w-[18px] h-[18px] shrink-0;
+  @apply w-[18px] h-[18px] shrink-0 self-center my-auto flex items-center justify-center;
 }
 .footer {
   @apply text-xs text-[rgba(255,255,255,0.3)];
@@ -86,7 +86,7 @@ h4 {
 
 /* ===== RIGHT PANEL ===== */
 .login-page .right-panel {
-  @apply flex items-center justify-center opacity-0 translate-y-[18px] animate-[rightFadeIn_0.2s_ease_forwards] p-10;
+  @apply flex items-center justify-center opacity-0 translate-y-[18px] animate-[rightFadeIn_0.2s_ease_forwards] p-6 lg:p-10 h-full overflow-y-auto;
 }
 @keyframes rightFadeIn {
   to {
@@ -124,12 +124,17 @@ label {
 .input-wrap:focus-within .field-icon {
   @apply text-[color:var(--primary)];
 }
-.input-wrap input {
-  @apply w-full border-[color:var(--border)] text-[0.9rem] text-[color:var(--text)] transition-[border-color] duration-[0.2s,box-shadow] delay-[0.2s] pl-[2.6rem] pr-4 py-4 rounded-[9px] border-[1.5px] border-solid focus:border-[color:var(--primary)] focus:shadow-[0_0_0_3px_rgba(26,79,138,0.1)];
+.input-wrap input,
+.input-wrap select {
+  @apply w-full border-[color:var(--border)] text-[0.9rem] text-[color:var(--text)] transition-[border-color] duration-[0.2s,box-shadow] delay-[0.2s] pl-[2.6rem] pr-8 py-4 rounded-[9px] border-[1.5px] border-solid focus:border-[color:var(--primary)] focus:shadow-[0_0_0_3px_rgba(26,79,138,0.1)];
   background: var(--input-bg);
   font-family: "Inter", sans-serif;
 }
-.input-wrap input:focus {
+.input-wrap select {
+  @apply cursor-pointer;
+}
+.input-wrap input:focus,
+.input-wrap select:focus {
   outline: none;
   background: white;
 }
@@ -173,10 +178,10 @@ nav {
   @apply text-[red];
 }
 .auth-section {
-  @apply min-h-screen grid place-items-center pt-20 pb-8 px-4;
+  @apply min-h-screen flex flex-col items-center justify-center pt-16 pb-6 px-4 box-border;
 }
 .signnup-card {
-  @apply w-full max-w-[700px] border border-[color:var(--border)] shadow-[0_24px_64px_rgba(26,79,138,0.12)] opacity-0 translate-y-10 animate-[fadeSlideUp_0.4s_ease-out_forwards] p-12 rounded-[20px] border-solid;
+  @apply w-full max-w-[700px] border border-[color:var(--border)] shadow-[0_20px_50px_rgba(26,79,138,0.1)] opacity-0 translate-y-4 animate-[fadeSlideUp_0.4s_ease-out_forwards] p-6 sm:p-8 lg:p-10 rounded-[20px] border-solid mb-3;
   background: white;
 }
 .auth-title {
@@ -260,7 +265,7 @@ nav {
 /* APPROVAL PENDING PAGE */
 /* ===================================================== */
 .pending-card {
-  @apply w-full max-w-[520px] border border-[color:var(--border)] shadow-[0_24px_64px_rgba(26,79,138,0.12)] opacity-0 translate-y-10 animate-[fadeSlideUp_0.4s_ease-out_forwards] p-12 rounded-[20px] border-solid;
+  @apply w-full max-w-[520px] border border-[color:var(--border)] shadow-[0_24px_64px_rgba(26,79,138,0.12)] opacity-0 translate-y-6 animate-[fadeSlideUp_0.4s_ease-out_forwards] p-6 sm:p-10 lg:p-12 rounded-[20px] border-solid my-auto;
   background: white;
 }
 .btn-pending {
@@ -576,65 +581,46 @@ nav {
 }
 
 /* ── ANALYTICS TABS ── */
+/* ── ANALYTICS / DASHBOARD TABS (Compact, Scrollable & Teal Style) ── */
 .analytics-tabs-container {
-  display: flex;
-  gap: 32px;
-  border-bottom: 2px solid #e2e8f0;
-  margin-top: 32px;
-  margin-bottom: 24px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 2px; /* Slight breathing room for the scrollbar */
+  @apply flex gap-2 mt-7 mb-6 border-b border-[#e5e7eb] pb-1 overflow-x-auto overflow-y-hidden whitespace-nowrap;
   
-  /* Firefox */
+  /* Sleek, thin scrollbar for Firefox */
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
 
-/* ── SLEEK CUSTOM SCROLLBAR FOR CHROME/EDGE/SAFARI ── */
+/* Subtle ultra-thin 4px scrollbar for Chromium/Safari */
 .analytics-tabs-container::-webkit-scrollbar {
-  height: 6px; /* Ultra-thin horizontal scrollbar */
+  height: 4px;
 }
 
 .analytics-tabs-container::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 10px;
 }
 
 .analytics-tabs-container::-webkit-scrollbar-thumb {
-  background: #cbd5e1; /* Subtle slate color */
-  border-radius: 10px;
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 
 .analytics-tabs-container::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8; /* Slightly darker grey when the user hovers over it */
+  background: #94a3b8;
 }
 
-/* ── TAB BUTTON STYLES ── */
 .analytics-tab {
-  background: transparent;
-  border: none;
+  @apply bg-transparent border-0 px-3.5 py-2 text-[0.875rem] font-medium text-[#64748b] cursor-pointer whitespace-nowrap transition-all duration-200;
   border-bottom: 2px solid transparent;
-  padding: 8px 4px 12px 4px;
-  margin-bottom: -4px; /* Pulls the border down to perfectly overlap the track */
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #64748b;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.2s ease, border-color 0.2s ease;
 }
 
 .analytics-tab:hover {
-  color: #317D89;
+  @apply text-[#317d89];
 }
 
 .analytics-tab.active {
-  border-bottom: 2px solid #317D89;
-  font-weight: 700;
-  color: #0f172a;
+  @apply font-semibold text-[#317d89];
+  border-bottom: 2px solid #317d89;
 }
-
 /* ===================================================== */
 /* FEEDBACK PAGE*/
 /* ===================================================== */
@@ -784,10 +770,10 @@ nav {
   @apply flex justify-between items-center mb-6;
 }
 .as-title-wrap h1 {
-  @apply text-[28px] font-[bold] text-gray-900 m-0;
+  @apply text-2xl font-bold text-[#1e293b] m-0 leading-tight;
 }
 .as-subtitle {
-  @apply text-gray-500 mt-1;
+  @apply text-sm text-[#64748b] mt-1 mb-0 mx-0 leading-normal;
 }
 
 /* Buttons */
@@ -836,7 +822,9 @@ nav {
   @apply text-lg font-bold text-gray-900 m-0;
 }
 .as-card-desc {
-  @apply text-gray-500 text-sm leading-normal grow mb-4;
+  @apply text-gray-500 text-sm leading-normal grow mb-4 break-words;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .as-card-details {
   @apply flex flex-col gap-2.5 mt-0 mb-5 mx-0 p-0;
@@ -854,7 +842,6 @@ nav {
   @apply text-xs font-semibold px-3 py-1 rounded-full;
 }
 
-/* Figma Status Colors */
 .as-badge.on-going {
   @apply bg-green-100 text-green-600;
 }
@@ -1187,10 +1174,32 @@ nav {
   @apply bg-amber-100 text-amber-700 text-amber-700 border border-amber-100 border-solid;
 }
 
+.status-badge.ready-for-pickup,
+.status-ready-for-pickup,
+.status-badge[class*="ready for pickup"] {
+  @apply bg-blue-50 text-blue-700 border border-blue-200 before:bg-blue-500;
+}
+
+.status-badge.responded {
+  @apply bg-indigo-50 text-indigo-700 border border-indigo-200 before:bg-indigo-500;
+}
+
+.status-badge.resolved {
+  @apply bg-emerald-50 text-emerald-700 border border-emerald-200 before:bg-emerald-500;
+}
+
+.status-badge.acted-upon,
+.status-badge[class*="acted upon"] {
+  @apply bg-emerald-50 text-emerald-700 border border-emerald-200 before:bg-emerald-500;
+}
+
+.status-badge.received {
+@apply bg-teal-50 text-teal-800 border border-teal-200 before:bg-teal-600;
+}
+
 /* Action Buttons */
 .btn-view {
-  @apply text-blue-600 font-medium text-sm cursor-pointer inline-flex items-center justify-center gap-1.5 rounded transition-[background-color] duration-[0.2s] px-3 py-1.5 border-[none] hover:bg-blue-50 hover:text-blue-700 text-[color:var(--text)] border border-[color:var(--border)] border-solid hover:border-[color:var(--teal)] hover:text-[color:var(--teal)];
-  background: none;
+@apply bg-white text-blue-600 border-[1.5px] border-slate-400 font-semibold shadow-xs transition-all duration-150 hover:bg-blue-50 hover:border-blue-600 hover:text-blue-700 hover:shadow-[0_2px_4px_rgba(37,99,235,0.15)];  background: none;
 }
 
 /* =========================================
@@ -1254,7 +1263,7 @@ nav {
 
 /* Modal Footer */
 .modal-footer {
-  @apply bg-gray-50 flex justify-end gap-3 px-6 py-4 border-t border-solid border-t-slate-100 flex justify-end gap-3 px-8 py-5 border-t border-solid;
+  @apply bg-slate-50 flex justify-end items-center gap-2.5 px-6 py-3 border-t border-slate-100;
 }
 .modal-footer button {
   @apply text-sm font-medium cursor-pointer flex items-center gap-2 transition-all duration-[0.2s] px-4 py-2 rounded-md border-[none];
@@ -1591,7 +1600,7 @@ nav {
   @apply w-full text-left border-collapse;
 }
 .req-table th {
-  @apply text-[0.85rem] font-bold text-slate-500 uppercase tracking-wider border-b-[color:var(--border)] px-6 py-5 border-b-2 border-solid;
+  @apply text-[0.95rem] font-bold text-slate-500 uppercase tracking-wider border-b-[color:var(--border)] px-6 py-5 border-b-2 border-solid;
   background: #f8fafc;
   font-family: "Poppins", sans-serif;
 }
@@ -2316,13 +2325,13 @@ nav {
  
   /* ── Login page ── */
   .login-page {
-    @apply grid-cols-[1fr];
+    @apply grid-cols-[1fr] h-screen overflow-y-auto;
   }
   .login-page .left-panel {
     @apply hidden;
   }
   .login-page .right-panel {
-    @apply p-5;
+    @apply p-5 h-auto;
   }
   .login-box {
     @apply max-w-full;
