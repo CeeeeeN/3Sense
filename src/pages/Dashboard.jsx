@@ -392,11 +392,54 @@ function PaginationBar({ current, total, onChange }) {
   );
 }
 
+// ── Helpers for Alerts & Announcements ──
+const getPostedAt = (a) => a.createdAt?.toDate?.() || a.time || null; // adjust to your field name
+
+const timeAgo = (value) => {
+  const t = new Date(value).getTime();
+  if (!value || isNaN(t)) return "";
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const isRecent = (value, days = 3) => {
+  if (!value) return false;
+  const t = new Date(value).getTime();
+  return !isNaN(t) && Date.now() - t < days * 86400000;
+};
+
+function EmptyState({ icon, title, text }) {
+  return (
+    <div className="db-empty">
+      <div className="db-empty__icon">{icon}</div>
+      <div className="db-empty__title">{title}</div>
+      <div className="db-empty__text">{text}</div>
+    </div>
+  );
+}
+
+function SkeletonCards({ count = 2 }) {
+  return (
+    <div className="db-alerts-grid">
+      {Array.from({ length: count }).map((_, i) => <div key={i} className="db-skeleton" />)}
+    </div>
+  );
+}
+
 export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, userRole, pendingAnnID, onAnnConsumed }) {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [showAllAnns, setShowAllAnns] = useState(false);
   const [alertPage, setAlertPage] = useState(1);
   const [annPage, setAnnPage] = useState(1);
+  const [annLoading, setAnnLoading] = useState(true);
+  const [annFilter, setAnnFilter] = useState("All");
+  const [annSearch, setAnnSearch] = useState("");
   const [realUserName, setRealUserName] = useState(userName);
   const [dataLoading, setDataLoading] = useState(true);
   const [announcementsData, setAnnouncementsData] = useState([]);
@@ -426,6 +469,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   useEffect(() => {
     const unsubAnns = subscribeToAnnouncements((data) => {
       setAnnouncementsData(data);
+      setAnnLoading(false);
     });
     return () => unsubAnns();
   }, []);
@@ -550,7 +594,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           { icon: <FeedbackIcon />, color: "green", value: fbCount.data().count.toString(), label: "Feedback", sub: "submitted", badge: "Done", badgeIcon: <CheckSmallIcon /> },
           { icon: <BarangayStatusIcon />, color: "purple", value: "...", label: "Barangay Status", sub: "current standing", badge: "Active", badgeIcon: <TrendUpIcon /> },
         ]);
-        
+
       } catch (err) {
         console.error(err);
       } finally {
@@ -596,7 +640,6 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       const isAlert = !targetsEveryone && userCategories.some(uc => {
         const u = uc.trim().toLowerCase();
         if (!u) return false;
-        // Exact match only — the announcement's category field must equal the user's category
         return annCatClean === u || annAudienceClean === u;
       });
 
@@ -613,14 +656,19 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   });
   const combinedAnns = [...smartAlertsList, ...generalAnnsList];
 
-  // Pagination derived values
+  // Pagination + filter derived values
   const alertTotalPages = Math.max(1, Math.ceil(smartAlertsList.length / ITEMS_PER_PAGE));
-  const annTotalPages = Math.max(1, Math.ceil(generalAnnsList.length / ITEMS_PER_PAGE));
   const pagedAlerts = smartAlertsList.slice((alertPage - 1) * ITEMS_PER_PAGE, alertPage * ITEMS_PER_PAGE);
-  const pagedAnns = generalAnnsList.slice((annPage - 1) * ITEMS_PER_PAGE, annPage * ITEMS_PER_PAGE);
 
-  // Reset pages when data refreshes
-  // (safe because these are render-time derivations, not effects)
+  const filterOptions = ["All", ...new Set(generalAnnsList.map(a => a.announcementCategory).filter(Boolean))];
+
+  const filteredAnns = generalAnnsList.filter(a =>
+    (annFilter === "All" || a.announcementCategory === annFilter) &&
+    (!annSearch.trim() || `${a.title} ${a.description}`.toLowerCase().includes(annSearch.trim().toLowerCase()))
+  );
+
+  const annTotalPages = Math.max(1, Math.ceil(filteredAnns.length / ITEMS_PER_PAGE));
+  const pagedAnns = filteredAnns.slice((annPage - 1) * ITEMS_PER_PAGE, annPage * ITEMS_PER_PAGE);
 
   return (
     <main className="db-page">
@@ -637,7 +685,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       <div className="db-content">
 
         {overdueRentals.length > 0 && (
-          <div style={{ marginBottom: "20px" }}>
+          <div style={{ marginBottom: "-0.75rem" }}>
             <div
               onClick={() => setShowEqModal(true)}
               style={{
@@ -706,8 +754,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           </div>
         )}
 
-        <FeedbackAlerts 
-          householdID={propsHouseholdID} 
+        <FeedbackAlerts
+          householdID={propsHouseholdID}
           residentID={memberID}
           onNavigate={onNavigate}
         />
@@ -744,32 +792,53 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           {/* Alerts */}
           <div style={{ padding: "0 1.5rem" }}>
             <SubLabel icon={<BoltIcon />} label="Based on Your Profile Category" />
-            {smartAlertsList.length === 0 ? (
-              <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No alerts based on your profile category at this time.</p>
+            {annLoading ? (
+              <SkeletonCards />
+            ) : smartAlertsList.length === 0 ? (
+              <EmptyState
+                icon={<BoltIcon />}
+                title="You're all caught up"
+                text="Alerts matching your profile category will show up here."
+              />
             ) : (
               <>
                 <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
-                  {pagedAlerts.map((a) => (
-                    <div key={a.id} className={`alert-card alert-card--${a.dotColor}`}>
-                      <div className="alert-card__header">
-                        <div className="alert-card__icon-wrap">{a.icon}</div>
-                        <span className="alert-card__tag">{a.category}</span>
+                  {pagedAlerts.map((a) => {
+                    const posted = getPostedAt(a);
+                    return (
+                      <div
+                        key={a.id}
+                        className={`alert-card alert-card--${a.dotColor}`}
+                        onClick={() => setSelectedAnn(a)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && setSelectedAnn(a)}
+                      >
+                        <div className="alert-card__top-bar" />
+                        <div className="alert-card__header">
+                          <div className="alert-card__icon-wrap">{a.icon}</div>
+                          <span className="alert-card__tag">{a.category}</span>
+                        </div>
+                        <div className="alert-card__body">
+                          <div className="alert-card__meta">
+                            {isRecent(posted) && <span className="alert-card__new">New</span>}
+                            <span>{timeAgo(posted)}</span>
+                          </div>
+                          <div className="alert-card__title">{a.title}</div>
+                          <div className="alert-card__desc" style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>{a.description}</div>
+                          <span className="alert-card__cta">
+                            View Details <ArrowRightIcon />
+                          </span>
+                        </div>
                       </div>
-                      <div className="alert-card__body">
-                        <div className="alert-card__title">{a.title}</div>
-                        <div className="alert-card__desc" style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>{a.description}</div>
-                        <button className="alert-card__cta" onClick={() => setSelectedAnn(a)}>
-                          View Details <ArrowRightIcon />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <PaginationBar current={alertPage} total={alertTotalPages} onChange={setAlertPage} />
               </>
@@ -779,8 +848,40 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           {/* Barangay Announcements */}
           <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
             <SubLabel icon={<BellIcon />} label="Barangay Announcements" />
-            {generalAnnsList.length === 0 ? (
-              <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>No new announcements at this time.</p>
+
+            <div className="ann-toolbar">
+              <div className="ann-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search announcements..."
+                  value={annSearch}
+                  onChange={(e) => { setAnnSearch(e.target.value); setAnnPage(1); }}
+                />
+              </div>
+              <div className="ann-chips">
+                {filterOptions.map((opt) => (
+                  <button
+                    key={opt}
+                    className={`ann-chip${annFilter === opt ? " ann-chip--active" : ""}`}
+                    onClick={() => { setAnnFilter(opt); setAnnPage(1); }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {annLoading ? (
+              <div className="db-skeleton db-skeleton--row" />
+            ) : filteredAnns.length === 0 ? (
+              <EmptyState
+                icon={<BellIcon />}
+                title="No announcements found"
+                text={annSearch || annFilter !== "All" ? "Try a different search or category." : "Check back later for barangay updates."}
+              />
             ) : (
               <>
                 <div className="ann-table-header">
@@ -808,7 +909,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                         textOverflow: 'ellipsis'
                       }}>{a.description}</div>
                     </div>
-                    <div className="ann-row__date">{a.time ? new Date(a.time).toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" }) : a.date}</div>
+                    <div className="ann-row__date">
+                      {isRecent(getPostedAt(a)) && <span className="ann-row__fresh" />}
+                      {timeAgo(getPostedAt(a)) || a.date}
+                    </div>
                     <div className="ann-row__cat">
                       <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
                     </div>

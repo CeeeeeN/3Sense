@@ -15,6 +15,16 @@ const getSaved = (key, fallback) => {
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
+// Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
+const normalizePHMobile = (value) => {
+  let d = String(value || "").replace(/\D/g, "");
+  if (d.startsWith("63") && d.length >= 12) d = "0" + d.slice(2);
+  else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
+  return d.slice(0, 11);
+};
+
+const isValidPHMobile = (value) => /^09\d{9}$/.test(value);
+
 function ValidityReminderBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
@@ -196,9 +206,18 @@ function Step2({ docType, form, setForm, errors }) {
       </div>
 
       <div className="dr-field-row">
-        <div className="dr-field">
+          <div className="dr-field">
           <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
-          <input className={`sv-input${errors.contact ? " sv-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
+          <input
+            className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
+            type="tel"
+            inputMode="numeric"
+            maxLength={11}
+            value={form.contact}
+            onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
+            onBlur={e => set("contact", normalizePHMobile(e.target.value))}
+            placeholder="09123456789"
+          />
           {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
         </div>
         <div className="dr-field">
@@ -440,6 +459,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     if (!form.dob) e.dob = "Required.";
     if (!form.address.trim()) e.address = "Required.";
     if (!String(form.contact || "").trim()) e.contact = "Required.";
+    else if (!isValidPHMobile(form.contact)) e.contact = "Enter a valid 11-digit mobile number (e.g. 09123456789).";
     if (!form.residingSince) e.residingSince = "Required.";
     if (!form.purposeOption) e.purposeOption = "Required.";
     if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
