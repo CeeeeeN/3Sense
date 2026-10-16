@@ -277,6 +277,7 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
 
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
   const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { t } = useLanguage();
 
   const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility

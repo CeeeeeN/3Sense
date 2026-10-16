@@ -342,20 +342,6 @@ export default function ServiceVawc({ onBack, userRole }) {
     }
   };
 
-  if (!isAuthorized) {
-    return (
-      <div className="as-container" style={{ textAlign: "center", padding: "60px 20px" }}>
-        <h2>Access Denied</h2>
-        <p style={{ color: "#6b7280" }}>
-          You do not have administrative privileges to view the VAWC workspace.
-        </p>
-        <button className="as-btn-aqua" style={{ marginTop: "16px" }} onClick={onBack}>
-          &larr; Return to Services Hub
-        </button>
-      </div>
-    );
-  }
-
   // Filtered & Searched Data
   const filteredCases = useMemo(() => {
     return cases.filter((c) => {
@@ -385,6 +371,20 @@ export default function ServiceVawc({ onBack, userRole }) {
       return true;
     });
   }, [cases, statusFilter, genderFilter, violenceFilter, searchQuery]);
+
+  if (!isAuthorized) {
+    return (
+      <div className="as-container" style={{ textAlign: "center", padding: "60px 20px" }}>
+        <h2>Access Denied</h2>
+        <p style={{ color: "#6b7280" }}>
+          You do not have administrative privileges to view the VAWC workspace.
+        </p>
+        <button className="as-btn-aqua" style={{ marginTop: "16px" }} onClick={onBack}>
+          &larr; Return to Services Hub
+        </button>
+      </div>
+    );
+  }
 
   // Pagination Math
   const totalPages = Math.ceil(filteredCases.length / rowsPerPage);

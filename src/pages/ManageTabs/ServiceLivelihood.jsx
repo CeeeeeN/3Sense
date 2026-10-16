@@ -257,7 +257,7 @@ export default function ServiceLivelihood({ onBack }) {
         );
       }
       if (selectedParticipant && selectedParticipant.id === p.id) {
-        setSelectedItem(prev => ({ ...prev, status: "approved" }));
+        setSelectedParticipant(prev => ({ ...prev, status: "approved" }));
       }
 
       queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodRegistrations'] });

@@ -251,6 +251,7 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
 
 function RentalForm({ onBack, equipment, userData, householdID, userName, userID }) {
   const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { t } = useLanguage();
 
   const equipmentName = equipment?.equipmentName || equipment?.name || "Equipment";
   const maxQty = equipment?.quantity ? parseInt(equipment.quantity, 10) : 0;

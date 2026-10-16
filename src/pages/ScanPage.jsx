@@ -146,16 +146,6 @@ export default function ScanPage({
   const jsQRRef = useRef(null);
   const scanning = useRef(false);
 
-  // ── Resize listener ──
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 769);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      stopCamera();
-    };
-  }, []);
-
   // ── Camera control ──
   const stopCamera = useCallback(() => {
     scanning.current = false;
@@ -165,6 +155,16 @@ export default function ScanPage({
       streamRef.current = null;
     }
   }, []);
+
+  // ── Resize listener ──
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 769);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const startCamera = async () => {
     setCamState("requesting");

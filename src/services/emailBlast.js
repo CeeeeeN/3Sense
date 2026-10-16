@@ -103,7 +103,7 @@ export async function sendEmailBlast({
   onProgress,
 }) {
   const from =
-    (typeof process !== "undefined" && process.env?.RESEND_FROM_EMAIL) ||
+    import.meta.env?.VITE_RESEND_FROM_EMAIL ||
     "Barangay 3S+ Malanday <noreply@3s-sense.site>";
 
   const response = await fetch("/api/email-blast", {

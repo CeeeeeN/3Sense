@@ -1891,7 +1891,7 @@ export function LanguageProvider({ children }) {
         return args[0];
       }
       // Last resort: return key (prevents blank UI)
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.warn(`[i18n] Missing translation key: "${key}"`);
       }
       return key;
