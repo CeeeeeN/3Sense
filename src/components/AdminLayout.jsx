@@ -16,6 +16,7 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  limit, // <-- Added limit
 } from "firebase/firestore";
 
 // Helper to initialize user profile synchronously from sessionStorage to avoid flickering
@@ -68,45 +69,56 @@ export default function AdminLayout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // ─── 1. FETCH AUTH & USER PROFILE ────────────────────────────
+  // ─── 1. FETCH AUTH & USER PROFILE (OPTIMIZED WITH SESSION CACHE) ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // Check session storage first to prevent redundant Firestore reads
+        const cacheKey = `admin_profile_${user.uid}`;
+        const cachedProfile = sessionStorage.getItem(cacheKey);
+
+        if (cachedProfile) {
+          setCurrentUserData(JSON.parse(cachedProfile));
+          return;
+        }
+
         try {
           const approvedQ = query(
             collection(db, "approvedAdmins"),
-            where("uid", "==", user.uid)
+            where("uid", "==", user.uid),
+            limit(1)
           );
           const approvedSnapshot = await getDocs(approvedQ);
 
           let updated = null;
           if (!approvedSnapshot.empty) {
             const data = approvedSnapshot.docs[0].data();
-            updated = {
+            const profileData = {
               fullName: data.fullName || data.username || "Admin",
               position: data.position || "Admin",
-              role: data.role || data.position || "Super Admin",
+              role: data.role || data.position || "Standard Admin",
             };
-          } else {
-            const pendingQ = query(
-              collection(db, "pendingAdmins"),
-              where("uid", "==", user.uid)
-            );
-            const pendingSnapshot = await getDocs(pendingQ);
-
-            if (!pendingSnapshot.empty) {
-              const data = pendingSnapshot.docs[0].data();
-              updated = {
-                fullName: data.fullName || data.username || "Admin",
-                position: data.position || "Admin",
-                role: data.role || data.position || "Super Admin",
-              };
-            }
+            setCurrentUserData(profileData);
+            sessionStorage.setItem(cacheKey, JSON.stringify(profileData)); // Save to cache
+            return;
           }
 
-          if (updated) {
-            setCurrentUserData(updated);
-            sessionStorage.setItem("adminUserData", JSON.stringify(updated));
+          const pendingQ = query(
+            collection(db, "pendingAdmins"),
+            where("uid", "==", user.uid),
+            limit(1)
+          );
+          const pendingSnapshot = await getDocs(pendingQ);
+
+          if (!pendingSnapshot.empty) {
+            const data = pendingSnapshot.docs[0].data();
+            const profileData = {
+              fullName: data.fullName || data.username || "Admin",
+              position: data.position || "Admin",
+              role: data.role || data.position || "Standard Admin",
+            };
+            setCurrentUserData(profileData);
+            sessionStorage.setItem(cacheKey, JSON.stringify(profileData)); // Save to cache
           }
         } catch (error) {
           console.error("Error fetching admin profile:", error);
@@ -117,11 +129,12 @@ export default function AdminLayout({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // ─── 2. REAL-TIME NOTIFICATION LISTENER ────────────────────────
+  // ─── 2. REAL-TIME NOTIFICATION LISTENER (OPTIMIZED WITH LIMIT) ───
   useEffect(() => {
     const q = query(
       collection(db, "notifications"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(50) // <-- Crucial: Limits reads to only the 50 most recent notifications
     );
 
     const unsubscribe = onSnapshot(
@@ -310,7 +323,9 @@ export default function AdminLayout({ children }) {
 
   const handleLogout = async () => {
     try {
-      sessionStorage.removeItem("adminUserData");
+      if (auth.currentUser) {
+        sessionStorage.removeItem(`admin_profile_${auth.currentUser.uid}`);
+      }
       await auth.signOut();
       window.location.href = "/admin/login";
     } catch (error) {

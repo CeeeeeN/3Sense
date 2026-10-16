@@ -47,13 +47,25 @@ function AdvanceRentalBanner() {
         <line x1="3" y1="10" x2="21" y2="10" />
       </svg>
       <div style={{ flex: 1 }}>
-        <strong style={{ display: "block", marginBottom: "2px", color: "#1e3a8a" }}>
+        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
           Advance Request Required
         </strong>
         Equipment rentals must be submitted at least{" "}
         <strong>3 days before</strong> your intended pick-up date. Please plan accordingly.
       </div>
-      <button onClick={() => setDismissed(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "#1e40af", padding: "0" }}>
+      <button
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss reminder"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#92400e",
+          padding: "0",
+          flexShrink: 0,
+          lineHeight: 1,
+        }}
+      >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
         </svg>

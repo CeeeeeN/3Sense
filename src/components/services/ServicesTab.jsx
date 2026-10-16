@@ -20,22 +20,41 @@ import LivelihoodTab from "./subtabs/LivelihoodTab";
 import BADACTab from "./subtabs/BADACTab";
 
 // ── Services Sub-Tab Data ──
+// Order matters: Legal first, then Community (the grouped grid fills column by column)
 const SERVICES_SUBTABS = [
-  { key: "vawc",       label: "VAWC",          color: "#e03e3e", icon: <ServiceShieldIcon />,    category: "legal"     },
-  { key: "peace",      label: "Peace & Order", color: "#1a56a0", icon: <SirenIcon />,      category: "legal"     },
-  { key: "badac",      label: "BADAC",         color: "#92400e", icon: <BadgeIcon />,      category: "legal"     },
-  { key: "bosca",      label: "BOSCA",         color: "#703381", icon: <UsersIcon />,      category: "community" },
-  { key: "bswd",       label: "BSWD",          color: "#317D89", icon: <HeartIcon />,      category: "community" },
-  { key: "livelihood", label: "Livelihood",    color: "#1e8a5e", icon: <BriefcaseIcon />, category: "community" },
+  { key: "vawc",       label: "VAWC",          color: "#e03e3e", icon: <ServiceShieldIcon />, category: "legal"     },
+  { key: "peace",      label: "Peace & Order", color: "#1a56a0", icon: <SirenIcon />,         category: "legal"     },
+  { key: "badac",      label: "BADAC",         color: "#92400e", icon: <BadgeIcon />,         category: "legal"     },
+  { key: "bosca",      label: "BOSCA",         color: "#703381", icon: <UsersIcon />,         category: "community" },
+  { key: "bswd",       label: "BSWD",          color: "#317D89", icon: <HeartIcon />,         category: "community" },
+  { key: "livelihood", label: "Livelihood",    color: "#1e8a5e", icon: <BriefcaseIcon />,     category: "community" },
 ];
 
 const SVC_CARD_META = {
-  vawc:       { fullName: "Violence Against Women & Children",        desc: "Hotlines, protection orders, and guided support for VAWC cases.",              bg: "rgba(220,38,38,0.06)",  border: "rgba(220,38,38,0.18)",  text: "#b91c1c" },
-  bosca:      { fullName: "Barangay Office for Senior Citizens Assoc.",desc: "Senior citizen membership, benefits, welfare programs and how to join.",      bg: "rgba(112,51,129,0.06)", border: "rgba(112,51,129,0.18)", text: "#703381" },
-  bswd:       { fullName: "Barangay Social Welfare and Development",   desc: "Report homeless individuals, send tips, and access social welfare services.", bg: "rgba(49,125,137,0.06)", border: "rgba(49,125,137,0.18)", text: "#317D89" },
-  peace:      { fullName: "Peace & Order",                             desc: "Emergency hotline, file an incident report, and track your report status.",   bg: "rgba(26,86,160,0.06)",  border: "rgba(26,86,160,0.18)",  text: "#1a56a0" },
-  livelihood: { fullName: "Livelihood Skills Training",               desc: "Register for free skills training programs and track your enrollment status.", bg: "rgba(30,138,94,0.06)",  border: "rgba(30,138,94,0.18)",  text: "#1e8a5e" },
-  badac:      { fullName: "Barangay Anti-Drug Abuse Council",         desc: "Confidential assistance, free drug testing, and rehabilitation referral.",     bg: "rgba(146,64,14,0.06)",  border: "rgba(146,64,14,0.18)",  text: "#92400e" },
+  vawc:       { fullName: "Violence Against Women & Children",         desc: "Hotlines, protection orders, and guided support for VAWC cases." },
+  bosca:      { fullName: "Barangay Office for Senior Citizens Assoc.", desc: "Senior citizen membership, benefits, welfare programs and how to join." },
+  bswd:       { fullName: "Barangay Social Welfare and Development",    desc: "Report homeless individuals, send tips, and access social welfare services." },
+  peace:      { fullName: "Peace & Order",                              desc: "Emergency hotline, file an incident report, and track your report status." },
+  livelihood: { fullName: "Livelihood Skills Training",                desc: "Register for free skills training programs and track your enrollment status." },
+  badac:      { fullName: "Barangay Anti-Drug Abuse Council",          desc: "Confidential assistance, free drug testing, and rehabilitation referral." },
+};
+
+// ── Category theme: card tint, border, accent bar ──
+const CATEGORY_THEME = {
+  legal: {
+    label: "Legal",
+    color: "#1a56a0",
+    bg: "linear-gradient(135deg, rgba(26,86,160,0.16) 0%, rgba(26,86,160,0.07) 100%)",
+    border: "rgba(26,86,160,0.38)",
+    pillBg: "rgba(26,86,160,0.16)",
+  },
+  community: {
+    label: "Community",
+    color: "#317D89",
+    bg: "linear-gradient(135deg, rgba(49,125,137,0.16) 0%, rgba(49,125,137,0.07) 100%)",
+    border: "rgba(49,125,137,0.38)",
+    pillBg: "rgba(49,125,137,0.16)",
+  },
 };
 
 const FILTERS = [
@@ -76,9 +95,10 @@ export default function ServicesTab({ userData, householdID, userName }) {
           <div>
             <div className="sc-card-title">Community Services</div>
             <div className="sc-card-subtitle">Select a service to learn more or take action.</div>
-         </div>
+          </div>
         </div>
       </div>
+
       <div className="svc-filter-tabbar">
         {FILTERS.map(f => (
           <button key={f.key} className={`svc-filter-tab${filter === f.key ? " svc-filter-tab--active" : ""}`} onClick={() => setFilter(f.key)}>
@@ -89,22 +109,52 @@ export default function ServicesTab({ userData, householdID, userName }) {
           </button>
         ))}
       </div>
-      <div className="svc-picker__grid">
+
+      <div className={`svc-picker__grid${filter === "all" ? " svc-picker__grid--grouped" : ""}`}>
         {filtered.map(s => {
           const meta = SVC_CARD_META[s.key];
+          const cat  = CATEGORY_THEME[s.category];
           return (
-            <button key={s.key} className="svc-picker-card" onClick={() => setSub(s.key)}
-              style={{ "--card-color": meta.text, "--card-bg": meta.bg, "--card-border": meta.border }}>
-              <div className="svc-picker-card__icon" style={{ background: meta.bg, color: meta.text, border: `1.5px solid ${meta.border}` }}>{s.icon}</div>
+            <button
+              key={s.key}
+              className="svc-picker-card"
+              onClick={() => setSub(s.key)}
+              style={{
+                "--card-color": cat.color,
+                "--card-bg": cat.bg,
+                "--card-border": cat.border,
+                background: cat.bg,
+                border: `1.5px solid ${cat.border}`,
+                borderLeft: `5px solid ${cat.color}`,
+              }}
+            >
+              <div
+                className="svc-picker-card__icon"
+                style={{
+                  background: "#fff",
+                  color: s.color,
+                  border: `1.5px solid ${cat.border}`,
+                  boxShadow: `0 2px 8px ${cat.border}`,
+                }}
+              >
+                {s.icon}
+              </div>
+
               <div className="svc-picker-card__body">
                 <div className="svc-picker-card__label-row">
                   <span className="svc-picker-card__label">{s.label}</span>
-                  <span className="svc-picker-card__cat" style={{ background: s.category === "legal" ? "rgba(26,86,160,0.08)" : "rgba(49,125,137,0.08)", color: s.category === "legal" ? "#1a56a0" : "#317D89" }}>{s.category === "legal" ? "Legal" : "Community"}</span>
+                  <span
+                    className="svc-picker-card__cat"
+                    style={{ background: cat.pillBg, color: cat.color, fontWeight: 700 }}
+                  >
+                    {cat.label}
+                  </span>
                 </div>
                 <div className="svc-picker-card__name">{meta.fullName}</div>
                 <div className="svc-picker-card__desc">{meta.desc}</div>
               </div>
-              <div className="svc-picker-card__arrow" style={{ color: meta.text }}>
+
+              <div className="svc-picker-card__arrow" style={{ color: cat.color }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
               </div>
             </button>

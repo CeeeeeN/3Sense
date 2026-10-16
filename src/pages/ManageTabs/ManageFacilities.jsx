@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Manage_IconClock, IconAdd, Manage_IconQR, IconDownload, IconConfirmCheck, ChevronLeftIcon, ChevronRightIcon } from "../../components/Icons";
 import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
 
 const PREVIEW_LIMIT = 120;
 
@@ -32,7 +33,8 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageFacilities() {
-  const [facilities, setFacilities] = useState([]);
+  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("All");
   const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, cap_desc, cap_asc
@@ -40,7 +42,6 @@ export default function ManageFacilities() {
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
-  const [showGlobalQRModal, setShowGlobalQRModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState(null);
   const [selectedQR, setSelectedQR] = useState(null);
   const [editingFacilityId, setEditingFacilityId] = useState(null);
@@ -61,35 +62,32 @@ export default function ManageFacilities() {
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const facQuery = query(
-      collection(db, "facilities"),
-      orderBy("createdAt", "desc"),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(facQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
+  // ─── OPTIMIZED: React Query instead of onSnapshot ───
+  const { data: facilities = [], isLoading } = useQuery({
+    queryKey: ['adminManage_facilities'],
+    queryFn: async () => {
+      const facQuery = query(
+        collection(db, "facilities"),
+        orderBy("createdAt", "desc"),
+        limit(150)
+      );
+      const snapshot = await getDocs(facQuery);
+      return snapshot.docs.map(doc => {
         const docData = doc.data();
         const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
         return {
@@ -98,11 +96,9 @@ export default function ManageFacilities() {
           ...docData
         };
       });
-      setFacilities(data);
-    });
-    
-    return () => unsubscribe();
-  }, []);
+    },
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -122,6 +118,8 @@ export default function ManageFacilities() {
     
     try {
       await updateDoc(doc(db, "facilities", selectedFacility.id), { blockedDates: newBlocked });
+      // Refresh cache so UI stays in sync
+      queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
     } catch(err) {
       console.error(err);
     }
@@ -159,13 +157,15 @@ export default function ManageFacilities() {
           "DELETED_FACILITY",
           `Deleted facility with ID: ${id}`,
         );
+        // Refresh cache
+        queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
       } catch(error) {
         console.error("Error deleting facility: ", error);
         logTransaction(
           adminName,
           adminRole,
           "ERROR_DELETING_FACILITY",
-          `Error deleting facility with ID: ${id} - ${error.message}`,
+          `Error deleting facility with ID: ${id}\n${error.message}`,
         );
       }
     }
@@ -187,6 +187,10 @@ export default function ManageFacilities() {
         await updateDoc(newRef, { facilityID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_FACILITY", `Added new facility: ${newFacility.facilityName} (ID: ${newRef.id})`);
       }
+      
+      // Refresh cache so the new/edited item appears immediately
+      queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
+
       setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, purposeOptions: [], customFields: [] });
       setPurposeInput("");
       setEditingPurposeIdx(null);
@@ -307,6 +311,10 @@ export default function ManageFacilities() {
       </button>
     ));
   };
+
+  if (isLoading) {
+    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Facilities...</div>;
+  }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>
@@ -590,7 +598,7 @@ export default function ManageFacilities() {
         <div className="as-modal-overlay">
           <div className="as-modal-content" style={{ maxWidth: '600px' }}>
             <div className="as-modal-header">
-              <h2>Availability Calendar - {selectedFacility.name}</h2>
+              <h2>Availability Calendar - {selectedFacility.name || selectedFacility.facilityName}</h2>
               <button className="as-modal-close" onClick={() => setShowCalendarModal(false)}>&times;</button>
             </div>
             <div className="as-modal-body" style={{ padding: '20px' }}>

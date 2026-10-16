@@ -20,6 +20,7 @@ import {
   collection,
   collectionGroup,
   query,
+  where,
   orderBy,
   getDocs,
   getCountFromServer,
@@ -38,120 +39,132 @@ const TABS = [
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('resident');
 
-  // ── REACT QUERY: The centralized data fetcher ──
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['adminDashboardAnalytics_v2'],
+  // ─── 1. CORE SUMMARY QUERY (Always loads - Optimized with getCount) ───
+  const { data: summaryData, isLoading: isSummaryLoading, isError: isSummaryError, error: summaryError } = useQuery({
+    queryKey: ['adminDashboard_summary'],
     queryFn: async () => {
-      // 1. ULTRA-OPTIMIZED COUNTS: Get totals without downloading the actual documents (1 read each!)
-      const [hhCount, resCount, pendingCount] = await Promise.all([
+      const [hhCount, resCount, pendingCount, docPendingCount, facPendingCount, fbSnap] = await Promise.all([
         getCountFromServer(collection(db, "households")),
         getCountFromServer(collectionGroup(db, "residents")),
-        getCountFromServer(collection(db, "pending_registrations"))
-      ]);
- 
-      // 2. PARALLEL BOUNDED FETCHES: Download the data for charts (capped to prevent read spikes)
-      const [
-        fbSnap, resSnap, docSnap, facSnap, attSnap, livSnap, incSnap, bswdSnap, equSnap, invSnap
-      ] = await Promise.all([
-        getDocs(query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"), limit(300))),
-        getDocs(query(collectionGroup(db, "residents"), limit(500))), // For demographic charts
-        getDocs(query(collection(db, "document_requests"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collection(db, "facility_reservations"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collectionGroup(db, "attendees"), limit(400))),
-        getDocs(query(collection(db, "livelihoodRegistrations"), limit(400))),
-        getDocs(query(collection(db, "incidentReports"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collection(db, "equipment_rentals"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(collection(db, "equipment"))
+        getCountFromServer(collection(db, "pending_registrations")),
+        getCountFromServer(query(collection(db, "document_requests"), where("status", "==", "Pending"))),
+        getCountFromServer(query(collection(db, "facility_reservations"), where("status", "==", "Pending"))),
+        getDocs(query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"), limit(300)))
       ]);
 
-      // 3. MAP DATA
-      const feedbacks = fbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const residentsData = resSnap.docs.map(doc => doc.data());
-      
-      const docRequestsData = docSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const facilityRequestsData = facSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      const generalAttendees = attSnap.docs.map(doc => {
-        const d = doc.data();
-        return { id: doc.id, programName: d.programName || d.eventName || doc.ref.parent.parent?.id || "General Program", ...d };
-      });
-      
-      const livelihoodAttendees = livSnap.docs.map(doc => {
-        const d = doc.data();
-        return { id: doc.id, programName: d.programName || d.eventName || "Livelihood Program", ...d };
-      });
-      
-      const incidentData = incSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const bswdData = bswdSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      const equipmentData = equSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const inventoryData = invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // 4. CALCULATE PENDING STATS
-      const docPending = docRequestsData.filter(d => d.status === "Pending").length;
-      const facPending = facilityRequestsData.filter(d => d.status === "Pending").length;
-
-      // 5. RETURN ALL STATE TO REACT QUERY
       return {
-        feedbacks,
-        residentsData,
-        docRequestsData,
-        facilityRequestsData,
-        generalAttendees,
-        livelihoodAttendees,
-        incidentData,
-        bswdData,
-        equipmentData,
-        inventoryData,
+        feedbacks: fbSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
         stats: {
           households: hhCount.data().count,
           residents: resCount.data().count,
           pendingApprovals: pendingCount.data().count,
-          docRequests: docPending,
-          facilityRequests: facPending
+          docRequests: docPendingCount.data().count,
+          facilityRequests: facPendingCount.data().count
         }
       };
     },
-    // Keep data fresh in memory for 10 minutes before checking Firebase again
-    staleTime: 1000 * 60 * 10,
-    // Keep inactive data cached for 30 minutes
-    gcTime: 1000 * 60 * 30,
-
+    staleTime: 1000 * 60 * 30, // 30 minutes
+    gcTime: 1000 * 60 * 60,    // 60 minutes
     retry: false,
   });
 
-  // 1. Check for errors FIRST
-  if (isError) {
+  // ─── 2. LAZY LOADED TAB QUERIES (Only fetches when tab is clicked) ───
+
+  const { data: residentData, isLoading: isResidentLoading } = useQuery({
+    queryKey: ['adminDashboard_resident'],
+    queryFn: async () => {
+      const snap = await getDocs(query(collectionGroup(db, "residents"), limit(500)));
+      return snap.docs.map(doc => doc.data());
+    },
+    enabled: activeTab === 'resident',
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+
+  const { data: servicesData, isLoading: isServicesLoading } = useQuery({
+    queryKey: ['adminDashboard_services'],
+    queryFn: async () => {
+      const [docSnap, facSnap, equSnap, invSnap] = await Promise.all([
+        getDocs(query(collection(db, "document_requests"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collection(db, "facility_reservations"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collection(db, "equipment_rentals"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(collection(db, "equipment"))
+      ]);
+      return {
+        docRequestsData: docSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        facilityRequestsData: facSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        equipmentData: equSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        inventoryData: invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      };
+    },
+    enabled: activeTab === 'services',
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+
+  const { data: programsData, isLoading: isProgramsLoading } = useQuery({
+    queryKey: ['adminDashboard_programs'],
+    queryFn: async () => {
+      const [attSnap, livSnap] = await Promise.all([
+        getDocs(query(collectionGroup(db, "attendees"), limit(400))),
+        getDocs(query(collection(db, "livelihoodRegistrations"), limit(400)))
+      ]);
+      const generalAttendees = attSnap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, programName: d.programName || d.eventName || doc.ref.parent.parent?.id || "General Program", ...d };
+      });
+      const livelihoodAttendees = livSnap.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, programName: d.programName || d.eventName || "Livelihood Program", ...d };
+      });
+      return [...generalAttendees, ...livelihoodAttendees];
+    },
+    enabled: activeTab === 'programs',
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+
+  const { data: peaceData, isLoading: isPeaceLoading } = useQuery({
+    queryKey: ['adminDashboard_peace'],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "incidentReports"), orderBy("submittedAt", "desc"), limit(300)));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    enabled: activeTab === 'peace',
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+
+  const { data: bswdData, isLoading: isBswdLoading } = useQuery({
+    queryKey: ['adminDashboard_bswd'],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(300)));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    enabled: activeTab === 'bswd',
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+
+  // ─── RENDER LOGIC ───
+
+  if (isSummaryError) {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center", color: "#b91c1c" }}>
           <h2>Analytics failed to load.</h2>
           <p style={{ background: "#fee2e2", padding: "16px", borderRadius: "8px", display: "inline-block" }}>
-            {error?.message || "Unknown error occurred"}
+            {summaryError?.message || "Unknown error occurred"}
           </p>
         </div>
       </AdminLayout>
     );
   }
 
-  // 2. THEN check for loading or missing data
-  if (isLoading || !data) {
+  if (isSummaryLoading || !summaryData) {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center" }}>
-          <h2>Loading Analytics... (This may take a moment)</h2>
+          <h2>Loading Dashboard... (This may take a moment)</h2>
         </div>
       </AdminLayout>
     );
   }
-
-  // Destructure the data provided by React Query
-  const { 
-    feedbacks, residentsData, docRequestsData, facilityRequestsData, 
-    generalAttendees, livelihoodAttendees, incidentData, bswdData, stats,
-    equipmentData, inventoryData, 
-  } = data;
 
   return (
     <AdminLayout>
@@ -169,8 +182,8 @@ export default function AdminDashboard() {
 
         {/* PINNED: SUMMARY CARDS */}
         <DashboardSummaryCards 
-          stats={stats} 
-          totalFeedbacks={feedbacks.length} 
+          stats={summaryData.stats} 
+          totalFeedbacks={summaryData.feedbacks.length} 
         />
 
         {/* TAB NAVIGATION */}
@@ -191,25 +204,26 @@ export default function AdminDashboard() {
           
           {/* TAB: RESIDENT ANALYTICS */}
           {activeTab === 'resident' && (
+            isResidentLoading ? <p>Loading resident data...</p> :
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
               <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', gridColumn: '1 / -1' }}>
                 <h1 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Resident Analytics</h1>
                 <div className="resident-analytics-grid">
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Resident Demographic</h2>
-                    <ResidentDemographics data={residentsData} />
+                    <ResidentDemographics data={residentData} />
                   </div>
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Age Distribution</h2>
-                    <AgeAnalytics data={residentsData} />
+                    <AgeAnalytics data={residentData} />
                   </div>
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Sex Assigned at Birth</h2>
-                    <SexAnalytics data={residentsData} />
+                    <SexAnalytics data={residentData} />
                   </div>
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Gender Orientation</h2>
-                    <GenderOrientationAnalytics data={residentsData} />
+                    <GenderOrientationAnalytics data={residentData} />
                   </div>
                 </div>
               </div>
@@ -218,27 +232,29 @@ export default function AdminDashboard() {
 
           {/* TAB: SERVICES & FACILITIES */}
           {activeTab === 'services' && (
+            isServicesLoading ? <p>Loading services data...</p> :
             <ServiceFacilityAnalytics 
-              docRequestsData={docRequestsData} 
-              facilityRequestsData={facilityRequestsData}
-              equipmentData={equipmentData}
-              inventoryData={inventoryData}
+              docRequestsData={servicesData.docRequestsData} 
+              facilityRequestsData={servicesData.facilityRequestsData}
+              equipmentData={servicesData.equipmentData}
+              inventoryData={servicesData.inventoryData}
             />
           )}
 
           {/* TAB: PROGRAMS & LIVELIHOOD */}
           {activeTab === 'programs' && (
+            isProgramsLoading ? <p>Loading programs data...</p> :
             <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
               <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Program & Livelihood Attendance</h1>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Total registered residents across all programs</p>
-              <ProgramAnalytics data={[...generalAttendees, ...livelihoodAttendees]} />
+              <ProgramAnalytics data={programsData} />
             </div>
           )}
 
           {/* TAB: SENTIMENT & SATISFACTION */}
           {activeTab === 'sentiment' && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
-              <SentimentSummaryCard feedbacks={feedbacks} />
+              <SentimentSummaryCard feedbacks={summaryData.feedbacks} />
               <div style={{ flex: '2 1 500px' }}>
                 <SentimentComparisonChart />
               </div>
@@ -247,15 +263,17 @@ export default function AdminDashboard() {
 
           {/* TAB: PEACE & ORDER */}
           {activeTab === 'peace' && (
+            isPeaceLoading ? <p>Loading incident data...</p> :
             <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
               <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Peace & Order Overview</h1>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for incident reports, urgency levels, and location hotspots</p>
-              <PeaceAndOrderAnalytics data={incidentData} />
+              <PeaceAndOrderAnalytics data={peaceData} />
             </div>
           )}
 
           {/* TAB: SOCIAL WELFARE (BSWD) */}
           {activeTab === 'bswd' && (
+            isBswdLoading ? <p>Loading welfare data...</p> :
             <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
               <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Social Welfare (BSWD) Overview</h1>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for displaced persons reports, tips, and sighting locations</p>
@@ -268,7 +286,7 @@ export default function AdminDashboard() {
         {/* PINNED: AI INSIGHTS */}
         <div className="section" style={{ marginTop: '32px' }}>
           <div className="dashboard-section">
-            <AIInsightsWidget feedbacks={feedbacks} />
+            <AIInsightsWidget feedbacks={summaryData.feedbacks} />
           </div>
         </div>
 

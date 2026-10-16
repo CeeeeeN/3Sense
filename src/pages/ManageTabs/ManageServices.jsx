@@ -11,12 +11,15 @@ import { QRCodeSVG } from "qrcode.react";
 import { auth, db } from "../../firebase/firebase";
 import {
   collection,
-  onSnapshot,
   query,
-  where,
   getDocs,
+  orderBy,
+  limit,
+  where,
+  getCountFromServer
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { useQuery } from '@tanstack/react-query'; 
 
 import { ROLE_PERMISSIONS } from "../../services/permissions";
 
@@ -25,101 +28,87 @@ import ServiceLivelihood from "./ServiceLivelihood";
 import ServiceBswd from "./ServiceBswd";
 import ServiceVawc from "./ServiceVawc";
 
-// ── Today's date as YYYY-MM-DD (used for QR token) ───────────────────────────
 const getTodayStr = () => new Date().toISOString().split("T")[0];
+
+// Helper to fetch server-side counts without downloading documents
+const fetchCollectionStats = async (collectionName, statuses, dateField = "submittedAt") => {
+  const baseRef = collection(db, collectionName);
+  
+  // 1. Get total count
+  const totalPromise = getCountFromServer(baseRef);
+  
+  // 2. Get counts for each specific status
+  const statusPromises = statuses.map(s => 
+    getCountFromServer(query(baseRef, where("status", "==", s)))
+  );
+  
+  // 3. Get exactly 1 document to find the latest date
+  const latestPromise = getDocs(query(baseRef, orderBy(dateField, "desc"), limit(1)));
+
+  const results = await Promise.all([totalPromise, latestPromise, ...statusPromises]);
+  
+  const total = results[0].data().count;
+  const latestSnap = results[1];
+  
+  let latestDate = "—";
+  if (!latestSnap.empty) {
+    const docData = latestSnap.docs[0].data();
+    const ts = docData[dateField] || docData.createdAt;
+    if (ts) {
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      latestDate = d.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
+
+  const byStatus = {};
+  statuses.forEach((s, idx) => {
+    byStatus[s] = results[idx + 2].data().count;
+  });
+
+  return { total, byStatus, latest: latestDate };
+};
 
 export default function ManageServices() {
   const [activeDashboard, setActiveDashboard] = useState(null);
   const [selectedServiceQR, setSelectedServiceQR] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-
-  // ── Real-time stats ──────────────────────────────────────────────────────────
-  const [peaceStats, setPeaceStats] = useState({
-    total: 0,
-    byStatus: {},
-    latest: null,
-  });
-  const [livelihoodStats, setLivelihoodStats] = useState({
-    total: 0,
-    byStatus: {},
-    latest: null,
-  });
-  const [bswdStats, setBswdStats] = useState({
-    total: 0,
-    byStatus: {},
-    latest: null,
-  });
-  const [vawcStats, setVawcStats] = useState({
-    total: 0,
-    byStatus: {},
-    latest: null,
-  });
-
-  const computeStats = (snapshot, dateField = "submittedAt") => {
-    const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const byStatus = {};
-    let latest = null;
-
-    docs.forEach((doc) => {
-      const s = doc.status || "unknown";
-      byStatus[s] = (byStatus[s] || 0) + 1;
-      const ts = doc[dateField] || doc.createdAt;
-      if (ts) {
-        const d = ts.toDate ? ts.toDate() : new Date(ts);
-        if (!latest || d > latest) latest = d;
-      }
-    });
-
-    return {
-      total: docs.length,
-      byStatus,
-      latest: latest
-        ? latest.toLocaleDateString("en-PH", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
-        : "—",
-    };
-  };
+  const [userRole, setUserRole] = useState("Standard Admin");
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const snap = await getDocs(q);
-        if (!snap.empty)
-          setUserRole(snap.docs[0].data().role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setUserRole(parsed.role || "Standard Admin");
+        }
       }
     });
-
-    const unsubPeace = onSnapshot(collection(db, "incidentReports"), (snap) =>
-      setPeaceStats(computeStats(snap, "submittedAt")),
-    );
-    const unsubLivelihood = onSnapshot(
-      collection(db, "livelihoodRegistrations"),
-      (snap) => setLivelihoodStats(computeStats(snap, "submittedAt")),
-    );
-    const unsubBswd = onSnapshot(collection(db, "bswdReports"), (snap) =>
-      setBswdStats(computeStats(snap, "submittedAt")),
-    );
-    const unsubVawc = onSnapshot(collection(db, "vawcCases"), (snap) =>
-      setVawcStats(computeStats(snap, "createdAt")),
-    );
-
-    return () => {
-      unsubscribeAuth();
-      unsubPeace();
-      unsubLivelihood();
-      unsubBswd();
-      unsubVawc();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
-  // ── QR Generation ─────────────────────────────────────────────────────────────
+  // ─── FULLY OPTIMIZED: Server-side counts, no mass document downloading ───
+  const { data: statsData = {}, isLoading } = useQuery({
+    queryKey: ['adminManage_servicesStats'],
+    queryFn: async () => {
+      // Execute all collection stats in parallel
+      const [peace, livelihood, bswd, vawc] = await Promise.all([
+        fetchCollectionStats("incidentReports", ["Pending", "Responded", "Resolved"], "submittedAt"),
+        fetchCollectionStats("livelihoodRegistrations", ["Pending", "Approved", "Rejected"], "submittedAt"),
+        fetchCollectionStats("bswdReports", ["Pending", "Received", "Acted Upon"], "submittedAt"),
+        fetchCollectionStats("vawcCases", ["Pending", "Analyzed", "Resolved"], "createdAt")
+      ]);
+
+      return { peace, livelihood, bswd, vawc };
+    },
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
+
+  const emptyStats = { total: 0, byStatus: {}, latest: "—" };
+  const peaceStats = statsData.peace || emptyStats;
+  const livelihoodStats = statsData.livelihood || emptyStats;
+  const bswdStats = statsData.bswd || emptyStats;
+  const vawcStats = statsData.vawc || emptyStats;
+
   const handleGenerateQR = (serviceName, category) => {
     const today = getTodayStr();
     const base = "https://3-sense.vercel.app/";
@@ -150,37 +139,11 @@ export default function ManageServices() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  // ── Sub-page routing ─────────────────────────────────────────────────────────
-  if (activeDashboard === "peace")
-    return (
-      <ServicePeaceOrder
-        onBack={() => setActiveDashboard(null)}
-        userRole={userRole}
-      />
-    );
-  if (activeDashboard === "livelihood")
-    return (
-      <ServiceLivelihood
-        onBack={() => setActiveDashboard(null)}
-        userRole={userRole}
-      />
-    );
-  if (activeDashboard === "bswd")
-    return (
-      <ServiceBswd
-        onBack={() => setActiveDashboard(null)}
-        userRole={userRole}
-      />
-    );
-  if (activeDashboard === "vawc")
-    return (
-      <ServiceVawc
-        onBack={() => setActiveDashboard(null)}
-        userRole={userRole}
-      />
-    );
+  if (activeDashboard === "peace") return <ServicePeaceOrder onBack={() => setActiveDashboard(null)} userRole={userRole} />;
+  if (activeDashboard === "livelihood") return <ServiceLivelihood onBack={() => setActiveDashboard(null)} userRole={userRole} />;
+  if (activeDashboard === "bswd") return <ServiceBswd onBack={() => setActiveDashboard(null)} userRole={userRole} />;
+  if (activeDashboard === "vawc") return <ServiceVawc onBack={() => setActiveDashboard(null)} userRole={userRole} />;
 
-  // ── Stat bar component ───────────────────────────────────────────────────────
   const StatBar = ({ stats }) => {
     const statusColors = {
       pending: { bg: "#fef3c7", text: "#92400e", dot: "#d97706" },
@@ -193,176 +156,55 @@ export default function ManageServices() {
       "acted upon": { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
     };
     return (
-      <div
-        style={{
-          marginTop: "12px",
-          padding: "12px",
-          background: "#eff0f0",
-          borderRadius: "8px",
-          border: "1px solid #e5e7eb",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "2px",
-            marginBottom: "10px",
-          }}
-        >
-          <span
-            style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}
-          >
-            Total entries
-          </span>
-          <span
-            style={{
-              fontSize: "1.35rem",
-              fontWeight: 700,
-              color: "#0f172a",
-              lineHeight: 1.1,
-            }}
-          >
-            {stats.total}
-          </span>
+      <div style={{ marginTop: "12px", padding: "12px", background: "#eff0f0", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "10px" }}>
+          <span style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>Total entries</span>
+          <span style={{ fontSize: "1.35rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}>{stats.total}</span>
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "6px",
-            marginBottom: "6px",
-          }}
-        >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px" }}>
           {Object.entries(stats.byStatus).map(([status, count]) => {
             const key = status.toLowerCase();
-            const c = statusColors[key] || {
-              bg: "#f3f4f6",
-              text: "#4b5563",
-              dot: "#9ca3af",
-            };
-            const capitalizedStatus =
-              status.charAt(0).toUpperCase() + status.slice(1);
+            const c = statusColors[key] || { bg: "#f3f4f6", text: "#4b5563", dot: "#9ca3af" };
+            const capitalizedStatus = status.charAt(0).toUpperCase() + status.slice(1);
 
             return (
-              <span
-                key={status}
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "3px 8px",
-                  borderRadius: "10px",
-                  background: c.bg,
-                  color: c.text,
-                  fontWeight: 600,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "5px",
-                }}
-              >
-                <span
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    backgroundColor: c.dot,
-                    display: "inline-block",
-                  }}
-                />
+              <span key={status} style={{ fontSize: "0.72rem", padding: "3px 8px", borderRadius: "10px", background: c.bg, color: c.text, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: c.dot, display: "inline-block" }} />
                 {capitalizedStatus}: {count}
               </span>
             );
           })}
         </div>
-        <div
-          style={{
-            marginTop: "8px",
-            paddingTop: "8px",
-            borderTop: "1px solid #e2e8f0",
-            fontSize: "0.75rem",
-            color: "#64748b",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #e2e8f0", fontSize: "0.75rem", color: "#64748b", display: "flex", alignItems: "center", gap: "4px" }}>
           <span>Latest:</span>
-          <span style={{ color: "#1e293b", fontWeight: 600 }}>
-            {stats.latest}
-          </span>
+          <span style={{ color: "#1e293b", fontWeight: 600 }}>{stats.latest}</span>
         </div>
       </div>
     );
   };
 
   const allowedServices = ROLE_PERMISSIONS[userRole]?.services || [];
-  const hasWorkspaceServices = allowedServices.some((s) =>
-    ["Peace & Order", "Livelihood", "BSWD", "VAWC"].includes(s),
-  );
-  const hasInfoServices = allowedServices.some((s) =>
-    ["BADAC", "BOSCA"].includes(s),
-  );
+  const hasWorkspaceServices = allowedServices.some((s) => ["Peace & Order", "Livelihood", "BSWD", "VAWC"].includes(s));
+  const hasInfoServices = allowedServices.some((s) => ["BADAC", "BOSCA"].includes(s));
 
-  // ── Shared QR modal ─────────────────────────────────────────────────────────
   const QRModal = () => (
     <div className="as-modal-overlay">
       <div className="as-modal-content" style={{ maxWidth: "450px" }}>
         <div className="as-modal-header">
           <h2>QR Code Generated</h2>
-          <button
-            className="as-modal-close"
-            onClick={() => setSelectedServiceQR(null)}
-          >
-            &times;
-          </button>
+          <button className="as-modal-close" onClick={() => setSelectedServiceQR(null)}>&times;</button>
         </div>
         <div className="as-modal-body" style={{ textAlign: "center" }}>
-          <div className="as-modal-confirm-icon">
-            <IconConfirmCheck />
-          </div>
+          <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
           <h3>{selectedServiceQR.name}</h3>
-
-          <div
-            style={{
-              background: "#fef3c7",
-              border: "1px solid #fde68a",
-              borderRadius: "8px",
-              padding: "10px 14px",
-              marginBottom: "12px",
-              fontSize: "0.82rem",
-              color: "#92400e",
-              textAlign: "left",
-            }}
-          >
-            ⚠️{" "}
-            <strong>This QR is valid for today only ({getTodayStr()}).</strong>{" "}
-            A new QR must be generated each day.
+          <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "8px", padding: "10px 14px", marginBottom: "12px", fontSize: "0.82rem", color: "#92400e", textAlign: "left" }}>
+            ⚠️ <strong>This QR is valid for today only ({getTodayStr()}).</strong> A new QR must be generated each day.
           </div>
-
-          <p className="as-modal-desc">
-            Residents can scan this code to access the {selectedServiceQR.name}{" "}
-            page.
-          </p>
-          <div
-            className="as-qr-holder"
-            style={{
-              margin: "20px auto",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            <QRCodeSVG
-              id="as-qr-svg"
-              value={selectedServiceQR.qrValue}
-              size={150}
-              level={"H"}
-              includeMargin={true}
-            />
+          <p className="as-modal-desc">Residents can scan this code to access the {selectedServiceQR.name} page.</p>
+          <div className="as-qr-holder" style={{ margin: "20px auto", display: "flex", justifyContent: "center" }}>
+            <QRCodeSVG id="as-qr-svg" value={selectedServiceQR.qrValue} size={150} level={"H"} includeMargin={true} />
           </div>
-          <button
-            className="as-btn-ghost"
-            onClick={handleDownloadQR}
-            style={{ width: "100%" }}
-          >
+          <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: "100%" }}>
             <IconDownload /> Download QR (PNG)
           </button>
         </div>
@@ -370,99 +212,38 @@ export default function ManageServices() {
     </div>
   );
 
+  if (isLoading) {
+    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Services Overview...</div>;
+  }
+
   return (
     <>
       <div className="as-container" style={{ padding: 0 }}>
-        {/* ── Services Hub Workspace Services ── */}
         {hasWorkspaceServices && (
           <>
             <div className="as-header-section">
               <div className="as-title-wrap">
                 <h1>Services</h1>
-                <p className="as-subtitle">
-                  Adaptive workspaces for handling different barangay services
-                  and departments
-                </p>
+                <p className="as-subtitle">Adaptive workspaces for handling different barangay services and departments</p>
               </div>
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                gap: "20px",
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
               {/* 1. Peace & Order */}
               {allowedServices.includes("Peace & Order") && (
-                <div
-                  className="as-card"
-                  style={{ display: "flex", flexDirection: "column" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: "#eff6ff",
-                        color: "#1d4ed8",
-                        padding: "12px",
-                        borderRadius: "12px",
-                      }}
-                    >
-                      <SirenIcon />
-                    </div>
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#eff6ff", color: "#1d4ed8", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>
-                        Peace &amp; Order
-                      </h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        Interactive Form &amp; Inbox
-                      </span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Peace &amp; Order</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Interactive Form &amp; Inbox</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>
-                    Monitor incoming incident reports, dispatch barangay tanods,
-                    and manage blotters.
-                  </p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Monitor incoming incident reports, dispatch barangay tanods, and manage blotters.</p>
                   <StatBar stats={peaceStats} />
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      marginTop: "16px",
-                    }}
-                  >
-                    <button
-                      className="as-btn-aqua"
-                      style={{
-                        flex: "1 1 120px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => setActiveDashboard("peace")}
-                    >
-                      Workspace &rarr;
-                    </button>
-                    <button
-                      className="as-qr-btn"
-                      style={{
-                        flex: "1 1 150px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() =>
-                        handleGenerateQR("Peace and Order", "Services")
-                      }
-                    >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("peace")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("Peace and Order", "Services")}>
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -471,72 +252,19 @@ export default function ManageServices() {
 
               {/* 2. Livelihood */}
               {allowedServices.includes("Livelihood") && (
-                <div
-                  className="as-card"
-                  style={{ display: "flex", flexDirection: "column" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: "#f0fdf4",
-                        color: "#15803d",
-                        padding: "12px",
-                        borderRadius: "12px",
-                      }}
-                    >
-                      <BriefcaseIcon />
-                    </div>
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#f0fdf4", color: "#15803d", padding: "12px", borderRadius: "12px" }}><BriefcaseIcon /></div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>
-                        Livelihood
-                      </h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        Registration System
-                      </span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Livelihood</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Registration System</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>
-                    Approve or reject community registrations for training
-                    programs and assistance.
-                  </p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Approve or reject community registrations for training programs and assistance.</p>
                   <StatBar stats={livelihoodStats} />
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      marginTop: "16px",
-                    }}
-                  >
-                    <button
-                      className="as-btn-aqua"
-                      style={{
-                        flex: "1 1 120px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => setActiveDashboard("livelihood")}
-                    >
-                      Workspace &rarr;
-                    </button>
-                    <button
-                      className="as-qr-btn"
-                      style={{
-                        flex: "1 1 150px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => handleGenerateQR("Livelihood", "Services")}
-                    >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("livelihood")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("Livelihood", "Services")}>
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -545,70 +273,19 @@ export default function ManageServices() {
 
               {/* 3. BSWD */}
               {allowedServices.includes("BSWD") && (
-                <div
-                  className="as-card"
-                  style={{ display: "flex", flexDirection: "column" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: "#f0fdf2",
-                        color: "#115e59",
-                        padding: "12px",
-                        borderRadius: "12px",
-                      }}
-                    >
-                      <SirenIcon />
-                    </div>
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#f0fdf2", color: "#115e59", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
                     <div>
                       <h3 style={{ margin: 0, fontSize: "1.1rem" }}>BSWD</h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        Social Welfare
-                      </span>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Social Welfare</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>
-                    Manage reports of displaced persons and community tips
-                    regarding resident welfare.
-                  </p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Manage reports of displaced persons and community tips regarding resident welfare.</p>
                   <StatBar stats={bswdStats} />
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      marginTop: "16px",
-                    }}
-                  >
-                    <button
-                      className="as-btn-aqua"
-                      style={{
-                        flex: "1 1 120px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => setActiveDashboard("bswd")}
-                    >
-                      Workspace &rarr;
-                    </button>
-                    <button
-                      className="as-qr-btn"
-                      style={{
-                        flex: "1 1 150px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => handleGenerateQR("BSWD", "Services")}
-                    >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("bswd")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("BSWD", "Services")}>
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -617,70 +294,19 @@ export default function ManageServices() {
 
               {/* 4. VAWC - Promoted */}
               {allowedServices.includes("VAWC") && (
-                <div
-                  className="as-card"
-                  style={{ display: "flex", flexDirection: "column" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: "#fff1f2",
-                        color: "#e11d48",
-                        padding: "12px",
-                        borderRadius: "12px",
-                      }}
-                    >
-                      <SirenIcon />
-                    </div>
+                <div className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                    <div style={{ background: "#fff1f2", color: "#e11d48", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
                     <div>
                       <h3 style={{ margin: 0, fontSize: "1.1rem" }}>VAWC</h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        Case Management &amp; Desk Intake
-                      </span>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Case Management &amp; Desk Intake</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>
-                    Log VAC/VAW incident reports, manage protective actions, and
-                    track referrals.
-                  </p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Log VAC/VAW incident reports, manage protective actions, and track referrals.</p>
                   <StatBar stats={vawcStats} />
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      marginTop: "16px",
-                    }}
-                  >
-                    <button
-                      className="as-btn-aqua"
-                      style={{
-                        flex: "1 1 120px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => setActiveDashboard("vawc")}
-                    >
-                      Workspace &rarr;
-                    </button>
-                    <button
-                      className="as-qr-btn"
-                      style={{
-                        flex: "1 1 150px",
-                        justifyContent: "center",
-                        whiteSpace: "normal",
-                        textAlign: "center",
-                      }}
-                      onClick={() => handleGenerateQR("VAWC", "Services")}
-                    >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("vawc")}>Workspace &rarr;</button>
+                    <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("VAWC", "Services")}>
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>
@@ -692,86 +318,30 @@ export default function ManageServices() {
 
         {hasInfoServices && (
           <>
-            <div
-              className="as-header-section"
-              style={{
-                marginTop: "40px",
-                paddingTop: "20px",
-                borderTop: "1px solid #e5e7eb",
-              }}
-            >
+            <div className="as-header-section" style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
               <div className="as-title-wrap">
                 <h2>Informational Services</h2>
-                <p className="as-subtitle">
-                  Standard content guides mapping to external references or
-                  rules.
-                </p>
+                <p className="as-subtitle">Standard content guides mapping to external references or rules.</p>
               </div>
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                gap: "20px",
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
               {[
-                {
-                  name: "BADAC",
-                  color: { bg: "#fef3c7", text: "#b45309" },
-                  desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures.",
-                },
-                {
-                  name: "BOSCA",
-                  color: { bg: "#e0e7ff", text: "#4338ca" },
-                  desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines.",
-                },
+                { name: "BADAC", color: { bg: "#fef3c7", text: "#b45309" }, desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures." },
+                { name: "BOSCA", color: { bg: "#e0e7ff", text: "#4338ca" }, desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines." },
               ]
                 .filter((svc) => allowedServices.includes(svc.name))
                 .map((svc) => (
-                  <div
-                    key={svc.name}
-                    className="as-card"
-                    style={{ display: "flex", flexDirection: "column" }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: svc.color.bg,
-                          color: svc.color.text,
-                          padding: "12px",
-                          borderRadius: "12px",
-                        }}
-                      >
-                        <InfoIcon />
-                      </div>
+                  <div key={svc.name} className="as-card" style={{ display: "flex", flexDirection: "column" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                      <div style={{ background: svc.color.bg, color: svc.color.text, padding: "12px", borderRadius: "12px" }}><InfoIcon /></div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: "1.1rem" }}>
-                          {svc.name}
-                        </h3>
-                        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                          Informational Content
-                        </span>
+                        <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{svc.name}</h3>
+                        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Informational Content</span>
                       </div>
                     </div>
-                    <p
-                      style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}
-                    >
-                      {svc.desc}
-                    </p>
-                    <button
-                      className="as-qr-btn"
-                      style={{ width: "100%", marginTop: "16px" }}
-                      onClick={() => handleGenerateQR(svc.name, "Services")}
-                    >
+                    <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{svc.desc}</p>
+                    <button className="as-qr-btn" style={{ width: "100%", marginTop: "16px" }} onClick={() => handleGenerateQR(svc.name, "Services")}>
                       <Manage_IconQR /> Generate QR Code
                     </button>
                   </div>

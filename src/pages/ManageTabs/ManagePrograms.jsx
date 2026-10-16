@@ -16,7 +16,6 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  onSnapshot,
   serverTimestamp,
   query,
   where,
@@ -30,6 +29,7 @@ import { runStatusMaintenance } from "../../services/statusUpdater";
 import { createUserNotification } from "../../services/userNotifications";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildProgramEmail } from "../../utils/emailTemplates";
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
 
 const PREVIEW_LIMIT = 120;
 const getTodayStr = () => new Date().toISOString().split("T")[0];
@@ -76,7 +76,6 @@ function StatusBadge({ status }) {
 
   const c = map[s] || map.pending;
 
-  // Capitalize first letter of each word
   const capitalizedStatus = raw
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -98,14 +97,9 @@ function StatusBadge({ status }) {
     >
       <span
         style={{
-          width: "6px",
-          height: "6px",
-          minWidth: "6px",
-          minHeight: "6px",
-          borderRadius: "50%",
-          backgroundColor: c.dot,
-          display: "inline-block",
-          flexShrink: 0,
+          width: "6px", height: "6px", minWidth: "6px", minHeight: "6px",
+          borderRadius: "50%", backgroundColor: c.dot,
+          display: "inline-block", flexShrink: 0,
         }}
       />
       {capitalizedStatus}
@@ -133,7 +127,6 @@ function StatBar({ stats }) {
           const key = status.toLowerCase().trim();
           const c = statusColors[key] || { bg: "#f3f4f6", text: "#4b5563", dot: "#9ca3af" };
           
-          // Capitalize each word (e.g. "registered" -> "Registered", "pending" -> "Pending")
           const capitalizedStatus = status
             .split(" ")
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -143,30 +136,12 @@ function StatBar({ stats }) {
             <span
               key={status}
               style={{
-                fontSize: "0.72rem",
-                padding: "3px 8px",
-                borderRadius: "10px",
-                background: c.bg,
-                color: c.text,
-                fontWeight: 600,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
+                fontSize: "0.72rem", padding: "3px 8px", borderRadius: "10px",
+                background: c.bg, color: c.text, fontWeight: 600,
+                display: "inline-flex", alignItems: "center", gap: "5px",
               }}
             >
-              {/* Visible Status Dot */}
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  minWidth: "6px",
-                  minHeight: "6px",
-                  borderRadius: "50%",
-                  backgroundColor: c.dot,
-                  display: "inline-block",
-                  flexShrink: 0,
-                }}
-              />
+              <span style={{ width: "6px", height: "6px", minWidth: "6px", minHeight: "6px", borderRadius: "50%", backgroundColor: c.dot, display: "inline-block", flexShrink: 0 }} />
               {capitalizedStatus}: {count}
             </span>
           );
@@ -177,11 +152,11 @@ function StatBar({ stats }) {
   );
 }
 
+// ─── PROGRAM WORKSPACE COMPONENT (Optimized with React Query) ───
 function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
-  const [attendees, setAttendees] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filterStatus, setFilterStatus] = useState("All");
-  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc
+  const [sortOrder, setSortOrder] = useState("date_desc");
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -189,37 +164,28 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
   const [removeTarget, setRemoveTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
-
   const [showEmailBlast, setShowEmailBlast] = useState(false);
 
-  useEffect(() => {
-    const attendeesRef = query(
-      collection(db, "Programs", program.id, "attendees"),
-      orderBy("createdAt", "desc"),
-      limit(150)
-    );
-    const unsub = onSnapshot(
-      attendeesRef,
-      (snap) => {
-        setAttendees(snap.docs.map((d) => {
-          const docData = d.data();
-          const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
-          return {
-            id: d.id,
-            rawDate,
-            ...docData
-          };
-        }));
-        setLoading(false);
-      },
-      (err) => { console.error("Error loading attendees:", err); setLoading(false); }
-    );
-    return () => unsub();
-  }, [program.id]);
+  const { data: attendees = [], isLoading: loading } = useQuery({
+    queryKey: ['adminManage_programWorkspace', program.id],
+    queryFn: async () => {
+      const attendeesRef = query(
+        collection(db, "Programs", program.id, "attendees"),
+        orderBy("createdAt", "desc"),
+        limit(150)
+      );
+      const snap = await getDocs(attendeesRef);
+      return snap.docs.map((d) => {
+        const docData = d.data();
+        const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+        return { id: d.id, rawDate, ...docData };
+      });
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
   const totalSlots = parseInt(program.slots || "0", 10);
-  const getApprovedCount = () =>
-    attendees.filter((a) => (a.status || "").toLowerCase() === "approved").length;
+  const getApprovedCount = () => attendees.filter((a) => (a.status || "").toLowerCase() === "approved").length;
   const getSlotsLeft = () => {
     if (!totalSlots) return null;
     return totalSlots - getApprovedCount();
@@ -254,7 +220,6 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
         where("programId", "==", program.id),
         where("userID", "==", a.userID)
       );
-
       const regSnap = await getDocs(regQ);
 
       for (const regDoc of regSnap.docs) {
@@ -263,17 +228,16 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
           updatedAt: serverTimestamp(),
         });
       }
+      
       const residentID = a.userID || a.residentID;
       const hhID = a.householdID;
       if (residentID && hhID) {
-        await createUserNotification(
-          hhID, residentID,
-          "Program Registration Approved",
-          `Your registration for "${program.title}" has been approved!`,
-          "general",
-          a.id
-        );
+        await createUserNotification(hhID, residentID, "Program Registration Approved", `Your registration for "${program.title}" has been approved!`, "general", a.id);
       }
+      
+      // Refresh cache
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
     } catch (err) { console.error(err); }
   };
 
@@ -289,32 +253,24 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
         updatedAt: serverTimestamp(),
       });
 
-      const regQ = query(
-        collection(db, "programRegistrations"),
-        where("programId", "==", program.id),
-        where("userID", "==", a.userID)
-      );
-
+      const regQ = query(collection(db, "programRegistrations"), where("programId", "==", program.id), where("userID", "==", a.userID));
       const regSnap = await getDocs(regQ);
 
       for (const regDoc of regSnap.docs) {
         await updateDoc(doc(db, "programRegistrations", regDoc.id), {
-          status: "rejected",
-          rejectReason: rejectReason.trim(),
-          updatedAt: serverTimestamp(),
+          status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
         });
       }
+      
       const residentID = a?.userID || a?.residentID;
       const hhID = a?.householdID;
       if (residentID && hhID) {
-        await createUserNotification(
-          hhID, residentID,
-          "Program Registration Rejected",
-          `Your registration for "${program.title}" was rejected. Reason: ${rejectReason.trim()}`,
-          "general",
-          a.id
-        );
+        await createUserNotification(hhID, residentID, "Program Registration Rejected", `Your registration for "${program.title}" was rejected. Reason: ${rejectReason.trim()}`, "general", a.id);
       }
+      
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
+      
       setShowRejectModal(false); setRejectTarget(null); setRejectReason("");
     } catch (err) { console.error(err); }
     setSaving(false);
@@ -325,28 +281,20 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     setSaving(true);
     try {
       await updateDoc(doc(db, "Programs", program.id, "attendees", removeTarget), {
-        status: "pending",
-        rejectReason: "",
-        updatedAt: serverTimestamp(),
+        status: "pending", rejectReason: "", updatedAt: serverTimestamp(),
       });
 
       const attendee = attendees.find((x) => x.id === removeTarget);
-
-      const regQ = query(
-        collection(db, "programRegistrations"),
-        where("programId", "==", program.id),
-        where("userID", "==", attendee?.userID)
-      );
-
+      const regQ = query(collection(db, "programRegistrations"), where("programId", "==", program.id), where("userID", "==", attendee?.userID));
       const regSnap = await getDocs(regQ);
 
       for (const regDoc of regSnap.docs) {
-        await updateDoc(doc(db, "programRegistrations", regDoc.id), {
-          status: "pending",
-          rejectReason: "",
-          updatedAt: serverTimestamp(),
-        });
+        await updateDoc(doc(db, "programRegistrations", regDoc.id), { status: "pending", rejectReason: "", updatedAt: serverTimestamp() });
       }
+      
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
+
       setShowRemoveModal(false); setRemoveTarget(null);
     } catch (err) { console.error(err); }
     setSaving(false);
@@ -428,10 +376,8 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
               </div>
               <div style={{ marginTop: "8px", width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
                 <div style={{
-                  height: "100%",
-                  width: `${Math.min((getApprovedCount() / totalSlots) * 100, 100)}%`,
-                  background: isFull ? "#ef4444" : "#2DB17B",
-                  borderRadius: "4px", transition: "width 0.3s",
+                  height: "100%", width: `${Math.min((getApprovedCount() / totalSlots) * 100, 100)}%`,
+                  background: isFull ? "#ef4444" : "#2DB17B", borderRadius: "4px", transition: "width 0.3s",
                 }} />
               </div>
             </div>
@@ -640,9 +586,10 @@ const EMPTY_PROGRAM = {
   slots: "", requirements: [""], customFields: [],
 };
 
+// ─── MAIN MANAGE PROGRAMS COMPONENT ───
 export default function ManagePrograms() {
-  const [programs, setPrograms] = useState([]);
-  const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const queryClient = useQueryClient(); // <-- For invalidating caches
+  
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -656,89 +603,89 @@ export default function ManagePrograms() {
   const [newProgram, setNewProgram] = useState(EMPTY_PROGRAM);
   const [activeProgramWorkspace, setActiveProgramWorkspace] = useState(null);
 
-  const [programStats, setProgramStats] = useState({});
-
+  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    runStatusMaintenance();
+  // Run status maintenance occasionally
+  useEffect(() => { runStatusMaintenance(); }, []);
 
-    const progQuery = query(
-      collection(db, "Programs"),
-      orderBy("createdAt", "desc"),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(
-      progQuery,
-      (snapshot) => {
-        setPrograms(
-          snapshot.docs
-            .map((d) => {
-              const docData = d.data();
-              const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
-              return {
-                id: d.id,
-                rawDate,
-                ...docData
-              };
-            })
-            .filter((p) => p.programType !== "livelihood")
-        );
-        setLoadingPrograms(false);
-      },
-      (error) => { console.error("Error fetching programs:", error); setLoadingPrograms(false); }
-    );
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (programs.length === 0) return;
-    const unsubs = programs.map((prog) => {
-      const attendeesRef = query(
-        collection(db, "Programs", prog.id, "attendees"),
+  // ─── OPTIMIZED: React Query for Programs List ───
+  const { data: programs = [], isLoading: loadingPrograms } = useQuery({
+    queryKey: ['adminManage_programs'],
+    queryFn: async () => {
+      const progQuery = query(
+        collection(db, "Programs"),
         orderBy("createdAt", "desc"),
-        limit(150)
+        limit(100)
       );
+      const snapshot = await getDocs(progQuery);
+      return snapshot.docs
+        .map((d) => {
+          const docData = d.data();
+          const rawDate = docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : (docData.createdAt ? new Date(docData.createdAt).getTime() : 0);
+          return { id: d.id, rawDate, ...docData };
+        })
+        .filter((p) => p.programType !== "livelihood");
+    },
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
+
+  const { data: programStats = {} } = useQuery({
+    queryKey: ['adminManage_programStats', programs.map(p => p.id)],
+    queryFn: async () => {
+      const statsObj = {};
       
-      return onSnapshot(attendeesRef, (snap) => {
-        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const byStatus = {};
-        let latest = null;
-        docs.forEach((doc) => {
-          const s = doc.status || "pending";
-          byStatus[s] = (byStatus[s] || 0) + 1;
-          const ts = doc.createdAt;
+      await Promise.all(programs.map(async (prog) => {
+        const baseRef = collection(db, "Programs", prog.id, "attendees");
+
+        // Run all counts in parallel on the server (costs only 1 read per aggregate!)
+        const [totalSnap, approvedSnap, pendingSnap, rejectedSnap, registeredSnap, latestSnap] = await Promise.all([
+          getCountFromServer(baseRef),
+          getCountFromServer(query(baseRef, where("status", "==", "approved"))),
+          getCountFromServer(query(baseRef, where("status", "==", "pending"))),
+          getCountFromServer(query(baseRef, where("status", "==", "rejected"))),
+          getCountFromServer(query(baseRef, where("status", "==", "registered"))),
+          getDocs(query(baseRef, orderBy("createdAt", "desc"), limit(1))) // Only fetch exactly 1 document to find the latest date
+        ]);
+
+        let latestDate = "—";
+        if (!latestSnap.empty) {
+          const ts = latestSnap.docs[0].data().createdAt;
           if (ts) {
             const d = ts.toDate ? ts.toDate() : new Date(ts);
-            if (!latest || d > latest) latest = d;
+            latestDate = d.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
           }
-        });
-        setProgramStats((prev) => ({
-          ...prev,
-          [prog.id]: {
-            total: docs.length,
-            byStatus,
-            latest: latest ? latest.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—",
+        }
+
+        statsObj[prog.id] = {
+          total: totalSnap.data().count,
+          byStatus: {
+            approved: approvedSnap.data().count,
+            pending: pendingSnap.data().count,
+            rejected: rejectedSnap.data().count,
+            registered: registeredSnap.data().count,
           },
-        }));
-      });
-    });
-    return () => unsubs.forEach((u) => u());
-  }, [programs]);
+          latest: latestDate,
+        };
+      }));
+      
+      return statsObj;
+    },
+    enabled: programs.length > 0,
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
 
   const handleGenerateQR = (prog) => {
     const today = getTodayStr();
@@ -800,9 +747,10 @@ export default function ManagePrograms() {
     try {
       await deleteDoc(doc(db, "Programs", id));
       logTransaction(adminName, adminRole, "DELETED_PROGRAM", `Deleted program "${progTitle}" ID: ${id}`);
+      // Refresh cache
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programs'] });
     } catch (error) {
       console.error("Error deleting program:", error);
-      logTransaction(adminName, adminRole, "FAILED_DELETE_PROGRAM", `Failed to delete program "${progTitle}" ID: ${id} - ${error.message}`);
       alert("Failed to delete program. Please try again.");
     }
   };
@@ -838,6 +786,10 @@ export default function ManagePrograms() {
         });
         logTransaction(adminName, adminRole, "CREATED_PROGRAM", `Created new program: "${newProgram.title}"`);
       }
+      
+      // Refresh cache
+      queryClient.invalidateQueries({ queryKey: ['adminManage_programs'] });
+      
       setNewProgram(EMPTY_PROGRAM);
       setEditingProgramId(null);
       setShowAddModal(false);
