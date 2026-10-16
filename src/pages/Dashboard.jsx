@@ -730,10 +730,19 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                   color: overdueRentals.some(r => r.status === 'Unreturned') ? "#c2410c" : "#b91c1c",
                   fontFamily: "'Poppins', sans-serif"
                 }}>
-                  {overdueRentals.length > 1
-                    ? t('dashboard_eq_return_multi', overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment', overdueRentals.length - 1)
-                    : t('dashboard_eq_return_single', overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment')
-                  }
+                  {overdueRentals.length > 1 ? (
+                    <>
+                      {t('dashboard_eq_return_multi_prefix', 'Please return your rented ')}
+                      <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment'}</strong>
+                      {t('dashboard_eq_return_multi_suffix', overdueRentals.length - 1)}
+                    </>
+                  ) : (
+                    <>
+                      {t('dashboard_eq_return_single_prefix', 'Please return your rented ')}
+                      <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment'}</strong>
+                      {t('dashboard_eq_return_single_suffix', ' to the Barangay Hall as soon as possible.')}
+                    </>
+                  )}
                 </p>
               </div>
 

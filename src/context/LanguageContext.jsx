@@ -126,7 +126,11 @@ const translations = {
     dashboard_eq_overdue_single: 'Action Required: Overdue Equipment Return',
     dashboard_eq_overdue_multi: (n) => `Action Required: ${n} Equipment Rentals Overdue`,
     dashboard_eq_return_single: (name) => `Please return your rented ${name} to the Barangay Hall as soon as possible.`,
+    dashboard_eq_return_single_prefix: 'Please return your rented ',
+    dashboard_eq_return_single_suffix: ' to the Barangay Hall as soon as possible.',
     dashboard_eq_return_multi: (name, n) => `Please return your rented ${name} and ${n} other item(s) to the Barangay Hall.`,
+    dashboard_eq_return_multi_prefix: 'Please return your rented ',
+    dashboard_eq_return_multi_suffix: (n) => ` and ${n} other item(s) to the Barangay Hall.`,
 
     // ─── Widget labels ───
     widget_verified_visits: 'Verified Visits',
@@ -1068,7 +1072,11 @@ const translations = {
     dashboard_eq_overdue_single: 'Kailangan ng Aksyon: Nalagpasan na ang Petsa ng Pagbabalik ng Kagamitan',
     dashboard_eq_overdue_multi: (n) => `Kailangan ng Aksyon: ${n} Kagamitang Naka-overdue`,
     dashboard_eq_return_single: (name) => `Mangyaring ibalik ang iyong inarkilang ${name} sa Barangay Hall sa lalong madaling panahon.`,
+    dashboard_eq_return_single_prefix: 'Mangyaring ibalik ang iyong inarkilang ',
+    dashboard_eq_return_single_suffix: ' sa Barangay Hall sa lalong madaling panahon.',
     dashboard_eq_return_multi: (name, n) => `Mangyaring ibalik ang iyong inarkilang ${name} at ${n} pang item sa Barangay Hall.`,
+    dashboard_eq_return_multi_prefix: 'Mangyaring ibalik ang iyong inarkilang ',
+    dashboard_eq_return_multi_suffix: (n) => ` at ${n} pang item sa Barangay Hall.`,
 
     // ─── Widget labels ───
     widget_verified_visits: 'Mga Beripikadong Pagbisita',
