@@ -1,35 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
-import { Search, Eye, CheckCircle, XCircle, X, Calendar, FileText, User, Info, Clock } from 'lucide-react';
+import { Search, CheckCircle, XCircle, X, Clock, Info } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, increment, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, increment, orderBy, limit } from 'firebase/firestore';
 import { onAuthStateChanged } from "firebase/auth";
 import { createUserNotification } from '../services/userNotifications';
 import { logTransaction } from '../services/logger';
 import { formatDisplayEmail } from '../utils/maskEmail';
 import { getFamilyNumber } from '../utils/householdNumbers';
-import { useAlert } from '../context/AlertContext'; // <-- IMPORT HOOK
+import { useAlert } from '../context/AlertContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; 
 
 export default function AdminRequests() {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  const { showAlert } = useAlert(); // <-- INITIALIZE HOOK
+  const queryClient = useQueryClient(); 
+  const { showAlert } = useAlert();
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // --- STATE MANAGEMENT ---
-  const [activeTab, setActiveTab] = useState('Facility'); // 'Facility', 'Document', or 'Equipment'
+  const [activeTab, setActiveTab] = useState('Facility');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [sortOrder, setSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc
+  const [sortOrder, setSortOrder] = useState('date_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Modal State
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -37,7 +33,6 @@ export default function AdminRequests() {
   const [isUnreturnedModalOpen, setIsUnreturnedModalOpen] = useState(false);
   const [unreturnedNotes, setUnreturnedNotes] = useState('');
 
-  // --- FIREBASE HELPER FUNCTIONS ---
   const formatTime = (time24) => {
     if (!time24) return 'N/A';
     const [h, m] = time24.split(':');
@@ -67,61 +62,25 @@ export default function AdminRequests() {
   };
   
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const docQuery = query(collection(db, 'document_requests'), orderBy('submittedAt', 'desc'), limit(150));
-    const facQuery = query(collection(db, 'facility_reservations'), orderBy('submittedAt', 'desc'), limit(150));
-    const eqQuery = query(collection(db, 'equipment_rentals'), orderBy('submittedAt', 'desc'), limit(150));
-
-    let docList = [];
-    let facList = [];
-    let eqList = [];
-
-    const updateCombined = () => {
-      const combined = [...docList, ...facList, ...eqList];
-      setRequests(combined);
-      setLoading(false);
-    };
-
-    const unsubDocs = onSnapshot(docQuery, (snapshot) => {
-      docList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
-        const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
-        return {
-          docId: doc.id,
-          collectionName: 'document_requests',
-          id: data.requestID || data.refNum || doc.id.substring(0, 8).toUpperCase(),
-          residentName: data.fullName || data.residentName || formatName(data.firstName, data.middleName, data.lastName),
-          contact: sanitizedEmail,
-          category: 'Document',
-          type: data.documentType || 'Unknown Document',
-          purpose: data.purpose || 'No purpose stated',
-          dateRequested: formatDate(rawDate),
-          rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
-          dateNeeded: formatDate(data.dateNeeded),
-          status: data.status || 'Pending',
-          allData: { ...data, email: sanitizedEmail }
-        };
-      });
-      updateCombined();
-    });
-
-    const unsubFacs = onSnapshot(facQuery, (snapshot) => {
-      facList = snapshot.docs.map(doc => {
+  // ─── 1. LAZY LOADED: Facility Reservations ───
+  const { data: facRequests = [], isLoading: facLoading } = useQuery({
+    queryKey: ['adminManage_facRequests'],
+    queryFn: async () => {
+      const facSnap = await getDocs(query(collection(db, 'facility_reservations'), orderBy('submittedAt', 'desc'), limit(150)));
+      return facSnap.docs.map(doc => {
         const data = doc.data();
         const time = data.timeSlot ? ` (${data.timeSlot})` : '';
         let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
@@ -146,11 +105,47 @@ export default function AdminRequests() {
           allData: { ...data, email: sanitizedEmail }
         };
       });
-      updateCombined();
-    });
+    },
+    enabled: activeTab === 'Facility', 
+    staleTime: 1000 * 60 * 30,
+  });
 
-    const unsubEqs = onSnapshot(eqQuery, (snapshot) => {
-      eqList = snapshot.docs.map(doc => {
+  // ─── 2. LAZY LOADED: Document Requests ───
+  const { data: docRequests = [], isLoading: docLoading } = useQuery({
+    queryKey: ['adminManage_docRequests'],
+    queryFn: async () => {
+      const docSnap = await getDocs(query(collection(db, 'document_requests'), orderBy('submittedAt', 'desc'), limit(150)));
+      return docSnap.docs.map(doc => {
+        const data = doc.data();
+        let rawDate = data.submittedAt || data.dateRequested || data.createdAt || null;
+        const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
+        return {
+          docId: doc.id,
+          collectionName: 'document_requests',
+          id: data.requestID || data.refNum || doc.id.substring(0, 8).toUpperCase(),
+          residentName: data.fullName || data.residentName || formatName(data.firstName, data.middleName, data.lastName),
+          contact: sanitizedEmail,
+          category: 'Document',
+          type: data.documentType || 'Unknown Document',
+          purpose: data.purpose || 'No purpose stated',
+          dateRequested: formatDate(rawDate),
+          rawDate: rawDate?.toDate ? rawDate.toDate().getTime() : (rawDate ? new Date(rawDate).getTime() : 0),
+          dateNeeded: formatDate(data.dateNeeded),
+          status: data.status || 'Pending',
+          allData: { ...data, email: sanitizedEmail }
+        };
+      });
+    },
+    enabled: activeTab === 'Document', 
+    staleTime: 1000 * 60 * 30,
+  });
+
+  // ─── 3. LAZY LOADED: Equipment Rentals ───
+  const { data: eqRequests = [], isLoading: eqLoading } = useQuery({
+    queryKey: ['adminManage_eqRequests'],
+    queryFn: async () => {
+      const eqSnap = await getDocs(query(collection(db, 'equipment_rentals'), orderBy('submittedAt', 'desc'), limit(150)));
+      return eqSnap.docs.map(doc => {
         const data = doc.data();
         let rawDate = data.submittedAt || data.createdAt || null;
         const sanitizedEmail = formatDisplayEmail(data.email, adminRole);
@@ -184,20 +179,16 @@ export default function AdminRequests() {
           allData: { ...data, email: sanitizedEmail }
         };
       });
-      updateCombined();
-    });
+    },
+    enabled: activeTab === 'Equipment',
+    staleTime: 1000 * 60 * 30,
+  });
 
-    return () => {
-      unsubDocs();
-      unsubFacs();
-      unsubEqs();
-    };
-  }, [adminRole]);
+  const requests = activeTab === 'Facility' ? facRequests : activeTab === 'Document' ? docRequests : eqRequests;
+  const loading = activeTab === 'Facility' ? facLoading : activeTab === 'Document' ? docLoading : eqLoading;
 
-  // --- FILTERING & SORTING LOGIC ---
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
-      const matchesTab = req.category === activeTab;
       const safeSearchTerm = String(searchTerm || "").toLowerCase();
       const safeResidentName = String(req.residentName || "").toLowerCase();
       const safeType = String(req.type || "").toLowerCase();
@@ -211,23 +202,15 @@ export default function AdminRequests() {
         
       const matchesStatus = filterStatus === 'All' || safeStatus === filterStatus.toLowerCase();
       
-      return matchesTab && matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus;
     }).sort((a, b) => {
-      if (sortOrder === "date_desc") {
-        return (b.rawDate || 0) - (a.rawDate || 0);
-      }
-      if (sortOrder === "date_asc") {
-        return (a.rawDate || 0) - (b.rawDate || 0);
-      }
-      if (sortOrder === "name_asc") {
-        return (a.residentName || "").localeCompare(b.residentName || "");
-      }
-      if (sortOrder === "name_desc") {
-        return (b.residentName || "").localeCompare(a.residentName || "");
-      }
+      if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+      if (sortOrder === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+      if (sortOrder === "name_asc") return (a.residentName || "").localeCompare(b.residentName || "");
+      if (sortOrder === "name_desc") return (b.residentName || "").localeCompare(a.residentName || "");
       return 0;
     });
-  }, [requests, activeTab, searchTerm, filterStatus, sortOrder]);
+  }, [requests, searchTerm, filterStatus, sortOrder]);
 
   useEffect(() => {
     setFilterStatus('All');
@@ -299,22 +282,39 @@ export default function AdminRequests() {
     setUnreturnedNotes('');
   };
 
+  const updateLocalCache = (category, docId, newStatus) => {
+    const queryKey = category === 'Facility' ? ['adminManage_facRequests'] :
+                     category === 'Document' ? ['adminManage_docRequests'] :
+                     ['adminManage_eqRequests'];
+
+    queryClient.setQueryData(queryKey, (old = []) => 
+      old.map(req => req.docId === docId ? { ...req, status: newStatus } : req)
+    );
+  };
+
   const handleApprove = async (req) => {
     const target = req || selectedRequest;
     if (!target) return;
 
     if (target.category === 'Facility') {
-      const hasOverlap = requests.some(r => {
-        if (r.category !== 'Facility' || r.docId === target.docId || String(r.status || "").toLowerCase() !== 'approved') return false;
-        const targetData = target.allData;
-        const rData = r.allData;
-        if (String(rData.facilityId) !== String(targetData.facilityId)) return false;
-        if (rData.date !== targetData.date) return false;
+      const targetData = target.allData;
+      
+      // ─── OPTIMIZED: Targeted Server-Side Check ensures 100% accuracy ───
+      const overlapQuery = query(
+        collection(db, 'facility_reservations'),
+        where('facilityId', '==', String(targetData.facilityId)),
+        where('date', '==', targetData.date),
+        where('status', 'in', ['Approved', 'approved', 'Completed', 'completed'])
+      );
+      
+      const checkSnap = await getDocs(overlapQuery);
+      const hasOverlap = checkSnap.docs.some(doc => {
+        if (doc.id === target.docId) return false;
+        const rData = doc.data();
         return targetData.startTime < rData.endTime && rData.startTime < targetData.endTime;
       });
 
       if (hasOverlap) {
-        // <-- REPLACED ALERT
         await showAlert("Conflict", "Cannot approve: The selected time slot conflicts with an existing approved reservation.");
         return;
       }
@@ -349,12 +349,11 @@ export default function AdminRequests() {
         );
       }
 
-      // <-- REPLACED ALERT
+      updateLocalCache(target.category, target.docId, 'Approved'); // Sync UI instantly
       await showAlert("Success", "Request Approved Successfully!");
       closeModal();
     } catch (error) {
       console.error("Error approving request: ", error);
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to approve request.");
     }
   };
@@ -387,12 +386,11 @@ export default function AdminRequests() {
         );
       }
 
-      // <-- REPLACED ALERT
+      updateLocalCache(target.category, target.docId, 'Ready for Pickup');
       await showAlert("Success", "Request Marked as Ready for Pickup.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to update request.");
     }
   };
@@ -418,6 +416,8 @@ export default function AdminRequests() {
           await updateDoc(eqRef, {
             quantity: increment(-requestedQty)
           });
+          // ─── OPTIMIZED: Cross-Cache Invalidation ───
+          queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
         }
       }
 
@@ -437,12 +437,11 @@ export default function AdminRequests() {
         );
       }
 
-      // <-- REPLACED ALERT
+      updateLocalCache(target.category, target.docId, 'Claimed');
       await showAlert("Success", "Request Marked as Claimed.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to update request.");
     }
   };
@@ -468,6 +467,8 @@ export default function AdminRequests() {
           await updateDoc(eqRef, {
             quantity: increment(requestedQty)
           });
+          // ─── OPTIMIZED: Cross-Cache Invalidation ───
+          queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
         }
       }
 
@@ -486,12 +487,11 @@ export default function AdminRequests() {
         );
       }
 
-      // <-- REPLACED ALERT
+      updateLocalCache(target.category, target.docId, 'Returned');
       await showAlert("Success", "Equipment Marked as Returned.");
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to update request.");
     }
   };
@@ -529,19 +529,17 @@ export default function AdminRequests() {
         );
       }
 
-      // <-- REPLACED ALERT
+      updateLocalCache(target.category, target.docId, 'Unreturned');
       await showAlert("Reported", "Equipment reported as Unreturned.");
       closeModal();
     } catch (error) {
       console.error('Error reporting unreturned:', error);
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to report equipment as unreturned.");
     }
   };
 
   const handleConfirmReject = async () => {
     if (rejectReason.trim() === '') {
-      // <-- REPLACED ALERT
       await showAlert("Required Field", "Please provide a reason for rejection.");
       return;
     }
@@ -576,6 +574,7 @@ export default function AdminRequests() {
         );
       }
 
+      updateLocalCache(selectedRequest.category, selectedRequest.docId, 'Rejected');
       await showAlert("Success", "Request Rejected.");
       closeModal();
     } catch (error) {
@@ -1024,59 +1023,59 @@ export default function AdminRequests() {
               </div>
               
               <div className="modal-footer">
-{(
-  String(selectedRequest.status || "").toLowerCase() === 'pending' ||
-  (String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment')) ||
-  (String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment')) ||
-  ((['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment') ||
-  (String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment')
-) && (
-  <div className="modal-footer">
-    {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
-      <>
-        <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
-          <XCircle size={16} /> Reject
-        </button>
-        <button className="btn-approve" onClick={() => handleApprove()}>
-          <CheckCircle size={16} /> Approve
-        </button>
-      </>
-    )}
-    {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-      <button className="btn-approve" onClick={() => handleReadyForPickup()}>
-        <CheckCircle size={16} /> Mark Ready for Pickup
-      </button>
-    )}
-    {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-      <button className="btn-approve" onClick={() => handleClaimed()}>
-        <CheckCircle size={16} /> Mark Claimed
-      </button>
-    )}
-    {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
-      <button className="btn-approve" onClick={() => handleReturned()}>
-        <CheckCircle size={16} /> Mark Returned
-      </button>
-    )}
-    {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
-      <button
-        onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
-        style={{
-          height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
-          fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          gap: '6px', padding: '0 16px', borderRadius: '8px',
-          background: '#fff7ed', color: '#c2410c',
-          border: '1.5px solid #fed7aa',
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-        Report Unreturned
-      </button>
-    )}
-  </div>
-)}
+                {(
+                  String(selectedRequest.status || "").toLowerCase() === 'pending' ||
+                  (String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment')) ||
+                  (String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment')) ||
+                  ((['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment') ||
+                  (String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment')
+                ) && (
+                  <div className="modal-footer">
+                    {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
+                      <>
+                        <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
+                          <XCircle size={16} /> Reject
+                        </button>
+                        <button className="btn-approve" onClick={() => handleApprove()}>
+                          <CheckCircle size={16} /> Approve
+                        </button>
+                      </>
+                    )}
+                    {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+                      <button className="btn-approve" onClick={() => handleReadyForPickup()}>
+                        <CheckCircle size={16} /> Mark Ready for Pickup
+                      </button>
+                    )}
+                    {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+                      <button className="btn-approve" onClick={() => handleClaimed()}>
+                        <CheckCircle size={16} /> Mark Claimed
+                      </button>
+                    )}
+                    {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
+                      <button className="btn-approve" onClick={() => handleReturned()}>
+                        <CheckCircle size={16} /> Mark Returned
+                      </button>
+                    )}
+                    {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
+                      <button
+                        onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
+                        style={{
+                          height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+                          fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          gap: '6px', padding: '0 16px', borderRadius: '8px',
+                          background: '#fff7ed', color: '#c2410c',
+                          border: '1.5px solid #fed7aa',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        Report Unreturned
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

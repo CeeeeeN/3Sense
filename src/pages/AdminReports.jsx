@@ -5,6 +5,7 @@ import { collection, getDocs, query, where, collectionGroup } from "firebase/fir
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../services/logger";
+import { useQuery } from '@tanstack/react-query'; // <-- Added React Query
 
 import barangayLogo from "./barangay-logo.jpg";
 
@@ -29,10 +30,7 @@ const getImageFormat = (src) => {
 export default function Reports() {
   // ── State ────────────────────────────────────────────────────────────────────
   const [reportType, setReportType] = useState("demographics");
-  const [residentData, setResidentData] = useState([]);
-  const [householdData, setHouseholdData] = useState([]);
-  const [vawcData, setVawcData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
   const [exportLoading, setExportLoading] = useState(false);
   const [sexFilter, setSexFilter] = useState("all");
   const [sortDemographics, setSortDemographics] = useState("name_asc");
@@ -52,105 +50,102 @@ export default function Reports() {
     setRbiAPage(1);
   }, [sortRbiA, rbiARowsPerPage]);
 
-  // ── Auth ─────────────────────────────────────────────────────────────────────
+  // ─── OPTIMIZED: Fetch Admin Profile from Session Cache (0 Reads) ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // ── Fetch Residents via collectionGroup ──────────────────────────────────────
-  useEffect(() => {
-    const fetchResidents = async () => {
-      setLoading(true);
-      try {
-        const snapshot = await getDocs(collectionGroup(db, "residents"));
-        const data = snapshot.docs.map((doc) => {
-          const d = doc.data();
-          let age = null;
-          if (d.birthDate) {
-            const birth = new Date(d.birthDate);
-            if (!isNaN(birth.getTime())) {
-              const today = new Date();
-              age = today.getFullYear() - birth.getFullYear();
-              const m = today.getMonth() - birth.getMonth();
-              if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-            }
+  // ─── 1. LAZY LOADED: Residents Data (Shared by Demographics & RBI) ───
+  const { data: residentData = [], isLoading: loadingResidents } = useQuery({
+    queryKey: ['adminManage_reportResidents'],
+    queryFn: async () => {
+      const snapshot = await getDocs(collectionGroup(db, "residents"));
+      return snapshot.docs.map((doc) => {
+        const d = doc.data();
+        let age = null;
+        if (d.birthDate) {
+          const birth = new Date(d.birthDate);
+          if (!isNaN(birth.getTime())) {
+            const today = new Date();
+            age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
           }
-          return {
-            id: doc.id,
-            householdID: d.householdID || "",
-            firstName: d.firstName || "",
-            lastName: d.lastName || "",
-            middleName: d.middleName || "",
-            suffix: d.suffix || "",
-            fullName: `${d.firstName || ""} ${d.lastName || ""}`.trim() || "Unknown",
-            sex: d.sex || "Unknown",
-            birthDate: d.birthDate || "",
-            birthPlace: d.birthPlace || "",
-            age,
-            civilStatus: d.civilStatus || "N/A",
-            citizenship: d.citizenship || "Filipino",
-            occupation: d.occupation || "",
-            religion: d.religion || "",
-            educationAttainment: d.educationAttainment || "",
-            educationStatus: d.educationStatus || "",
-            employmentStatus: d.employmentStatus || "",
-            role: d.role || "",
-            categories: d.categories || {},
-          };
-        });
-        setResidentData(data);
-      } catch (err) { console.error("Error fetching residents:", err); }
-      setLoading(false);
-    };
-    fetchResidents();
-  }, []);
+        }
+        return {
+          id: doc.id,
+          householdID: d.householdID || "",
+          firstName: d.firstName || "",
+          lastName: d.lastName || "",
+          middleName: d.middleName || "",
+          suffix: d.suffix || "",
+          fullName: `${d.firstName || ""} ${d.lastName || ""}`.trim() || "Unknown",
+          sex: d.sex || "Unknown",
+          birthDate: d.birthDate || "",
+          birthPlace: d.birthPlace || "",
+          age,
+          civilStatus: d.civilStatus || "N/A",
+          citizenship: d.citizenship || "Filipino",
+          occupation: d.occupation || "",
+          religion: d.religion || "",
+          educationAttainment: d.educationAttainment || "",
+          educationStatus: d.educationStatus || "",
+          employmentStatus: d.employmentStatus || "",
+          role: d.role || "",
+          categories: d.categories || {},
+        };
+      });
+    },
+    // Only load if the admin is looking at a tab that requires residents
+    enabled: reportType === 'demographics' || reportType === 'rbi-a' || reportType === 'rbi-c',
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
 
-  // ── Fetch Households ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchHouseholds = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, "households"));
-        const data = snapshot.docs.map((doc) => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            householdID: d.householdID || doc.id,
-            householdAddress: [d.houseNumber, d.street, d.barangay].filter(Boolean).join(", "),
-            totalMembers: d.totalMembers || 0,
-            householdClassification: d.householdClassification || "",
-            barangay: d.barangay || "Malanday",
-            city: d.city || "Valenzuela City",
-          };
-        });
-        setHouseholdData(data);
-      } catch (err) { console.error("Error fetching households:", err); }
-    };
-    fetchHouseholds();
-  }, []);
+  // ─── 2. LAZY LOADED: Households Data (For RBI Form A & C) ───
+  const { data: householdData = [], isLoading: loadingHouseholds } = useQuery({
+    queryKey: ['adminManage_reportHouseholds'],
+    queryFn: async () => {
+      const snapshot = await getDocs(collection(db, "households"));
+      return snapshot.docs.map((doc) => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          householdID: d.householdID || doc.id,
+          householdAddress: [d.houseNumber, d.street, d.barangay].filter(Boolean).join(", "),
+          totalMembers: d.totalMembers || 0,
+          householdClassification: d.householdClassification || "",
+          barangay: d.barangay || "Malanday",
+          city: d.city || "Valenzuela City",
+        };
+      });
+    },
+    enabled: reportType === 'rbi-a' || reportType === 'rbi-c',
+    staleTime: 1000 * 60 * 30,
+  });
 
-  // ── Fetch VAWC Cases ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchVawc = async () => {
-      try {
-        const snap = await getDocs(collection(db, "vawcCases"));
-        setVawcData(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      } catch (err) {
-        console.error("Error fetching VAWC cases for report:", err);
-      }
-    };
-    fetchVawc();
-  }, [reportType]);
+  // ─── 3. LAZY LOADED: VAWC Data ───
+  const { data: vawcData = [] } = useQuery({
+    queryKey: ['adminManage_reportVawc'],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, "vawcCases"));
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    },
+    enabled: reportType === 'vawc',
+    staleTime: 1000 * 60 * 30,
+  });
+
+  const loading = reportType === 'demographics' ? loadingResidents :
+                  reportType === 'rbi-a' || reportType === 'rbi-c' ? (loadingResidents || loadingHouseholds) : false;
 
   // ── Demographics Calculations ───────────────────────────────────────────────
   const filteredResidents = useMemo(() => {
@@ -1368,7 +1363,7 @@ export default function Reports() {
           </>
         )}
 
-        {/* ══ VAWC CASES TAB (Screenshot 1 & Screenshot 2 Structure) ═══════ */}
+        {/* ══ VAWC CASES TAB ═══════ */}
         {reportType === "vawc" && (
           <>
             <div className="card-grid">
@@ -1396,7 +1391,7 @@ export default function Reports() {
                 </div>
               </div>
 
-              {/* Official Document Matrix (Screenshot 1) */}
+              {/* Official Document Matrix */}
               <div className="req-table-wrapper" style={{ overflowX: "auto", border: "1px solid #cbd5e1", borderRadius: "8px" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "center" }}>
                   <thead>
