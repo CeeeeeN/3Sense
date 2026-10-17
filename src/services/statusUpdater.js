@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { collection, query, where, getDocs, writeBatch, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 export const runStatusMaintenance = async () => {

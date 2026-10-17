@@ -8,6 +8,7 @@ import TransferHouseholdModal from "../components/TransferHouseholdModal";
 import TransferHeadModal from "../components/TransferHeadModal";
 import TransferBranchHeadModal from "../components/TransferBranchHeadModal";
 import RemoveMemberModal from "../components/RemoveMemberModal";
+import { useLanguage } from "../context/LanguageContext";
 
 const QR_PAT = [
   true, true, true, false, true,
@@ -449,6 +450,7 @@ function PrivacyModal({ onClose }) {
 }
 
 export default function Profile({ onBack, onNavigate, householdID, memberID, userRole, userID }) {
+  const { t, language, setLanguage } = useLanguage();
   const [data, setData] = useState({ ...BLANK });
   const [draft, setDraft] = useState({ ...BLANK });
   const [open, setOpen] = useState(false);
@@ -1252,11 +1254,60 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
           {/* ── SETTINGS AND PREFERENCES MENU (MOBILE APP MATCH) ── */}
           <div style={{ marginBottom: "2rem" }}>
-            <Card icon={IconSettings} title="Preferences">
+            <Card icon={IconSettings} title={t('profile_settings_title', 'Preferences')}>
+              <SettingRow
+                icon={() => (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                )}
+                title={t('profile_settings_language', 'Language')}
+                description={t('profile_settings_language_desc', 'Choose your preferred interface language.')}
+                action={
+                  <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setLanguage('en')}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        background: language === 'en' ? '#317D89' : 'transparent',
+                        color: language === 'en' ? '#fff' : '#64748b',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {t('profile_settings_language_en', 'English')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLanguage('fil')}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        background: language === 'fil' ? '#317D89' : 'transparent',
+                        color: language === 'fil' ? '#fff' : '#64748b',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {t('profile_settings_language_fil', 'Filipino')}
+                    </button>
+                  </div>
+                }
+              />
               {isHead && (
                 <SettingRow 
                   icon={ProfileIconUser} 
-                  title="Transfer Head Role" 
+                  title={t('profile_transfer_head', 'Transfer Head Role')} 
                   description="Assign the Household Head role to another member" 
                   onClick={() => setActiveModal('transferHead')} 
                 />
@@ -1265,7 +1316,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               {isHead && (
                 <SettingRow 
                   icon={IconTrash} 
-                  title="Remove Member" 
+                  title={t('profile_remove_member', 'Remove Member')} 
                   description="Permanently delete a member from this household" 
                   onClick={() => setActiveModal('removeMember')} 
                 />
@@ -1273,14 +1324,14 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               {isBranchHead && (
                 <SettingRow 
                   icon={ProfileIconUser} 
-                  title="Transfer Branch Head Role" 
+                  title={t('profile_transfer_branch', 'Transfer Branch Head Role')} 
                   description="Assign the Branch Head role to another member" 
                   onClick={() => setActiveModal('transferBranchHead')} 
                 />
               )}
               <SettingRow 
                 icon={IconBell} 
-                title="Push Notifications" 
+                title={t('profile_settings_notif', 'Push Notifications')} 
                 description="Receive important updates & notifications" 
                 action={
                   <label className="pf-toggle-switch" style={{ position: "relative", display: "inline-block", width: "40px", height: "24px" }}>
@@ -1305,7 +1356,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               />
               <SettingRow 
                 icon={IconTransfer} 
-                title="Transfer Household" 
+                title={t('profile_transfer_household', 'Transfer Household')} 
                 description="Move your profile to a different household" 
                 onClick={() => setActiveModal('transfer')} 
               />
@@ -1313,25 +1364,25 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           </div>
 
           <div style={{ marginBottom: "2rem" }}>
-            <Card icon={IconSupport} title="Support">
+            <Card icon={IconSupport} title={t('profile_settings_support', 'Support')}>
               <SettingRow 
                 icon={IconHelp} 
-                title="Help & FAQ" 
+                title={t('profile_settings_help', 'Help & FAQ')} 
                 onClick={() => setActiveModal('help')} 
               />
               <SettingRow 
                 icon={IconMessage} 
-                title="Contact Barangay" 
+                title={t('profile_settings_contact', 'Contact Barangay')} 
                 onClick={() => setActiveModal('contact')} 
               />
               <SettingRow 
                 icon={IconInfo} 
-                title="About" 
+                title={t('profile_settings_about', 'About')} 
                 onClick={() => setActiveModal('about')} 
               />
               <SettingRow 
                 icon={IconShield2} 
-                title="Privacy Policy" 
+                title={t('profile_settings_privacy', 'Privacy Policy')} 
                 onClick={() => setActiveModal('privacy')} 
               />
             </Card>

@@ -4,7 +4,8 @@ import { db } from "../../firebase/firebase";
 import { submitFacilityReservation, submitEquipmentRental } from "../../services/services";
 import { createNotification } from "../../services/notifications";
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
-import { useAlert } from "../../context/AlertContext"; // <-- 1. IMPORT HOOK
+import { useAlert } from "../../context/AlertContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -48,6 +49,7 @@ function isFullyCovered(approvedOnDate, openTime, closeTime) {
 }
 
 function AdvanceBookingBanner() {
+  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
@@ -76,15 +78,15 @@ function AdvanceBookingBanner() {
       </svg>
       <div style={{ flex: 1 }}>
         <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}> 
-          Advance Booking Required
+          {t("fac_advance_title", "Advance Booking Required")}
         </strong>
-        Facility reservations must be submitted at least{" "}
-        <strong>3 days before</strong> your intended date of use. Same-day
-        and next-day bookings are not accepted. Please plan accordingly.
+        {t("fac_advance_desc_prefix", "Facility reservations must be submitted at least ")}
+        <strong>{t("fac_advance_desc_highlight", "3 days before")}</strong>
+        {t("fac_advance_desc_suffix", " your intended date of use. Same-day and next-day bookings are not accepted. Please plan accordingly.")}
       </div>
       <button
         onClick={() => setDismissed(true)}
-        aria-label="Dismiss reminder"
+        aria-label={t("close", "Dismiss reminder")}
         style={{
           background: "none",
           border: "none",
@@ -104,6 +106,7 @@ function AdvanceBookingBanner() {
 }
 
 export default function FacilitiesTab({ userData, householdID, userName, userID }) {
+  const { t } = useLanguage();
   const [facilities, setFacilities] = useState([]);
   const [reservationFacility, setReservationFacility] = useState(null);
 
@@ -131,7 +134,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
               <div>
                 <div className="sv-facility-card__title">{f.facilityName || f.name || f.title}</div>
                 <div className="sv-facility-card__meta">
-                  <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
+                  <span>{f.capacity ? t("fac_capacity_label", f.capacity) : ""}</span>
                   <span className="sv-facility-card__dot" />
                   <span>{f.openTime && f.closeTime ? (() => {
                     const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
@@ -143,10 +146,10 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
             </div>
             <div className="sv-facility-card__right">
               <span className={`sv-avail-badge${f.available ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
-                <span className="sv-avail-dot" />{f.available ? "Available" : "Unavailable"}
+                <span className="sv-avail-dot" />{f.available ? t("fac_available", "Available") : t("fac_unavailable", "Unavailable")}
               </span>
               {f.available && (
-                <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>Reserve <ChevronRightIcon /></button>
+                <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>{t("fac_reserve", "Reserve")} <ChevronRightIcon /></button>
               )}
             </div>
           </div>
@@ -175,6 +178,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
 }
 
 function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDates = [] }) {
+  const { t } = useLanguage();
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -242,8 +246,8 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         })}
       </div>
       <div className="sv-cal-legend">
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Fully Reserved</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />{t("fac_available", "Available")}</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />{t("fac_fully_reserved_dot", "Fully Reserved")}</span>
       </div>
 
       <div style={{
@@ -265,7 +269,7 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
         <span style={{ flex: 1, lineHeight: "1.5" }}>
-          Bookings must be made at least <strong>3 days in advance</strong>. Greyed-out dates are unavailable.
+          {t("fac_cal_prefix", "Bookings must be made at least ")}<strong>{t("fac_notice_highlight", "3 days in advance")}</strong>{t("fac_cal_suffix", ". Greyed-out dates are unavailable.")}
         </span>
       </div>
     </div>
@@ -274,6 +278,7 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
 
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
   const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { t } = useLanguage();
 
   const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
@@ -511,7 +516,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       <div className="sv-form-header">
         <div className="sv-form-header-icon"><BuildingIcon /></div>
         <div>
-          <div className="sv-form-header-title">{facilityName} Reservation</div>
+          <div className="sv-form-header-title">{t("fac_res_header", facilityName)}</div>
           <div className="sv-form-header-desc">{facilityDesc}</div>
         </div>
       </div>
@@ -543,19 +548,19 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
       <div className="sv-form-body">
         <div className="sv-fields">
-          <div className="sv-field-section-label">Requester Information</div>
+          <div className="sv-field-section-label">{t("eq_requester_info", "Requester Information")}</div>
           <div className="sv-field-row">
             <div className="sv-field">
-              <label className="sv-label">Full Name</label>
+              <label className="sv-label">{t("doc_full_name", "Full Name")}</label>
               <input className="sv-input sv-input--readonly" value={form.fullName} readOnly />
             </div>
             <div className="sv-field">
-              <label className="sv-label">Contact Number</label>
+              <label className="sv-label">{t("profile_contact", "Contact Number")}</label>
               <input className="sv-input sv-input--readonly" value={form.contactNumber} readOnly />
             </div>
           </div>
           <div className="sv-field">
-            <label className="sv-label">Email Address <span className="sv-required">*</span></label>
+            <label className="sv-label">{t("profile_email", "Email Address")} <span className="sv-required">*</span></label>
             <input
               className={`sv-input${errors.email ? " sv-input--error" : ""}`}
               type="email" placeholder="your@email.com" value={form.email}
@@ -564,15 +569,15 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
 
-          <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Reservation Details</div>
+          <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>{t("fac_details_title", "Reservation Details")}</div>
           <div className="sv-field">
-            <label className="sv-label">Purpose of Use <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} placeholder="e.g. Birthday celebration, community meeting..." value={form.purpose} onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }} />
+            <label className="sv-label">{t("fac_purpose_of_use", "Purpose of Use")} <span className="sv-required">*</span></label>
+            <input className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} placeholder={t("fac_purpose_placeholder", "e.g. Birthday celebration, community meeting...")} value={form.purpose} onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }} />
             {errors.purpose && <span className="sv-error-msg">{errors.purpose}</span>}
           </div>
           <div className="sv-field-row">
             <div className="sv-field">
-              <label className="sv-label">Start Time <span className="sv-required">*</span></label>
+              <label className="sv-label">{t("fac_start_time", "Start Time")} <span className="sv-required">*</span></label>
               <input
                 className={`sv-input${errors.startTime ? " sv-input--error" : ""}`}
                 type="time" value={form.startTime}
@@ -583,7 +588,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
               {errors.startTime && <span className="sv-error-msg">{errors.startTime}</span>}
             </div>
             <div className="sv-field">
-              <label className="sv-label">End Time <span className="sv-required">*</span></label>
+              <label className="sv-label">{t("fac_end_time", "End Time")} <span className="sv-required">*</span></label>
               <input
                 className={`sv-input${errors.endTime ? " sv-input--error" : ""}`}
                 type="time" value={form.endTime}
@@ -619,23 +624,23 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             {errors.attendees && <span className="sv-error-msg">{errors.attendees}</span>}
           </div>
           <div className="sv-field">
-            <label className="sv-label">Additional Notes <span className="sv-optional">(Optional)</span></label>
+            <label className="sv-label">{t("eq_additional_notes", "Additional Notes")} <span className="sv-optional">({t("optional", "Optional")})</span></label>
             <textarea className="sv-textarea" placeholder="Any special setup requirements, equipment needed, etc." rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
           </div>
         </div>
 
         {/* ── BUNDLED EQUIPMENT RENTALS ── */}
         <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
-          <div className="sv-field-section-label">Additional Equipment <span className="sv-optional">(Optional)</span></div>
+          <div className="sv-field-section-label">{t("fac_bundled_equip_title", "Additional Equipment")} <span className="sv-optional">({t("optional", "Optional")})</span></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
             {equipmentInventory.length === 0 ? (
-              <div style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>No equipment available at this time.</div>
+              <div style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>{t("fac_no_equip_available", "No equipment available at this time.")}</div>
             ) : (
               equipmentInventory.map(eq => (
                 <div key={eq.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>{eq.equipmentName || eq.name}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Inventory: {eq.quantity} available</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{t("fac_inventory_avail", eq.quantity)}</div>
                   </div>
                   <input
                     type="number"
@@ -669,7 +674,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
         {facility?.customFields?.length > 0 && (
           <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
-            <div className="sv-field-section-label">Additional Information</div>
+            <div className="sv-field-section-label">{t("doc_additional_info", "Additional Information")}</div>
             <div className="dr-field-row dr-field-row--wrap">
               {facility.customFields.map(f => {
                 if (f.type === "checkbox") {
@@ -696,7 +701,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         )}
 
         <div className="sv-calendar-col" style={{ marginTop: "1.5rem" }}>
-          <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
+          <div className="sv-field-section-label">{t("fac_select_date_label", "Select Date")} <span className="sv-required">*</span></div>
           <Calendar
             selectedDate={form.date}
             fullyBookedDates={fullyBookedDates}
@@ -711,15 +716,15 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           )}
           {showApprovedOverlapWarning && !errors.timeOverlap && (
             <div className="sv-cal-warning sv-cal-warning--pending">
-              <ServiceInfoIcon /> This time slot overlaps with an existing approved reservation. Please choose a different time.
+              <ServiceInfoIcon /> {t("fac_overlap_msg")}
             </div>
           )}
         </div>
       </div>
 
       <div className="sv-form-actions">
-        <button className="sv-btn-ghost" onClick={onBack}>Cancel</button>
-        <button className="sv-btn-primary" onClick={handleSubmit}>Submit Reservation</button>
+        <button className="sv-btn-ghost" onClick={onBack}>{t("cancel", "Cancel")}</button>
+        <button className="sv-btn-primary" onClick={handleSubmit}>{t("fac_submit_btn", "Submit Reservation")}</button>
       </div>
     </div>
   );

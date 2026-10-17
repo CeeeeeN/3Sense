@@ -12,6 +12,7 @@ import { auth, db } from "./firebase/firebase";
 
 import { ROLE_PERMISSIONS } from "./services/permissions";
 import { AlertProvider } from "./context/AlertContext";
+import { LanguageProvider } from "./context/LanguageContext";
 
 import AdminSignup from "./pages/AdminSignup";
 import ApprovalPending from "./pages/AdminApprovalPending";
@@ -162,6 +163,7 @@ function App() {
 
   return (
     // <!-- WRAP ENTIRE APP IN ALERT PROVIDER -->
+    <LanguageProvider>
     <AlertProvider>
       <Router>
         <Routes>
@@ -357,6 +359,7 @@ function App() {
         </Routes>
       </Router>
     </AlertProvider>
+    </LanguageProvider>
   );
 }
 

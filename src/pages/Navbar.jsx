@@ -3,6 +3,7 @@ import barangayLogo from "./barangay-logo.jpg";
 import { IconBell, NavIconUser, IconProfile2, IconSettings, IconHelp, IconLogout } from "../components/Icons";
 import NotificationModal from "../components/NotificationModal";
 import TransferConsentModal from "../components/TransferConsentModal"; // <-- NEW IMPORT
+import { useLanguage } from "../context/LanguageContext";
 import {
   subscribeToUserNotifications,
   markNotificationAsRead,
@@ -11,15 +12,17 @@ import {
 } from "../services/userNotifications";
 import { requestPushPermission } from "../services/fcm";
 
-const NAV_ITEMS = [
-  { key: "home", label: "Home", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg> },
-  { key: "services", label: "Services", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg> },
-  { key: "scan", label: "Scan", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" /><line x1="3" y1="12" x2="21" y2="12" /></svg> },
-  { key: "activity", label: "Activity", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg> },
-  { key: "emergency", label: "Emergency", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>, emergency: true },
+const NAV_ITEMS_KEYS = [
+  { key: "home",      labelKey: "nav_home",      icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg> },
+  { key: "services",  labelKey: "nav_services",  icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg> },
+  { key: "scan",      labelKey: "nav_scan",      icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" /><line x1="3" y1="12" x2="21" y2="12" /></svg> },
+  { key: "activity",  labelKey: "nav_activity",  icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg> },
+  { key: "emergency", labelKey: "nav_emergency", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>, emergency: true },
 ];
 
 export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
+  const { t } = useLanguage();
+  const NAV_ITEMS = NAV_ITEMS_KEYS.map(item => ({ ...item, label: t(item.labelKey) }));
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -190,8 +193,8 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
           <div className="nb-logo" onClick={() => nav("home")}>
             <img src={barangayLogo} alt="Logo" className="nb-logo-img" />
             <div>
-              <div className="nb-logo-name">Barangay 3S+ Malanday</div>
-              <span className="nb-logo-sub">Community Management System</span>
+              <div className="nb-logo-name">{t('app_name')}</div>
+              <span className="nb-logo-sub">{t('app_system')}</span>
             </div>
           </div>
 
@@ -225,11 +228,11 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                     <div className="nb-user-info-name">{userName || "—"}</div>
                     <div className="nb-user-info-id">{householdID || "—"}</div>
                     <div className="nb-user-info-role">
-                      {userRole === "Household Head" ? "⭐ Household Head" : 
-                       userRole === "Branch Head" ? "⭐ Branch Head" : "👤 Member"}
+                      {userRole === "Household Head" ? t('profile_hh_role_head') : 
+                       userRole === "Branch Head" ? t('profile_hh_role_branch') : t('profile_hh_role_member')}
                     </div>
                   </div>
-                  <button className="nb-dd-item" onClick={() => { nav("profile"); setUserOpen(false); }}><IconProfile2 /> My Profile</button>
+                  <button className="nb-dd-item" onClick={() => { nav("profile"); setUserOpen(false); }}><IconProfile2 /> {t('nav_profile')}</button>
                   <div className="nb-dd-divider" />
                   <button
                     className="nb-dd-item danger"
@@ -238,7 +241,7 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                       setShowLogoutModal(true);
                     }}
                   >
-                    <IconLogout /> Logout
+                    <IconLogout /> {t('nav_logout')}
                   </button>
                 </div>
               )}
@@ -311,9 +314,9 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
               <div className="nb-logout-modal-icon">
                 <IconLogout />
               </div>
-              <h3 id="logout-dialog-title" className="nb-logout-modal-title">Confirm Logout</h3>
+              <h3 id="logout-dialog-title" className="nb-logout-modal-title">{t('logout_title')}</h3>
               <p className="nb-logout-modal-desc">
-                Are you sure you want to log out?
+                {t('logout_desc')}
               </p>
               <div className="nb-logout-modal-actions">
                 <button
@@ -321,14 +324,14 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
                   className="nb-logout-btn-cancel"
                   onClick={() => setShowLogoutModal(false)}
                 >
-                  Cancel
+                  {t('logout_cancel')}
                 </button>
                 <button
                   type="button"
                   className="nb-logout-btn-confirm"
                   onClick={handleLogoutConfirm}
                 >
-                  Log Out
+                  {t('logout_confirm')}
                 </button>
               </div>
             </div>
