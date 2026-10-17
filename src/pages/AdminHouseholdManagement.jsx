@@ -6,7 +6,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../services/logger";
 import {
   collection,
-  onSnapshot,
   doc,
   deleteDoc,
   updateDoc,
@@ -14,33 +13,27 @@ import {
   arrayUnion,
   serverTimestamp,
   query,
-  where,
   getDocs,
   orderBy,
-  limit
+  limit,
+  where // <-- Ensure where is imported
 } from "firebase/firestore";
 import { approveRegistration, generateResidentUID } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 import { getFamilyNumber } from "../utils/householdNumbers";
-import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
+import { useAlert } from "../context/AlertContext"; 
+import { useQuery, useQueryClient } from "@tanstack/react-query"; 
 
 import TransferRequestsTab from "../components/TransferRequestsTab"; 
 import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab"; 
 
 export default function HouseholdManagement() {
-  const { showAlert, showConfirm } = useAlert(); // <-- INITIALIZE HOOK
-
-  const [residents, setResidents] = useState([]);
-  const [hhRequests, setHhRequests] = useState([]);
-  
-  // ── NEW TRANSFER STATES ──
-  const [transfers, setTransfers] = useState([]);
-  const [newHouseholds, setNewHouseholds] = useState([]);
+  const queryClient = useQueryClient(); 
+  const { showAlert, showConfirm } = useAlert(); 
 
   // ── TABS ──
-  // Options: "requests", "residents", "transfers", "new_households"
   const [activeTab, setActiveTab] = useState("requests");
 
   const [search, setSearch] = useState("");
@@ -69,54 +62,36 @@ export default function HouseholdManagement() {
   const [adminRole, setAdminRole] = useState("");
   const [adminProfile, setAdminProfile] = useState({ fullName: "Admin", position: "" });
 
+  // ─── 1. OPTIMIZED: Zero-Read Admin Verification ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid)
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName || "Admin");
+          setAdminRole(parsed.role || "Standard Admin");
+          setAdminProfile({
+            fullName: parsed.fullName || parsed.username || user.email,
+            position: parsed.position || "Admin",
+          });
         }
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const fetchAdmin = async () => {
-      const q = query(collection(db, "approvedAdmins"), where("uid", "==", user.uid));
+  // ─── 2. LAZY LOADED: Pending Registrations ───
+  const { data: hhRequests = [], isLoading: loadingRequests } = useQuery({
+    queryKey: ['adminManage_hhRequests'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "pending_registrations"),
+        orderBy("createdAt", "desc"),
+        limit(100)
+      );
       const snap = await getDocs(q);
-      if (!snap.empty) {
-        const d = snap.docs[0].data();
-        setAdminProfile({
-          fullName: d.fullName || d.username || user.email,
-          position: d.position || "Admin",
-        });
-      }
-    };
-    fetchAdmin();
-  }, []);
-
-  // ── 1. REGISTRATION REQUESTS LISTENER ──
-  useEffect(() => {
-    const pendingQuery = query(
-      collection(db, "pending_registrations"),
-      orderBy("createdAt", "desc"),
-      limit(100)
-    );
-
-    const unsub = onSnapshot(pendingQuery, (snapshot) => {
-      const requests = snapshot.docs.map(docSnap => {
+      return snap.docs.map(docSnap => {
         const data = docSnap.data();
         return {
           id: docSnap.id,
@@ -131,34 +106,22 @@ export default function HouseholdManagement() {
           email: formatDisplayEmail(data.email, adminRole)
         };
       });
-      setHhRequests(requests);
-    });
-    return () => unsub();
-  }, [adminRole]);
+    },
+    enabled: activeTab === "requests", 
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-  // ── 2. ACTIVE RESIDENTS LISTENER ──
-  useEffect(() => {
-    let latestActive = [];
-    let latestPending = [];
+  // ─── 3. LAZY LOADED & SERVER-FILTERED: Active Residents & Unactivated Households ───
+  const { data: residents = [], isLoading: loadingResidents } = useQuery({
+    queryKey: ['adminManage_residents'],
+    queryFn: async () => {
+      // OPTIMIZATION: Use where("activated", "==", false) so we only fetch exactly what we need
+      const [resSnap, unactivatedHhSnap] = await Promise.all([
+        getDocs(query(collectionGroup(db, "residents"), limit(300))),
+        getDocs(query(collection(db, "households"), where("activated", "==", false), limit(100)))
+      ]);
 
-    const merge = () => {
-      const seen = new Set();
-      const deduped = latestActive.filter(r => {
-        const key = `${r.householdId}__${r.id}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      setResidents([...deduped, ...latestPending]);
-    };
-
-    const residentsQuery = query(
-      collectionGroup(db, "residents"),
-      limit(300) 
-    );
-
-    const unsubResidents = onSnapshot(residentsQuery, (snap) => {
-      latestActive = snap.docs.map(docSnap => {
+      const resDocs = resSnap.docs.map(docSnap => {
         const data = docSnap.data();
         const householdId = docSnap.ref.parent.parent?.id || "Unknown";
         const effectiveBranchID = data.branchID || "BR-001";
@@ -183,21 +146,13 @@ export default function HouseholdManagement() {
           rawDate: data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0,
         };
       });
-      merge();
-    });
 
-    const householdsQuery = query(
-      collection(db, "households"),
-      limit(300)
-    );
-
-    const unsubHouseholds = onSnapshot(householdsQuery, (snap) => {
-      latestPending = [];
-      snap.docs.forEach(hhDoc => {
+      const unactDocs = [];
+      unactivatedHhSnap.docs.forEach(hhDoc => {
         const hhData = hhDoc.data();
-        if (hhData.activated === false && hhData._pendingHeadData) {
+        if (hhData._pendingHeadData) {
           const head = hhData._pendingHeadData;
-          latestPending.push({
+          unactDocs.push({
             ...head,
             id: `unactivated-${hhDoc.id}`,
             householdId: hhDoc.id,
@@ -217,49 +172,49 @@ export default function HouseholdManagement() {
           });
         }
       });
-      merge();
-    });
 
-    return () => {
-      unsubResidents();
-      unsubHouseholds();
-    };
-  }, [adminRole]);
+      // Deduplicate
+      const seen = new Set();
+      const dedupedRes = resDocs.filter(r => {
+        const key = `${r.householdId}__${r.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
-  // ── 3. HOUSEHOLD TRANSFERS LISTENER ──
-  useEffect(() => {
-    const q = query(
-      collection(db, "household_transfers"),
-      orderBy("submittedAt", "desc"),
-      limit(200)
-    );
+      return [...dedupedRes, ...unactDocs];
+    },
+    enabled: activeTab === "residents",
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-    const unsub = onSnapshot(q, (snapshot) => {
-      const existingList = [];
-      const newList = [];
-
-      snapshot.docs.forEach(docSnap => {
+  // ─── 4. LAZY LOADED: Household Transfers & New Households ───
+  const { data: allTransfers = [] } = useQuery({
+    queryKey: ['adminManage_transfers'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "household_transfers"),
+        orderBy("submittedAt", "desc"),
+        limit(200)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(docSnap => {
         const data = docSnap.data();
-        const item = {
+        return {
           id: docSnap.id,
           dateSubmitted: data.submittedAt ? data.submittedAt.toDate().toLocaleDateString() : "N/A",
           ...data
         };
-
-        if (data.transferType === "existing") {
-          existingList.push(item);
-        } else if (data.transferType === "new") {
-          newList.push(item);
-        }
       });
+    },
+    enabled: activeTab === "transfers" || activeTab === "new_households",
+    staleTime: 1000 * 60 * 30,
+  });
 
-      setTransfers(existingList);
-      setNewHouseholds(newList);
-    });
+  const transfers = useMemo(() => allTransfers.filter(t => t.transferType === "existing"), [allTransfers]);
+  const newHouseholds = useMemo(() => allTransfers.filter(t => t.transferType === "new"), [allTransfers]);
 
-    return () => unsub();
-  }, []);
-
+  // ─── Filter Logic ───
   const filteredHhRequests = useMemo(() => {
     return hhRequests
       .filter((req) => {
@@ -273,18 +228,10 @@ export default function HouseholdManagement() {
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
-        if (sortHhRequest === "date_desc") {
-          return (b.rawDate || 0) - (a.rawDate || 0);
-        }
-        if (sortHhRequest === "date_asc") {
-          return (a.rawDate || 0) - (b.rawDate || 0);
-        }
-        if (sortHhRequest === "name_asc") {
-          return a.fullName.localeCompare(b.fullName);
-        }
-        if (sortHhRequest === "name_desc") {
-          return b.fullName.localeCompare(a.fullName);
-        }
+        if (sortHhRequest === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
+        if (sortHhRequest === "date_asc") return (a.rawDate || 0) - (b.rawDate || 0);
+        if (sortHhRequest === "name_asc") return a.fullName.localeCompare(b.fullName);
+        if (sortHhRequest === "name_desc") return b.fullName.localeCompare(a.fullName);
         return 0;
       });
   }, [hhRequests, searchHhRequest, filterHhStatus, sortHhRequest]);
@@ -297,121 +244,8 @@ export default function HouseholdManagement() {
     setHhRequestPage(1);
   }, [searchHhRequest, filterHhStatus, sortHhRequest, hhRowsPerPage]);
 
-  const handleHhApprove = async (req) => {
-    const isConfirmed = await showConfirm(
-      "Approve Resident Registration",
-      "Approving will create a Household ID and email the resident. They will appear in the Account Management tab."
-    );
-
-    if (!isConfirmed) return;
-    if (isApproving) return;
-
-    setIsApproving(true);
-    try {
-      await approveRegistration(req.id);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Approved Registration",
-        `Approved household registration for ${req.fullName} (Household ID: ${req.householdId})`
-      );
-      // REPLACED ALERT
-      await showAlert("Success", "Registration approved successfully. An email has been sent to the head.");
-    } catch (error) {
-      console.error("Error approving registration:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Approve Registration",
-        `Failed to approve household registration for ${req.fullName} (Household ID: ${req.householdId}). Error: ${error.message}`
-      );
-      // REPLACED ALERT
-      await showAlert("Error", "Error approving registration: " + error.message);
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  const handleHhReject = async (req) => {
-    const isConfirmed = await showConfirm(
-      "Confirm Rejection",
-      "Are you sure you want to reject this resident registration? This will delete the request permanently."
-    );
-
-    if (!isConfirmed) return;
-
-    try {
-      await deleteDoc(doc(db, "pending_registrations", req.id));
-      logTransaction(
-        adminName,
-        adminRole,
-        "Rejected Registration",
-        `Rejected household registration for ${req.fullName} (Household ID: ${req.householdId})`
-      );
-      // REPLACED ALERT
-      await showAlert("Success", "Registration rejected successfully.");
-    } catch (error) {
-      console.error("Error rejecting registration:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Reject Registration",
-        `Failed to reject household registration for ${req.fullName} (Household ID: ${req.householdId}). Error: ${error.message}`
-      );
-      // REPLACED ALERT
-      await showAlert("Error", "Error rejecting registration: " + error.message);
-    }
-  };
-
-  const handleDeleteResident = async (res) => {
-    const isConfirmed = await showConfirm(
-      "Confirm Deletion",
-      `Are you sure you want to delete the resident ${res.fullName}? This action cannot be undone.`
-    );
-
-    if (!isConfirmed) return;
-
-    try {
-      if (res.isPendingActivation) {
-        await deleteDoc(doc(db, "households", res.householdId));
-        logTransaction(
-          adminName,
-          adminRole,
-          "Deleted Unactivated Household",
-          `Deleted unactivated household with ID: ${res.householdId} (Head: ${res.fullName})`
-        );
-      } else {
-        const residentsQuery = query(collection(db, "households", res.householdId, "residents"));
-        const residentsSnapshot = await getDocs(residentsQuery);
-
-        await deleteDoc(doc(db, "households", res.householdId, "residents", res.id));
-
-        logTransaction(
-          adminName,
-          adminRole,
-          "Deleted Resident",
-          `Deleted resident ${res.fullName} (ID: ${res.id}) from household ${res.householdId}`
-        );
-        if (residentsSnapshot.size <= 1) {
-          await deleteDoc(doc(db, "households", res.householdId));
-        }
-      }
-      // REPLACED ALERT
-      await showAlert("Success", "Resident deleted successfully.");
-    } catch (error) {
-      console.error("Error deleting resident:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Delete Resident",
-        `Failed to delete resident ${res.fullName} (ID: ${res.id}) from household ${res.householdId}. Error: ${error.message}`
-      );
-      // REPLACED ALERT
-      await showAlert("Error", "Error deleting resident: " + error.message);
-    }
-  };
-
   const filteredResidents = useMemo(() => {
+    // Re-dedupe just in case
     const seenKeys = new Set();
     const unique = residents.filter(r => {
       const key = `${r.householdId}__${r.id}`;
@@ -422,7 +256,6 @@ export default function HouseholdManagement() {
 
     return unique.filter(r => {
       const searchText = search.toLowerCase();
-
       const matchesSearch =
         r.fullName.toLowerCase().includes(searchText) ||
         (r.householdId || "").toLowerCase().includes(searchText) ||
@@ -434,18 +267,10 @@ export default function HouseholdManagement() {
 
       return matchesSearch && matchesStatus;
     }).sort((a, b) => {
-      if (sortResident === "name_asc") {
-        return a.fullName.localeCompare(b.fullName);
-      }
-      if (sortResident === "name_desc") {
-        return b.fullName.localeCompare(a.fullName);
-      }
-      if (sortResident === "id_asc") {
-        return (a.householdId || "").localeCompare(b.householdId || "");
-      }
-      if (sortResident === "id_desc") {
-        return (b.householdId || "").localeCompare(a.householdId || "");
-      }
+      if (sortResident === "name_asc") return a.fullName.localeCompare(b.fullName);
+      if (sortResident === "name_desc") return b.fullName.localeCompare(a.fullName);
+      if (sortResident === "id_asc") return (a.householdId || "").localeCompare(b.householdId || "");
+      if (sortResident === "id_desc") return (b.householdId || "").localeCompare(a.householdId || "");
       return 0;
     });
   }, [residents, search, filterStatus, sortResident]);
@@ -491,11 +316,121 @@ export default function HouseholdManagement() {
     ));
   };
 
+  // ─── 5. OPTIMIZED: Zero-Read Local Mutations ───
+  const handleHhApprove = async (req) => {
+    const isConfirmed = await showConfirm(
+      "Approve Resident Registration",
+      "Approving will create a Household ID and email the resident. They will appear in the Account Management tab."
+    );
+
+    if (!isConfirmed) return;
+    if (isApproving) return;
+
+    setIsApproving(true);
+    try {
+      await approveRegistration(req.id);
+      
+      // Zero-Read Mutation
+      queryClient.setQueryData(['adminManage_hhRequests'], (old = []) => 
+        old.map(r => r.id === req.id ? { ...r, status: 'approved' } : r)
+      );
+      // Invalidate residents cache so it pulls the new household next time the tab is clicked
+      queryClient.invalidateQueries({ queryKey: ['adminManage_residents'] });
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "Approved Registration",
+        `Approved household registration for ${req.fullName} (Household ID: ${req.householdId})`
+      );
+      await showAlert("Success", "Registration approved successfully. An email has been sent to the head.");
+    } catch (error) {
+      console.error("Error approving registration:", error);
+      await showAlert("Error", "Error approving registration: " + error.message);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleHhReject = async (req) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Rejection",
+      "Are you sure you want to reject this resident registration? This will delete the request permanently."
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "pending_registrations", req.id));
+
+      // Zero-Read Mutation
+      queryClient.setQueryData(['adminManage_hhRequests'], (old = []) => 
+        old.filter(r => r.id !== req.id)
+      );
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "Rejected Registration",
+        `Rejected household registration for ${req.fullName} (Household ID: ${req.householdId})`
+      );
+      await showAlert("Success", "Registration rejected successfully.");
+    } catch (error) {
+      console.error("Error rejecting registration:", error);
+      await showAlert("Error", "Error rejecting registration: " + error.message);
+    }
+  };
+
+  const handleDeleteResident = async (res) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `Are you sure you want to delete the resident ${res.fullName}? This action cannot be undone.`
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      if (res.isPendingActivation) {
+        await deleteDoc(doc(db, "households", res.householdId));
+        logTransaction(
+          adminName,
+          adminRole,
+          "Deleted Unactivated Household",
+          `Deleted unactivated household with ID: ${res.householdId} (Head: ${res.fullName})`
+        );
+      } else {
+        const residentsQuery = query(collection(db, "households", res.householdId, "residents"));
+        const residentsSnapshot = await getDocs(residentsQuery);
+
+        await deleteDoc(doc(db, "households", res.householdId, "residents", res.id));
+
+        logTransaction(
+          adminName,
+          adminRole,
+          "Deleted Resident",
+          `Deleted resident ${res.fullName} (ID: ${res.id}) from household ${res.householdId}`
+        );
+        if (residentsSnapshot.size <= 1) {
+          await deleteDoc(doc(db, "households", res.householdId));
+        }
+      }
+
+      // Zero-Read Mutation
+      queryClient.setQueryData(['adminManage_residents'], (old = []) => 
+        old.filter(r => r.id !== res.id)
+      );
+
+      await showAlert("Success", "Resident deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting resident:", error);
+      await showAlert("Error", "Error deleting resident: " + error.message);
+    }
+  };
+
   const handleSaveStatus = async () => {
     if (!statusData) return;
 
     if (statusData.isPendingActivation) {
-      // REPLACED ALERT
       await showAlert("Action Denied", "Cannot update status of accounts that are pending activation. Wait for the user to activate their profile.");
       return;
     }
@@ -527,6 +462,18 @@ export default function HouseholdManagement() {
         : `Your barangay status has been updated to: ${statusData.status}.`;
       await createUserNotification(statusData.householdId, statusData.id, "Status Update", notifMsg, "general");
 
+      // Zero-Read Mutation
+      queryClient.setQueryData(['adminManage_residents'], (old = []) => 
+        old.map(r => r.id === statusData.id ? { 
+          ...r, 
+          status: statusData.status,
+          remarks: statusData.remarks,
+          incident: statusData.incident,
+          adminLastUpdatedBy: adminProfile.fullName,
+          adminLastUpdatedByPosition: adminProfile.position
+        } : r)
+      );
+
       logTransaction(
         adminName,
         adminRole,
@@ -538,13 +485,6 @@ export default function HouseholdManagement() {
       setStatusData(null);
     } catch (error) {
       console.error("Error updating resident status:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Update Resident Status",
-        `Failed to update status for resident ${statusData.fullName} (ID: ${statusData.id}) in household ${statusData.householdId}. Error: ${error.message}`
-      );
-      // REPLACED ALERT
       await showAlert("Error", "Failed to update status.");
     }
   };
@@ -563,6 +503,11 @@ export default function HouseholdManagement() {
           updatedAt: serverTimestamp() 
         });
         
+        // Zero-Read Mutation
+        queryClient.setQueryData(['adminManage_residents'], (old = []) => 
+          old.map(r => r.id === res.id ? { ...r, UID: newUID } : r)
+        );
+
         setSelectedResident(prev => ({ ...prev, UID: newUID }));
       } catch (error) {
         console.error("Silent UID patch failed:", error);
@@ -677,7 +622,9 @@ export default function HouseholdManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedHhRequests.length > 0 ? (
+                  {loadingRequests ? (
+                     <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>Loading requests...</td></tr>
+                  ) : paginatedHhRequests.length > 0 ? (
                     paginatedHhRequests.map((req) => (
                       <tr
                         key={req.id}
@@ -846,7 +793,9 @@ export default function HouseholdManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedResidents.length > 0 ? (
+                  {loadingResidents ? (
+                     <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>Loading residents...</td></tr>
+                  ) : paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
                       <tr
                         key={`${res.householdId}__${res.id}`}
