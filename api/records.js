@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 
+// ─── OPTIMIZED: Global Cache for Firebase Admin & Firestore ───
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
@@ -13,6 +14,9 @@ if (!admin.apps.length) {
     console.error('Firebase admin initialization error', error);
   }
 }
+
+const db = admin.firestore();
+const auth = admin.auth();
 
 const FULL_EMAIL_ROLES = [
   "Super Admin",
@@ -59,23 +63,31 @@ export default async function handler(req, res) {
   const idToken = authHeader.split('Bearer ')[1];
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
 
-    const db = admin.firestore();
-    const adminSnap = await db.collection("approvedAdmins").where("uid", "==", uid).get();
+    const payload = req.method === 'POST' ? req.body : req.query;
+    const { collectionName } = payload;
+    
+    // Safety cap to prevent Vercel Out-Of-Memory (OOM) crashes on huge collections
+    const maxRecords = payload.maxRecords ? Number(payload.maxRecords) : 1000;
+
+    if (!collectionName) {
+      return res.status(400).json({ error: 'Missing collectionName parameter' });
+    }
+
+    // ─── OPTIMIZED: Parallel Data Fetching ───
+    // We check the admin's role and download the collection data simultaneously.
+    const [adminSnap, snapshot] = await Promise.all([
+      db.collection("approvedAdmins").where("uid", "==", uid).get(),
+      db.collection(collectionName).limit(maxRecords).get()
+    ]);
     
     let userRole = "Standard User";
     if (!adminSnap.empty) {
       userRole = adminSnap.docs[0].data().role || "Standard Admin";
     }
 
-    const { collectionName } = req.query || req.body;
-    if (!collectionName) {
-      return res.status(400).json({ error: 'Missing collectionName parameter' });
-    }
-
-    const snapshot = await db.collection(collectionName).get();
     const records = snapshot.docs.map(doc => {
       const data = doc.data();
       return sanitizeRecord({ id: doc.id, ...data }, userRole, uid);
