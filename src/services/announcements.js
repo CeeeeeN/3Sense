@@ -1,51 +1,67 @@
-import { collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, getDocs } from "firebase/firestore";
+import { 
+    collection, 
+    collectionGroup, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    doc, 
+    onSnapshot, 
+    serverTimestamp, 
+    query, 
+    orderBy, 
+    getDocs, 
+    limit, 
+    where 
+} from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { createUserNotification } from "./userNotifications";
 
 /**
  * Fan out an in-app notification to every HOUSEHOLD that has at least one
  * resident whose categories array contains the announcement's target category.
- * Targets the householdID (globally unique) instead of the resident doc ID
- * (which is NOT unique — e.g. "head" exists in every household).
- * Only runs for specific-category announcements — skips "All Residents".
- * Fire-and-forget: errors are silently swallowed so they never block the post.
  */
 const fanOutAnnouncementNotification = async ({ title, description, category, announcementID }) => {
-  // "All Residents" announcements do NOT trigger notifications
   if (!category || category.trim().toLowerCase() === "all residents") return;
 
-  const categoryClean = category.trim().toLowerCase();
-  console.log(`[fanOut] Starting fan-out for category: "${category}"`);
+  const baseCategory = category.trim();
+  console.log(`[fanOut] Starting fan-out for category: "${baseCategory}"`);
 
   try {
-    // Fetch all residents across all households (no composite index needed)
-    const snap = await getDocs(collectionGroup(db, "residents"));
+    // ─── OPTIMIZED: Targeted Server-Side Query ───
+    // Instead of downloading 5,000 residents to find 50, we ask Firestore to only 
+    // send us the residents who match. We use variations to catch capitalization differences.
+    const variations = [...new Set([
+        baseCategory,
+        baseCategory.toLowerCase(),
+        baseCategory.toUpperCase(),
+        baseCategory.charAt(0).toUpperCase() + baseCategory.slice(1).toLowerCase()
+    ])];
+
+    const q = query(
+        collectionGroup(db, "residents"),
+        where("categories", "array-contains-any", variations)
+    );
+
+    const snap = await getDocs(q);
 
     if (snap.empty) {
-      console.warn("[fanOut] No residents found in collectionGroup.");
+      console.warn(`[fanOut] No residents found matching category: ${baseCategory}`);
       return;
     }
 
-    // Collect unique householdIDs that have at least one resident matching the category
+    // Collect unique householdIDs
     const matchedHouseholdIDs = new Set();
     snap.docs.forEach((d) => {
-      const data = d.data();
-      const cats = Array.isArray(data.categories) ? data.categories : [];
-      const matches = cats.some((c) => String(c).trim().toLowerCase() === categoryClean);
-      if (matches) {
-        // d.ref.parent.parent.id is the householdID — always globally unique
-        const householdID = d.ref.parent.parent?.id;
-        if (householdID) matchedHouseholdIDs.add(householdID);
-      }
+      const householdID = d.ref.parent.parent?.id;
+      if (householdID) matchedHouseholdIDs.add(householdID);
     });
 
-    console.log(`[fanOut] Matched ${matchedHouseholdIDs.size} household(s) for category "${category}"`);
+    console.log(`[fanOut] Matched ${matchedHouseholdIDs.size} household(s) for category "${baseCategory}"`);
 
     if (matchedHouseholdIDs.size === 0) return;
 
-    // Send ONE notification per household.
-    // residentID = "household" marks it as a household-wide notification
-    // so the Navbar's household stream can subscribe to (householdID, "household").
+    // Fire network requests in parallel
+    // (Note: We will optimize createUserNotification's internal writes when we review userNotifications.js)
     const results = await Promise.allSettled(
       [...matchedHouseholdIDs].map((householdID) =>
         createUserNotification(
@@ -54,7 +70,7 @@ const fanOutAnnouncementNotification = async ({ title, description, category, an
           `New Announcement`,
           `${title} — ${description}`.slice(0, 200),
           "announcement",
-          announcementID                         // refNum — used to deep-link to the announcement
+          announcementID                         // refNum
         )
       )
     );
@@ -70,11 +86,15 @@ const fanOutAnnouncementNotification = async ({ title, description, category, an
   }
 };
 
-
-
 export const createAnnouncement = async (data, adminID) => {
   const announcementsRef = collection(db, "announcements");
-  const newRef = await addDoc(announcementsRef, {
+  
+  // ─── OPTIMIZED: 1-Write Creation ───
+  // Generate the ID locally, then set it in a single payload.
+  const newRef = doc(announcementsRef);
+  
+  await setDoc(newRef, {
+    announcementID: newRef.id,
     adminID: adminID || "Admin",
     title: data.title || "",
     description: data.description || "",
@@ -87,9 +107,8 @@ export const createAnnouncement = async (data, adminID) => {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  await updateDoc(newRef, { announcementID: newRef.id });
 
-  // Fire-and-forget: notify matching residents (category-specific only)
+  // Fire-and-forget: notify matching residents
   fanOutAnnouncementNotification({
     title: data.title || "",
     description: data.description || "",
@@ -101,7 +120,6 @@ export const createAnnouncement = async (data, adminID) => {
 export const updateAnnouncement = async (id, data) => {
   const annRef = doc(db, "announcements", id);
 
-  // Create a clean updates object without complex nested things
   const updates = {
     title: data.title || "",
     description: data.description || "",
@@ -123,15 +141,23 @@ export const deleteAnnouncement = async (id) => {
 };
 
 export const subscribeToAnnouncements = (callback) => {
-  const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
+  // ─── OPTIMIZED: Capped Listener ───
+  // Prevents downloading years of history on mount
+  const q = query(
+      collection(db, "announcements"), 
+      orderBy("createdAt", "desc"),
+      limit(50)
+  );
+  
   return onSnapshot(q, (snapshot) => {
     const announcements = snapshot.docs.map(doc => {
       const data = doc.data();
       let displayDate = "";
 
       if (data.createdAt) {
-        // handle firestore timestamp
-        displayDate = data.createdAt.toDate ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" }) : new Date(data.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
+        displayDate = data.createdAt.toDate 
+            ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" }) 
+            : new Date(data.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
       } else {
         displayDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
       }
@@ -139,7 +165,7 @@ export const subscribeToAnnouncements = (callback) => {
       return {
         id: doc.id,
         ...data,
-        date: displayDate, // for display purposes in ui
+        date: displayDate,
       };
     });
     callback(announcements);

@@ -6,25 +6,36 @@
 // fan-out needed — the admin panel just reads the whole collection).
 // ─────────────────────────────────────────────────────────────
 
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 /**
  * @param {"household_registration"|"document_request"|"facility_request"|"feedback"|"new_admin"} type
- * @param {string} message   – Short human-readable description
+ * @param {string} message     – Short human-readable description
  * @param {string} triggeredBy – Name or email of the person who triggered it
- * @param {string} [refNum]  – Optional reference / HH number
+ * @param {string} [refNum]    – Optional reference / HH number
+ * @param {object} [batch=null] – (Optional) Firestore writeBatch object to group this notification atomically
  */
-export async function createNotification(type, message, triggeredBy, refNum = "") {
+export async function createNotification(type, message, triggeredBy, refNum = "", batch = null) {
   try {
-    await addDoc(collection(db, "notifications"), {
+    // Generate the document reference locally
+    const notifRef = doc(collection(db, "notifications"));
+    
+    const notifData = {
       type,
       message,
       triggeredBy,
       refNum,
       isRead: false,
       createdAt: serverTimestamp(),
-    });
+    };
+
+    // ─── OPTIMIZED: Append to Batch if provided, otherwise execute immediately ───
+    if (batch) {
+      batch.set(notifRef, notifData);
+    } else {
+      await setDoc(notifRef, notifData);
+    }
   } catch (err) {
     // Non-blocking — notification failure should never break the main action
     console.error("Failed to create notification:", err);

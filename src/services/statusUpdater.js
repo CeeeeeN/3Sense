@@ -1,11 +1,32 @@
-import { collection, query, where, getDocs, writeBatch, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 export const runStatusMaintenance = async () => {
   console.log("[Maintenance] Running background status checks for 3Sense...");
-  const batch = writeBatch(db);
-  let updatesCount = 0;
   
+  let batch = writeBatch(db);
+  let batchOperationCount = 0;
+  let totalUpdatesCount = 0;
+  
+  // ─── OPTIMIZED: Chunked Batch Handler ───
+  // Prevents the script from crashing if it exceeds Firestore's 500-write limit
+  const commitAndResetBatch = async () => {
+    if (batchOperationCount > 0) {
+      await batch.commit();
+      totalUpdatesCount += batchOperationCount;
+      batch = writeBatch(db);
+      batchOperationCount = 0;
+    }
+  };
+
+  const safeBatchUpdate = async (ref, data) => {
+    batch.update(ref, data);
+    batchOperationCount++;
+    if (batchOperationCount >= 450) {
+      await commitAndResetBatch();
+    }
+  };
+
   // 1. Get accurate LOCAL date and time
   const now = new Date();
   const year = now.getFullYear();
@@ -22,12 +43,12 @@ export const runStatusMaintenance = async () => {
     // ── A. Check ALL Programs (General & Livelihood) ──
     const qProg = query(
       collection(db, "Programs"), 
-      // Look for anything that hasn't finished yet
       where("status", "in", ["Upcoming", "Approved", "Ongoing"]) 
     );
     const snapProg = await getDocs(qProg);
 
-    snapProg.forEach((docSnap) => {
+    // MUST use for...of loop. .forEach() ignores async/await!
+    for (const docSnap of snapProg.docs) {
       const data = docSnap.data();
       const progDate = data.date; 
       const startTime = data.startTime || "00:00"; 
@@ -36,34 +57,30 @@ export const runStatusMaintenance = async () => {
 
       let newStatus = null;
 
-      // Logic Check 1: Is it entirely in the past?
       if (progDate && progDate < todayStr) {
         newStatus = "Completed";
-      } 
-      // Logic Check 2: Is it happening TODAY?
-      else if (progDate === todayStr) {
+      } else if (progDate === todayStr) {
         if (currentTimeStr >= endTime) {
-          // Time has passed the end time
           newStatus = "Completed";
         } else if (currentTimeStr >= startTime && currentTimeStr < endTime) {
-          // Time is currently between start and end time!
           newStatus = "Ongoing";
         }
       }
 
-      // Only add to the update batch if the status actually needs to change
       if (newStatus && newStatus !== currentStatus) {
-        batch.update(docSnap.ref, { status: newStatus });
-        updatesCount++;
+        await safeBatchUpdate(docSnap.ref, { status: newStatus });
 
-        const attendeesRef = collection(db, "Programs", docSnap.id, "attendees");
-        getDocs(attendeesRef).then((attendeeSnap) => {
-          attendeeSnap.forEach((attendeeDoc) => {
-             updateDoc(attendeeDoc.ref, { status: "Completed" });
-          });
-        });
+        // Safely and atomically batch the attendee updates
+        if (newStatus === "Completed") {
+          const attendeesRef = collection(db, "Programs", docSnap.id, "attendees");
+          const attendeeSnap = await getDocs(attendeesRef);
+          
+          for (const attendeeDoc of attendeeSnap.docs) {
+            await safeBatchUpdate(attendeeDoc.ref, { status: "Completed" });
+          }
+        }
       }
-    });
+    }
 
     // ── B. Check Facility Reservations ──
     const qRes = query(
@@ -72,7 +89,7 @@ export const runStatusMaintenance = async () => {
     );
     const snapRes = await getDocs(qRes);
 
-    snapRes.forEach((docSnap) => {
+    for (const docSnap of snapRes.docs) {
       const data = docSnap.data();
       const resDate = data.date; 
       const resStartTime = data.startTime || data.time || "00:00"; 
@@ -92,15 +109,15 @@ export const runStatusMaintenance = async () => {
       }
 
       if (newStatus && newStatus !== currentStatus) {
-        batch.update(docSnap.ref, { status: newStatus });
-        updatesCount++;
+        await safeBatchUpdate(docSnap.ref, { status: newStatus });
       }
-    });
+    }
 
-    // ── Commit the Batch ──
-    if (updatesCount > 0) {
-      await batch.commit();
-      console.log(`[Maintenance] Successfully updated ${updatesCount} transactions.`);
+    // ── Commit any remaining updates in the final Batch ──
+    await commitAndResetBatch();
+
+    if (totalUpdatesCount > 0) {
+      console.log(`[Maintenance] Successfully updated ${totalUpdatesCount} transactions.`);
     } else {
       console.log("[Maintenance] All statuses are up to date.");
     }
