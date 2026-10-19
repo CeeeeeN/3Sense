@@ -1,5 +1,5 @@
 import { db } from "../firebase/firebase";
-import { collection, addDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 // Static services defined in the app that don't have dedicated collections
 const VALID_STATIC_SERVICES = [
@@ -10,6 +10,10 @@ const VALID_STATIC_SERVICES = [
   "vawc",
   "bosca"
 ];
+
+// ─── OPTIMIZED: In-Memory Validation Cache ───
+// Prevents redundant database reads if the same QR code is scanned multiple times in a session.
+const validationCache = new Map();
 
 /**
  * Validates the scanned QR data against Firestore (when applicable) and logs the scan event.
@@ -40,49 +44,62 @@ export async function processQRScan({ qrUrl, residentID, householdID, userID }) 
   let isValid = false;
   let validationName = serviceName || "Unknown Service";
 
-  // Strict Server-Side Validation based on the category
-  try {
-    if (category === "Services") {
-      if (VALID_STATIC_SERVICES.includes(serviceId.toLowerCase())) {
-        isValid = true;
-      }
-    } else if (category === "Programs") {
-      const docRef = doc(db, "Programs", serviceId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        isValid = true;
-        validationName = docSnap.data().title || validationName;
-      }
-    } else if (category === "Facilities") {
-      if (serviceId === "facilities_global") {
-        isValid = true;
-      } else {
-        const docRef = doc(db, "facilities", serviceId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
+  // Check the cache first to save Firestore reads
+  const cacheKey = `${category}_${serviceId}`;
+  if (validationCache.has(cacheKey)) {
+    isValid = true;
+    validationName = validationCache.get(cacheKey);
+  } else {
+    // Strict Server-Side Validation based on the category
+    try {
+      if (category === "Services") {
+        if (VALID_STATIC_SERVICES.includes(serviceId.toLowerCase())) {
           isValid = true;
-          validationName = docSnap.data().name || docSnap.data().title || validationName;
+          validationCache.set(cacheKey, validationName);
         }
-      }
-    } else if (category === "Documents") {
-      if (serviceId === "documents_global") {
-        isValid = true;
-      } else {
-        const docRef = doc(db, "documents", serviceId);
+      } else if (category === "Programs") {
+        const docRef = doc(db, "Programs", serviceId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           isValid = true;
           validationName = docSnap.data().title || validationName;
+          validationCache.set(cacheKey, validationName);
+        }
+      } else if (category === "Facilities") {
+        if (serviceId === "facilities_global") {
+          isValid = true;
+          validationCache.set(cacheKey, validationName);
+        } else {
+          const docRef = doc(db, "facilities", serviceId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            isValid = true;
+            validationName = docSnap.data().name || docSnap.data().title || validationName;
+            validationCache.set(cacheKey, validationName);
+          }
+        }
+      } else if (category === "Documents") {
+        if (serviceId === "documents_global") {
+          isValid = true;
+          validationCache.set(cacheKey, validationName);
+        } else {
+          const docRef = doc(db, "documents", serviceId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            isValid = true;
+            validationName = docSnap.data().title || validationName;
+            validationCache.set(cacheKey, validationName);
+          }
         }
       }
-    }
 
-    if (!isValid) {
-      throw new Error("Scanned item does not exist or matches no active records.");
+      if (!isValid) {
+        throw new Error("Scanned item does not exist or matches no active records.");
+      }
+    } catch (error) {
+      console.error("QR Validation Error:", error);
+      throw new Error("Validation failed. Please try again or assure internet connection.");
     }
-  } catch (error) {
-    console.error("QR Validation Error:", error);
-    throw new Error("Validation failed. Please try again or assure internet connection.");
   }
 
   // Construct Data Payload (snake_case collection / camelCase fields)
@@ -108,12 +125,12 @@ export async function processQRScan({ qrUrl, residentID, householdID, userID }) 
     scanData.serviceID = serviceId;
   }
 
-  // Add to firestore
+  // ─── OPTIMIZED: 1-Write Creation via setDoc ───
   try {
-    await addDoc(collection(db, "qr_scans"), scanData);
+    const scanRef = doc(collection(db, "qr_scans"));
+    await setDoc(scanRef, scanData);
   } catch (err) {
     console.error("Failed to log scan record:", err);
-
     throw new Error("Failed to record scan activity.");
   }
 

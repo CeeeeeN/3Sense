@@ -17,7 +17,8 @@ export const loginWithHouseholdID = async (householdID, password) => {
         throw new Error("Please enter your Household ID and password.");
     }
 
-    const householdRef = doc(db, "households", householdID.trim());
+    const cleanID = householdID.trim();
+    const householdRef = doc(db, "households", cleanID);
     const snapshot = await getDoc(householdRef);
 
     if (!snapshot.exists()) throw new Error("Invalid Household ID.");
@@ -33,9 +34,6 @@ export const loginWithHouseholdID = async (householdID, password) => {
     try {
         await signInWithEmailAndPassword(auth, householdData.email, password);
     } catch (err) {
-        // If the old email is invalid, but we have a pendingEmail, try it.
-        // This handles the case where the user verified their new email via the verification link,
-        // which automatically switched their Firebase Auth email to the new one.
         if (err.code === "auth/invalid-credential") {
             let success = false;
             
@@ -53,9 +51,8 @@ export const loginWithHouseholdID = async (householdID, password) => {
                 }
             }
 
-            // Fallback for edge cases where pendingEmail wasn't set but the head resident doc HAS the new email
             if (!success) {
-                const headRef = doc(db, "households", householdID.trim(), "residents", "head");
+                const headRef = doc(db, "households", cleanID, "residents", "head");
                 const headSnap = await getDoc(headRef);
                 if (headSnap.exists()) {
                     const headData = headSnap.data();
@@ -80,22 +77,42 @@ export const loginWithHouseholdID = async (householdID, password) => {
         }
     }
 
-    // Load all residents from the sub-collection
-    const residentsSnap = await getDocs(
-        collection(db, "households", householdID.trim(), "residents")
-    );
-
-    const residents = residentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-    // Load all branches from the sub-collection
-    const branchesSnap = await getDocs(
-        collection(db, "households", householdID.trim(), "branches")
-    );
+    // ─── OPTIMIZED: Cache-First Login Payload ───
+    // This allows the user to log in instantly without waiting for 2 collection downloads
+    const cacheKeyResidents = `hh_residents_${cleanID}`;
+    const cacheKeyBranches = `hh_branches_${cleanID}`;
     
-    const branches = branchesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    let residents = JSON.parse(localStorage.getItem(cacheKeyResidents) || "[]");
+    let branches = JSON.parse(localStorage.getItem(cacheKeyBranches) || "[]");
+    
+    // Background Sync (Fire and Forget)
+    // Updates the local cache silently for the next time the app opens, or for UI components to use
+    Promise.all([
+        getDocs(collection(db, "households", cleanID, "residents")),
+        getDocs(collection(db, "households", cleanID, "branches"))
+    ]).then(([resSnap, branchSnap]) => {
+        const freshResidents = resSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const freshBranches = branchSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        
+        localStorage.setItem(cacheKeyResidents, JSON.stringify(freshResidents));
+        localStorage.setItem(cacheKeyBranches, JSON.stringify(freshBranches));
+    }).catch(e => console.warn("Failed background cache sync on login:", e));
+
+    // If cache was empty (first time login on this device), we must await the fetch
+    if (residents.length === 0) {
+        const resSnap = await getDocs(collection(db, "households", cleanID, "residents"));
+        residents = resSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        localStorage.setItem(cacheKeyResidents, JSON.stringify(residents));
+    }
+    
+    if (branches.length === 0) {
+        const branchSnap = await getDocs(collection(db, "households", cleanID, "branches"));
+        branches = branchSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        localStorage.setItem(cacheKeyBranches, JSON.stringify(branches));
+    }
 
     return {
-        householdID: householdID.trim(),
+        householdID: cleanID,
         householdName: (() => {
             const head = residents.find(r => r.role === "Household Head" || r.role === "head");
             return [head?.firstName, head?.lastName].filter(Boolean).join(" ") || householdData.email;
@@ -227,7 +244,6 @@ export const resetMemberPin = async (householdID, residentID) => {
         });
     } catch (error) {
         console.error("Failed to send PIN reset email:", error);
-        // Don't throw - the PIN was still reset, email is just a courtesy
     }
 
     const [user, domain] = residentEmail.split("@");

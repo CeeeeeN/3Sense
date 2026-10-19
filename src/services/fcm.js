@@ -1,11 +1,13 @@
 import { getToken, onMessage } from "firebase/messaging";
 import { messaging, db } from "../firebase/firebase";
-import { doc, setDoc, arrayUnion } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
-// Request notification permission, generate FCM token, and store it for the specified user.
-
+/**
+ * Request notification permission, generate FCM token, and store it for the specified user.
+ * OPTIMIZED: Uses local storage to prevent redundant database writes on page refresh.
+ */
 export const requestPushPermission = async (householdID, residentID) => {
   if (!householdID || !residentID) return;
 
@@ -26,8 +28,17 @@ export const requestPushPermission = async (householdID, residentID) => {
       });
 
       if (token) {
+        // ─── OPTIMIZED: Dirty Check / Cache Check ───
+        // Prevent writing to Firestore if we already saved this exact token for this user
+        const cacheKey = `fcm_sync_${householdID}_${residentID}`;
+        const cachedToken = localStorage.getItem(cacheKey);
+
+        if (cachedToken === token) {
+          console.log("FCM Token already synced to database. Skipping write.");
+          return;
+        }
+
         // Save token using the token itself as the document ID
-        // This prevents duplicates and allows us to store the householdID & residentID as fields to be queried
         const userFcmRef = doc(db, "fcmTokens", token);
         await setDoc(userFcmRef, {
           token: token,
@@ -36,7 +47,9 @@ export const requestPushPermission = async (householdID, residentID) => {
           updatedAt: new Date()
         }, { merge: true });
 
-        console.log("FCM Token saved successfully.");
+        // Cache the successful sync
+        localStorage.setItem(cacheKey, token);
+        console.log("FCM Token saved successfully to database.");
       }
     } else {
       console.log("Notification permission denied");
@@ -46,12 +59,13 @@ export const requestPushPermission = async (householdID, residentID) => {
   }
 };
 
-
-// Attaches a listener for foreground FCM messages.
-
+/**
+ * Attaches a listener for foreground FCM messages.
+ */
 export const listenForForegroundMessages = () => {
   return onMessage(messaging, (payload) => {
-
     console.log("Push notification received in foreground: ", payload);
+    // You can dispatch a custom event or React state update here if you want 
+    // to show an in-app toast notification when the app is open.
   });
 };
