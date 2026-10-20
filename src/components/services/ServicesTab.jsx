@@ -31,12 +31,12 @@ const SERVICES_SUBTABS = [
 ];
 
 const SVC_CARD_META = {
-  vawc:       { fullName: "Violence Against Women & Children",         desc: "Hotlines, protection orders, and guided support for VAWC cases." },
-  bosca:      { fullName: "Barangay Office for Senior Citizens Assoc.", desc: "Senior citizen membership, benefits, welfare programs and how to join." },
-  bswd:       { fullName: "Barangay Social Welfare and Development",    desc: "Report homeless individuals, send tips, and access social welfare services." },
-  peace:      { fullName: "Peace & Order",                              desc: "Emergency hotline, file an incident report, and track your report status." },
-  livelihood: { fullName: "Livelihood Skills Training",                desc: "Register for free skills training programs and track your enrollment status." },
-  badac:      { fullName: "Barangay Anti-Drug Abuse Council",          desc: "Confidential assistance, free drug testing, and rehabilitation referral." },
+  vawc:       { fullName: "Violence Against Women and Children",         desc: "Get help for cases of abuse, learn about available protection, or ask for assistance for yourself or someone you know." },
+  bosca:      { fullName: "Senior Citizens' Services", desc: "Report safety concerns, ask for help from the barangay tanod, or report incidents in your community." },
+  bswd:       { fullName: "Barangay Social Welfare and Development",    desc: "Ask for guidance about drug-related concerns, learn about prevention programs, or seek help for someone who needs support." },
+  peace:      { fullName: "Peace and Order",                              desc: "Get information about senior citizen benefits, membership, and available programs. Ask for help if you are unsure how to apply." },
+  livelihood: { fullName: "Livelihood Skills Training",                desc: "Ask about social assistance and available welfare services for individuals and families who need help." },
+  badac:      { fullName: "Barangay Anti-Drug Abuse Council",          desc: "Learn about skills training and livelihood programs that can help you find work, develop new skills, or start a small business." },
 };
 
 // ── Category theme: card tint, border, accent bar ──

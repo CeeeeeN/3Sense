@@ -133,26 +133,12 @@ export default function BSWDTab({ userData, householdID }) {
       <div className="svc-hero svc-hero--teal">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>Social Welfare & Development</div>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>BSWD</div>
             <h2 className="svc-hero__title">Barangay Social Welfare and Development</h2>
-            <p className="svc-hero__abbr">BSWD</p>
-            <p className="svc-hero__sub">Providing social protection, welfare programs, and community development services to all residents of Barangay 3S+ Malanday.</p>
+            <p className="svc-hero__sub">Seek information and assistance for social welfare concerns, including support for individuals and families in need of community services.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              Coordinating with <strong>DSWD</strong> — Department of Social Welfare and Development
-            </div>
-          </div>
-          <div className="svc-hero__right">
-            <div className="svc-hero__hotline-pill">
-              <div className="svc-hero__hotline-item">
-                <span className="svc-hero__hotline-label">BSWD Hotline</span>
-                <a href="tel:044000000" className="svc-hero__hotline-num">(044) 000-0000</a>
-              </div>
-              <div className="svc-hero__hotline-sep" />
-              <div className="svc-hero__hotline-item">
-                <span className="svc-hero__hotline-label">DSWD National</span>
-                <a href="tel:8888" className="svc-hero__hotline-num">8-888</a>
-              </div>
+              Coordination: Barangay social welfare services and the appropriate city or municipal social welfare office
             </div>
           </div>
         </div>

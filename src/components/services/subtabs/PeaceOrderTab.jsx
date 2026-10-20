@@ -190,11 +190,10 @@ export default function PeaceOrderTab({ userData, householdID }) {
           <div className="svc-hero__left">
             <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><SirenIcon /></span>Barangay Tanod</div>
             <h2 className="svc-hero__title">Peace & Order</h2>
-            <p className="svc-hero__abbr">BARANGAY 3S+ MALANDAY</p>
-            <p className="svc-hero__sub">Report incidents, request assistance, and help keep our community safe.</p>
+            <p className="svc-hero__sub">Report community disturbances and safety concerns, request assistance, and help maintain peace and order within the barangay.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              Barangay Tanod Unit · Barangay 3S+ Malanday, Valenzuela City
+              Service focus: Community safety and public order
             </div>
           </div>
         </div>

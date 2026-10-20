@@ -4,7 +4,7 @@ import { db } from "../../firebase/firebase";
 import { submitFacilityReservation, submitEquipmentRental } from "../../services/services";
 import { createNotification } from "../../services/notifications";
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
-import { useAlert } from "../../context/AlertContext"; // <-- 1. IMPORT HOOK
+import { useAlert } from "../../context/AlertContext";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -51,22 +51,22 @@ function AdvanceBookingBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-  <div style={{
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "12px",
-    background: "#fffbeb",
-    border: "1px solid #fcd34d",
-    borderRadius: "10px",
-    padding: "14px 16px",
-    margin: "20px 28px 18px",
-    fontSize: "14px",
-    color: "#92400e",
-  }}>
-<svg
+    <div style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: "12px",
+      background: "#fffbeb",
+      border: "1px solid #fcd34d",
+      borderRadius: "10px",
+      padding: "10px 14px",
+      margin: "0 0 0.75rem",
+      fontSize: "14px",
+      color: "#92400e",
+    }}>
+      <svg
         style={{ flexShrink: 0, marginTop: "1px" }}
         width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="#d97706"                       
+        stroke="#d97706"
         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
       >
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -75,7 +75,7 @@ function AdvanceBookingBanner() {
         <line x1="3" y1="10" x2="21" y2="10" />
       </svg>
       <div style={{ flex: 1 }}>
-        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}> 
+        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
           Advance Booking Required
         </strong>
         Facility reservations must be submitted at least{" "}
@@ -89,7 +89,7 @@ function AdvanceBookingBanner() {
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: "#92400e",                
+          color: "#92400e",
           padding: "0",
           flexShrink: 0,
           lineHeight: 1,
@@ -121,36 +121,38 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
 
   return (
     <>
-      <AdvanceBookingBanner />
+      <div className="sv-tint">
+        <AdvanceBookingBanner />
 
-      <div className="sv-facilities-list">
-        {facilities.map(f => (
-          <div key={f.id} className="sv-facility-card">
-            <div className="sv-facility-card__left">
-              <div className="sv-facility-card__icon-wrap"><BuildingIcon /></div>
-              <div>
-                <div className="sv-facility-card__title">{f.facilityName || f.name || f.title}</div>
-                <div className="sv-facility-card__meta">
-                  <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
-                  <span className="sv-facility-card__dot" />
-                  <span>{f.openTime && f.closeTime ? (() => {
-                    const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
-                    return fmt(f.openTime) + ' – ' + fmt(f.closeTime);
-                  })() : f.hours}</span>
+        <div className="sv-facilities-list">
+          {facilities.map(f => (
+            <div key={f.id} className="sv-facility-card">
+              <div className="sv-facility-card__left">
+                <div className="sv-facility-card__icon-wrap"><BuildingIcon /></div>
+                <div>
+                  <div className="sv-facility-card__title">{f.facilityName || f.name || f.title}</div>
+                  <div className="sv-facility-card__meta">
+                    <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
+                    <span className="sv-facility-card__dot" />
+                    <span>{f.openTime && f.closeTime ? (() => {
+                      const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
+                      return fmt(f.openTime) + ' – ' + fmt(f.closeTime);
+                    })() : f.hours}</span>
+                  </div>
+                  <div className="sv-facility-card__desc">{f.description || f.fullDescription || f.desc}</div>
                 </div>
-                <div className="sv-facility-card__desc">{f.description || f.fullDescription || f.desc}</div>
+              </div>
+              <div className="sv-facility-card__right">
+                <span className={`sv-avail-badge${f.available ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
+                  <span className="sv-avail-dot" />{f.available ? "Available" : "Unavailable"}
+                </span>
+                {f.available && (
+                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>Reserve <ChevronRightIcon /></button>
+                )}
               </div>
             </div>
-            <div className="sv-facility-card__right">
-              <span className={`sv-avail-badge${f.available ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
-                <span className="sv-avail-dot" />{f.available ? "Available" : "Unavailable"}
-              </span>
-              {f.available && (
-                <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>Reserve <ChevronRightIcon /></button>
-              )}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {reservationFacility && (
@@ -252,15 +254,15 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
         gap: "6px",
         marginTop: "10px",
         fontSize: "12px",
-        color: "#1e40af",
-        background: "#eff6ff",
-        border: "1px solid #bfdbfe",
+        color: "#92400e",
+        background: "#fffbeb",
+        border: "1px solid #fde68a",
         borderRadius: "6px",
         padding: "7px 10px",
       }}>
         <svg
           style={{ flexShrink: 0, marginTop: "1px" }}
-          width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
         >
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
@@ -273,7 +275,7 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
 }
 
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
-  const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { showAlert } = useAlert();
 
   const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
   const facilityDesc = facility
@@ -290,7 +292,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
   useEffect(() => {
     if (!facility) return;
-    
+
     const q = query(
       collection(db, "facility_reservations"),
       where("facilityId", "==", String(facility.id))
@@ -299,10 +301,10 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     const unsub = onSnapshot(q, (snapshot) => {
       const approved = [];
       const allActive = [];
-      
+
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (data.date) { 
+        if (data.date) {
           const stat = (data.status || "").toLowerCase();
           if (stat === "rejected") return;
           const entry = { id: doc.id, date: data.date, startTime: data.startTime, endTime: data.endTime, status: stat };
@@ -444,7 +446,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         userData?.residentID || userID || "",
         userName || "Unknown",
         facility,
-        submissionForm, 
+        submissionForm,
         customData
       );
 
@@ -454,16 +456,16 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           householdID,
           userData?.residentID || userID || "",
           form.fullName || userName || "Unknown",
-          eq, 
+          eq,
           {
             purpose: `Facility Bundle (${facilityName}): ${form.purpose}`,
             quantity: eq.requestedQuantity,
-            pickUpDate: form.date, 
+            pickUpDate: form.date,
             returnDate: form.date,
             notes: `Bundled with facility reservation ${generatedRef}. ${form.notes}`,
             email: form.email,
             contactNumber: form.contactNumber,
-            UID: userUID 
+            UID: userUID
           },
           {}
         );
@@ -476,7 +478,6 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit reservation:", error);
-      // <-- 3. REPLACE INLINE ERROR SETTING WITH ALERT POPUP
       await showAlert("Submission Failed", error.message || "Failed to submit reservation. Please try again.");
     }
   };
@@ -486,11 +487,11 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       <div className="sv-success-icon"><ServiceCheckCircleIcon /></div>
       <h3 className="sv-success-title">Reservation Submitted</h3>
       <p className="sv-success-sub">Your reservation request has been submitted and is awaiting barangay approval.</p>
-      <div className="dr-ref-box" style={{ margin: '1.5rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+      <div className="dr-ref-box" style={{ margin: '1rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
         <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
         <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
       </div>
-      
+
       {Object.keys(selectedEquipment).length > 0 && (
         <div style={{ fontSize: '13px', color: '#64748b', background: '#f1f5f9', padding: '10px', borderRadius: '6px', marginBottom: '1rem', textAlign: 'center' }}>
           Your bundled equipment request has also been submitted and will be reviewed alongside this facility.
@@ -520,15 +521,15 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         display: "flex",
         alignItems: "flex-start",
         gap: "10px",
-        background: "#eff6ff",
-        border: "1px solid #93c5fd",
+        background: "#fffbeb",
+        border: "1px solid #fcd34d",
         borderRadius: "8px",
         padding: "10px 14px",
-        margin: "0 0 16px 0",
+        margin: "0.75rem 1.25rem 0",
         fontSize: "13px",
-        color: "#1e40af",
+        color: "#92400e",
       }}>
-        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
           <line x1="16" y1="2" x2="16" y2="6" />
           <line x1="8" y1="2" x2="8" y2="6" />
@@ -564,7 +565,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
 
-          <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Reservation Details</div>
+          <div className="sv-field-section-label" style={{ marginTop: "0.75rem" }}>Reservation Details</div>
           <div className="sv-field">
             <label className="sv-label">Purpose of Use <span className="sv-required">*</span></label>
             <input className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} placeholder="e.g. Birthday celebration, community meeting..." value={form.purpose} onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }} />
@@ -625,14 +626,14 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         </div>
 
         {/* ── BUNDLED EQUIPMENT RENTALS ── */}
-        <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
+        <div className="sv-fields">
           <div className="sv-field-section-label">Additional Equipment <span className="sv-optional">(Optional)</span></div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
             {equipmentInventory.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>No equipment available at this time.</div>
             ) : (
               equipmentInventory.map(eq => (
-                <div key={eq.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div key={eq.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>{eq.equipmentName || eq.name}</div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Inventory: {eq.quantity} available</div>
@@ -668,7 +669,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         </div>
 
         {facility?.customFields?.length > 0 && (
-          <div className="sv-fields" style={{ marginTop: "1.5rem" }}>
+          <div className="sv-fields">
             <div className="sv-field-section-label">Additional Information</div>
             <div className="dr-field-row dr-field-row--wrap">
               {facility.customFields.map(f => {
@@ -695,7 +696,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           </div>
         )}
 
-        <div className="sv-calendar-col" style={{ marginTop: "1.5rem" }}>
+        <div className="sv-calendar-col">
           <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
           <Calendar
             selectedDate={form.date}

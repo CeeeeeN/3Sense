@@ -287,11 +287,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
               Barangay Livelihood Program
             </div>
             <h2 className="svc-hero__title">Livelihood Skills Training</h2>
-            <p className="svc-hero__abbr">FREE · OPEN TO ALL RESIDENTS</p>
-            <p className="svc-hero__sub">Build new skills, earn more, and grow your small business. All training programs are free for qualified Barangay Malanday residents.</p>
+            <p className="svc-hero__sub">Explore skills training and livelihood opportunities designed to help residents develop practical skills and improve their employment or income opportunities.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              In partnership with DOLE · Open to residents 18 and above
+              Program coordination: Subject to available training programs and eligibility requirements
             </div>
           </div>
           <div className="svc-hero__right">

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
-import { submitEquipmentRental } from "../../services/services"; 
+import { submitEquipmentRental } from "../../services/services";
 import { ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
-import { useAlert } from "../../context/AlertContext"; // <-- 1. IMPORT HOOK
+import { useAlert } from "../../context/AlertContext";
 
 const EquipmentIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,14 +34,14 @@ function AdvanceRentalBanner() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-  <div style={{
-    display: "flex", alignItems: "flex-start", gap: "12px",
-    background: "#eff6ff", border: "1px solid #93c5fd",
-    borderRadius: "10px", padding: "14px 16px",
-    margin: "20px 28px 18px",   // was: marginBottom: "18px"
-    fontSize: "14px", color: "#1e40af",
-  }}>
-      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: "12px",
+      background: "#fffbeb", border: "1px solid #fcd34d",
+      borderRadius: "10px", padding: "10px 14px",
+      margin: "0 0 0.75rem",
+      fontSize: "14px", color: "#92400e",
+    }}>
+      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
@@ -81,52 +81,54 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
   useEffect(() => {
     const q = query(
       collection(db, "equipment"),
-      limit(100) 
+      limit(100)
     );
 
     const unsub = onSnapshot(q, snapshot => {
       setEquipmentList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    
+
     return () => unsub();
   }, []);
 
   return (
     <>
-      <AdvanceRentalBanner />
+      <div className="sv-tint">
+        <AdvanceRentalBanner />
 
-      <div className="sv-facilities-list">
-        {equipmentList.map(eq => {
-          // Dynamically check if the item is out of stock (quantity <= 0)
-          const isOutOfStock = eq.quantity !== undefined && eq.quantity !== "" && Number(eq.quantity) <= 0;
-          
-          // It is only available if the admin switch is ON and it has stock
-          const isAvailable = eq.available !== false && !isOutOfStock;
+        <div className="sv-facilities-list">
+          {equipmentList.map(eq => {
+            // Dynamically check if the item is out of stock (quantity <= 0)
+            const isOutOfStock = eq.quantity !== undefined && eq.quantity !== "" && Number(eq.quantity) <= 0;
 
-          return (
-            <div key={eq.id} className="sv-facility-card">
-              <div className="sv-facility-card__left">
-                <div className="sv-facility-card__icon-wrap"><EquipmentIcon /></div>
-                <div>
-                  <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
-                  <div className="sv-facility-card__meta">
-                    <span>{eq.quantity !== undefined && eq.quantity !== "" ? `Total Inventory: ${eq.quantity} units` : "Quantity unlisted"}</span>
+            // It is only available if the admin switch is ON and it has stock
+            const isAvailable = eq.available !== false && !isOutOfStock;
+
+            return (
+              <div key={eq.id} className="sv-facility-card">
+                <div className="sv-facility-card__left">
+                  <div className="sv-facility-card__icon-wrap"><EquipmentIcon /></div>
+                  <div>
+                    <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
+                    <div className="sv-facility-card__meta">
+                      <span>{eq.quantity !== undefined && eq.quantity !== "" ? `Total Inventory: ${eq.quantity} units` : "Quantity unlisted"}</span>
+                    </div>
+                    <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
                   </div>
-                  <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
+                </div>
+                <div className="sv-facility-card__right">
+                  <span className={`sv-avail-badge${isAvailable ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
+                    <span className="sv-avail-dot" />
+                    {isAvailable ? "Available" : (isOutOfStock ? "Out of Stock" : "Unavailable")}
+                  </span>
+                  {isAvailable && (
+                    <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>
+                  )}
                 </div>
               </div>
-              <div className="sv-facility-card__right">
-                <span className={`sv-avail-badge${isAvailable ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
-                  <span className="sv-avail-dot" />
-                  {isAvailable ? "Available" : (isOutOfStock ? "Out of Stock" : "Unavailable")}
-                </span>
-                {isAvailable && (
-                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {rentalEquipment && (
@@ -222,10 +224,10 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
       </div>
       <div style={{
         display: "flex", alignItems: "flex-start", gap: "6px", marginTop: "10px",
-        fontSize: "12px", color: "#1e40af", background: "#eff6ff", border: "1px solid #bfdbfe",
+        fontSize: "12px", color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a",
         borderRadius: "6px", padding: "7px 10px",
       }}>
-        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
         <span style={{ flex: 1, lineHeight: "1.5" }}>
@@ -237,11 +239,11 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
 }
 
 function RentalForm({ onBack, equipment, userData, householdID, userName, userID }) {
-  const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { showAlert } = useAlert();
 
   const equipmentName = equipment?.equipmentName || equipment?.name || "Equipment";
   const maxQty = equipment?.quantity ? parseInt(equipment.quantity, 10) : 0;
-  
+
   const [form, setForm] = useState({
     fullName: "", email: "", contactNumber: "",
     purpose: "", customPurpose: "", quantity: "", pickUpDate: "", returnDate: "", notes: ""
@@ -266,13 +268,13 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
   const validate = () => {
     const e = {};
     if (!form.email?.trim()) e.email = "Email is required.";
-    
+
     if (!form.purpose) e.purpose = "Please select a purpose.";
     if (form.purpose === "Other" && !form.customPurpose.trim()) e.customPurpose = "Please specify your purpose.";
-    
+
     if (!form.quantity || form.quantity <= 0) e.quantity = "Please enter a valid quantity.";
     if (maxQty > 0 && form.quantity > maxQty) e.quantity = `Requested quantity exceeds available inventory (Max: ${maxQty}).`;
-    
+
     if (!form.pickUpDate) e.pickUpDate = "Please select a pick-up date.";
     if (!form.returnDate) e.returnDate = "Please select a return date.";
     if (form.returnDate && form.pickUpDate && form.returnDate < form.pickUpDate) {
@@ -288,28 +290,27 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
 
     try {
       const finalPurpose = form.purpose === "Other" ? form.customPurpose : form.purpose;
-      
+
       const userUID = userData?.UID || getSaved("UID", null);
-      
-      const submissionForm = { 
-        ...form, 
+
+      const submissionForm = {
+        ...form,
         purpose: finalPurpose,
-        UID: userUID 
+        UID: userUID
       };
-      
+
       const generatedRef = await submitEquipmentRental(
         householdID,
         userData?.residentID || userID || "",
         userName || "Unknown",
         equipment,
-        submissionForm, 
-        {} 
+        submissionForm,
+        {}
       );
       setRefNum(generatedRef || "");
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit rental:", error);
-      // <-- 3. REPLACE INLINE ERROR SETTING WITH ALERT POPUP
       await showAlert("Submission Failed", error.message || "Failed to submit request. Please try again.");
     }
   };
@@ -319,7 +320,7 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
       <div className="sv-success-icon"><ServiceCheckCircleIcon /></div>
       <h3 className="sv-success-title">Request Submitted</h3>
       <p className="sv-success-sub">Your equipment rental request has been submitted and is awaiting barangay approval.</p>
-      <div className="dr-ref-box" style={{ margin: '1.5rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+      <div className="dr-ref-box" style={{ margin: '1rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
         <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
         <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
       </div>
@@ -339,10 +340,10 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
       </div>
 
       <div style={{
-        display: "flex", alignItems: "flex-start", gap: "10px", background: "#eff6ff", border: "1px solid #93c5fd",
-        borderRadius: "8px", padding: "10px 14px", margin: "0 0 16px 0", fontSize: "13px", color: "#1e40af",
+        display: "flex", alignItems: "flex-start", gap: "10px", background: "#fffbeb", border: "1px solid #fcd34d",
+        borderRadius: "8px", padding: "10px 14px", margin: "0.75rem 1.25rem 0", fontSize: "13px", color: "#92400e",
       }}>
-        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg style={{ flexShrink: 0, marginTop: "1px" }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
           <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
         </svg>
@@ -370,13 +371,13 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
 
-          <div className="sv-field-section-label" style={{ marginTop: "1.5rem" }}>Rental Details</div>
-          
+          <div className="sv-field-section-label" style={{ marginTop: "0.75rem" }}>Rental Details</div>
+
           <div className="sv-field">
             <label className="sv-label">Purpose of Rental <span className="sv-required">*</span></label>
-            <select 
-              className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} 
-              value={form.purpose} 
+            <select
+              className={`sv-input${errors.purpose ? " sv-input--error" : ""}`}
+              value={form.purpose}
               onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }}
             >
               <option value="" disabled>Select a purpose...</option>
@@ -402,15 +403,15 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
             {errors.quantity && <span className="sv-error-msg">{errors.quantity}</span>}
           </div>
 
-          <div className="sv-field-row" style={{ marginTop: "1rem" }}>
-             <div className="sv-field">
+          <div className="sv-field-row">
+            <div className="sv-field">
               <label className="sv-label">Return Date <span className="sv-required">*</span></label>
-              <input 
-                className={`sv-input${errors.returnDate ? " sv-input--error" : ""}`} 
-                type="date" 
+              <input
+                className={`sv-input${errors.returnDate ? " sv-input--error" : ""}`}
+                type="date"
                 min={form.pickUpDate || MIN_RENTAL_DATE}
-                value={form.returnDate} 
-                onChange={e => { set("returnDate", e.target.value); setErrors(p => ({ ...p, returnDate: "" })); }} 
+                value={form.returnDate}
+                onChange={e => { set("returnDate", e.target.value); setErrors(p => ({ ...p, returnDate: "" })); }}
               />
               {errors.returnDate && <span className="sv-error-msg">{errors.returnDate}</span>}
             </div>

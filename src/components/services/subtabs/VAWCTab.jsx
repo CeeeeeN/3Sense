@@ -203,13 +203,12 @@ export default function VAWCTab() {
       <div className="svc-hero svc-hero--red">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><ServiceShieldIcon /></span>VAWC Protection</div>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><ServiceShieldIcon /></span>VAWC</div>
             <h2 className="svc-hero__title">Violence Against Women & Children</h2>
-            <p className="svc-hero__abbr">VAWC</p>
-            <p className="svc-hero__sub">You deserve to be safe. If you or someone you know is experiencing abuse, help is available — confidentially and for free.</p>
+            <p className="svc-hero__sub">Report cases of abuse and seek assistance, guidance, and protection for women and children experiencing violence.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              Protected under <strong>RA 9262</strong> — Anti-VAWC Act of 2004
+              Legal reference: RA 9262 <strong> — </strong> Anti-Violence Against Women and Their Children Act of 2004
             </div>
           </div>
         </div>
