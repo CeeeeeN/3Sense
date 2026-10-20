@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 // Load environment variables from the .env file
 dotenv.config();
 
+// ─── OPTIMIZED: Global Cache for Firebase Admin & Firestore ───
+// Prevents Vercel from rebuilding the connection on every PIN request
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
@@ -18,6 +20,7 @@ if (!admin.apps.length) {
     console.error('Firebase admin initialization error', error);
   }
 }
+const db = admin.firestore();
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -54,7 +57,14 @@ const lockedResponse = (lockedUntilMs, now) => ({
 
 const callerOwnsHousehold = async (db, householdID, decodedToken) => {
   const householdRef = db.collection('households').doc(householdID);
-  const householdSnap = await householdRef.get();
+  
+  // ─── OPTIMIZED: Parallel Auth Resolution ───
+  // Fetches both documents simultaneously instead of waiting for one to finish before starting the other.
+  const [householdSnap, headSnap] = await Promise.all([
+    householdRef.get(),
+    householdRef.collection('residents').doc('head').get()
+  ]);
+
   if (!householdSnap.exists) return false;
 
   const household = householdSnap.data();
@@ -68,7 +78,6 @@ const callerOwnsHousehold = async (db, householdID, decodedToken) => {
     if (candidates.includes(tokenEmail)) return true;
   }
 
-  const headSnap = await householdRef.collection('residents').doc('head').get();
   return headSnap.exists && headSnap.data().userID === decodedToken.uid;
 };
 
@@ -218,8 +227,6 @@ export default async function handler(req, res) {
     if ((action === 'verify' || action === 'create') && !(typeof pin === 'string' && /^\d{4}$/.test(pin))) {
       return res.status(400).json({ success: false, code: 'BAD_REQUEST', message: 'PIN must be exactly 4 digits.' });
     }
-
-    const db = admin.firestore();
 
     if (!(await callerOwnsHousehold(db, householdID, decodedToken))) {
       return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Forbidden' });
