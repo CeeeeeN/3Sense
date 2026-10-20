@@ -8,8 +8,6 @@ export const runStatusMaintenance = async () => {
   let batchOperationCount = 0;
   let totalUpdatesCount = 0;
   
-  // ─── OPTIMIZED: Chunked Batch Handler ───
-  // Prevents the script from crashing if it exceeds Firestore's 500-write limit
   const commitAndResetBatch = async () => {
     if (batchOperationCount > 0) {
       await batch.commit();
@@ -27,17 +25,15 @@ export const runStatusMaintenance = async () => {
     }
   };
 
-  // 1. Get accurate LOCAL date and time
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   
-  const todayStr = `${year}-${month}-${day}`; // e.g., "2026-05-12"
-  
+  const todayStr = `${year}-${month}-${day}`;
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
-  const currentTimeStr = `${hours}:${minutes}`; // e.g., "14:30"
+  const currentTimeStr = `${hours}:${minutes}`;
 
   try {
     // ── A. Check ALL Programs (General & Livelihood) ──
@@ -47,24 +43,29 @@ export const runStatusMaintenance = async () => {
     );
     const snapProg = await getDocs(qProg);
 
-    // MUST use for...of loop. .forEach() ignores async/await!
     for (const docSnap of snapProg.docs) {
       const data = docSnap.data();
-      const progDate = data.date; 
+      
+      // ─── OPTIMIZED: Multi-Day Logic ───
+      // Support dedicated startDate/endDate fields, but fallback to single "date" if they don't exist
+      const startDate = data.startDate || data.date; 
+      const endDate = data.endDate || data.date || startDate; 
       const startTime = data.startTime || "00:00"; 
       const endTime = data.endTime || "23:59";     
       const currentStatus = data.status;
 
       let newStatus = null;
 
-      if (progDate && progDate < todayStr) {
+      // 1. Are we past the exact end moment?
+      const isPastEnd = (todayStr > endDate) || (todayStr === endDate && currentTimeStr >= endTime);
+      
+      // 2. Are we past the exact start moment?
+      const isPastStart = (todayStr > startDate) || (todayStr === startDate && currentTimeStr >= startTime);
+
+      if (isPastEnd) {
         newStatus = "Completed";
-      } else if (progDate === todayStr) {
-        if (currentTimeStr >= endTime) {
-          newStatus = "Completed";
-        } else if (currentTimeStr >= startTime && currentTimeStr < endTime) {
-          newStatus = "Ongoing";
-        }
+      } else if (isPastStart) {
+        newStatus = "Ongoing";
       }
 
       if (newStatus && newStatus !== currentStatus) {
@@ -91,29 +92,53 @@ export const runStatusMaintenance = async () => {
 
     for (const docSnap of snapRes.docs) {
       const data = docSnap.data();
-      const resDate = data.date; 
-      const resStartTime = data.startTime || data.time || "00:00"; 
-      const resEndTime = data.endTime || "23:59";
+      
+      // Apply the same multi-day logic to reservations
+      const startDate = data.startDate || data.date; 
+      const endDate = data.endDate || data.date || startDate; 
+      const startTime = data.startTime || data.time || "00:00"; 
+      const endTime = data.endTime || "23:59";
       const currentStatus = data.status;
 
       let newStatus = null;
 
-      if (resDate && resDate < todayStr) {
+      const isPastEnd = (todayStr > endDate) || (todayStr === endDate && currentTimeStr >= endTime);
+      const isPastStart = (todayStr > startDate) || (todayStr === startDate && currentTimeStr >= startTime);
+
+      if (isPastEnd) {
         newStatus = "Completed";
-      } else if (resDate === todayStr) {
-        if (currentTimeStr >= resEndTime) {
-          newStatus = "Completed";
-        } else if (currentTimeStr >= resStartTime && currentTimeStr < resEndTime) {
-          newStatus = "Ongoing";
-        }
+      } else if (isPastStart) {
+        newStatus = "Ongoing";
       }
 
       if (newStatus && newStatus !== currentStatus) {
         await safeBatchUpdate(docSnap.ref, { status: newStatus });
+
+        // Safely and atomically batch the attendee updates
+        if (newStatus === "Completed") {
+          
+          // 1. Update standard program attendees (Sub-collection)
+          const attendeesRef = collection(db, "Programs", docSnap.id, "attendees");
+          const attendeeSnap = await getDocs(attendeesRef);
+          for (const attendeeDoc of attendeeSnap.docs) {
+            await safeBatchUpdate(attendeeDoc.ref, { status: "Completed" });
+          }
+
+          // 2. Update livelihood registrants (Root collection matching the programId)
+          const livelihoodRef = collection(db, "livelihoodRegistrations");
+          const qLivelihood = query(livelihoodRef, where("programId", "==", docSnap.id));
+          const livelihoodSnap = await getDocs(qLivelihood);
+          for (const livelihoodDoc of livelihoodSnap.docs) {
+            // Only update those that were approved (don't mark rejected/pending as completed)
+            if (livelihoodDoc.data().status === "approved" || livelihoodDoc.data().status === "Ongoing") {
+              await safeBatchUpdate(livelihoodDoc.ref, { status: "Completed" });
+            }
+          }
+          
+        }
       }
     }
 
-    // ── Commit any remaining updates in the final Batch ──
     await commitAndResetBatch();
 
     if (totalUpdatesCount > 0) {
