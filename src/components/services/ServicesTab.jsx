@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLanguage } from "../../context/LanguageContext";
 
 // 1. Import all the Icons this specific tab uses!
 import { 
@@ -58,12 +59,13 @@ const CATEGORY_THEME = {
 };
 
 const FILTERS = [
-  { key: "all",       label: "All Services" },
-  { key: "legal",     label: "Legal" },
-  { key: "community", label: "Community" },
+  { key: "all",       labelKey: "svtab_all_services", defaultLabel: "All Services" },
+  { key: "legal",     labelKey: "svtab_legal",        defaultLabel: "Legal" },
+  { key: "community", labelKey: "svtab_community",    defaultLabel: "Community" },
 ];
 
 export default function ServicesTab({ userData, householdID, userName }) {
+  const { t } = useLanguage();
   const [sub, setSub]       = useState(null);
   const [filter, setFilter] = useState("all");
 
@@ -72,7 +74,7 @@ export default function ServicesTab({ userData, householdID, userName }) {
       <div className="svc-detail-wrap">
         <button className="svc-detail-back" onClick={() => setSub(null)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Back to Services
+          {t("svtab_back_to_services")}
         </button>
         {/* Pass userData to the tabs that need it */}
         {sub === "vawc"       && <VAWCTab />}
@@ -93,8 +95,8 @@ export default function ServicesTab({ userData, householdID, userName }) {
         <div className="sc-card-header-left">
           <div className="sc-card-icon-wrap"><ServicesMenuIcon /></div>
           <div>
-            <div className="sc-card-title">Community Services</div>
-            <div className="sc-card-subtitle">Select a service to learn more or take action.</div>
+            <div className="sc-card-title">{t("svtab_community_services")}</div>
+            <div className="sc-card-subtitle">{t("svtab_community_services_sub")}</div>
           </div>
         </div>
       </div>
@@ -102,7 +104,7 @@ export default function ServicesTab({ userData, householdID, userName }) {
       <div className="svc-filter-tabbar">
         {FILTERS.map(f => (
           <button key={f.key} className={`svc-filter-tab${filter === f.key ? " svc-filter-tab--active" : ""}`} onClick={() => setFilter(f.key)}>
-            {f.label}
+            {t(f.labelKey, f.defaultLabel)}
             {f.key !== "all" && (
               <span className="svc-filter-tab__count">{SERVICES_SUBTABS.filter(s => s.category === f.key).length}</span>
             )}
@@ -114,6 +116,9 @@ export default function ServicesTab({ userData, householdID, userName }) {
         {filtered.map(s => {
           const meta = SVC_CARD_META[s.key];
           const cat  = CATEGORY_THEME[s.category];
+          const cardName = t(`svtab_${s.key}_name`, meta?.fullName || s.label);
+          const cardDesc = t(`svtab_${s.key}_desc`, meta?.desc || "");
+          const catLabel = t(`svtab_${s.category}`, cat.label);
           return (
             <button
               key={s.key}
@@ -142,16 +147,16 @@ export default function ServicesTab({ userData, householdID, userName }) {
 
               <div className="svc-picker-card__body">
                 <div className="svc-picker-card__label-row">
-                  <span className="svc-picker-card__label">{s.label}</span>
+                  <span className="svc-picker-card__label">{t(`svtab_${s.key}`, s.label)}</span>
                   <span
                     className="svc-picker-card__cat"
                     style={{ background: cat.pillBg, color: cat.color, fontWeight: 700 }}
                   >
-                    {cat.label}
+                    {catLabel}
                   </span>
                 </div>
-                <div className="svc-picker-card__name">{meta.fullName}</div>
-                <div className="svc-picker-card__desc">{meta.desc}</div>
+                <div className="svc-picker-card__name">{cardName}</div>
+                <div className="svc-picker-card__desc">{cardDesc}</div>
               </div>
 
               <div className="svc-picker-card__arrow" style={{ color: cat.color }}>

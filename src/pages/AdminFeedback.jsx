@@ -3,83 +3,78 @@ import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, AlertTriangle, Clock, BarChart2, List } from 'lucide-react';
 import { auth, db } from '../firebase/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, orderBy, doc, updateDoc, getDocs, limit } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { logTransaction } from '../services/logger';
 import { useAlert } from '../context/AlertContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; 
 
 import SummaryDashboard from '../components/Feedback/SummaryDashboard';
 import FeedbackTable from '../components/Feedback/FeedbackTable';
 import ReviewModal from '../components/Feedback/ReviewModal';
 
-// Set standard SLA deadline for negative feedback (e.g., 72 hours)
 const SLA_HOURS = 72;
 const SLA_MS = SLA_HOURS * 60 * 60 * 1000;
 
 export default function AdminFeedback() {
+  const queryClient = useQueryClient(); 
   const { showAlert } = useAlert();
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
   const [activeTab, setActiveTab] = useState('summary');
-
-  // Real-time clock for the countdown timers (updates every minute)
   const [currentTime, setCurrentTime] = useState(Date.now());
 
+  // ─── OPTIMIZED: Conditional Timer avoids global re-render thrashing ───
   useEffect(() => {
+    // Only run the intensive 60-second tick when the admin is actually looking at the Action tab
+    if (activeTab !== 'action') return;
+    
     const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTab]);
 
-  // For logging purposes
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  // States for 'Action Required' tab filtering & sorting
   const [actionSearchTerm, setActionSearchTerm] = useState('');
   const [actionFilterStatus, setActionFilterStatus] = useState('All');
-  const [actionFilterUrgency, setActionFilterUrgency] = useState('All'); // <-- NEW: Overdue filter
-  const [actionSortOrder, setActionSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc
+  const [actionFilterUrgency, setActionFilterUrgency] = useState('All'); 
+  const [actionSortOrder, setActionSortOrder] = useState('date_desc'); 
 
-  // States for 'All Feedback' tab filtering & sorting
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterSentiment, setFilterSentiment] = useState('All');
   const [sortOrder, setSortOrder] = useState('date_desc');
 
-  // Modal State
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ─── OPTIMIZED: Fetch Admin Profile from Session Cache ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid)
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
         }
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  // --- FETCH FIREBASE DATA ---
-  useEffect(() => {
-    const q = query(
-      collection(db, "feedback"), 
-      orderBy("createdAt", "desc"),
-      limit(200)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fbData = snapshot.docs.map(doc => {
+  // ─── OPTIMIZED: Bounded React Query ───
+  const { data: feedbacks = [], isLoading: loading } = useQuery({
+    queryKey: ['adminManage_feedback'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "feedback"), 
+        orderBy("createdAt", "desc"),
+        limit(200)
+      );
+      const snapshot = await getDocs(q);
+      
+      return snapshot.docs.map(doc => {
         const data = doc.data();
 
         let formattedDate = "Unknown";
@@ -107,15 +102,10 @@ export default function AdminFeedback() {
           rawDate: rawDate,
         };
       });
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-      setFeedbacks(fbData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // --- BASE ACTION REQUIRED LIST (FOR BADGE COUNT) ---
   const actionRequiredFeedbacks = useMemo(() => {
     return feedbacks.filter(fb =>
       String(fb.sentiment).toLowerCase() === 'negative' &&
@@ -123,7 +113,6 @@ export default function AdminFeedback() {
     );
   }, [feedbacks]);
 
-  // --- PRE-PROCESS TIMERS ---
   const processedActionRequired = useMemo(() => {
     return actionRequiredFeedbacks.map(fb => {
       let timerText = "N/A";
@@ -150,7 +139,6 @@ export default function AdminFeedback() {
     });
   }, [actionRequiredFeedbacks, currentTime]);
 
-  // --- ACTION REQUIRED FILTERING & SORTING LOGIC ---
   const filteredActionRequiredFeedbacks = useMemo(() => {
     return processedActionRequired
       .filter(fb => {
@@ -165,7 +153,6 @@ export default function AdminFeedback() {
           actionFilterStatus === 'All' ||
           String(fb.status).toLowerCase() === actionFilterStatus.toLowerCase();
 
-        // <-- NEW: Filter by Overdue Urgency
         const matchesUrgency = 
           actionFilterUrgency === 'All' || 
           (actionFilterUrgency === 'Overdue' && fb.isOverdue);
@@ -181,7 +168,6 @@ export default function AdminFeedback() {
       });
   }, [processedActionRequired, actionSearchTerm, actionFilterStatus, actionFilterUrgency, actionSortOrder]);
 
-  // --- ALL FEEDBACK FILTERING & SORTING LOGIC ---
   const allFilteredFeedbacks = useMemo(() => {
     return feedbacks
       .filter(fb => {
@@ -217,6 +203,7 @@ export default function AdminFeedback() {
     setIsModalOpen(true);
   };
 
+  // ─── OPTIMIZED: Zero-Read Local Cache Update ───
   const handleSaveModal = async (docId, adminNote, newStatus) => {
     try {
       const fbRef = doc(db, "feedback", docId);
@@ -227,23 +214,28 @@ export default function AdminFeedback() {
         processedRole: adminRole,
         processedAt: new Date()
       });
+
+      queryClient.setQueryData(['adminManage_feedback'], (old = []) => 
+        old.map(fb => fb.docId === docId ? { 
+          ...fb, 
+          status: newStatus, 
+          adminNotes: adminNote,
+          processedBy: adminName,
+          processedRole: adminRole
+        } : fb)
+      );
+
       await showAlert("Success", "Feedback updated successfully!");
       setIsModalOpen(false);
       logTransaction(
         adminName,
         adminRole,
         "Update Feedback",
-        `Updated feedback (Ref: ${selectedFeedback?.referenceID || docId}) - New Status: ${newStatus}Admin Note: ${adminNote.substring(0, 50)}...`
+        `Updated feedback (Ref: ${selectedFeedback?.referenceID || docId}) - New Status: ${newStatus}`
       );
     } catch (error) {
       console.error("Error updating feedback:", error);
       await showAlert("Error", "Failed to update feedback.");
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed Feedback Update",
-        `Attempted to update feedback (Ref: ${selectedFeedback?.referenceID || docId}) - Error: ${error.message}`
-      );
     }
   };
 
@@ -251,7 +243,6 @@ export default function AdminFeedback() {
     <AdminLayout>
       <div className="requests-container">
 
-        {/* Page Header */}
         <div className="requests-header">
           <h1 className="requests-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <BarChart2 size={28} color="#317D89" /> Feedback & Sentiment Analytics
@@ -259,7 +250,6 @@ export default function AdminFeedback() {
           <p className="requests-subtitle">Analyze AI insights, resolve negative complaints, and view historical feedback data.</p>
         </div>
 
-        {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
           <button
             onClick={() => setActiveTab('summary')}
@@ -322,7 +312,6 @@ export default function AdminFeedback() {
           </button>
         </div>
 
-        {/* Tab Content Routing */}
         {loading ? (
           <div className="empty-state">
             <Clock className="animate-spin mb-2" size={32} />
@@ -411,7 +400,6 @@ export default function AdminFeedback() {
                       : "Hooray! No negative feedback requires admin action right now."
                   }
                   onReview={handleReviewClick}
-                  // Identify we are currently passing action tab data containing timer logic
                   isActionTab={true}
                 />
               </div>

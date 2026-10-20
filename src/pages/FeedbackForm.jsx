@@ -7,6 +7,7 @@ import {
   StarIcon, CheckCircleIcon, BoltIcon, ShieldIcon,
   MapPinIcon, UploadIcon, ArrowLeftIcon, HomeIcon, ActivityIcon, CheckSmallIcon
 } from '../components/Icons';
+import { useLanguage } from '../context/LanguageContext';
 
 const STAR_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
@@ -58,6 +59,7 @@ const validateQRParams = (params) => {
 
 // ── QR Invalid Screen ─────────────────────────────────────────────────────────
 function QRInvalidScreen({ reason, startDate, endDate, onGoHome }) {
+  const { t } = useLanguage();
   const config = {
     expired: {
       icon:    "🔒",
@@ -98,7 +100,7 @@ function QRInvalidScreen({ reason, startDate, endDate, onGoHome }) {
   return (
     <main className="fb-page">
       <div className="fb-topbar">
-        <div className="fb-topbar__title">QR Verification</div>
+        <div className="fb-topbar__title">{t('qr_verification', 'QR Verification')}</div>
       </div>
       <div className="fb-card" style={{ textAlign: "center", padding: "40px 24px" }}>
         {/* Icon */}
@@ -135,11 +137,13 @@ function QRInvalidScreen({ reason, startDate, endDate, onGoHome }) {
           </div>
         )}
 
+
+
         <button
           onClick={onGoHome}
           style={{ width: "100%", padding: "14px", background: "#317D89", color: "#fff", border: "none", borderRadius: "10px", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer" }}
         >
-          <HomeIcon style={{ marginRight: 6, verticalAlign: "middle" }} /> Back to Home
+          <HomeIcon style={{ marginRight: 6, verticalAlign: "middle" }} /> {t('feedback_confirm_home', 'Back to Home')}
         </button>
       </div>
     </main>
@@ -148,19 +152,20 @@ function QRInvalidScreen({ reason, startDate, endDate, onGoHome }) {
 
 // ── Success Confirmation ──────────────────────────────────────────────────────
 function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
+  const { t } = useLanguage();
   return (
     <div className="fb-confirm-wrap">
       <div className="fb-confirm-icon"><CheckCircleIcon /></div>
-      <h2 className="fb-confirm-title">Feedback Successfully Submitted</h2>
+      <h2 className="fb-confirm-title">{t('feedback_confirm_title')}</h2>
       <p className="fb-confirm-sub">
-        Thank you for submitting your feedback regarding the {serviceName}. Your submission has been received and recorded.
+        {t('feedback_confirm_sub', serviceName)}
       </p>
       <div className="fb-confirm-ref">
-        <span className="fb-confirm-ref__label">Reference ID</span>
+        <span className="fb-confirm-ref__label">{t('feedback_confirm_ref')}</span>
         <span className="fb-confirm-ref__id">{refId}</span>
       </div>
       <div className="fb-confirm-status-wrap">
-        <div className="fb-confirm-status-title">Submission Status</div>
+        <div className="fb-confirm-status-title">{t('feedback_confirm_status')}</div>
         <div className="fb-confirm-timeline">
           <div className="fb-confirm-timeline__track">
             <div className="fb-confirm-timeline__fill" style={{ width: "50%" }} />
@@ -168,33 +173,35 @@ function FeedbackConfirmation({ refId, serviceName, onGoHome, onGoActivity }) {
           <div className="fb-confirm-timeline__steps">
             <div className="fb-confirm-timeline__step fb-confirm-timeline__step--done">
               <div className="fb-confirm-timeline__dot fb-confirm-timeline__dot--done"><CheckSmallIcon /></div>
-              <span>Submitted</span>
+              <span>{t('feedback_confirm_submitted')}</span>
             </div>
             <div className="fb-confirm-timeline__step fb-confirm-timeline__step--active">
               <div className="fb-confirm-timeline__dot fb-confirm-timeline__dot--active" />
-              <span>Under Review</span>
+              <span>{t('feedback_confirm_review')}</span>
             </div>
             <div className="fb-confirm-timeline__step">
               <div className="fb-confirm-timeline__dot" />
-              <span>Resolved</span>
+              <span>{t('feedback_confirm_resolved')}</span>
             </div>
           </div>
         </div>
         <div className="fb-confirm-ai-note">
-          Automated analysis has been completed. Your feedback is currently under review.
+          {t('feedback_confirm_ai_note')}
         </div>
       </div>
       <div className="fb-confirm-actions">
-        <button className="fb-confirm-btn-primary" onClick={onGoActivity}><ActivityIcon /> View Progress in Activity</button>
-        <button className="fb-confirm-btn-ghost"   onClick={onGoHome}><HomeIcon /> Back to Home</button>
+        <button className="fb-confirm-btn-primary" onClick={onGoActivity}><ActivityIcon /> {t('feedback_confirm_view_activity')}</button>
+        <button className="fb-confirm-btn-ghost"   onClick={onGoHome}><HomeIcon /> {t('feedback_confirm_home')}</button>
       </div>
-      <p className="fb-confirm-footnote">This submission has been recorded for reference purposes.</p>
+      <p className="fb-confirm-footnote">{t('feedback_confirm_footnote')}</p>
     </div>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function FeedbackForm({ onNavigate, service, userName = "Resident", householdID, userID, userData }) {
+  const { t } = useLanguage();
+  const starLabels = ["", t('feedback_star_poor'), t('feedback_star_fair'), t('feedback_star_good'), t('feedback_star_vgood'), t('feedback_star_excellent')];
   const [rating,       setRating]       = useState(0);
   const [hoverRating,  setHoverRating]  = useState(0);
   const [comment,      setComment]      = useState("");
@@ -462,7 +469,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
   if (submitted) {
     return (
       <main className="fb-page">
-        <div className="fb-topbar"><div className="fb-topbar__title">Feedback Confirmation</div></div>
+        <div className="fb-topbar"><div className="fb-topbar__title">{t('feedback_title')}</div></div>
         <div className="fb-card">
           <FeedbackConfirmation
             refId={refId}
@@ -480,12 +487,12 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
     <main className="fb-page">
       <div className="fb-topbar">
         <button className="fb-topbar__back" onClick={() => onNavigate && onNavigate("scan")}><ArrowLeftIcon /></button>
-        <div className="fb-topbar__title">Service Feedback</div>
+        <div className="fb-topbar__title">{t('feedback_title')}</div>
       </div>
       <div className="fb-card">
         <div className="fb-verified-banner">
           <CheckCircleIcon style={{ width: 16, height: 16 }} />
-          <span>Attendance Verified!</span>
+          <span>{t('feedback_attendance_verified')}</span>
         </div>
         <div className="fb-service-info" style={{ background: currentService.bg, borderColor: currentService.border }}>
           <div className="fb-service-info__icon" style={{ color: currentService.color }}><MapPinIcon /></div>
@@ -497,10 +504,10 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         </div>
 
         <div className="fb-field">
-          <label className="fb-label">Rate your experience <span className="fb-required">*</span></label>
-          <p className="fb-hint">Please rate your overall experience with the service provided</p>
+          <label className="fb-label">{t('feedback_rate_label')} <span className="fb-required">*</span></label>
+          <p className="fb-hint">{t('feedback_rate_hint')}</p>
           <div className="fb-stars-wrap">
-            <p className="fb-stars-prompt">How would you rate your experience today?</p>
+            <p className="fb-stars-prompt">{t('feedback_rate_prompt')}</p>
             <div className="fb-stars">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -513,13 +520,13 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
                   aria-label={`Rate ${star} star`}
                 >
                   <StarIcon filled={displayRating >= star} />
-                  <span className="fb-star-label">{STAR_LABELS[star]}</span>
+                  <span className="fb-star-label">{starLabels[star]}</span>
                 </button>
               ))}
             </div>
             {displayRating > 0 && (
               <div className="fb-star-selected-label" style={{ color: currentService.color }}>
-                {STAR_LABELS[displayRating]} ({displayRating}/5)
+                {starLabels[displayRating]} ({displayRating}/5)
               </div>
             )}
           </div>
@@ -527,20 +534,20 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         </div>
 
         <div className="fb-field">
-          <label className="fb-label">Comments or Suggestions <span className="fb-required">*</span></label>
-          <p className="fb-hint">Share your experience to help us improve our services</p>
+          <label className="fb-label">{t('feedback_comments_label')} <span className="fb-required">*</span></label>
+          <p className="fb-hint">{t('feedback_comments_hint')}</p>
           <textarea
             className={`fb-textarea${errors.comment ? " fb-textarea--error" : ""}`}
-            rows={5} placeholder="Write your detailed feedback..."
+            rows={5} placeholder={t('feedback_comments_placeholder')}
             value={comment} onChange={(e) => setComment(e.target.value)}
           />
-          <p className="fb-char-hint">Please provide specific details to help us understand your concern.</p>
+          <p className="fb-char-hint">{t('feedback_comments_details')}</p>
           {errors.comment && <span className="fb-error-msg">{errors.comment}</span>}
         </div>
 
         <div className="fb-field">
-          <label className="fb-label">Image (Optional)</label>
-          <p className="fb-hint">Attach photo documentation if applicable</p>
+          <label className="fb-label">{t('feedback_image_label')}</label>
+          <p className="fb-hint">{t('feedback_image_hint')}</p>
           <label className="fb-upload-box">
             <input type="file" accept=".jpg,.jpeg,.png" style={{ display: "none" }} onChange={handlePhotoUpload} />
             {photoName ? (
@@ -551,8 +558,8 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
             ) : (
               <div className="fb-upload-placeholder">
                 <UploadIcon />
-                <span className="fb-upload-text">Click to upload</span>
-                <span className="fb-upload-hint">Supports JPG, PNG (Max 5MB)</span>
+                <span className="fb-upload-text">{t('feedback_click_upload')}</span>
+                <span className="fb-upload-hint">{t('feedback_upload_hint')}</span>
               </div>
             )}
           </label>
@@ -561,15 +568,15 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         <div className="fb-ai-notice">
           <div className="fb-ai-notice__icon"><BoltIcon /></div>
           <div>
-            <div className="fb-ai-notice__title">AI-Powered Analysis System</div>
-            <div className="fb-ai-notice__desc">Your feedback will be automatically analyzed by our intelligent system to detect priority concerns and route them to the appropriate department for faster resolution.</div>
+            <div className="fb-ai-notice__title">{t('feedback_ai_title')}</div>
+            <div className="fb-ai-notice__desc">{t('feedback_ai_desc')}</div>
           </div>
         </div>
 
         <div className="fb-privacy-notice">
           <ShieldIcon />
           <span>
-            <strong>Data Privacy Statement:</strong> Your personal information and feedback are protected under the Data Privacy Act of 2012 (RA 10173). All submissions are confidential and will only be used for service improvement purposes.
+            <strong>{t('feedback_privacy_title')}</strong> {t('feedback_privacy_desc')}
           </span>
         </div>
 
@@ -579,9 +586,9 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           disabled={submitting}
           style={{ background: submitting ? "#a0b5c8" : currentService?.color || "#317D89", cursor: submitting ? "not-allowed" : "pointer" }}
         >
-          {submitting ? <><span className="fb-submit-spinner" /> Submitting...</> : "Submit Feedback"}
+          {submitting ? <><span className="fb-submit-spinner" /> {t('feedback_submitting')}</> : t('feedback_submit')}
         </button>
-        <p className="fb-submit-note">By submitting this form, you acknowledge that the information provided is accurate and complete.</p>
+        <p className="fb-submit-note">{t('feedback_submit_note')}</p>
       </div>
     </main>
   );

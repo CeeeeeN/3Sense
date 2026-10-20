@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { loginWithHouseholdID, getMemberPinStatus, saveMemberPin, verifyMemberPin, resetMemberPin } from "../services/login";
 import { LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOffIcon, HouseholdHeadIcon, MemberIcon, IconUser } from "../components/Icons";
 import ErrorMessage from "../components/ErrorMessage";
+import { useLanguage } from "../context/LanguageContext";
 
 const LOGIN_FEATURES = [
   {
@@ -127,6 +128,7 @@ function formatCountdown(totalSeconds) {
 
 // ADDED onAddMember to props
 export default function Login({ onBack, onForgotPassword, onSuccess, onRegister, onActivate, onAddMember }) {
+  const { lang, setLang, t } = useLanguage();
   const [screen, setScreen] = useState("credentials");
   const [screenKey, setScreenKey] = useState(0);
   const [hhNumber, setHhNumber] = useState("");
@@ -449,7 +451,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-                <button className="btn-ghost-sm" onClick={onForgotPassword}>Forgot password?</button>
+                <button className="btn-ghost-sm" onClick={onForgotPassword}>{t("login_forgot_password", "Forgot password?")}</button>
               </div>
 
               {/*Display the custom ErrorMessage if login fails*/}
@@ -462,16 +464,16 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               )}
 
               <button className="act-btn-main" onClick={handleLogin} disabled={!hhNumber.trim() || !password || loginLoading}>
-                {loginLoading ? "Signing in..." : <> Login <LoginArrowIcon /> </>}
+                {loginLoading ? t("login_signing_in", "Signing in...") : <> {t("login_sign_in", "Login")} <LoginArrowIcon /> </>}
               </button>
 
-              <div className="divider">or</div>
+              <div className="divider">{t("or", "or")}</div>
 
               <div className="act-bottom-link">
-                Don't have an account? <a onClick={onRegister}>Register Household</a>
+                {t("login_no_account", "Don't have an account?")} <a onClick={onRegister}>{t("landing_register_btn", "Register Household")}</a>
               </div>
               <div className="act-bottom-link" style={{ marginTop: "0.5rem" }}>
-                Have an approval email? <a onClick={onActivate}>Activate Account</a>
+                {t("login_need_activation", "Have an approval email?")} <a onClick={onActivate}>{t("login_activate", "Activate Account")}</a>
               </div>
             </div>
           )}
@@ -547,7 +549,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               <button className="act-btn-main" onClick={handleContinueToPin} disabled={!selectedProfile}>
-                Continue <LoginArrowIcon />
+                {t("login_continue", "Continue")} <LoginArrowIcon />
               </button>
 
               <button
@@ -579,7 +581,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </button>
 
               <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
-                <button className="btn-ghost-sm" onClick={() => switchScreen("credentials")}>← Back</button>
+                <button className="btn-ghost-sm" onClick={() => switchScreen("credentials")}>{t("back", "← Back")}</button>
               </div>
             </div>
           )}

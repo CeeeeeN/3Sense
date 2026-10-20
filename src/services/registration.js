@@ -1,4 +1,4 @@
-import { doc, setDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, collection, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 const uploadToCloudinary = async (base64String, folder) => {
@@ -36,24 +36,33 @@ export const submitRegistration = async (formData) => {
     const pendingRef = doc(collection(db, "pending_registrations"));
     const registrationID = pendingRef.id;
 
-    let idImageUrl = "";
+    // ─── OPTIMIZED: Parallel Image Uploads ───
+    // Instead of waiting for ID to finish before starting Selfie, we fire both at the same time
+    let idImagePromise = Promise.resolve("");
     if (formData.idImage || formData.idImageUrl) {
-        idImageUrl = await uploadToCloudinary(
+        idImagePromise = uploadToCloudinary(
             formData.idImage || formData.idImageUrl,
             `3Sense/pending_registrations/${registrationID}`
         );
     }
 
-    const selfieImageUrl = await uploadToCloudinary(
+    let selfieImagePromise = uploadToCloudinary(
         formData.selfieImage || formData.selfieImageUrl,
         `3Sense/pending_registrations/${registrationID}`
     );
+
+    // Wait for both uploads to finish simultaneously
+    const [idImageUrl, selfieImageUrl] = await Promise.all([idImagePromise, selfieImagePromise]);
 
     const genderResolved = formData.gender === "Others" 
         ? (formData.genderOther || "Others") 
         : (formData.gender || formData.genderOrientation || "");
 
-    await setDoc(pendingRef, {
+    // ─── OPTIMIZED: Batched Atomic Write (Registration + Notification) ───
+    const batch = writeBatch(db);
+
+    // 1. Create the Pending Registration Document
+    batch.set(pendingRef, {
         idNumber: formData.idNumber || "",
         firstName: (formData.firstName || "").trim(),
         middleName: (formData.middleName || "").trim(),
@@ -99,6 +108,20 @@ export const submitRegistration = async (formData) => {
         status: "pending",
         createdAt: serverTimestamp(),
     });
+
+    // 2. Alert the Admins
+    const notifRef = doc(collection(db, "notifications"));
+    batch.set(notifRef, {
+        type: "household_registration",
+        message: `New household registration submitted by ${(formData.firstName || "").trim()} ${(formData.lastName || "").trim()}.`,
+        triggeredBy: (formData.email || "").trim().toLowerCase() || "Resident",
+        refNum: registrationID,
+        isRead: false,
+        createdAt: serverTimestamp()
+    });
+
+    // Commit both writes as a single network request
+    await batch.commit();
 
     return registrationID;
 };

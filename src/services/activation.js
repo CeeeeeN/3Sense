@@ -53,9 +53,8 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
     const head = data._pendingHeadData || {};
     const headRef = doc(db, "households", cleanID, "residents", "head");
     
-    // ─── NEW: BRANCH-OFF MIGRATION LOGIC ───
+    // ─── BRANCH-OFF MIGRATION LOGIC (Already Batched) ───
     if (data.branchingData && data.branchingData.oldHouseholdID && data.branchingData.residentID) {
-        // Fetch the resident's actual, mature profile from their old household
         const oldResidentRef = doc(db, "households", data.branchingData.oldHouseholdID, "residents", data.branchingData.residentID);
         const oldResidentSnap = await getDoc(oldResidentRef);
         
@@ -63,7 +62,6 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
             const oldData = oldResidentSnap.data();
             const batch = writeBatch(db);
 
-            // Copy their old profile exactly, but promote them and update their location
             batch.set(headRef, {
                 ...oldData,
                 householdID: cleanID,
@@ -71,7 +69,6 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
                 role: "Household Head",
                 branchID: "BR-001",
                 userID: userCredential.user.uid,
-                // Update their address to match the newly registered household
                 houseNumber: data.houseNumber || "",
                 street: data.street || "",
                 barangay: data.barangay || "Malanday",
@@ -81,19 +78,16 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
                 updatedAt: serverTimestamp()
             });
 
-            // Delete their old ghost profile
             batch.delete(oldResidentRef);
             
-            // Clean up the household container
             batch.update(householdRef, {
                 activated: true,
                 activatedAt: serverTimestamp(),
                 userID: userCredential.user.uid,
                 _pendingHeadData: deleteField(),
-                branchingData: deleteField() // Clean up the breadcrumb
+                branchingData: deleteField() 
             });
 
-            // Set up their branch
             const branchRef = doc(db, "households", cleanID, "branches", "BR-001");
             batch.set(branchRef, {
                 branchName: `${oldData.lastName || head.lastName || ""} Family`.trim(),
@@ -118,19 +112,21 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
                 },
             };
         }
-        // If the old resident profile went missing, the code naturally falls through 
-        // to standard registration logic below to ensure they aren't locked out.
     }
     // ───────────────────────────────────────
 
-    // STANDARD REGISTRATION LOGIC
+    // ─── OPTIMIZED: STANDARD REGISTRATION LOGIC (Now Batched) ───
     const genderResolved = head.gender === "Others"
         ? (head.genderOther || "Others")
         : (head.gender || head.genderOrientation || "");
 
     const finalUID = head.UID || generateResidentUID();
 
-    await setDoc(headRef, {
+    // Initialize the batch
+    const standardBatch = writeBatch(db);
+
+    // 1. Set the Head Profile
+    standardBatch.set(headRef, {
         UID:         finalUID,
         residentID:  "head",
         householdID: cleanID,
@@ -180,20 +176,25 @@ export const activateAccount = async (householdID, password, confirmPassword) =>
         updatedAt: serverTimestamp(),
     });
 
-    await updateDoc(householdRef, {
+    // 2. Update the Household Status
+    standardBatch.update(householdRef, {
         activated: true,
         activatedAt: serverTimestamp(),
         userID: userCredential.user.uid,
         _pendingHeadData: deleteField(),
     });
 
+    // 3. Set the default Branch
     const branchRef = doc(db, "households", cleanID, "branches", "BR-001");
-    await setDoc(branchRef, {
+    standardBatch.set(branchRef, {
         branchName: `${head.lastName || ""} Family`.trim(),
         familyNumber: `${cleanID}-1`,
         residentID: "head",
         createdAt: serverTimestamp(),
     });
+
+    // Commit all 3 writes as a single network request
+    await standardBatch.commit();
 
     return {
         householdID: cleanID,

@@ -180,7 +180,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       const userName = [userData?.firstName, userData?.lastName].filter(Boolean).join(" ");
 
       // Submits to the backend pipeline
-      await submitHouseholdTransfer(currentHH, residentID, userUID, userName, submissionData);
+      await submitHouseholdTransfer(currentHouseholdID, residentID, userUID, userName, submissionData);
       
       setStep(3); 
     } catch (error) {

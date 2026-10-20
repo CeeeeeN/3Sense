@@ -1,4 +1,12 @@
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
+import { 
+    doc, 
+    getDoc, 
+    setDoc, 
+    collection, 
+    getDocs, 
+    serverTimestamp,
+    writeBatch 
+} from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
 // Fallback UID generator for all new dependents
@@ -41,6 +49,7 @@ export const createBranch = async (householdID, branchName) => {
     if (!householdID) throw new Error("Household ID is required.");
     if (!branchName || !branchName.trim()) throw new Error("Branch name is required.");
 
+    // Fetching branches is very lightweight (households rarely have > 5 branches)
     const branchesSnap = await getDocs(collection(db, "households", householdID, "branches"));
     let maxBranchNum = 0;
     branchesSnap.forEach(b => {
@@ -50,6 +59,7 @@ export const createBranch = async (householdID, branchName) => {
 
     const newBranchNum = maxBranchNum + 1;
     const newBranchID = `BR-${String(newBranchNum).padStart(3, "0")}`;
+    
     await setDoc(doc(db, "households", householdID, "branches", newBranchID), {
         branchName: branchName.trim(),
         familyNumber: `${householdID}-${newBranchNum}`,
@@ -77,13 +87,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
     const branchID = memberData.branchID || "BR-001";
     const residentID = newMemberRef.id;
 
-    if (memberData.isBranchHead && branchID && branchID !== "BR-001") {
-        await updateDoc(doc(db, "households", cleanID, "branches", branchID), {
-            residentID: residentID,
-        });
-    }
-
-    // Upload images conditionally
+    // Execute heavy image uploads BEFORE initializing the database write
     let idImageUrl = "";
     if (memberData.idImage || memberData.idImageUrl) {
         idImageUrl = await uploadToCloudinary(
@@ -102,7 +106,7 @@ export const addHouseholdMember = async (householdID, memberData) => {
         : (memberData.gender || memberData.genderOrientation || "");
 
     const resident = {
-        UID: generateResidentUID(), // <-- NEW: Permanent Barangay UID generated here
+        UID: generateResidentUID(),
         residentID: residentID,
         householdID: cleanID,
         role: memberData.isBranchHead && branchID !== "BR-001" ? "Branch Head" : (memberData.role || "Member"),
@@ -166,6 +170,19 @@ export const addHouseholdMember = async (householdID, memberData) => {
         resident.region = memberData.region || "NCR";
     }
 
-    await setDoc(newMemberRef, resident);
+    // ─── OPTIMIZED: Batched Atomic Write ───
+    // Groups the conditional branch update and the resident creation into 1 network call
+    const batch = writeBatch(db);
+
+    if (memberData.isBranchHead && branchID && branchID !== "BR-001") {
+        const branchRef = doc(db, "households", cleanID, "branches", branchID);
+        batch.update(branchRef, { residentID: residentID });
+    }
+
+    batch.set(newMemberRef, resident);
+    
+    // Fires everything at once
+    await batch.commit();
+
     return residentID;
 };

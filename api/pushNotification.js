@@ -15,6 +15,11 @@ if (!admin.apps.length) {
   }
 }
 
+// ─── OPTIMIZED: Global Connections ───
+// Cache database and messaging clients outside the handler for faster warm-starts
+const db = admin.firestore();
+const messaging = admin.messaging();
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -27,8 +32,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing target parameters' });
     }
 
-    const db = admin.firestore();
-    
     // Query the tokens where householdID and residentID match
     const tokensSnapshot = await db.collection("fcmTokens")
       .where("householdID", "==", householdID)
@@ -39,12 +42,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'No registered devices found for user.' });
     }
 
-    let tokens = [];
-    tokensSnapshot.forEach(doc => {
-      if (doc.data().token) {
-        tokens.push(doc.data().token);
-      }
-    });
+    // Map tokens efficiently
+    const tokens = tokensSnapshot.docs
+      .map(doc => doc.data().token)
+      .filter(Boolean); // Drops any undefined or empty token fields
 
     if (tokens.length === 0) {
       return res.status(200).json({ success: true, message: 'User has no active devices.' });
@@ -62,10 +63,14 @@ export default async function handler(req, res) {
     };
 
     // Use sendEachForMulticast to blast the message to all user devices securely
-    const response = await admin.messaging().sendEachForMulticast(payload);
+    const response = await messaging.sendEachForMulticast(payload);
 
-    // Auto-cleanup invalid or expired tokens in Firestore
+    // ─── OPTIMIZED: Serverless-Safe Cleanup ───
+    // Awaits the deletion of invalid tokens before returning the response. 
+    // Without this, Vercel kills the function before Firestore finishes the delete!
     if (response.failureCount > 0) {
+      const cleanupPromises = [];
+      
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error?.code;
@@ -73,11 +78,17 @@ export default async function handler(req, res) {
             errorCode === 'messaging/invalid-registration-token' ||
             errorCode === 'messaging/registration-token-not-registered'
           ) {
-            // Delete the invalid token document
-            db.collection("fcmTokens").doc(tokens[idx]).delete().catch(console.error);
+            cleanupPromises.push(
+              db.collection("fcmTokens").doc(tokens[idx]).delete()
+            );
           }
         }
       });
+
+      if (cleanupPromises.length > 0) {
+        await Promise.all(cleanupPromises);
+        console.log(`Cleaned up ${cleanupPromises.length} invalid FCM tokens.`);
+      }
     }
 
     return res.status(200).json({ success: true, pushed: response.successCount });

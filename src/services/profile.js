@@ -1,18 +1,34 @@
-import { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 import { verifyBeforeUpdateEmail } from "firebase/auth";
 
 export const getMemberProfile = async (householdID, residentID) => {
     if (!householdID || !residentID) throw new Error("Missing household or resident ID.");
 
-    const residentRef = doc(db, "households", householdID, "residents", residentID);
-    const residentSnap = await getDoc(residentRef);
+    // ─── OPTIMIZED: Cache-First Profile Load ───
+    const cacheKeyResidents = `hh_residents_${householdID}`;
+    const cacheKeyBranches = `hh_branches_${householdID}`;
+    
+    let residents = JSON.parse(localStorage.getItem(cacheKeyResidents) || "[]");
+    let branches = JSON.parse(localStorage.getItem(cacheKeyBranches) || "[]");
 
-    if (!residentSnap.exists()) throw new Error("Resident profile not found.");
+    let d;
+    // Check Cache first
+    if (residents.length > 0) {
+        d = residents.find(r => r.id === residentID || r.residentID === residentID);
+    }
+    
+    // Fallback to Network if cache missed or empty
+    if (!d) {
+        const residentRef = doc(db, "households", householdID, "residents", residentID);
+        const residentSnap = await getDoc(residentRef);
+        if (!residentSnap.exists()) throw new Error("Resident profile not found.");
+        d = residentSnap.data();
+    }
 
-    const d = residentSnap.data();
+    const hasOwnAddress = !!(d.houseNumber || d.street || d.barangay || d.city);
+    const sameAddress = d.sameAddress !== undefined ? !!d.sameAddress : !hasOwnAddress;
 
-    // If the resident shares the household address, load it from the household doc
     let address = {
         houseNumber: d.houseNumber || "",
         street: d.street || "",
@@ -22,14 +38,13 @@ export const getMemberProfile = async (householdID, residentID) => {
         region: d.region || "",
     };
 
-    const hasOwnAddress = !!(d.houseNumber || d.street || d.barangay || d.city);
-    const sameAddress = d.sameAddress !== undefined ? !!d.sameAddress : !hasOwnAddress;
-
-    const householdRef = doc(db, "households", householdID);
-    const householdSnap = await getDoc(householdRef);
-    const h = householdSnap.exists() ? householdSnap.data() : {};
-
+    let h = {};
     if (sameAddress) {
+        // Fallback to Network for Household Parent
+        const householdRef = doc(db, "households", householdID);
+        const householdSnap = await getDoc(householdRef);
+        h = householdSnap.exists() ? householdSnap.data() : {};
+
         address = {
             houseNumber: h.houseNumber || "",
             street: h.street || "",
@@ -40,15 +55,22 @@ export const getMemberProfile = async (householdID, residentID) => {
         };
     }
 
-    // Resolve branch name from the branches sub-collection
+    // Resolve branch name from the branches cache (or network fallback)
     const branchID = d.branchID || (residentID === "head" ? "BR-001" : "BR-001");
     let branchName = "";
     let familyNumber = null;
+    
     if (branchID) {
-        const branchRef = doc(db, "households", householdID, "branches", branchID);
-        const branchSnap = await getDoc(branchRef);
-        if (branchSnap.exists()) {
-            const branchData = branchSnap.data();
+        let branchData;
+        if (branches.length > 0) {
+            branchData = branches.find(b => b.id === branchID);
+        } else {
+            const branchRef = doc(db, "households", householdID, "branches", branchID);
+            const branchSnap = await getDoc(branchRef);
+            if (branchSnap.exists()) branchData = branchSnap.data();
+        }
+
+        if (branchData) {
             branchName = branchData.branchName || "";
             if (branchData.familyNumber) {
                 familyNumber = branchData.familyNumber;
@@ -71,7 +93,6 @@ export const getMemberProfile = async (householdID, residentID) => {
                 .filter(Boolean)
             : [];
 
-    // Normalize status history — each entry is a plain object stored via arrayUnion
     const rawHistory = Array.isArray(d.statusHistory) ? d.statusHistory : [];
     const statusHistory = rawHistory
         .map(entry => ({
@@ -80,10 +101,8 @@ export const getMemberProfile = async (householdID, residentID) => {
             incident: entry.incident || "",
             setBy: entry.setBy || "Admin",
             setByPosition: entry.setByPosition || "",
-            // setAt is stored as ISO string
             setAt: entry.setAt || null,
         }))
-        // Sort newest first
         .sort((a, b) => {
             if (!a.setAt) return 1;
             if (!b.setAt) return -1;
@@ -91,7 +110,7 @@ export const getMemberProfile = async (householdID, residentID) => {
         });
 
     return {
-        UID:         d.UID || "", // <-- RETRIEVE PERMANENT UID
+        UID:         d.UID || "",
         residentID:  residentID,
         householdID: householdID,
         householdNumber: householdID,
@@ -136,7 +155,6 @@ export const getMemberProfile = async (householdID, residentID) => {
         occupation:          d.occupation || "",
         employmentStatus:    d.employmentStatus || "",
 
-        // Admin-managed record status
         adminStatus:         d.adminStatus || "Clear Case",
         adminRemarks:        d.adminRemarks || "",
         adminIncident:       d.adminIncident || "",
@@ -154,6 +172,7 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
     if (!householdID || !residentID) throw new Error("Missing household or resident ID.");
 
     const residentRef = doc(db, "households", householdID, "residents", residentID);
+    const batch = writeBatch(db); // ─── OPTIMIZED: Batched Atomic Write ───
 
     const normalizedCategories = Array.isArray(updatedData.categories)
         ? updatedData.categories
@@ -164,14 +183,11 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
     const sameAddress = !!updatedData.sameAddress;
 
     const payload = {
-        // Identity 
         role: residentID === "head" ? "Household Head" : (updatedData.role || "Member"),
         firstName: updatedData.firstName || "",
         middleName: updatedData.middleName || "",
         lastName: updatedData.lastName || "",
         suffix: updatedData.suffix || "",
-
-        // Personal 
         birthDate: updatedData.birthDate || "",
         age: updatedData.age ? Number(updatedData.age) : null,
         birthPlace: updatedData.birthPlace || "",
@@ -180,40 +196,25 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         civilStatus: updatedData.civilStatus || "",
         religion: updatedData.religion || "",
         citizenship: updatedData.citizenship || "",
-        contactNumber: updatedData.contactNumber
-            ? Number(String(updatedData.contactNumber).replace(/\D/g, ""))
-            : null,
+        contactNumber: updatedData.contactNumber ? Number(String(updatedData.contactNumber).replace(/\D/g, "")) : null,
         email: updatedData.email || "",
         residingSinceYear: updatedData.residingSinceYear ? Number(updatedData.residingSinceYear) : null,
-
         categories: normalizedCategories,
         pwdStatus: updatedData.pwdStatus || "",
         disabilityType: updatedData.disabilityType === "Others" ? (updatedData.disabilityTypeOther || "Others") : (updatedData.disabilityType || ""),
-
         totalMembers: updatedData.totalMembers || updatedData.householdMembers || "",
         householdClassification: updatedData.householdClassification || "",
-
         educationAttainment: updatedData.educationAttainment || "",
         educationStatus: updatedData.educationStatus || "",
         occupation: updatedData.occupation || "",
         employmentStatus: updatedData.employmentStatus || "",
-
-        // Always store householdID so the resident knows their household (foreign key)
         householdID,
-
         updatedAt: serverTimestamp(),
     };
 
-    // <-- SAFELY PRESERVE OR UPDATE THE UID
-    if (updatedData.UID !== undefined) {
-        payload.UID = updatedData.UID;
-    }
+    if (updatedData.UID !== undefined) payload.UID = updatedData.UID;
+    if (updatedData.profilePhoto !== undefined) payload.profilePhoto = updatedData.profilePhoto;
 
-    if (updatedData.profilePhoto !== undefined) {
-        payload.profilePhoto = updatedData.profilePhoto;
-    }
-
-    // Only write address fields when the member has their own address
     if (!sameAddress) {
         payload.houseNumber = updatedData.houseNumber || "";
         payload.street = updatedData.street || "";
@@ -223,9 +224,10 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         payload.region = updatedData.region || "";
     }
 
-    await updateDoc(residentRef, payload);
+    batch.update(residentRef, payload);
 
-    // Keep household master record in sync when head updates profile fields.
+    let displayMessage = null;
+
     if (residentID === "head" || payload.role === "Household Head" || payload.role === "head") {
         const householdRef = doc(db, "households", householdID);
         const householdSnap = await getDoc(householdRef);
@@ -234,7 +236,6 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         const totalMembersValue = updatedData.totalMembers ?? existingHousehold.totalMembers ?? null;
         const newEmail = payload.email || existingHousehold.email || "";
 
-        let displayMessage = null;
         if (newEmail && existingHousehold.email && newEmail !== existingHousehold.email) {
             if (!auth.currentUser) {
                 throw new Error("You must be logged in to change the household login email.");
@@ -252,7 +253,6 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
         }
 
         const householdUpdate = {
-            // Only update the master email if we didn't require verification, otherwise keep the old one so login doesn't break.
             email: displayMessage ? existingHousehold.email : newEmail,
             pendingEmail: displayMessage ? newEmail : null,
             houseNumber: (sameAddress ? (updatedData.houseNumber || existingHousehold.houseNumber || "") : (payload.houseNumber || existingHousehold.houseNumber || "")),
@@ -265,12 +265,17 @@ export const updateMemberProfile = async (householdID, residentID, updatedData) 
             householdClassification: updatedData.householdClassification || existingHousehold.householdClassification || "",
         };
 
-    await updateDoc(householdRef, householdUpdate);
-
-    // If an email verification was sent, we throw an error so the UI displays it,
-    // but ONLY after we have successfully saved all other profile and household updates!
-    if (displayMessage) {
-        throw new Error(displayMessage); // This will show up in the UI as a red alert, but the save actually succeeded.
+        batch.update(householdRef, householdUpdate);
     }
+
+    // Fire both updates simultaneously
+    await batch.commit();
+
+    // Fire and forget cache invalidation
+    const cacheKeyResidents = `hh_residents_${householdID}`;
+    localStorage.removeItem(cacheKeyResidents);
+
+    if (displayMessage) {
+        throw new Error(displayMessage); 
     }
 };

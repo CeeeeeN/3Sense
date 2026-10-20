@@ -4,10 +4,15 @@ import AdminLayout from "../components/AdminLayout"
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
-import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
+import { useAlert } from "../context/AlertContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // <-- Added React Query
 
 export default function AdminProfile() {
-  const { showAlert } = useAlert(); // <-- INITIALIZE HOOK
+  const queryClient = useQueryClient(); // <-- For local cache mutation
+  const { showAlert } = useAlert();
+
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -15,10 +20,6 @@ export default function AdminProfile() {
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
-
-  const [userDocId, setUserDocId] = useState(null);
-  const [userCollection, setUserCollection] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -31,115 +32,139 @@ export default function AdminProfile() {
     confirmPassword: ""
   });
 
-  // Fetch current user data from Firebase
+  // ─── 1. INITIALIZE AUTHENTICATION ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthInitialized(true);
+
+      // Instantly hydrate form from session storage for zero-flicker UI
       if (user) {
-        // Check approvedAdmins first
-        const approvedQ = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid)
-        );
-        const approvedSnapshot = await getDocs(approvedQ);
-
-        if (!approvedSnapshot.empty) {
-          const docSnap = approvedSnapshot.docs[0];
-          const data = docSnap.data();
-          setUserDocId(docSnap.id);
-          setUserCollection("approvedAdmins");
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
           setForm(prev => ({
             ...prev,
-            fullName: data.fullName || "",
-            username: data.username || "",
-            email: data.email || user.email || "",
-            contact: data.contact || "",
-            position: data.position || ""
-          }));
-          setLoading(false);
-          return;
-        }
-
-        // Fallback: check pendingAdmins
-        const pendingQ = query(
-          collection(db, "pendingAdmins"),
-          where("uid", "==", user.uid)
-        );
-        const pendingSnapshot = await getDocs(pendingQ);
-
-        if (!pendingSnapshot.empty) {
-          const docSnap = pendingSnapshot.docs[0];
-          const data = docSnap.data();
-          setUserDocId(docSnap.id);
-          setUserCollection("pendingAdmins");
-          setForm(prev => ({
-            ...prev,
-            fullName: data.fullName || "",
-            username: data.username || "",
-            email: data.email || user.email || "",
-            contact: data.contact || "",
-            position: data.position || ""
+            fullName: parsed.fullName || "",
+            email: user.email || "",
+            position: parsed.position || ""
           }));
         }
-        setLoading(false);
       }
     });
 
     return () => unsubscribe();
   }, []);
 
+  // ─── 2. OPTIMIZED: Fetch Profile Metadata (Cached Indefinitely) ───
+  const { data: profileMeta, isLoading: profileLoading } = useQuery({
+    queryKey: ['adminManage_myProfile', currentUser?.uid],
+    queryFn: async () => {
+      const approvedQ = query(collection(db, "approvedAdmins"), where("uid", "==", currentUser.uid));
+      const approvedSnap = await getDocs(approvedQ);
+
+      if (!approvedSnap.empty) {
+        const docSnap = approvedSnap.docs[0];
+        return { docId: docSnap.id, collection: "approvedAdmins", data: docSnap.data() };
+      }
+
+      const pendingQ = query(collection(db, "pendingAdmins"), where("uid", "==", currentUser.uid));
+      const pendingSnap = await getDocs(pendingQ);
+
+      if (!pendingSnap.empty) {
+        const docSnap = pendingSnap.docs[0];
+        return { docId: docSnap.id, collection: "pendingAdmins", data: docSnap.data() };
+      }
+
+      throw new Error("Profile not found");
+    },
+    enabled: !!currentUser,
+    staleTime: Infinity, // The admin's own profile only changes when THEY edit it. No need to refetch.
+  });
+
+  // Sync fully loaded profile data into form (only if not actively editing)
+  useEffect(() => {
+    if (profileMeta && !isEditingProfile) {
+      setForm(prev => ({
+        ...prev,
+        fullName: profileMeta.data.fullName || "",
+        username: profileMeta.data.username || "",
+        email: profileMeta.data.email || currentUser?.email || "",
+        contact: profileMeta.data.contact || "",
+        position: profileMeta.data.position || ""
+      }));
+    }
+  }, [profileMeta, isEditingProfile, currentUser]);
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Update profile in Firestore
+  // ─── 3. OPTIMIZED: Zero-Read Profile Mutation & Cross-Component Sync ───
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
 
-    if (!userDocId || !userCollection) {
-      // <-- REPLACED ALERT
+    if (!profileMeta?.docId || !profileMeta?.collection) {
       await showAlert("Error", "Could not find your profile. Please try again.");
       return;
     }
 
     try {
-      await updateDoc(doc(db, userCollection, userDocId), {
+      await updateDoc(doc(db, profileMeta.collection, profileMeta.docId), {
         fullName: form.fullName,
         username: form.username,
         contact: form.contact
       });
-      // <-- REPLACED ALERT
+
+      // Update React Query Cache Surgically (0 Reads)
+      queryClient.setQueryData(['adminManage_myProfile', currentUser?.uid], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            fullName: form.fullName,
+            username: form.username,
+            contact: form.contact
+          }
+        };
+      });
+
+      // Update Session Storage instantly so Sidebar/Header catches the new name immediately
+      const sessionKey = `admin_profile_${currentUser.uid}`;
+      const existingSession = JSON.parse(sessionStorage.getItem(sessionKey) || '{}');
+      sessionStorage.setItem(sessionKey, JSON.stringify({
+        ...existingSession,
+        fullName: form.fullName
+      }));
+
       await showAlert("Success", "Profile updated successfully!");
       setIsEditingProfile(false);
     } catch (error) {
-      // <-- REPLACED ALERT
       await showAlert("Error", "Failed to update profile: " + error.message);
     }
   };
 
-  // Update password using Firebase Auth
+  // ─── 4. AUTH ONLY: Password Update (0 Firestore Reads) ───
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
 
     if (!form.password || !form.newPassword || !form.confirmPassword) {
-      // <-- REPLACED ALERT
       await showAlert("Warning", "Please fill in all password fields");
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
-      // <-- REPLACED ALERT
       await showAlert("Warning", "Passwords do not match");
       return;
     }
 
     try {
       const user = auth.currentUser;
-
       const credential = EmailAuthProvider.credential(user.email, form.password);
+      
       await reauthenticateWithCredential(user, credential);
-
       await updatePassword(user, form.newPassword);
 
-      // <-- REPLACED ALERT
       await showAlert("Success", "Password updated successfully!");
       setForm(prev => ({ ...prev, password: "", newPassword: "", confirmPassword: "" }));
       setIsEditingPassword(false);
@@ -149,10 +174,8 @@ export default function AdminProfile() {
 
     } catch (error) {
       if (error.code === "auth/wrong-password") {
-        // <-- REPLACED ALERT
         await showAlert("Error", "Current password is incorrect.");
       } else {
-        // <-- REPLACED ALERT
         await showAlert("Error", "Failed to update password: " + error.message);
       }
     }
@@ -162,6 +185,16 @@ export default function AdminProfile() {
     setIsEditingProfile(!isEditingProfile);
     setIsEditingPassword(false);
     setForm(prev => ({ ...prev, password: "", newPassword: "", confirmPassword: "" }));
+    
+    // Reset form to cached data if cancelling
+    if (isEditingProfile && profileMeta) {
+      setForm(prev => ({
+        ...prev,
+        fullName: profileMeta.data.fullName || "",
+        username: profileMeta.data.username || "",
+        contact: profileMeta.data.contact || "",
+      }));
+    }
   };
 
   const togglePasswordEdit = () => {
@@ -180,10 +213,13 @@ export default function AdminProfile() {
     form.password && form.newPassword && form.confirmPassword &&
     form.newPassword === form.confirmPassword;
 
-  if (loading) {
+  // Derive loading state
+  const isPageLoading = !authInitialized || (currentUser && profileLoading);
+
+  if (isPageLoading) {
     return (
       <AdminLayout>
-        <div style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem" }}>
+        <div style={{ textAlign: "center", padding: "60px", fontSize: "1.2rem", color: "#64748b" }}>
           Loading profile...
         </div>
       </AdminLayout>
@@ -206,8 +242,8 @@ export default function AdminProfile() {
           <div className="profile-card" style={{ display: "block" }}>
             <div className="profile-header">
               <div>
-                <h3>{form.fullName}</h3>
-                <span>{form.position}</span>
+                <h3>{form.fullName || "Admin"}</h3>
+                <span>{form.position || "Standard Admin"}</span>
               </div>
             </div>
 

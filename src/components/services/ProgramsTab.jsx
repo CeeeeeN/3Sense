@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { createNotification } from "../../services/notifications";
+import { useLanguage } from "../../context/LanguageContext";
 
 // ── SESSION HELPER ────────────────────────────────────────────────────────────
 const getSaved = (key, fallback) => {
@@ -172,6 +173,7 @@ function ProgramDetails({ program, slotsLeft, full }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ProgramsTab({ userData, householdID, userName }) {
+  const { t } = useLanguage();
   const [view, setView] = useState("main"); // "main" | "myregs" | "register"
   const [step, setStep] = useState(1);      // 1 | 2 | 3 | 4 (success)
   const [regNum, setRegNum] = useState("");
@@ -434,13 +436,11 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     setView("main");
   };
 
-  const goToStep = (n) => {
-    if (submitting) return;
-    setErrors({});
-    setStep(n);
-  };
-
-  const STEP_LABELS = ["Personal Info", "Choose Program", "Confirmation"];
+  const STEP_LABELS = [
+    t("prog_step_info", "Personal Info"),
+    t("prog_step_choose", "Choose Program"),
+    t("prog_step_confirm", "Confirmation")
+  ];
 
   // ════════════════════════════════════════════════════════════════
   // VIEW: MAIN
@@ -480,7 +480,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
                     </span>
                     {p.slots !== undefined && p.slots !== "" && (
                       <span className={`lh-prog-card__slots${full ? " lh-prog-card__slots--full" : low ? " lh-prog-card__slots--low" : ""}`}>
-                        {full ? "Full" : `${slotsNum} slot${slotsNum !== 1 ? "s" : ""} left`}
+                        {full ? t("prog_badge_full", "Full") : t("prog_slots_remaining", slotsNum)}
                       </span>
                     )}
                   </div>
@@ -593,20 +593,20 @@ export default function ProgramsTab({ userData, householdID, userName }) {
                       {sc.label}
                     </span>
                   </div>
-                  <div className="lh-reg-card__ref">Ref: {r.regNum || r.id}</div>
+                  <div className="lh-reg-card__ref">{t("ref", "Ref")}: {r.regNum || r.id}</div>
                   {rawStatus === "rejected" && r.rejectReason && (
                     <div style={{ marginTop: "6px", fontSize: "0.8rem", color: "#e03e3e", background: "rgba(224,62,62,0.07)", padding: "6px 10px", borderRadius: "6px" }}>
-                      Reason: {r.rejectReason}
+                      {t("prog_reason_label", "Reason:")} {r.rejectReason}
                     </div>
                   )}
                   {rawStatus === "pending" && (
                     <div style={{ marginTop: "6px", fontSize: "0.78rem", color: "#a16207" }}>
-                      ⏳ Awaiting admin review
+                      {t("prog_awaiting_review", "⏳ Awaiting admin review")}
                     </div>
                   )}
                   {(rawStatus === "approved" || rawStatus === "registered") && (
                     <div style={{ marginTop: "6px", fontSize: "0.78rem", color: "#317D89", display: "flex", alignItems: "center", gap: "4px" }}>
-                      <CheckIcon size={11} stroke="#317D89" /> Your registration is confirmed
+                      <CheckIcon size={11} stroke="#317D89" /> {t("prog_confirmed_box", "Your registration is confirmed")}
                     </div>
                   )}
                 </div>
@@ -671,15 +671,43 @@ export default function ProgramsTab({ userData, householdID, userName }) {
 
       <div className="lh-form-body">
 
-        {step < 4 && (
-          <div className="lh-step-stack">
+        {/* ── Step 1: Personal Info ── */}
+        {step === 1 && (
+          <div className="lh-form-section">
+            <div className="dr-field-row">
+              <div className="dr-field">
+                <label className="sv-label">{t("profile_first_name", "First Name")} <span className="sv-required">*</span></label>
+                <input
+                  className={`sv-input${errors.firstName ? " sv-input--error" : ""}`}
+                  value={form.firstName}
+                  onChange={(e) => set("firstName", e.target.value)}
+                  placeholder="Juan"
+                />
+                {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
+              </div>
+              <div className="dr-field">
+                <label className="sv-label">{t("profile_middle_name", "Middle Name")}</label>
+                <input className="sv-input" value={form.middleName} onChange={(e) => set("middleName", e.target.value)} placeholder="Santos" />
+              </div>
+              <div className="dr-field">
+                <label className="sv-label">{t("profile_last_name", "Last Name")} <span className="sv-required">*</span></label>
+                <input
+                  className={`sv-input${errors.lastName ? " sv-input--error" : ""}`}
+                  value={form.lastName}
+                  onChange={(e) => set("lastName", e.target.value)}
+                  placeholder="Dela Cruz"
+                />
+                {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
+              </div>
+            </div>
 
-            {/* Program details — shown on steps 1 and 2 so the resident knows what they are joining */}
-            {(step === 1 || step === 2) && selectedProgram && (
-              <ProgramDetails
-                program={selectedProgram}
-                slotsLeft={getSlotsNum(selectedProgram)}
-                full={isFull(selectedProgram)}
+            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
+              <label className="sv-label">{t("doc_address", "Complete Address")} <span className="sv-required">*</span></label>
+              <input
+                className={`sv-input${errors.address ? " sv-input--error" : ""}`}
+                value={form.address}
+                onChange={(e) => set("address", e.target.value)}
+                placeholder="House No., Street, Barangay Malanday"
               />
             )}
 
@@ -928,7 +956,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
               else { setView("main"); setErrors({}); }
             }}
           >
-            {step === 1 ? "Cancel" : "Previous"}
+            {step === 1 ? t("cancel", "Cancel") : t("back", "Previous")}
           </button>
           <button
             className="sv-btn-primary"
@@ -936,7 +964,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
             onClick={handleNext}
             disabled={submitting}
           >
-            {submitting ? "Submitting…" : step === 3 ? "Submit Registration" : "Next →"}
+            {submitting ? t("prog_submitting_btn", "Submitting…") : step === 3 ? t("prog_submit_reg_btn", "Submit Registration") : t("next_arrow", "Next →")}
           </button>
         </div>
       )}

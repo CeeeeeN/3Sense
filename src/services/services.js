@@ -1,8 +1,7 @@
 import { db } from "../firebase/firebase";
 import {
-  collection, addDoc, getDocs,
-  query, where, orderBy, serverTimestamp, limit, or,
-  getDoc, doc, writeBatch, updateDoc, deleteDoc
+  collection, doc, getDocs, setDoc, updateDoc, deleteDoc,
+  query, where, orderBy, serverTimestamp, limit, getDoc, writeBatch, or
 } from "firebase/firestore";
 import { generateHouseholdID, sendApprovalEmail } from "./admin";
 import { verifyMemberPin } from "./login";
@@ -10,23 +9,17 @@ import { verifyMemberPin } from "./login";
 // ══════════════════════════════
 // 📄 DOCUMENT REQUESTS
 // ══════════════════════════════
-/**
- * @param {string} householdID
- * @param {string} residentID  - Firestore doc ID of the resident (was userID/activeUserId)
- * @param {string} userName
- * @param {object} docType
- * @param {object} form
- * @param {object} customData
- */
-export async function submitDocumentRequest(householdID, residentID, userName, docType, form, customData = {}) {
+export async function submitDocumentRequest(householdID, residentID, userName, docType, form, customData = {}, batch = null) {
   const requestID = `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "document_requests"), {
+  const ref = doc(collection(db, "document_requests"));
+  
+  const payload = {
     requestID,
-    UID:             form.UID || "",                             // <-- INJECTED UID
+    UID:             form.UID || "",
     householdID,
-    residentID,                                                  // Firestore doc ID of the resident
-    documentID:      docType.id,                                 // renamed from documentId
-    documentType:    docType.documentName || docType.name || docType.title, // display name
+    residentID, 
+    documentID:      docType.id,
+    documentType:    docType.documentName || docType.name || docType.title,
     fee:             docType.fee || "Free",
     processingDays:  docType.days || docType.processingTime || "",
     firstName:       form.firstName,
@@ -45,7 +38,11 @@ export async function submitDocumentRequest(householdID, residentID, userName, d
     status:          "Pending",
     customFields:    customData,
     submittedAt:     serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
+  
   return requestID;
 }
 
@@ -62,22 +59,16 @@ export async function getDocumentRequests(householdID) {
 // ══════════════════════════════
 // 🏢 FACILITY RESERVATIONS
 // ══════════════════════════════
-/**
- * @param {string} householdID
- * @param {string} residentID  - Firestore doc ID of the resident
- * @param {string} userName
- * @param {object} facility
- * @param {object} form
- * @param {object} customData
- */
-export async function submitFacilityReservation(householdID, residentID, userName, facility, form, customData = {}) {
+export async function submitFacilityReservation(householdID, residentID, userName, facility, form, customData = {}, batch = null) {
   const reservationID = `FAC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "facility_reservations"), {
+  const ref = doc(collection(db, "facility_reservations"));
+
+  const payload = {
     reservationID,
-    UID:           form.UID || "",                                 // <-- INJECTED UID
+    UID:           form.UID || "",
     householdID,
-    residentID,                                                    // Firestore doc ID of the resident
-    facilityID:    facility?.id || "",                             // renamed from facilityId
+    residentID,
+    facilityID:    facility?.id || "", 
     facilityName:  facility?.facilityName || facility?.name || facility?.title || "Barangay Multi-Purpose Hall",
     fullName:      form.fullName || userName,
     email:         form.email || "",
@@ -91,63 +82,60 @@ export async function submitFacilityReservation(householdID, residentID, userNam
     status:        "Pending",
     customFields:  customData,
     submittedAt:   serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
+
   return reservationID;
 }
 
 // ══════════════════════════════
 // 🛠️ EQUIPMENT RENTALS
 // ══════════════════════════════
-/**
- * @param {string} householdID
- * @param {string} residentID  - Firestore doc ID of the resident
- * @param {string} userName
- * @param {object} equipment
- * @param {object} form
- * @param {object} customData
- */
-export async function submitEquipmentRental(householdID, residentID, userName, equipment, form, customData = {}) {
+export async function submitEquipmentRental(householdID, residentID, userName, equipment, form, customData = {}, batch = null) {
   const rentalID = `EQU-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "equipment_rentals"), {
+  const ref = doc(collection(db, "equipment_rentals"));
+
+  const payload = {
     rentalID,
-    UID:           form.UID || "",                                 // <-- INJECTED UID
+    UID:           form.UID || "",
     householdID,
-    residentID,                                                    // Firestore doc ID of the resident
+    residentID, 
     equipmentID:   equipment?.id || "",            
     equipmentName: equipment?.equipmentName || equipment?.name || "Equipment",
     fullName:      form.fullName || userName,
     email:         form.email || "",
     contactNumber: form.contactNumber || "",
     purpose:       form.purpose,
-    quantity:      Number(form.quantity),                          // Ensures quantity is saved as a number
+    quantity:      Number(form.quantity), 
     pickUpDate:    form.pickUpDate,
     returnDate:    form.returnDate,
     notes:         form.notes || "",
     status:        "Pending",
     customFields:  customData,
     submittedAt:   serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
+
   return rentalID;
 }
-
 
 // ══════════════════════════════
 // 🚔 INCIDENT REPORTS
 // ══════════════════════════════
-/**
- * @param {string} householdID
- * @param {string} userID      - Firebase Auth UID
- * @param {string} residentID  - Firestore doc ID
- * @param {object} form
- */
-export async function submitIncidentReport(householdID, userID, residentID, form) {
+export async function submitIncidentReport(householdID, userID, residentID, form, batch = null) {
   const refNum = `PO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "incidentReports"), {
+  const ref = doc(collection(db, "incidentReports"));
+
+  const payload = {
     refNum,
-    UID:            form.UID || "",                                // <-- INJECTED UID
+    UID:             form.UID || "",
     householdID,
-    userID,       // Firebase Auth UID
-    residentID,   // Firestore doc ID
+    userID, 
+    residentID,
     isAnonymous:    form.isAnonymous,
     reporterName:   form.isAnonymous ? "Anonymous" : form.reporterName || "",
     contact:        form.isAnonymous ? "" : form.contact || "",
@@ -163,7 +151,11 @@ export async function submitIncidentReport(householdID, userID, residentID, form
     status:         "received",
     updates:        [`${form.date} – Report received`],
     submittedAt:    serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
+
   return refNum;
 }
 
@@ -180,13 +172,15 @@ export async function trackIncidentReport(refNum) {
 // ══════════════════════════════
 // 💚 BSWD REPORTS & TIPS
 // ══════════════════════════════
-export async function submitBSWDReport(householdID, userID, residentID, form) {
+export async function submitBSWDReport(householdID, userID, residentID, form, batch = null) {
   const refNum = `BSWD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "bswdReports"), {
+  const ref = doc(collection(db, "bswdReports"));
+
+  const payload = {
     householdID,
-    UID:            form.UID || "",                                // <-- INJECTED UID
-    userID,      // Firebase Auth UID
-    residentID,  // Firestore doc ID
+    UID:            form.UID || "", 
+    userID,
+    residentID,
     refNum,
     type:           "homeless_report",
     reporterName:   form.name || "Anonymous",
@@ -195,16 +189,21 @@ export async function submitBSWDReport(householdID, userID, residentID, form) {
     photoFileName:  form.photo || "",
     status:         "received",
     submittedAt:    serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
 }
 
-export async function submitBSWDTip(householdID, userID, residentID, form) {
+export async function submitBSWDTip(householdID, userID, residentID, form, batch = null) {
   const refNum = `BSWD-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "bswdReports"), {
+  const ref = doc(collection(db, "bswdReports"));
+
+  const payload = {
     householdID,
-    UID:         form.UID || "",                                   // <-- INJECTED UID
-    userID,      // Firebase Auth UID
-    residentID,  // Firestore doc ID
+    UID:         form.UID || "", 
+    userID,
+    residentID,
     refNum,
     type:    "tip",
     about:   form.about,
@@ -212,20 +211,25 @@ export async function submitBSWDTip(householdID, userID, residentID, form) {
     contact: form.contact || "",
     status:  "received",
     submittedAt: serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
 }
 
 // ══════════════════════════════
 // 💼 LIVELIHOOD REGISTRATIONS
 // ══════════════════════════════
-export async function submitLivelihoodRegistration(householdID, userID, residentID, form, program) {
+export async function submitLivelihoodRegistration(householdID, userID, residentID, form, program, batch = null) {
   const regNum = `LH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  await addDoc(collection(db, "livelihoodRegistrations"), {
+  const ref = doc(collection(db, "livelihoodRegistrations"));
+
+  const payload = {
     regNum,
-    UID:             form.UID || "",                               // <-- INJECTED UID
+    UID:             form.UID || "", 
     householdID,
-    userID,      // Firebase Auth UID
-    residentID,  // Firestore doc ID
+    userID,
+    residentID, 
     fullName:        `${form.firstName} ${form.middleName || ""} ${form.lastName}`.trim(),
     firstName:       form.firstName,
     middleName:      form.middleName || "",
@@ -241,30 +245,23 @@ export async function submitLivelihoodRegistration(householdID, userID, resident
     programLocation: program.location,
     status:          "pending",
     submittedAt:     serverTimestamp(),
-  });
+  };
+
+  if (batch) batch.set(ref, payload);
+  else await setDoc(ref, payload);
+
   return regNum;
 }
-
-export async function getLivelihoodRegistrations(householdID) {
-  const q = query(
-    collection(db, "livelihoodRegistrations"),
-    where("householdID", "==", householdID),
-    orderBy("submittedAt", "desc")
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-
 
 // ══════════════════════════════
 // 🏠 HOUSEHOLD TRANSFERS
 // ══════════════════════════════
 export async function submitHouseholdTransfer(currentHouseholdID, residentID, userUID, userName, form) {
   const transferID = `TRF-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  
   const isExisting = form.transferType === "existing";
-
-  await addDoc(collection(db, "household_transfers"), {
+  
+  const ref = doc(collection(db, "household_transfers"));
+  await setDoc(ref, {
     transferID,
     UID:                userUID || "", 
     residentID,
@@ -275,7 +272,7 @@ export async function submitHouseholdTransfer(currentHouseholdID, residentID, us
     targetBranchID:     isExisting ? (form.targetBranchID || "BR-001") : "",
     newHouseNumber:     form.transferType === "new" ? form.newHouseNumber : "",
     newStreet:          form.transferType === "new" ? form.newStreet : "",
-    newEmail:           form.transferType === "new" ? form.newEmail : "", // <-- NEW FIELD
+    newEmail:           form.transferType === "new" ? form.newEmail : "",
     reason:             form.reason,
     proofFileName:      form.proofFileName || "",
     proofURL:           form.proofURL || "",
@@ -287,24 +284,25 @@ export async function submitHouseholdTransfer(currentHouseholdID, residentID, us
   if (isExisting) {
     try {
       const headResidentID = await getHouseholdHeadID(form.targetHouseholdID);
+      // Inline notification to avoid circular import issues
       if (headResidentID) {
-        await createUserNotification(
-          form.targetHouseholdID, 
-          headResidentID, 
-          "Transfer Request", 
-          `${userName} requested to join your household (${form.targetBranchID || "BR-001"}).`, 
-          "transfer_approval", 
-          transferID
-        );
+        await setDoc(doc(collection(db, "user_notifications")), {
+          householdID: form.targetHouseholdID.trim(),
+          residentID: headResidentID.trim(),
+          title: "Transfer Request",
+          message: `${userName} requested to join your household (${form.targetBranchID || "BR-001"}).`,
+          type: "transfer_approval",
+          refNum: transferID,
+          isRead: false,
+          createdAt: serverTimestamp(),
+        });
       }
     } catch (err) {
       console.warn("Could not dispatch transfer notification to target head:", err);
     }
   }
-  
   return transferID;
 }
-
 
 export async function processHouseholdTransfer(transferDocID, newStatus, requestData) {
   const transferRef = doc(db, "household_transfers", transferDocID);
@@ -335,7 +333,6 @@ export async function processHouseholdTransfer(transferDocID, newStatus, request
       finalTargetHouseholdID = await generateHouseholdID();
       const newHhRef = doc(db, "households", finalTargetHouseholdID);
       
-      // Initialize the unactivated household container using DB data
       batch.set(newHhRef, {
         householdID: finalTargetHouseholdID,
         houseNumber: transferDBData.newHouseNumber || "",
@@ -344,14 +341,12 @@ export async function processHouseholdTransfer(transferDocID, newStatus, request
         city: "Valenzuela City",
         province: "",
         region: "NCR",
-        email: (transferDBData.newEmail || "").trim().toLowerCase(), // Secured from DB
+        email: (transferDBData.newEmail || "").trim().toLowerCase(),
         totalMembers: 1,
         householdClassification: "",
         activated: false,
         activatedAt: null,
         createdAt: serverTimestamp(),
-        
-        // Breadcrumbs for activation.js
         branchingData: {
           isBranching: true,
           oldHouseholdID: requestData.currentHouseholdID,
@@ -390,15 +385,10 @@ export async function processHouseholdTransfer(transferDocID, newStatus, request
     await batch.commit();
 
     if (transferDBData.transferType === "new" && transferDBData.newEmail) {
-      console.log(`[Email Trigger] Dispatching approval to: ${transferDBData.newEmail}`);
-      try {
-        await sendApprovalEmail(finalTargetHouseholdID, transferDBData.requesterName, transferDBData.newEmail);
-        console.log("[Email Trigger] Successfully sent.");
-      } catch(err) {
-        console.warn("[Email Trigger] Failed:", err);
-      }
+      sendApprovalEmail(finalTargetHouseholdID, transferDBData.requesterName, transferDBData.newEmail).catch(err =>
+        console.warn("[Email Trigger] Failed:", err)
+      );
     }
-
   } else {
     await updateDoc(transferRef, {
       status: newStatus,
@@ -407,10 +397,6 @@ export async function processHouseholdTransfer(transferDocID, newStatus, request
   }
 }
 
-/**
- * Verifies if a Target Household exists and fetches its valid branches.
- * @param {string} householdID
- */
 export async function fetchHouseholdBranchesForTransfer(householdID) {
   if (!householdID) return { exists: false, branches: [] };
   
@@ -428,12 +414,11 @@ export async function fetchHouseholdBranchesForTransfer(householdID) {
     return { exists: true, branches: [{ id: "BR-001", name: "BR-001 (Main)" }] };
   }
 
-  const branches = branchesSnap.docs.map(doc => ({
-    id: doc.id,
-    name: `${doc.id} ${doc.data().branchName ? `(${doc.data().branchName})` : ""}`.trim()
+  const branches = branchesSnap.docs.map(d => ({
+    id: d.id,
+    name: `${d.id} ${d.data().branchName ? `(${d.data().branchName})` : ""}`.trim()
   }));
 
-  // Ensure BR-001 is always an option
   if (!branches.some(b => b.id === "BR-001")) {
      branches.unshift({ id: "BR-001", name: "BR-001 (Main)" });
   }
@@ -441,13 +426,9 @@ export async function fetchHouseholdBranchesForTransfer(householdID) {
   return { exists: true, branches };
 }
 
-
 // ══════════════════════════════
-// 👑 HOUSEHOLD HEAD TRANSFER
+// 👑 HEAD ROLE TRANSFERS
 // ══════════════════════════════
-/**
- * Fetches all residents in a specific household to populate the transfer dropdown.
- */
 export async function getHouseholdResidents(householdID) {
   if (!householdID) return [];
   const residentsRef = collection(db, "households", householdID, "residents");
@@ -458,141 +439,57 @@ export async function getHouseholdResidents(householdID) {
   }));
 }
 
-/**
- * Swaps the Household Head role between the current head and a target member.
- */
 export async function transferHouseholdHeadRole(householdID, currentHeadID, newHeadID) {
-  if (!householdID || !currentHeadID || !newHeadID) {
-    throw new Error("Missing required parameters to transfer the head role.");
-  }
-
-  const currentHeadRef = doc(db, "households", householdID, "residents", currentHeadID);
-  const newHeadRef = doc(db, "households", householdID, "residents", newHeadID);
-
   const batch = writeBatch(db);
-
-  // Demote current head to Member
-  batch.update(currentHeadRef, {
-    role: "Member",
-    updatedAt: serverTimestamp()
-  });
-
-  // Promote new head
-  batch.update(newHeadRef, {
-    role: "Household Head",
-    updatedAt: serverTimestamp()
-  });
-
+  batch.update(doc(db, "households", householdID, "residents", currentHeadID), { role: "Member", updatedAt: serverTimestamp() });
+  batch.update(doc(db, "households", householdID, "residents", newHeadID), { role: "Household Head", updatedAt: serverTimestamp() });
   await batch.commit();
 }
 
-/**
- * Swaps the Branch Head role between the current branch head and a target member.
- */
 export async function transferBranchHeadRole(householdID, currentHeadID, newHeadID) {
-  if (!householdID || !currentHeadID || !newHeadID) {
-    throw new Error("Missing required parameters to transfer the branch head role.");
-  }
-
-  const currentHeadRef = doc(db, "households", householdID, "residents", currentHeadID);
-  const newHeadRef = doc(db, "households", householdID, "residents", newHeadID);
-
   const batch = writeBatch(db);
-
-  // Demote current branch head to Member
-  batch.update(currentHeadRef, {
-    role: "Member",
-    updatedAt: serverTimestamp()
-  });
-
-  // Promote new branch head
-  batch.update(newHeadRef, {
-    role: "Branch Head",
-    updatedAt: serverTimestamp()
-  });
-
+  batch.update(doc(db, "households", householdID, "residents", currentHeadID), { role: "Member", updatedAt: serverTimestamp() });
+  batch.update(doc(db, "households", householdID, "residents", newHeadID), { role: "Branch Head", updatedAt: serverTimestamp() });
   await batch.commit();
 }
 
 // ══════════════════════════════
-// 🔒 PIN VERIFICATION
+// 🔒 PIN VERIFICATION & REMOVAL
 // ══════════════════════════════
 export async function verifyResidentPIN(householdID, residentID, inputPin) {
   if (!inputPin) throw new Error("Please enter your PIN.");
-
   const result = await verifyMemberPin(householdID, residentID, inputPin);
-
   if (!result.ok) {
-    if (result.code === "NO_PIN") {
-      throw new Error("No PIN is set on your profile. Please set up a PIN in your settings first.");
-    }
+    if (result.code === "NO_PIN") throw new Error("No PIN is set on your profile. Please set up a PIN in your settings first.");
     throw new Error(result.message || "Incorrect PIN. Please try again.");
   }
-
   return true;
 }
 
-
-/**
- * Removes a member from the household after verifying their personal PIN.
- */
 export async function removeHouseholdMember(householdID, targetResidentID, targetPin) {
-  if (!householdID || !targetResidentID || !targetPin) {
-    throw new Error("Missing required information to remove member.");
-  }
-
-  // 1. Verify the TARGET member's PIN using your existing function
   await verifyResidentPIN(householdID, targetResidentID, targetPin);
-
-  // 2. If verification passes, delete the member document
-  const residentRef = doc(db, "households", householdID, "residents", targetResidentID);
-  await deleteDoc(residentRef);
-  
+  await deleteDoc(doc(db, "households", householdID, "residents", targetResidentID));
   return true;
 }
 
-
-// ══════════════════════════════
-// 🏠 HOUSEHOLD TRANSFER NOTIFICATIONS & APPROVAL
-// ══════════════════════════════
-
-import { createUserNotification } from "./userNotifications"; // <-- Make sure to import this at the top!
-
-/**
- * Finds the head resident ID for a given household to dispatch targeted alerts.
- */
 export async function getHouseholdHeadID(householdID) {
-  const residentsRef = collection(db, "households", householdID, "residents");
-  const q = query(residentsRef, where("role", "in", ["Household Head", "head"]));
+  const q = query(collection(db, "households", householdID, "residents"), where("role", "in", ["Household Head", "head"]));
   const snap = await getDocs(q);
-  if (!snap.empty) {
-    return snap.docs[0].id;
-  }
-  return null;
+  return snap.empty ? null : snap.docs[0].id;
 }
 
-/**
- * Fetches transfer request details for the consent modal.
- */
 export async function getTransferRequestDetails(transferID) {
   const q = query(collection(db, "household_transfers"), where("transferID", "==", transferID), limit(1));
   const snap = await getDocs(q);
-  if (snap.empty) return null;
-  return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
-/**
- * Household/Branch Head approves or rejects the incoming member.
- */
 export async function respondToTransferConsent(transferDocID, headDecision) {
-  const transferRef = doc(db, "household_transfers", transferDocID);
-  await updateDoc(transferRef, {
-    headApproval: headDecision, // "Approved" or "Rejected"
+  await updateDoc(doc(db, "household_transfers", transferDocID), {
+    headApproval: headDecision,
     headRespondedAt: serverTimestamp(),
   });
 }
-
-
 
 // ══════════════════════════════
 // 📋 USER TRANSACTION HISTORY
@@ -600,49 +497,34 @@ export async function respondToTransferConsent(transferDocID, headDecision) {
 export async function fetchUserTransactions(householdID, residentID, userID, role = "Member", userUID = null) {
   if (!residentID && !userUID && !householdID) return [];
 
+  // ─── OPTIMIZED: Native OR() Queries ───
+  // Reduces network requests from 24 -> 8 by doing all multi-variable matching in 1 pass per collection
   const fetchCollection = async (collectionName, mapper, limitCount = 50) => {
-    const docMap = new Map();
-    const queries = [];
+    try {
+      const conditions = [];
+      if (householdID && residentID) conditions.push(where("residentID", "==", residentID));
+      else if (householdID) conditions.push(where("householdID", "==", householdID));
+      else if (residentID) conditions.push(where("residentID", "==", residentID));
 
-    if (householdID && residentID) {
-      queries.push(query(
-        collection(db, collectionName),
-        where("householdID", "==", householdID),
-        where("residentID", "==", residentID),
-        limit(limitCount)
-      ));
-    } else if (householdID) {
-      queries.push(query(collection(db, collectionName), where("householdID", "==", householdID), limit(limitCount)));
-    } else if (residentID) {
-      queries.push(query(collection(db, collectionName), where("residentID", "==", residentID), limit(limitCount)));
+      if (userUID) conditions.push(where("UID", "==", userUID));
+
+      // Build native query
+      const q = conditions.length > 1 
+        ? query(collection(db, collectionName), or(...conditions), limit(limitCount))
+        : query(collection(db, collectionName), conditions[0], limit(limitCount));
+
+      const snap = await getDocs(q);
+      const results = snap.docs.map(d => mapper({ id: d.id, data: () => d.data() }));
+
+      return results.sort((a, b) => {
+        const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return tb - ta;
+      });
+    } catch (err) {
+      console.warn(`[${collectionName}] query error:`, err);
+      return [];
     }
-
-    if (userUID) {
-      queries.push(query(collection(db, collectionName), where("UID", "==", userUID), limit(limitCount)));
-    }
-
-    for (const q of queries) {
-      try {
-        const snap = await getDocs(q);
-        snap.forEach(d => {
-          if (!docMap.has(d.id)) {
-            docMap.set(d.id, d.data());
-          }
-        });
-      } catch (err) {
-        console.warn(`[${collectionName}] query error:`, err);
-      }
-    }
-
-    const results = Array.from(docMap.entries()).map(([id, data]) => mapper({ id, data: () => data }));
-
-    results.sort((a, b) => {
-      const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-      const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-      return tb - ta;
-    });
-
-    return results.slice(0, limitCount);
   };
 
   const docs = await fetchCollection("document_requests", d => ({
@@ -667,25 +549,19 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
 
   const eqs = await fetchCollection("equipment_rentals", d => {
     const rawData = d.data();
-    const rawStatus = rawData.status || "Pending";
-    let effectiveStatus = rawStatus;
-    const alreadyResolved = ['Returned', 'Unreturned', 'Rejected'].includes(rawStatus);
-    if (!alreadyResolved && rawStatus === "Claimed" && rawData.returnDate) {
+    let effectiveStatus = rawData.status || "Pending";
+    if (!['Returned', 'Unreturned', 'Rejected'].includes(effectiveStatus) && effectiveStatus === "Claimed" && rawData.returnDate) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const returnDate = new Date(rawData.returnDate + "T00:00:00");
-      if (returnDate < today) {
-        effectiveStatus = "Overdue";
-      }
+      if (new Date(rawData.returnDate + "T00:00:00") < today) effectiveStatus = "Overdue";
     }
-
     return {
       id: d.id,
       category: "Equipment",
       serviceName: rawData.equipmentName || "Equipment Rental",
       refNum: rawData.rentalID || rawData.refNum || "",
       status: effectiveStatus,
-      firestoreStatus: rawStatus,
+      firestoreStatus: rawData.status,
       date: rawData.submittedAt,
       ...rawData,
     };
@@ -741,13 +617,10 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
     ...d.data(),
   }));
 
-  // Merge all arrays and sort by date descending
   const all = [...docs, ...facs, ...eqs, ...fbs, ...pos, ...bswds, ...progs, ...lhs];
-  all.sort((a, b) => {
+  return all.sort((a, b) => {
     const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
     const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
     return tb - ta;
   });
-
-  return all;
 }
