@@ -43,8 +43,8 @@ function ValidityReminderBanner() {
       background: "#fffbeb",
       border: "1px solid #fcd34d",
       borderRadius: "10px",
-      padding: "14px 16px",
-      marginBottom: "18px",
+      padding: "10px 14px",
+      marginBottom: "0.75rem",
       fontSize: "14px",
       color: "#92400e",
     }}>
@@ -202,6 +202,7 @@ function Step2({ docType, form, setForm, errors }) {
   };
 
   const isPdf = form.validIdFile?.type === "application/pdf" || /\.pdf$/i.test(form.validId || "");
+  const isOther = form.purposeOption === "Other";
 
   return (
     <div className="dr-step2">
@@ -215,147 +216,150 @@ function Step2({ docType, form, setForm, errors }) {
         </div>
       )}
 
-      <div className="dr-section-label">{t("doc_basic_info", "Basic Information")}</div>
-      <div className="dr-field-row">
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_first_name", "First Name")} <span className="sv-required">*</span></label>
-          <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
-          {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
-        </div>
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_middle_name", "Middle Name")}</label>
-          <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
-        </div>
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_last_name", "Last Name")} <span className="sv-required">*</span></label>
-          <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
-          {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
-        </div>
-      </div>
-      <div className="dr-field-row">
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_birthdate", "Date of Birth")} <span className="sv-required">*</span></label>
-          <input className={`sv-input${errors.dob ? " sv-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
-          {errors.dob && <span className="sv-error-msg">{errors.dob}</span>}
-        </div>
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_civil_status", "Civil Status")}</label>
-          <select className="sv-input sv-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
-            {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_residing_since", "Residing Since (Year)")} <span className="sv-required">*</span></label>
-          <input className={`sv-input${errors.residingSince ? " sv-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="e.g. 2010" />
-          {errors.residingSince && <span className="sv-error-msg">{errors.residingSince}</span>}
-        </div>
-      </div>
-      <div className="dr-field">
-        <label className="sv-label">{t("doc_address", "Complete Address")} <span className="sv-required">*</span></label>
-        <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
-        {errors.address && <span className="sv-error-msg">{errors.address}</span>}
-      </div>
+      {/* ── Personal information ── */}
+      <section className="dr-card">
+        <div className="dr-card__title">Personal Information</div>
+        <div className="dr-grid">
+          <div className="dr-field">
+            <label className="sv-label">First Name <span className="sv-required">*</span></label>
+            <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
+            {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
+          </div>
+          <div className="dr-field">
+            <label className="sv-label">Middle Name</label>
+            <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
+          </div>
+          <div className="dr-field">
+            <label className="sv-label">Last Name <span className="sv-required">*</span></label>
+            <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+            {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
+          </div>
+          <div className="dr-field">
+            <label className="sv-label">Date of Birth <span className="sv-required">*</span></label>
+            <input className={`sv-input${errors.dob ? " sv-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+            {errors.dob && <span className="sv-error-msg">{errors.dob}</span>}
+          </div>
 
-      <div className="dr-field-row">
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_contact", "Contact Number")} <span className="sv-required">*</span></label>
-          <input
-            className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
-            type="tel"
-            inputMode="numeric"
-            maxLength={11}
-            value={form.contact}
-            onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
-            onBlur={e => set("contact", normalizePHMobile(e.target.value))}
-            placeholder="09123456789"
-          />
-          {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
-        </div>
-        <div className="dr-field">
-          <label className="sv-label">{t("profile_email", "Email Address")}</label>
-          <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
-        </div>
-        <div className="dr-field">
-          <label className="sv-label">{t("doc_purpose", "Purpose of Request")} <span className="sv-required">*</span></label>
-          <select
-            className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
-            value={form.purposeOption}
-            onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
-          >
-            <option value="">{t("doc_select_purpose", "— Select purpose —")}</option>
-            {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            <option value="Other">{t("doc_other", "Other")}</option>
-          </select>
-          {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
-        </div>
-      </div>
-
-      {form.purposeOption === "Other" && (
-        <div className="dr-field-row">
-          <div />
-          <div />
-          <div className="dr-field dr-field--other-specify">
-            <label className="sv-label">{t("doc_specify_purpose", "Please specify")} <span className="sv-required">*</span></label>
+          <div className="dr-field">
+            <label className="sv-label">Civil Status</label>
+            <select className="sv-input sv-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
+              {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="dr-field">
+            <label className="sv-label">Residing Since <span className="sv-required">*</span></label>
+            <input className={`sv-input${errors.residingSince ? " sv-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="Year, e.g. 2010" />
+            {errors.residingSince && <span className="sv-error-msg">{errors.residingSince}</span>}
+          </div>
+          <div className="dr-field">
+            <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
             <input
-              className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
-              value={form.purposeOther}
-              onChange={e => set("purposeOther", e.target.value)}
-              placeholder={t("doc_specify_placeholder", "Describe your purpose...")}
+              className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
+              type="tel"
+              inputMode="numeric"
+              maxLength={11}
+              value={form.contact}
+              onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
+              onBlur={e => set("contact", normalizePHMobile(e.target.value))}
+              placeholder="09123456789"
             />
-            {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
+            {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
+          </div>
+          <div className="dr-field">
+            <label className="sv-label">Email Address</label>
+            <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
+          </div>
+
+          <div className="dr-field dr-span-4">
+            <label className="sv-label">Complete Address <span className="sv-required">*</span></label>
+            <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
+            {errors.address && <span className="sv-error-msg">{errors.address}</span>}
           </div>
         </div>
-      )}
+      </section>
 
-      <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>{t("doc_file_upload", "File Upload")}</div>
-      <div className="dr-field">
-        <label className="sv-label">{t("doc_upload_id", "Upload Valid ID")} <span className="sv-required">*</span></label>
-        <label className={`dr-upload-box${form.validId ? " dr-upload-box--filled" : ""}${errors.validId ? " dr-upload-box--error" : ""}`}>
-          <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
-          {form.validId ? (
-            <div className="dr-upload-file">
-              {previewUrl ? (
-                <img className="dr-upload-thumb" src={previewUrl} alt="Uploaded ID preview" />
-              ) : (
-                <div className="dr-upload-file-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                </div>
-              )}
-              <div className="dr-upload-file-meta">
-                <span className="dr-upload-file-name" title={form.validId}>{form.validId}</span>
-                <span className="dr-upload-file-sub">
-                  {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · {t("doc_click_replace", "Click to replace")}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="dr-upload-remove"
-                onClick={removeFile}
-                aria-label="Remove uploaded ID"
-                title="Remove"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-          ) : (
-            <div className="dr-upload-placeholder">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-              <span>{t("feedback_click_upload", "Click to upload")}</span>
-              <span className="dr-upload-hint">{t("doc_upload_hint", "JPG, PNG or PDF · Max 5MB")}</span>
+      {/* ── Request details: purpose + valid ID ── */}
+      <section className="dr-card">
+        <div className="dr-card__title">Request Details</div>
+        <div className="dr-grid">
+          <div className="dr-field dr-span-2">
+            <label className="sv-label">Purpose of Request <span className="sv-required">*</span></label>
+            <select
+              className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
+              value={form.purposeOption}
+              onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
+            >
+              <option value="">— Select purpose —</option>
+              {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              <option value="Other">Other</option>
+            </select>
+            {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
+          </div>
+
+          {isOther && (
+            <div className="dr-field dr-span-2">
+              <label className="sv-label">Please specify <span className="sv-required">*</span></label>
+              <input
+                className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
+                value={form.purposeOther}
+                onChange={e => set("purposeOther", e.target.value)}
+                placeholder="Describe your purpose..."
+              />
+              {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
             </div>
           )}
-        </label>
-        {errors.validId && <span className="sv-error-msg">{errors.validId}</span>}
-      </div>
 
+          <div className={`dr-field ${isOther ? "dr-span-4" : "dr-span-2"}`}>
+            <label className="sv-label">Upload Valid ID <span className="sv-required">*</span></label>
+            <label className={`dr-upload-box dr-upload-box--compact${form.validId ? " dr-upload-box--filled" : ""}${errors.validId ? " dr-upload-box--error" : ""}`}>
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
+              {form.validId ? (
+                <div className="dr-upload-file">
+                  {previewUrl ? (
+                    <img className="dr-upload-thumb" src={previewUrl} alt="Uploaded ID preview" />
+                  ) : (
+                    <div className="dr-upload-file-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                    </div>
+                  )}
+                  <div className="dr-upload-file-meta">
+                    <span className="dr-upload-file-name" title={form.validId}>{form.validId}</span>
+                    <span className="dr-upload-file-sub">
+                      {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Click to replace
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="dr-upload-remove"
+                    onClick={removeFile}
+                    aria-label="Remove uploaded ID"
+                    title="Remove"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
+              ) : (
+                <div className="dr-upload-placeholder">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                  <span>Click to upload</span>
+                  <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
+                </div>
+              )}
+            </label>
+            {errors.validId && <span className="sv-error-msg">{errors.validId}</span>}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Document-specific fields ── */}
       {extraFields.length > 0 && (
-        <>
-          <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>{t("doc_additional_info", "Additional Information")}</div>
-          <div className="dr-field-row dr-field-row--wrap">
+        <section className="dr-card">
+          <div className="dr-card__title">Additional Information</div>
+          <div className="dr-grid">
             {extraFields.map(f => {
               if (f.type === "checkbox") {
                 return (
-                  <div className="dr-field dr-field--full" key={f.id}>
+                  <div className="dr-field dr-span-4" key={f.id}>
                     <label className={`dr-checkbox-label${errors[f.id] ? " dr-checkbox-label--error" : ""}`}>
                       <input type="checkbox" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} className="dr-checkbox" />
                       <span>{f.label} {f.required && <span className="sv-required">*</span>}</span>
@@ -365,7 +369,7 @@ function Step2({ docType, form, setForm, errors }) {
                 );
               }
               return (
-                <div className="dr-field" key={f.id}>
+                <div className="dr-field dr-span-2" key={f.id}>
                   <label className="sv-label">{f.label} {f.required && <span className="sv-required">*</span>}</label>
                   <input className={`sv-input${errors[f.id] ? " sv-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
                   {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
@@ -373,7 +377,7 @@ function Step2({ docType, form, setForm, errors }) {
               );
             })}
           </div>
-        </>
+        </section>
       )}
     </div>
   );
@@ -412,7 +416,7 @@ function Step3({ docType, form }) {
         border: "1px solid #fcd34d",
         borderRadius: "8px",
         padding: "10px 14px",
-        marginBottom: "16px",
+        marginBottom: "0.75rem",
         fontSize: "13px",
         color: "#92400e",
       }}>
