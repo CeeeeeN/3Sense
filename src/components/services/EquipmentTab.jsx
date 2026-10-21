@@ -115,7 +115,7 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
                   <div>
                     <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
                     <div className="sv-facility-card__meta">
-                      <span>{eq.quantity !== undefined && eq.quantity !== "" ? `Total Inventory: ${eq.quantity} units` : "Quantity unlisted"}</span>
+                      <span>{eq.quantity !== undefined && eq.quantity !== "" ? t("eq_inventory_count", `Total Inventory: ${eq.quantity} units`) : t("eq_qty_unlisted", "Quantity unlisted")}</span>
                     </div>
                     <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
                   </div>
@@ -123,10 +123,10 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
                 <div className="sv-facility-card__right">
                   <span className={`sv-avail-badge${isAvailable ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
                     <span className="sv-avail-dot" />
-                    {isAvailable ? "Available" : (isOutOfStock ? "Out of Stock" : "Unavailable")}
+                    {isAvailable ? t("eq_available", "Available") : (isOutOfStock ? t("eq_out_of_stock", "Out of Stock") : t("eq_unavailable", "Unavailable"))}
                   </span>
                   {isAvailable && (
-                    <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>Rent <ChevronRightIcon /></button>
+                    <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>{t("eq_rent", "Rent")} <ChevronRightIcon /></button>
                   )}
                 </div>
               </div>
@@ -244,7 +244,7 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
 }
 
 function RentalForm({ onBack, equipment, userData, householdID, userName, userID }) {
-  const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { showAlert } = useAlert();
   const { t } = useLanguage();
 
   const equipmentName = equipment?.equipmentName || equipment?.name || "Equipment";
@@ -377,10 +377,10 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
 
-          <div className="sv-field-section-label" style={{ marginTop: "0.75rem" }}>Rental Details</div>
+          <div className="sv-field-section-label" style={{ marginTop: "0.75rem" }}>{t("eq_rental_details", "Rental Details")}</div>
 
           <div className="sv-field">
-            <label className="sv-label">Purpose of Rental <span className="sv-required">*</span></label>
+            <label className="sv-label">{t("eq_purpose_rental", "Purpose of Rental")} <span className="sv-required">*</span></label>
             <select
               className={`sv-input${errors.purpose ? " sv-input--error" : ""}`}
               value={form.purpose}
@@ -411,7 +411,7 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
 
           <div className="sv-field-row">
             <div className="sv-field">
-              <label className="sv-label">Return Date <span className="sv-required">*</span></label>
+              <label className="sv-label">{t("eq_return_date_label", "Return Date")} <span className="sv-required">*</span></label>
               <input
                 className={`sv-input${errors.returnDate ? " sv-input--error" : ""}`}
                 type="date"

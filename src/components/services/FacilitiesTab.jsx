@@ -91,7 +91,7 @@ function AdvanceBookingBanner() {
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: "#92400e",
+          color: "#92400e",                
           padding: "0",
           flexShrink: 0,
           lineHeight: 1,
@@ -135,7 +135,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
                 <div>
                   <div className="sv-facility-card__title">{f.facilityName || f.name || f.title}</div>
                   <div className="sv-facility-card__meta">
-                    <span>{f.capacity ? `Up to ${f.capacity} persons` : ""}</span>
+                    <span>{f.capacity ? t("fac_capacity_label", `Up to ${f.capacity} persons`) : ""}</span>
                     <span className="sv-facility-card__dot" />
                     <span>{f.openTime && f.closeTime ? (() => {
                       const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
@@ -147,10 +147,10 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
               </div>
               <div className="sv-facility-card__right">
                 <span className={`sv-avail-badge${f.available ? " sv-avail-badge--yes" : " sv-avail-badge--no"}`}>
-                  <span className="sv-avail-dot" />{f.available ? "Available" : "Unavailable"}
+                  <span className="sv-avail-dot" />{f.available ? t("fac_available", "Available") : t("fac_unavailable", "Unavailable")}
                 </span>
                 {f.available && (
-                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>Reserve <ChevronRightIcon /></button>
+                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>{t("fac_reserve", "Reserve")} <ChevronRightIcon /></button>
                 )}
               </div>
             </div>
@@ -279,7 +279,7 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
 }
 
 function ReservationForm({ onBack, facility, userData, householdID, userName, userID }) {
-  const { showAlert } = useAlert(); // <-- 2. INITIALIZE HOOK
+  const { showAlert } = useAlert();
   const { t } = useLanguage();
 
   const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
@@ -570,7 +570,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
             {errors.email && <span className="sv-error-msg">{errors.email}</span>}
           </div>
 
-          <div className="sv-field-section-label" style={{ marginTop: "0.75rem" }}>Reservation Details</div>
+          <div className="sv-field-section-label" style={{ marginTop: "0.75rem" }}>{t("fac_details_title", "Reservation Details")}</div>
           <div className="sv-field">
             <label className="sv-label">{t("fac_purpose_of_use", "Purpose of Use")} <span className="sv-required">*</span></label>
             <input className={`sv-input${errors.purpose ? " sv-input--error" : ""}`} placeholder={t("fac_purpose_placeholder", "e.g. Birthday celebration, community meeting...")} value={form.purpose} onChange={e => { set("purpose", e.target.value); setErrors(p => ({ ...p, purpose: "" })); }} />
@@ -632,7 +632,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
         {/* ── BUNDLED EQUIPMENT RENTALS ── */}
         <div className="sv-fields">
-          <div className="sv-field-section-label">Additional Equipment <span className="sv-optional">(Optional)</span></div>
+          <div className="sv-field-section-label">{t("fac_bundled_equip_title", "Additional Equipment")} <span className="sv-optional">({t("optional", "Optional")})</span></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
             {equipmentInventory.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>{t("fac_no_equip_available", "No equipment available at this time.")}</div>
@@ -675,7 +675,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
         {facility?.customFields?.length > 0 && (
           <div className="sv-fields">
-            <div className="sv-field-section-label">Additional Information</div>
+            <div className="sv-field-section-label">{t("doc_additional_info", "Additional Information")}</div>
             <div className="dr-field-row dr-field-row--wrap">
               {facility.customFields.map(f => {
                 if (f.type === "checkbox") {
@@ -702,7 +702,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
         )}
 
         <div className="sv-calendar-col">
-          <div className="sv-field-section-label">Select Date <span className="sv-required">*</span></div>
+          <div className="sv-field-section-label">{t("fac_select_date_label", "Select Date")} <span className="sv-required">*</span></div>
           <Calendar
             selectedDate={form.date}
             fullyBookedDates={fullyBookedDates}
