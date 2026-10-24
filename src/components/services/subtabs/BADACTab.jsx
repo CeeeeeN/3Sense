@@ -26,13 +26,12 @@ export default function BADACTab() {
       <div className="svc-hero svc-hero--amber">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BadgeIcon /></span>Barangay Anti-Drug Abuse Council</div>
-            <h2 className="svc-hero__title">BADAC — We're Here to Help</h2>
-            <p className="svc-hero__abbr">BADAC</p>
-            <p className="svc-hero__sub">All information shared with BADAC is strictly confidential. We are here to support, not to judge.</p>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BadgeIcon /></span>BADAC</div>
+            <h2 className="svc-hero__title">Barangay Anti-Drug Abuse Council</h2>
+            <p className="svc-hero__sub">Seek guidance or report concerns related to illegal drug activities and access information about community-based drug prevention and rehabilitation support.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              Governed by RA 9165 (Comprehensive Dangerous Drugs Act) · Voluntary participation only
+              Legal reference: RA 9165 <strong> — </strong> Comprehensive Dangerous Drugs Act of 2002
             </div>
           </div>
         </div>
