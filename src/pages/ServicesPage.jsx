@@ -70,7 +70,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><ProgramsIcon /></div>
-                  <div><div className="sc-card-title">Barangay Programs</div><div className="sc-card-subtitle">Active programs available to residents</div></div>
+                  <div><div className="sc-card-title">Barangay Programs</div><div className="sc-card-subtitle">View available programs and check eligibility.</div></div>
                 </div>
               </div>
               <ProgramsTab userData={userData} />
@@ -82,7 +82,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><FacilitiesIcon /></div>
-                  <div><div className="sc-card-title">Barangay Facilities</div><div className="sc-card-subtitle">Check availability and reserve a facility</div></div>
+                  <div><div className="sc-card-title">Barangay Facilities</div><div className="sc-card-subtitle">Check availability and reserve facilities.</div></div>
                 </div>
               </div>
               <FacilitiesTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
@@ -94,7 +94,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><DocumentsIcon /></div>
-                  <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online</div></div>
+                  <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online.</div></div>
                 </div>
               </div>
               <DocumentsTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
@@ -106,7 +106,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><EquipmentIcon /></div>
-                  <div><div className="sc-card-title">Barangay Equipment</div><div className="sc-card-subtitle">Check availability and rent equipment</div></div>
+                  <div><div className="sc-card-title">Barangay Equipments</div><div className="sc-card-subtitle">Check availability and request equipment.</div></div>
                 </div>
               </div>
               <EquipmentTab userData={userData} householdID={householdID} userName={userName} userID={userID} />

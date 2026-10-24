@@ -94,7 +94,7 @@ export default function ServicesTab({ userData, householdID, userName }) {
           <div className="sc-card-icon-wrap"><ServicesMenuIcon /></div>
           <div>
             <div className="sc-card-title">Community Services</div>
-            <div className="sc-card-subtitle">Select a service to learn more or take action.</div>
+            <div className="sc-card-subtitle">View available services and request assistance.</div>
           </div>
         </div>
       </div>

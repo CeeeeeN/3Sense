@@ -214,7 +214,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     }
   }, [userData]);
 
-  // ── Real-time: Programs ───────────────────────────────────────────
   useEffect(() => {
     // BOUNDED QUERY: Cap the programs fetch to prevent downloading years of historical data
     const q = query(
