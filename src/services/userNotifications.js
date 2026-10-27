@@ -1,6 +1,6 @@
 import {
   collection,
-  addDoc,
+  setDoc, // <-- Imported setDoc
   updateDoc,
   deleteDoc,
   doc,
@@ -9,7 +9,8 @@ import {
   query,
   where,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  writeBatch // <-- Imported writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
@@ -65,6 +66,7 @@ async function sendPushToResidentOrHousehold(householdID, residentID, title, mes
     // Scenario B: Household-wide broadcast notification
     else {
       const residentsSnap = await getDocs(collection(db, "households", cleanHH, "residents"));
+      // Map over all residents and fire push requests concurrently
       const pushPromises = residentsSnap.docs.map(async (docSnap) => {
         const token = docSnap.data()?.pushToken;
         if (token) {
@@ -90,8 +92,12 @@ async function sendPushToResidentOrHousehold(householdID, residentID, title, mes
  */
 export async function createUserNotification(householdID, residentID, title, message, type, refNum = "") {
   try {
-    // 1. Create In-App Firestore Notification Record
-    const ref = await addDoc(collection(db, "user_notifications"), {
+    // ─── OPTIMIZED: 1-Write Creation ───
+    // Generate the doc locally so we can include the ID in the initial setDoc payload
+    const newNotifRef = doc(collection(db, "user_notifications"));
+
+    await setDoc(newNotifRef, {
+      userNotificationID: newNotifRef.id, // Set immediately, bypassing the old updateDoc
       householdID: householdID.trim(),
       residentID: residentID ? residentID.trim() : "household",
       title,
@@ -102,10 +108,11 @@ export async function createUserNotification(householdID, residentID, title, mes
       createdAt: serverTimestamp(),
     });
 
-    await updateDoc(ref, { userNotificationID: ref.id });
+    // Dispatch Live Mobile Push Notification (Non-blocking)
+    sendPushToResidentOrHousehold(householdID, residentID, title, message, refNum).catch(e => 
+      console.warn("Silent push notification error:", e)
+    );
 
-    // 2. Dispatch Live Mobile Push Notification
-    await sendPushToResidentOrHousehold(householdID, residentID, title, message, refNum);
   } catch (err) {
     console.error("Failed to create user notification:", err);
   }
@@ -116,7 +123,7 @@ export async function createUserNotification(householdID, residentID, title, mes
  */
 export async function createNotification(type, message, triggeredBy, refNum = "") {
   try {
-    await addDoc(collection(db, "notifications"), {
+    await setDoc(doc(collection(db, "notifications")), {
       type,
       message,
       triggeredBy,
@@ -181,9 +188,19 @@ export async function markNotificationAsRead(notifId) {
 export async function markAllNotificationsAsRead(notifications) {
   try {
     const unread = (notifications || []).filter((n) => !n.isRead);
-    await Promise.all(
-      unread.map((n) => updateDoc(doc(db, "user_notifications", n.id), { isRead: true }))
-    );
+    if (unread.length === 0) return;
+
+    // ─── OPTIMIZED: Batched Atomic Write ───
+    // Updates up to 500 unread notifications in exactly 1 network request
+    const batch = writeBatch(db);
+
+    unread.forEach((n) => {
+      const notifRef = doc(db, "user_notifications", n.id);
+      batch.update(notifRef, { isRead: true });
+    });
+
+    await batch.commit();
+
   } catch (err) {
     console.error("Failed to mark all notifications as read:", err);
   }

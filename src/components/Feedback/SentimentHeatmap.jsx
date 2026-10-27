@@ -4,7 +4,10 @@ import { PieChart } from 'lucide-react';
 export default function SentimentHeatmap({ feedbacks = [] }) {
   const [activeTab, setActiveTab] = useState('Facilities');
 
-  const categories = ['Documents', 'Equipment', 'Facilities', 'General Programs', 'Livelihood Programs', 'Peace & Order', 'Others'];
+  // Memoized so we don't recreate the array on every render
+  const categories = useMemo(() => [
+    'Documents', 'Equipment', 'Facilities', 'General Programs', 'Livelihood Programs', 'Peace & Order', 'Others'
+  ], []);
 
   const getCategory = (fb) => {
     const type = String(fb.category || fb.type || fb._type || fb.serviceType || "").toLowerCase();
@@ -25,29 +28,34 @@ export default function SentimentHeatmap({ feedbacks = [] }) {
   const computedHeatmapData = useMemo(() => {
     if (!feedbacks || feedbacks.length === 0) return {};
 
-    const filtered = feedbacks.filter(fb => {
-      const facilityName = String(fb.facilityName || "General").trim().toLowerCase();
-      if (facilityName === 'test' || facilityName.includes('test')) return false;
-      return getCategory(fb) === activeTab;
-    });
-
     const hData = {};
-    filtered.forEach(fb => {
-      const facility = fb.facilityName || "General";
+    
+    // Process all feedbacks in one pass rather than filtering first, slightly faster
+    for (let i = 0; i < feedbacks.length; i++) {
+      const fb = feedbacks[i];
+      const facilityName = String(fb.facilityName || "General").trim();
+      const facilityNameLower = facilityName.toLowerCase();
+      
+      if (facilityNameLower === 'test' || facilityNameLower.includes('test')) continue;
+      if (getCategory(fb) !== activeTab) continue;
+
+      const facility = facilityName || "General";
       const sentiment = fb.sentiment || "Neutral";
       
-      if (!hData[facility]) hData[facility] = { Positive: 0, Neutral: 0, Negative: 0, Total: 0 };
+      if (!hData[facility]) {
+        hData[facility] = { Positive: 0, Neutral: 0, Negative: 0, Total: 0 };
+      }
       
       if (hData[facility][sentiment] !== undefined) {
         hData[facility][sentiment]++;
         hData[facility].Total++;
       }
-    });
+    }
 
     return hData;
   }, [feedbacks, activeTab]);
 
-  const heatmapEntries = Object.entries(computedHeatmapData);
+  const heatmapEntries = useMemo(() => Object.entries(computedHeatmapData), [computedHeatmapData]);
 
   const getHeatmapStyle = (value, total, baseRgb, darkTextColor) => {
     if (total === 0 || value === 0) {

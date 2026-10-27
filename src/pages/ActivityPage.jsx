@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
 import { collection, query, where, orderBy, onSnapshot, limit, or } from "firebase/firestore";
 import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
+import { useLanguage } from "../context/LanguageContext";
 
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
@@ -35,20 +36,22 @@ const STATUS = {
 
 // ── Reusable Components ──
 function StatusBadge({ status }) {
+  const { t } = useLanguage();
   const safeStatus = status ? status.toLowerCase().replace(/ /g, "_") : "pending";
   const s = STATUS[safeStatus] || STATUS.pending;
   return (
     <span className="act2-status" style={{ background: s.bg, color: s.color }}>
-      {s.label}
+      {t("status_" + safeStatus, s.label)}
     </span>
   );
 }
 
 function EmptyState({ message }) {
+  const { t } = useLanguage();
   return (
     <div className="act2-empty">
       <div className="act2-empty__icon"><InboxIcon /></div>
-      <div className="act2-empty__title">No records yet</div>
+      <div className="act2-empty__title">{t("activity_no_records")}</div>
       <div className="act2-empty__sub">{message}</div>
     </div>
   );
@@ -56,6 +59,7 @@ function EmptyState({ message }) {
 
 // ── MAIN ACTIVITY PAGE ──
 export default function ActivityPage({ onNavigate, memberID: propMemberID, householdID: propHouseholdID, UID: propUID }) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("programs");
   const [loading, setLoading] = useState(true);
 
@@ -231,7 +235,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
-    if (!timestamp) return "Unknown Date";
+    if (!timestamp) return t('unknown_date');
     if (typeof timestamp === 'string') return timestamp;
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -240,7 +244,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── 6.1 Programs Tab ──
   const ProgramsFacilitiesTab = () => {
-    if (programs.length === 0) return <EmptyState message="You have not availed any programs yet." />;
+    if (programs.length === 0) return <EmptyState message={t('activity_no_programs')} />;
     return (
       <div className="act2-list">
         {programs.map((item, index) => (
@@ -249,7 +253,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item.category || "Program"}</span>
                 <div className="act2-card__title">{item.programName || item.name || item.eventName}</div>
-                <div className="act2-card__meta">Date: {formatDate(item.createdAt || item.date || item.submittedAt)}</div>
+                <div className="act2-card__meta">{t('date')}: {formatDate(item.createdAt || item.date || item.submittedAt)}</div>
                 <div className="act2-card__ref">Ref: {item.regNum || item.id}</div>
               </div>
               <StatusBadge status={item.status || "pending"} />
@@ -259,7 +263,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         {programs.length >= progLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
             <button onClick={() => setProgLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-              Load More
+              {t('load_more')}
             </button>
           </div>
         )}
@@ -269,7 +273,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── 6.2 Documents Tab ──
   const DocumentsTab = () => {
-    if (documents.length === 0) return <EmptyState message="You have not requested any documents yet." />;
+    if (documents.length === 0) return <EmptyState message={t('activity_no_documents')} />;
     return (
       <div className="act2-list">
         {documents.map((item) => (
@@ -277,12 +281,12 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <div className="act2-card__title">{item.documentName || item.documentType || item.name}</div>
-                <div className="act2-card__meta">Date Requested: {formatDate(item.submittedAt || item.createdAt)}</div>
+                <div className="act2-card__meta">{t('activity_date_requested')}: {formatDate(item.submittedAt || item.createdAt)}</div>
                 <div className="act2-card__ref">Ref: {item.requestID || item.refNum || item.refId || item.id}</div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>Processed by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`}</span>
+                    <span>{t('activity_processed_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`}</span>
                   </div>
                 )}
               </div>
@@ -293,7 +297,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         {documents.length >= docLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
             <button onClick={() => setDocLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-              Load More
+              {t('load_more')}
             </button>
           </div>
         )}
@@ -303,7 +307,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── 6.3 Reservations Tab ──
   const ReservationsTab = () => {
-    if (reservations.length === 0) return <EmptyState message="You have no facility reservations yet." />;
+    if (reservations.length === 0) return <EmptyState message={t('activity_no_reservations')} />;
     return (
       <div className="act2-list">
         {reservations.map((item) => (
@@ -316,7 +320,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
+                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
                   </div>
                 )}
               </div>
@@ -325,7 +329,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             {item.status?.toLowerCase() === "rejected" && item.remarks && (
               <div className="act2-card__remarks">
                 <div className="act2-card__remarks-header">
-                  <AlertCircleIcon /> Remarks
+                  <AlertCircleIcon /> {t('remarks')}
                 </div>
                 <p className="act2-card__remarks-body">{item.remarks}</p>
               </div>
@@ -335,7 +339,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         {reservations.length >= resLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
             <button onClick={() => setResLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-              Load More
+              {t('load_more')}
             </button>
           </div>
         )}
@@ -345,7 +349,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── 6.4 Equipment Tab ──
   const EquipmentTab = () => {
-    if (equipment.length === 0) return <EmptyState message="You have no equipment rentals yet." />;
+    if (equipment.length === 0) return <EmptyState message={t('activity_no_equipment')} />;
     return (
       <div className="act2-list">
         {equipment.map((item) => (
@@ -353,14 +357,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <div className="act2-card__title">{item.equipmentName || "Equipment Rental"}</div>
-                <div className="act2-card__subtitle">Quantity: {item.quantity} units · {item.purpose}</div>
+                <div className="act2-card__subtitle">{t('activity_quantity')}: {item.quantity} {item.quantity > 1 ? t('qty_units') : t('qty_unit')} · {item.purpose}</div>
                 <div className="act2-card__meta">
-                  Ref: {item.rentalID || item.id} · Pick-up: {formatDate(item.pickUpDate)} · Return: {formatDate(item.returnDate)}
+                  Ref: {item.rentalID || item.id} · {t('activity_pickup')}: {formatDate(item.pickUpDate)} · {t('activity_return')}: {formatDate(item.returnDate)}
                 </div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
+                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
                   </div>
                 )}
               </div>
@@ -369,7 +373,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             {item.status?.toLowerCase() === "rejected" && item.remarks && (
               <div className="act2-card__remarks">
                 <div className="act2-card__remarks-header">
-                  <AlertCircleIcon /> Remarks
+                  <AlertCircleIcon /> {t('remarks')}
                 </div>
                 <p className="act2-card__remarks-body">{item.remarks}</p>
               </div>
@@ -379,7 +383,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         {equipment.length >= eqLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
             <button onClick={() => setEqLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-              Load More
+              {t('load_more')}
             </button>
           </div>
         )}
@@ -389,7 +393,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── 6.5 Services Tab
   const ServicesTab = () => {
-    if (services.length === 0) return <EmptyState message="You have not submitted any service reports yet." />;
+    if (services.length === 0) return <EmptyState message={t('activity_no_services')} />;
     return (
       <div className="act2-list">
         {services.map((item) => (
@@ -404,7 +408,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
                   {item.location || item.tip || item.description || "—"}
                 </div>
                 <div className="act2-card__meta" style={{ marginTop: '4px' }}>
-                  Date Submitted: {formatDate(item.createdAt || item.submittedAt)}
+                  {t('activity_date_requested')}: {formatDate(item.createdAt || item.submittedAt)}
                 </div>
                 <div className="act2-card__ref">Ref: {item.refNum || item.id}</div>
               </div>
@@ -415,7 +419,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         {services.length >= servicesLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
             <button onClick={() => setServicesLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-              Load More
+              {t('load_more')}
             </button>
           </div>
         )}
@@ -425,7 +429,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── 6.6 Feedback Tab
   const FeedbackTab = () => {
-    if (feedback.length === 0) return <EmptyState message="You have not submitted any feedback yet." />;
+    if (feedback.length === 0) return <EmptyState message={t('activity_no_feedback')} />;
     return (
       <div className="act2-list">
         {feedback.map((item) => (
@@ -434,14 +438,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
               <div className="act2-card__main">
                 <div className="act2-card__title">{item.facilityName || "General Service"}</div>
                 <div className="act2-card__subtitle" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                  <span style={{ color: '#e8a020' }}>★</span> {item.rating} / 5 Rating
+                  <span style={{ color: '#e8a020' }}>★</span> {item.rating} / 5 {t('activity_feedback_rating')}
                 </div>
-                <div className="act2-card__meta" style={{ marginTop: '4px' }}>Date Submitted: {formatDate(item.createdAt)}</div>
+                <div className="act2-card__meta" style={{ marginTop: '4px' }}>{t('activity_date_requested')}: {formatDate(item.createdAt)}</div>
                 <div className="act2-card__ref">Ref: {item.referenceID || item.id}</div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>Handled by: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
+                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
                   </div>
                 )}
               </div>
@@ -452,7 +456,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
         {feedback.length >= feedbackLimit && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingBottom: '16px' }}>
             <button onClick={() => setFeedbackLimit(prev => prev + 5)} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", color: "#374151", padding: "8px 24px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "600", cursor: "pointer" }}>
-              Load More
+              {t('load_more')}
             </button>
           </div>
         )}
@@ -462,20 +466,20 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── TABS CONFIG ──
   const TABS = [
-    { key: "programs", label: "Programs", icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
-    { key: "documents", label: "Documents", icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
-    { key: "reservations", label: "Facilities", icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
-    { key: "equipment", label: "Equipment", icon: <EquipmentIcon />, count: equipment.length, component: <EquipmentTab /> },
-    { key: "services", label: "Services", icon: <AlertCircleIcon />, count: services.length, component: <ServicesTab /> },
-    { key: "feedback", label: "Feedback", icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
+    { key: "programs", label: t('activity_tab_programs'), icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
+    { key: "documents", label: t('activity_tab_documents'), icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
+    { key: "reservations", label: t('activity_tab_reservations'), icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "equipment", label: t('activity_tab_equipment'), icon: <EquipmentIcon />, count: equipment.length, component: <EquipmentTab /> },
+    { key: "services", label: t('activity_tab_services'), icon: <AlertCircleIcon />, count: services.length, component: <ServicesTab /> },
+    { key: "feedback", label: t('activity_tab_feedback'), icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
   ];
 
-  const current = TABS.find((t) => t.key === activeTab);
+  const current = TABS.find((tab) => tab.key === activeTab);
 
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
-        Loading your activity...
+        {t('loading')}
       </div>
     );
   }
@@ -494,12 +498,12 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       {/* ── Banner ── */}
       <div className="act2-banner">
         <div className="act2-banner__inner">
-          <div className="act2-banner__eyebrow">My Activity</div>
+          <div className="act2-banner__eyebrow">{t('activity_eyebrow')}</div>
           <h1 className="act2-banner__title">
-            Activity <span>History</span>
+            {t('activity_heading_start')}<span>{t('activity_heading_end')}</span>
           </h1>
           <p className="act2-banner__sub">
-            Track all your barangay transactions, feedback, reservations, rentals, and QR scan history in one place.
+            {t('activity_sub')}
           </p>
         </div>
       </div>
@@ -548,14 +552,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
               <span className="db-footer-tagline">Community Management System</span>
             </div>
             <nav className="db-footer-links">
-              <a className="db-footer-link" href="#">Privacy Policy</a>
-              <a className="db-footer-link" href="#">Terms of Use</a>
-              <a className="db-footer-link" href="#">Contact Support</a>
+              <a className="db-footer-link" href="#">{t('footer_privacy')}</a>
+              <a className="db-footer-link" href="#">{t('footer_terms')}</a>
+              <a className="db-footer-link" href="#">{t('footer_support')}</a>
             </nav>
           </div>
           <div className="db-footer-bottom">
-            <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
-            <p>Powered by the Barangay 3S+ Community Management System</p>
+            <p>{t('footer_rights', new Date().getFullYear())}</p>
+            <p>{t('footer_powered')}</p>
           </div>
         </div>
       </footer>

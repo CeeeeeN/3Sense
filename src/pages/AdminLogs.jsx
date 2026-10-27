@@ -3,31 +3,33 @@ import '../AdminStyle.css';
 import AdminLayout from "../components/AdminLayout";
 import { Search, Clock, ShieldAlert, Activity, FilterX } from 'lucide-react';
 import { db } from '../firebase/firebase';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore';
+import { useQuery } from '@tanstack/react-query'; // <-- Added React Query
 
 export default function AdminLogs() {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
   // --- FILTER & SORT STATES ---
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [sortOrder, setSortOrder] = useState('date_desc'); // date_desc, date_asc, name_asc, name_desc, action_asc, action_desc
+  const [sortOrder, setSortOrder] = useState('date_desc'); 
   
   // --- PAGINATION STATES ---
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(15);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, 'audit_logs'), 
-      orderBy('timestamp', 'desc'),
-      limit(300)
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const logData = snapshot.docs.map(doc => {
+  // ─── OPTIMIZED: React Query bounded to 300 logs ───
+  const { data: logs = [], isLoading: loading } = useQuery({
+    queryKey: ['adminManage_auditLogs'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, 'audit_logs'), 
+        orderBy('timestamp', 'desc'),
+        limit(300)
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      return snapshot.docs.map(doc => {
         const data = doc.data();
         const rawTime = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : (data.timestamp ? new Date(data.timestamp).getTime() : 0);
         return {
@@ -40,12 +42,9 @@ export default function AdminLogs() {
           rawTime: rawTime
         };
       });
-      setLogs(logData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'Just now';

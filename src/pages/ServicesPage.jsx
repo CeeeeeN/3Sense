@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getMemberProfile } from "../services/profile";
 import { ProgramsIcon, EquipmentIcon, FacilitiesIcon, DocumentsIcon, ServicesMenuIcon } from "../components/Icons";
+import { useLanguage } from "../context/LanguageContext";
 
 import ProgramsTab from "../components/services/ProgramsTab";
 import FacilitiesTab from "../components/services/FacilitiesTab";
@@ -8,17 +9,17 @@ import DocumentsTab from "../components/services/DocumentsTab";
 import ServicesTab from "../components/services/ServicesTab";
 import EquipmentTab from "../components/services/EquipmentTab";
 
-// ── Main Tabs ──
-const TABS = [
-  { key: "services",   label: "Services",   icon: <ServicesMenuIcon /> },
-  { key: "programs",   label: "Programs",   icon: <ProgramsIcon />     },
-  { key: "facilities", label: "Facilities", icon: <FacilitiesIcon />   },
-  { key: "documents",  label: "Documents",  icon: <DocumentsIcon />    },
-  { key: "equipment",  label: "Equipment",  icon: <EquipmentIcon />   },
-];
-
 export default function ServicesPage({ onNavigate, householdID, memberID, userName, userID }) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("services");
+
+  const TABS = [
+    { key: "services",   label: t('services_tab_services'),   icon: <ServicesMenuIcon /> },
+    { key: "programs",   label: t('services_tab_programs'),   icon: <ProgramsIcon />     },
+    { key: "facilities", label: t('services_tab_facilities'), icon: <FacilitiesIcon />   },
+    { key: "documents",  label: t('services_tab_documents'),  icon: <DocumentsIcon />    },
+    { key: "equipment",  label: t('services_tab_equipment'),  icon: <EquipmentIcon />   },
+  ];
 
   // Hold the user's profile data
   const [userData, setUserData] = useState(null);
@@ -42,9 +43,9 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
       <div className="db-welcome-banner">
         <div className="db-welcome-banner-inner">
           <div className="db-welcome-left">
-            <div className="db-welcome-eyebrow">Barangay Services</div>
-            <h1 className="db-welcome-heading">What can we <span>help you with?</span></h1>
-            <p className="db-welcome-sub">Access services, programs, facilities, equipment, and documents all in one place.</p>
+            <div className="db-welcome-eyebrow">{t('services_eyebrow')}</div>
+            <h1 className="db-welcome-heading">{t('services_heading_start')}<span>{t('services_heading_end')}</span></h1>
+            <p className="db-welcome-sub">{t('services_sub')}</p>
           </div>
         </div>
       </div>
@@ -70,7 +71,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><ProgramsIcon /></div>
-                  <div><div className="sc-card-title">Barangay Programs</div><div className="sc-card-subtitle">View available programs and check eligibility.</div></div>
+                  <div><div className="sc-card-title">{t('services_programs_title')}</div><div className="sc-card-subtitle">{t('services_programs_sub')}</div></div>
                 </div>
               </div>
               <ProgramsTab userData={userData} />
@@ -82,7 +83,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><FacilitiesIcon /></div>
-                  <div><div className="sc-card-title">Barangay Facilities</div><div className="sc-card-subtitle">Check availability and reserve facilities.</div></div>
+                  <div><div className="sc-card-title">{t('services_facilities_title')}</div><div className="sc-card-subtitle">{t('services_facilities_sub')}</div></div>
                 </div>
               </div>
               <FacilitiesTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
@@ -94,7 +95,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><DocumentsIcon /></div>
-                  <div><div className="sc-card-title">Document Requests</div><div className="sc-card-subtitle">Request official barangay documents online.</div></div>
+                  <div><div className="sc-card-title">{t('services_documents_title')}</div><div className="sc-card-subtitle">{t('services_documents_sub')}</div></div>
                 </div>
               </div>
               <DocumentsTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
@@ -106,7 +107,7 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <div className="sc-card-header">
                 <div className="sc-card-header-left">
                   <div className="sc-card-icon-wrap"><EquipmentIcon /></div>
-                  <div><div className="sc-card-title">Barangay Equipments</div><div className="sc-card-subtitle">Check availability and request equipment.</div></div>
+                  <div><div className="sc-card-title">{t('services_equipment_title')}</div><div className="sc-card-subtitle">{t('services_equipment_sub')}</div></div>
                 </div>
               </div>
               <EquipmentTab userData={userData} householdID={householdID} userName={userName} userID={userID} />
@@ -130,14 +131,14 @@ export default function ServicesPage({ onNavigate, householdID, memberID, userNa
               <span className="db-footer-tagline">Community Management System</span>
             </div>
             <nav className="db-footer-links">
-              <a className="db-footer-link" href="#">Privacy Policy</a>
-              <a className="db-footer-link" href="#">Terms of Use</a>
-              <a className="db-footer-link" href="#">Contact Support</a>
+              <a className="db-footer-link" href="#">{t('footer_privacy')}</a>
+              <a className="db-footer-link" href="#">{t('footer_terms')}</a>
+              <a className="db-footer-link" href="#">{t('footer_support')}</a>
             </nav>
           </div>
           <div className="db-footer-bottom">
-            <p>© 2026 Barangay 3S+ Malanday. All rights reserved.</p>
-            <p>Powered by the Barangay 3S+ Community Management System</p>
+            <p>{t('footer_rights', new Date().getFullYear())}</p>
+            <p>{t('footer_powered')}</p>
           </div>
         </div>
       </footer>

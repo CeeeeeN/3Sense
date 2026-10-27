@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { processQRScan } from "../services/qrScanner";
+import { useLanguage } from "../context/LanguageContext";
 
 // ── Load jsQR from CDN (no new npm dep needed) ──────────────────────────────
 const loadJsQR = () =>
@@ -57,6 +58,7 @@ const ScanPhoneIcon = () => (
 
 // ── Verified Popup ────────────────────────────────────────────────────────────
 function VerifiedPopup({ service, onProceed, onClose }) {
+  const { t } = useLanguage();
   return (
     <div className="scan-popup-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="scan-popup">
@@ -64,10 +66,10 @@ function VerifiedPopup({ service, onProceed, onClose }) {
         <div className="scan-popup__icon-wrap">
           <ScanCheckCircleIcon />
         </div>
-        <div className="scan-popup__badge">Visit Verified</div>
-        <h3 className="scan-popup__title">Scan Successful!</h3>
+        <div className="scan-popup__badge">{t('scan_verified_badge', 'Visit Verified')}</div>
+        <h3 className="scan-popup__title">{t('scan_success_title', 'Scan Successful!')}</h3>
         <p className="scan-popup__sub">
-          You may now submit feedback for <strong>{service.fullName}</strong>.
+          {t('scan_success_sub', service.fullName)}
         </p>
         <div
           className="scan-popup__service-tag"
@@ -78,10 +80,10 @@ function VerifiedPopup({ service, onProceed, onClose }) {
           </span>
         </div>
         <button className="scan-popup__btn" onClick={onProceed}>
-          Proceed to Feedback Form →
+          {t('scan_proceed_btn', 'Proceed to Feedback Form →')}
         </button>
         <p className="scan-popup__note">
-          <ScanInfoIcon /> Feedback is only accessible after a verified scan.
+          <ScanInfoIcon /> {t('scan_access_note', 'Feedback is only accessible after a verified scan.')}
         </p>
       </div>
     </div>
@@ -90,6 +92,7 @@ function VerifiedPopup({ service, onProceed, onClose }) {
 
 // ── Desktop Block (shown on non-mobile) ───────────────────────────────────────
 function DesktopBlock() {
+  const { t } = useLanguage();
   return (
     <div className="scan-desktop-block">
       <div className="scan-desktop-block__card">
@@ -102,9 +105,9 @@ function DesktopBlock() {
             </div>
           </div>
         </div>
-        <h2 className="scan-desktop-block__title">Mobile-Only Feature</h2>
+        <h2 className="scan-desktop-block__title">{t('scan_desktop_title', 'Mobile-Only Feature')}</h2>
         <p className="scan-desktop-block__desc">
-          The QR Scanner is designed for smartphones. Open this page on your mobile device to scan Barangay QR codes and submit feedback.
+          {t('scan_desktop_desc', 'The QR Scanner is designed for smartphones. Open this page on your mobile device to scan Barangay QR codes and submit feedback.')}
         </p>
         <div className="scan-desktop-block__chips">
           <span className="scan-desktop-block__chip"><ScanPhoneIcon /> Android</span>
@@ -112,7 +115,7 @@ function DesktopBlock() {
         </div>
         <div className="scan-desktop-block__note">
           <ScanShieldIcon />
-          <span>Requires camera access on your device</span>
+          <span>{t('scan_camera_req', 'Requires camera access on your device')}</span>
         </div>
       </div>
     </div>
@@ -127,6 +130,7 @@ export default function ScanPage({
   residentID = "",
   userID = "",
 }) {
+  const { t } = useLanguage();
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 769);
   // idle | requesting | active | error
   const [camState, setCamState] = useState("idle");
@@ -142,16 +146,6 @@ export default function ScanPage({
   const jsQRRef = useRef(null);
   const scanning = useRef(false);
 
-  // ── Resize listener ──
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 769);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      stopCamera();
-    };
-  }, []);
-
   // ── Camera control ──
   const stopCamera = useCallback(() => {
     scanning.current = false;
@@ -161,6 +155,16 @@ export default function ScanPage({
       streamRef.current = null;
     }
   }, []);
+
+  // ── Resize listener ──
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 769);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const startCamera = async () => {
     setCamState("requesting");
@@ -277,10 +281,10 @@ export default function ScanPage({
           {/* ── Top band ── */}
           <div className="scan-overlay__band">
             <div className="scan-topbar">
-              <span className="scan-topbar__eyebrow">QR Feedback Scanner</span>
+              <span className="scan-topbar__eyebrow">{t('scan_title', 'QR Feedback Scanner')}</span>
               {camState === "active" && (
                 <span className="scan-live-badge">
-                  <span className="scan-live-dot" /> LIVE
+                  <span className="scan-live-dot" /> {t('scan_live', 'LIVE')}
                 </span>
               )}
             </div>
@@ -318,10 +322,10 @@ export default function ScanPage({
             {camState === "idle" && (
               <>
                 <p className="scan-overlay__hint">
-                  Tap below to open your camera
+                  {t('scan_hint_idle', 'Tap below to open your camera')}
                 </p>
                 <button className="scan-start-btn" onClick={startCamera}>
-                  <CameraIcon /> Open Camera
+                  <CameraIcon /> {t('scan_open_cam', 'Open Camera')}
                 </button>
               </>
             )}
@@ -329,13 +333,13 @@ export default function ScanPage({
             {camState === "requesting" && (
               <>
                 <span className="scan-spinner" />
-                <p className="scan-overlay__hint">Requesting camera access…</p>
+                <p className="scan-overlay__hint">{t('scan_requesting', 'Requesting camera access…')}</p>
               </>
             )}
 
             {camState === "active" && (
               <p className="scan-overlay__hint scan-overlay__hint--active">
-                Align the QR code within the frame
+                {t('scan_align_qr', 'Align the QR code within the frame')}
               </p>
             )}
 
@@ -343,7 +347,7 @@ export default function ScanPage({
               <div className="scan-error-block">
                 <p className="scan-error-msg">{camError}</p>
                 <button className="scan-retry-btn" onClick={startCamera}>
-                  Try Again
+                  {t('scan_try_again', 'Try Again')}
                 </button>
               </div>
             )}

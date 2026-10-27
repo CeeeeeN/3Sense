@@ -1,32 +1,43 @@
 import {
-  collection,
-  getDocs,
   doc,
   getDoc,
-  setDoc,
   deleteDoc,
   serverTimestamp,
+  runTransaction,
+  writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-// Generates the MAL-YYYY-XXXXX format for the Household container
+// ─── OPTIMIZED: Secure, 1-Read Concurrency-Safe ID Generation ───
 export const generateHouseholdID = async () => {
   const currentYear = String(new Date().getFullYear());
-  const snapshot = await getDocs(collection(db, "households"));
+  const counterRef = doc(db, "counters", "household");
+
   let maxCount = 0;
 
-  snapshot.forEach(doc => {
-    const parts = doc.id.split('-');
-    if (parts.length === 3 && parts[1] === currentYear) {
-      const num = parseInt(parts[2], 10);
-      if (!isNaN(num) && num > maxCount) {
-        maxCount = num;
+  // Use a transaction to ensure two admins clicking "approve" at the exact 
+  // same millisecond don't get the same Household ID.
+  await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    
+    if (!counterDoc.exists()) {
+      // First time initializing the counter
+      maxCount = 1;
+      transaction.set(counterRef, { currentYear, count: 1 });
+    } else {
+      const data = counterDoc.data();
+      if (data.currentYear === currentYear) {
+        maxCount = data.count + 1;
+        transaction.update(counterRef, { count: maxCount });
+      } else {
+        // Year rolled over (e.g. 2026 -> 2027)
+        maxCount = 1;
+        transaction.update(counterRef, { currentYear, count: 1 });
       }
     }
   });
 
-  const count = maxCount + 1;
-  const padded = String(count).padStart(5, "0");
+  const padded = String(maxCount).padStart(5, "0");
   return `MAL-${currentYear}-${padded}`;
 };
 
@@ -51,8 +62,9 @@ export const approveRegistration = async (docID) => {
     throw new Error("This registration has already been approved.");
   }
 
+  // 1. Generate secure IDs
   const householdID = await generateHouseholdID();
-  const permanentUID = generateResidentUID(); // Generate the permanent anchor
+  const permanentUID = generateResidentUID();
   
   const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
   const genderResolved = data.gender === "Others" 
@@ -60,7 +72,13 @@ export const approveRegistration = async (docID) => {
     : (data.gender || data.genderOrientation || "");
 
   const householdRef = doc(db, "households", householdID);
-  await setDoc(householdRef, {
+
+  // ─── OPTIMIZED: Batched Atomic Write ───
+  // Ensures the pending registration is deleted AT THE EXACT SAME TIME 
+  // the household is created. No orphaned data if internet drops.
+  const batch = writeBatch(db);
+
+  batch.set(householdRef, {
     householdID,
     email: (data.email || "").trim().toLowerCase(),
 
@@ -76,11 +94,11 @@ export const approveRegistration = async (docID) => {
     activated: false,
     activatedAt: null,
     
-    // <-- NEW: Preserve the branching instructions for activation.js
+    // Preserve the branching instructions for activation.js
     branchingData: data.branchingPayload || null,
 
     _pendingHeadData: {
-      UID: permanentUID, // Save the permanent UID here (ignored during branching)
+      UID: permanentUID, 
       idNumber: data.idNumber || "",
       firstName: data.firstName || "",
       middleName: data.middleName || "",
@@ -114,14 +132,17 @@ export const approveRegistration = async (docID) => {
     },
   });
 
+  batch.delete(pendingRef);
+  
+  // Commit the batch
+  await batch.commit();
+
   // Non-blocking email trigger
   if (data.email) {
     sendApprovalEmail(householdID, fullName, data.email.trim().toLowerCase()).catch(err =>
       console.warn("Approval email failed (non-blocking):", err)
     );
   }
-
-  await deleteDoc(pendingRef);
 
   return { householdID, registrationID: docID, email: data.email, name: fullName };
 };

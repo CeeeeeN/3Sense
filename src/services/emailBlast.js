@@ -2,40 +2,49 @@ import {
   collection,
   collectionGroup,
   getDocs,
-  addDoc,
-  updateDoc,
+  setDoc, // <-- Imported setDoc
   doc,
   query,
   where,
+  orderBy, // <-- Imported orderBy
+  limit,   // <-- Imported limit
   serverTimestamp,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 
 export async function fetchRecipientsForAnnouncement(announcement) {
   const { category = "All Residents" } = announcement;
-  const isGeneral =
-    !category || category.trim().toLowerCase() === "all residents";
+  const isGeneral = !category || category.trim().toLowerCase() === "all residents";
 
-  const snap = await getDocs(collectionGroup(db, "residents"));
+  let snap;
+
+  // ─── OPTIMIZED: Targeted Server-Side Query ───
+  if (!isGeneral) {
+    const baseCategory = category.trim();
+    const variations = [...new Set([
+        baseCategory,
+        baseCategory.toLowerCase(),
+        baseCategory.toUpperCase(),
+        baseCategory.charAt(0).toUpperCase() + baseCategory.slice(1).toLowerCase()
+    ])];
+
+    const q = query(
+        collectionGroup(db, "residents"),
+        where("categories", "array-contains-any", variations)
+    );
+    snap = await getDocs(q);
+  } else {
+    // "All Residents" inherently requires fetching everyone
+    snap = await getDocs(collectionGroup(db, "residents"));
+  }
+
   if (snap.empty) return [];
 
-  const categoryClean = category.trim().toLowerCase();
   const emailSet = new Set();
-
   snap.docs.forEach((d) => {
     const data = d.data();
     const email = (data.email || "").trim().toLowerCase();
-    if (!email) return;
-
-    if (isGeneral) {
-      emailSet.add(email);
-    } else {
-      const cats = Array.isArray(data.categories) ? data.categories : [];
-      const matches = cats.some(
-        (c) => String(c).trim().toLowerCase() === categoryClean
-      );
-      if (matches) emailSet.add(email);
-    }
+    if (email) emailSet.add(email);
   });
 
   return [...emailSet];
@@ -76,22 +85,21 @@ export async function fetchRecipientsForLivelihood(programId) {
 
 export async function checkExistingBlast(sourceId) {
   if (!sourceId) return null;
+  
+  // ─── OPTIMIZED: Server-Side Sort & Limit ───
+  // Downloads exactly 1 document instead of pulling the whole history
   const q = query(
     collection(db, "emailBlasts"),
-    where("sourceId", "==", sourceId)
+    where("sourceId", "==", sourceId),
+    orderBy("sentAt", "desc"),
+    limit(1)
   );
+  
   const snap = await getDocs(q);
   if (snap.empty) return null;
 
-  const docs = snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => {
-      const ta = a.sentAt?.toDate ? a.sentAt.toDate() : new Date(a.sentAt || 0);
-      const tb = b.sentAt?.toDate ? b.sentAt.toDate() : new Date(b.sentAt || 0);
-      return tb - ta;
-    });
-
-  return docs[0];
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() };
 }
 
 export async function sendEmailBlast({
@@ -103,7 +111,7 @@ export async function sendEmailBlast({
   onProgress,
 }) {
   const from =
-    (typeof process !== "undefined" && process.env?.RESEND_FROM_EMAIL) ||
+    import.meta.env?.VITE_RESEND_FROM_EMAIL ||
     "Barangay 3S+ Malanday <noreply@3s-sense.site>";
 
   const response = await fetch("/api/email-blast", {
@@ -134,7 +142,11 @@ export async function sendEmailBlast({
     onProgress({ sent: totalSent, failed: totalFailed, total: recipients.length });
   }
 
+  // ─── OPTIMIZED: 1-Write Logging ───
+  const blastRef = doc(collection(db, "emailBlasts"));
+  
   const blastData = {
+    blastId: blastRef.id,
     sourceType,
     sourceId,
     sentBy: auth.currentUser?.uid || "admin",
@@ -153,8 +165,7 @@ export async function sendEmailBlast({
     })),
   };
 
-  const blastRef = await addDoc(collection(db, "emailBlasts"), blastData);
-  await updateDoc(blastRef, { blastId: blastRef.id });
+  await setDoc(blastRef, blastData);
 
   return {
     blastId: blastRef.id,

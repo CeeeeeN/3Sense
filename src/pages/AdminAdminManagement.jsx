@@ -12,30 +12,26 @@ import {
   addDoc,
   updateDoc,
   query,
-  where,
-  onSnapshot,
   orderBy,
   limit
 } from "firebase/firestore";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
-import { useAlert } from "../context/AlertContext"; // <-- IMPORT HOOK
+import { useAlert } from "../context/AlertContext"; 
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // <-- Added React Query
 
 export default function AdminManagement() {
+  const queryClient = useQueryClient(); // <-- For local cache mutations
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const { showAlert, showConfirm } = useAlert(); // <-- INITIALIZE HOOK
+  const { showAlert, showConfirm } = useAlert(); 
 
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
 
-  const [admins, setAdmins] = useState([]);
-  const [requests, setRequests] = useState([]);
-
   const [selectedAdmin, setSelectedAdmin] = useState(null);
-
   const [activeTab, setActiveTab] = useState("requests");
 
   const [searchAdmin, setSearchAdmin] = useState("");
@@ -45,7 +41,6 @@ export default function AdminManagement() {
   const [sortAdmin, setSortAdmin] = useState("name_asc");
 
   const [showViewModal, setShowViewModal] = useState(false);
-
   const [editedRole, setEditedRole] = useState("Standard Admin");
 
   const [requestPage, setRequestPage] = useState(1);
@@ -53,60 +48,21 @@ export default function AdminManagement() {
   const [requestRowsPerPage, setRequestRowsPerPage] = useState(10);
   const [adminRowsPerPage, setAdminRowsPerPage] = useState(10);
 
+  // ─── 1. OPTIMIZED: Zero-Read Auth & Role Verification ───
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const q = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid)
-        );
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setAdminName(data.fullName || "Admin");
-          setAdminRole(data.role || "Standard Admin");
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
-
-        const pendingQ = query(
-          collection(db, "pendingAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const pendingSnapshot = await getDocs(pendingQ);
-
-        if (!pendingSnapshot.empty) {
-          const userData = pendingSnapshot.docs[0].data();
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName || "Admin");
+          setAdminRole(parsed.role || "Standard Admin");
+          
           if (
-            userData.position === "Service Head" ||
-            userData.role === "Super admin" ||
-            userData.role === "Super Admin"
-          ) {
-            setIsSuperAdmin(true);
-          }
-        }
-
-        const approvedQ = query(
-          collection(db, "approvedAdmins"),
-          where("uid", "==", user.uid),
-        );
-        const approvedSnapshot = await getDocs(approvedQ);
-
-        if (!approvedSnapshot.empty) {
-          const userData = approvedSnapshot.docs[0].data();
-          if (
-            userData.position === "Service Head" ||
-            userData.role === "Super admin" ||
-            userData.role === "Super Admin"
+            parsed.position === "Service Head" ||
+            parsed.role === "Super admin" ||
+            parsed.role === "Super Admin"
           ) {
             setIsSuperAdmin(true);
           }
@@ -118,65 +74,57 @@ export default function AdminManagement() {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!isSuperAdmin) return;
+  // ─── 2. LAZY LOADED: Pending Admin Requests ───
+  const { data: requests = [], isLoading: loadingRequests } = useQuery({
+    queryKey: ['adminManage_pendingAdmins'],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "pendingAdmins"),
+        orderBy("createdAt", "desc"),
+        limit(100)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => {
+        const docData = doc.data();
+        return {
+          docId: doc.id,
+          ...docData,
+          email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
+          rawDate: docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : 0,
+          dateSubmitted:
+            docData.createdAt?.toDate().toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            }) || "N/A",
+        };
+      });
+    },
+    enabled: isSuperAdmin && activeTab === "requests", // <-- Only fetches when on this tab
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-    const pendingQuery = query(
-      collection(db, "pendingAdmins"),
-      orderBy("createdAt", "desc"),
-      limit(100)
-    );
+  // ─── 3. LAZY LOADED: Approved Admin Accounts ───
+  const { data: admins = [], isLoading: loadingAdmins } = useQuery({
+    queryKey: ['adminManage_approvedAdmins'],
+    queryFn: async () => {
+      const q = query(collection(db, "approvedAdmins"), limit(100));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => {
+        const docData = doc.data();
+        return {
+          docId: doc.id,
+          ...docData,
+          email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
+        };
+      });
+    },
+    enabled: isSuperAdmin && activeTab === "admins", // <-- Only fetches when on this tab
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
 
-    const unsubRequests = onSnapshot(
-      pendingQuery,
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => {
-          const docData = doc.data();
-          return {
-            docId: doc.id,
-            ...docData,
-            email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
-            rawDate: docData.createdAt?.toDate ? docData.createdAt.toDate().getTime() : 0,
-            dateSubmitted:
-              docData.createdAt?.toDate().toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              }) || "N/A",
-          };
-        });
-        setRequests(data);
-      },
-    );
-
-    const approvedQuery = query(
-      collection(db, "approvedAdmins"),
-      limit(100)
-    );
-
-    const unsubAdmins = onSnapshot(
-      approvedQuery,
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => {
-          const docData = doc.data();
-          return {
-            docId: doc.id,
-            ...docData,
-            email: formatDisplayEmail(docData.email, adminRole, currentUser?.uid === docData.uid),
-          };
-        });
-        setAdmins(data);
-      },
-    );
-
-    return () => {
-      unsubRequests();
-      unsubAdmins();
-    };
-  }, [isSuperAdmin, adminRole, currentUser]);
-
+  // ─── 4. OPTIMIZED: Zero-Read Mutations ───
   const handleApprove = async (req) => {
-    // 1. REPLACED custom modal trigger with global showConfirm hook
     const isConfirmed = await showConfirm(
       "Approve Admin Account",
       `Are you sure you want to approve ${req.fullName}?`
@@ -188,7 +136,7 @@ export default function AdminManagement() {
       await addDoc(collection(db, "approvedAdmins"), {
         uid: req.uid,
         fullName: req.fullName,
-        email: req.email,
+        email: req.email, // using original format, masking handles display later
         contact: req.contact,
         position: req.position,
         role: "Standard Admin",
@@ -200,6 +148,13 @@ export default function AdminManagement() {
         status: "approved",
       });
 
+      // Surgically update local cache (0 Reads)
+      queryClient.setQueryData(['adminManage_pendingAdmins'], (old = []) => 
+        old.map(r => r.docId === req.docId ? { ...r, status: 'approved' } : r)
+      );
+      // Invalidate admins so it correctly refetches the new addition when the tab is clicked
+      queryClient.invalidateQueries({ queryKey: ['adminManage_approvedAdmins'] });
+
       logTransaction(
         adminName,
         adminRole,
@@ -207,23 +162,14 @@ export default function AdminManagement() {
         `Approved admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
-      // 2. REPLACED silent success with success popup
       await showAlert("Success", "Admin approved successfully!");
     } catch (error) {
       console.error("Error approving admin:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Approve Admin",
-        `Failed to approve admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid}). Error: ${error.message}`
-      );
-      // 3. REPLACED native alert with custom alert
       await showAlert("Error", "Failed to approve admin. Please try again.");
     }
   };
 
   const handleReject = async (req) => {
-    // 1. REPLACED custom modal trigger with global showConfirm hook
     const isConfirmed = await showConfirm(
       "Confirm Rejection",
       "Are you sure you want to reject this request?"
@@ -236,6 +182,11 @@ export default function AdminManagement() {
         status: "rejected",
       });
 
+      // Surgically update local cache (0 Reads)
+      queryClient.setQueryData(['adminManage_pendingAdmins'], (old = []) => 
+        old.map(r => r.docId === req.docId ? { ...r, status: 'rejected' } : r)
+      );
+
       logTransaction(
         adminName,
         adminRole,
@@ -243,23 +194,14 @@ export default function AdminManagement() {
         `Rejected admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
-      // 2. REPLACED silent success with success popup
       await showAlert("Success", "Admin request rejected.");
     } catch (error) {
       console.error("Error rejecting admin:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Reject Admin",
-        `Failed to reject admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid}). Error: ${error.message}`
-      );
-      // 3. REPLACED native alert with custom alert
       await showAlert("Error", "Failed to reject admin. Please try again.");
     }
   };
 
   const handleDeleteAdmin = async (admin) => {
-    // 1. REPLACED custom modal trigger with global showConfirm hook
     const isConfirmed = await showConfirm(
       "Delete Admin",
       `This action cannot be undone. Delete admin account for ${admin.fullName}?`
@@ -270,6 +212,11 @@ export default function AdminManagement() {
     try {
       await deleteDoc(doc(db, "approvedAdmins", admin.docId));
 
+      // Surgically remove from local cache (0 Reads)
+      queryClient.setQueryData(['adminManage_approvedAdmins'], (old = []) => 
+        old.filter(a => a.docId !== admin.docId)
+      );
+
       logTransaction(
         adminName,
         adminRole,
@@ -277,17 +224,9 @@ export default function AdminManagement() {
         `Deleted admin account of ${admin.fullName} (${admin.email}) (ID: ${admin.uid})`
       );
 
-      // 2. REPLACED silent success with success popup
       await showAlert("Success", "Admin account deleted successfully.");
     } catch (error) {
       console.error("Error deleting admin:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Delete Admin Account",
-        `Failed to delete admin account of ${admin.fullName} (${admin.email}) (ID: ${admin.uid}). Error: ${error.message}`
-      );
-      // 3. REPLACED native alert with custom alert
       await showAlert("Error", "Failed to delete admin. Please try again.");
     }
   };
@@ -300,6 +239,11 @@ export default function AdminManagement() {
         role: editedRole,
       });
 
+      // Surgically update local cache (0 Reads)
+      queryClient.setQueryData(['adminManage_approvedAdmins'], (old = []) => 
+        old.map(a => a.docId === selectedAdmin.docId ? { ...a, role: editedRole } : a)
+      );
+
       logTransaction(
         adminName,
         adminRole,
@@ -309,18 +253,9 @@ export default function AdminManagement() {
 
       setSelectedAdmin(null);
       setShowViewModal(false);
-      
-      // 4. REPLACED native alert with custom alert
       await showAlert("Success", "Admin system role updated successfully!");
     } catch (error) {
       console.error("Error updating role:", error);
-      logTransaction(
-        adminName,
-        adminRole,
-        "Failed to Update Admin Role",
-        `Failed to update system role of ${selectedAdmin.fullName} (${selectedAdmin.email}) (ID: ${selectedAdmin.uid}) to ${editedRole}. Error: ${error.message}`
-      );
-      // 5. REPLACED native alert with custom alert
       await showAlert("Error", "Failed to update role. Please try again.");
     }
   };
@@ -341,7 +276,7 @@ export default function AdminManagement() {
       });
   }, [admins, searchAdmin, sortAdmin]);
 
-const filteredRequests = useMemo(() => {
+  const filteredRequests = useMemo(() => {
     return requests
       .filter((req) => {
         const searchText = searchRequest.toLowerCase();
@@ -525,7 +460,13 @@ const filteredRequests = useMemo(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedRequests.length > 0 ? (
+                  {loadingRequests ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "24px", color: "#9ca3af" }}>
+                        Loading requests...
+                      </td>
+                    </tr>
+                  ) : paginatedRequests.length > 0 ? (
                     paginatedRequests.map((req) => (
                       <tr
                         key={req.docId}
@@ -696,7 +637,13 @@ const filteredRequests = useMemo(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedAdmins.length > 0 ? (
+                  {loadingAdmins ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "24px", color: "#9ca3af" }}>
+                        Loading admins...
+                      </td>
+                    </tr>
+                  ) : paginatedAdmins.length > 0 ? (
                     paginatedAdmins.map((admin) => (
                       <tr
                         key={admin.docId}
@@ -758,7 +705,7 @@ const filteredRequests = useMemo(() => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}
                       >
                         No admin accounts found.
