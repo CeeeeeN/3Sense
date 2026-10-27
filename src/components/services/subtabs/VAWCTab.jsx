@@ -204,7 +204,7 @@ export default function VAWCTab() {
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
             <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><ServiceShieldIcon /></span>VAWC</div>
-            <h2 className="svc-hero__title">Violence Against Women & Children</h2>
+            <h2 className="svc-hero__title">Violence Against Women and Children</h2>
             <p className="svc-hero__sub">Report cases of abuse and seek assistance, guidance, and protection for women and children experiencing violence.</p>
             <div className="svc-hero__law">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
