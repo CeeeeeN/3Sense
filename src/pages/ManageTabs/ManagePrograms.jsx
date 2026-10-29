@@ -329,7 +329,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
         <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-          &larr; Back to Programs
+          ← Back to Programs
         </button>
 
         <div className="as-header-section">
@@ -521,7 +521,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
             <div className="as-modal-content" style={{ maxWidth: "400px" }}>
               <div className="as-modal-header">
                 <h2>Reject Registration</h2>
-                <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
+                <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body">
                 <form onSubmit={handleConfirmReject}>
@@ -545,7 +545,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
             <div className="as-modal-content" style={{ maxWidth: "400px" }}>
               <div className="as-modal-header">
                 <h2>Remove Approval</h2>
-                <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>&times;</button>
+                <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body">
                 <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
@@ -933,7 +933,7 @@ export default function ManagePrograms() {
                       style={{ padding: "8px 16px", flex: 1 }}
                       onClick={() => setActiveProgramWorkspace(prog)}
                     >
-                      Workspace &rarr;
+                      Workspace →
                     </button>
                     <button
                       className="as-btn-ghost"
@@ -987,7 +987,7 @@ export default function ManagePrograms() {
           <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
             <div className="as-modal-header">
               <h2>{editingProgramId ? "Edit Program" : "Add Program"}</h2>
-              <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
+              <button className="as-modal-close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="as-modal-body" style={{ alignItems: "stretch" }}>
               <form className="as-form" onSubmit={handleAddProgram}>
@@ -1012,8 +1012,22 @@ export default function ManagePrograms() {
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">Target Demographic</label>
-                    <input type="text" className="as-form-input" required placeholder="e.g. Students, Seniors" value={newProgram.demographic}
-                      onChange={(e) => setNewProgram({ ...newProgram, demographic: e.target.value })} />
+                    <select
+                      className="as-form-input"
+                      required
+                      value={newProgram.demographic}
+                      onChange={(e) => setNewProgram({ ...newProgram, demographic: e.target.value })}
+                    >
+                      <option value="">Select Target Demographic</option>
+                      <option value="All Residents">All Residents</option>
+                      <option value="Student">Student</option>
+                      <option value="Senior Citizen">Senior Citizen</option>
+                      <option value="PWD">PWD</option>
+                      <option value="Solo Parent">Solo Parent</option>
+                      <option value="OFW">OFW</option>
+                      <option value="Indigenous People">Indigenous People</option>
+                      <option value="LGBT">LGBT</option>
+                    </select>
                   </div>
                 </div>
 
@@ -1073,7 +1087,7 @@ export default function ManagePrograms() {
                       <input type="text" className="as-form-input" placeholder="e.g. Valid ID" value={req}
                         onChange={(e) => handleReqChange(i, e.target.value)} />
                       {newProgram.requirements.length > 1 && (
-                        <button type="button" className="as-btn-ghost" onClick={() => removeReqField(i)} style={{ padding: "0 10px", color: "red" }}>&times;</button>
+                        <button type="button" className="as-btn-ghost" onClick={() => removeReqField(i)} style={{ padding: "0 10px", color: "red" }}>×</button>
                       )}
                     </div>
                   ))}
@@ -1126,7 +1140,7 @@ export default function ManagePrograms() {
           <div className="as-modal-content" style={{ maxWidth: "450px" }}>
             <div className="as-modal-header">
               <h2>QR Code Generated</h2>
-              <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>
+              <button className="as-modal-close" onClick={() => setSelectedQR(null)}>×</button>
             </div>
             <div className="as-modal-body" style={{ textAlign: "center" }}>
               <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
