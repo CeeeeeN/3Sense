@@ -5,6 +5,7 @@ import { addHouseholdMember, createBranch } from "../services/addMembers";
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { useLanguage } from "../context/LanguageContext";
 
 const AVATAR_COLORS = [
   "linear-gradient(135deg,#0d7a55,#13a87a)",
@@ -234,6 +235,7 @@ const SvgArrowRight = ({ size = 16 }) => (
 
 // ─── Family Branch Step ───────────────────────────────────────────────────────
 function AmFamilyBranchStep({ onConfirm, householdID }) {
+  const { t } = useLanguage();
   const branchDisplayID = (branchID) => {
     const num = parseInt((branchID || "").replace("BR-", ""), 10);
     return isNaN(num) ? branchID : `${householdID}-${num}`;
@@ -265,14 +267,14 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
   useEffect(() => { if (householdID) fetchBranches(); }, [householdID, fetchBranches]);
 
   const handleConfirm = () => {
-    if (!selected) { setError("Please select a family branch."); return; }
+    if (!selected) { setError(t("am_select_branch_err", "Please select a family branch.")); return; }
     const branch = branches.find(b => b.id === selected);
     const needsHead = selected !== "BR-001" && !branch?.residentID;
     onConfirm(selected, needsHead, branch?.branchName || selected);
   };
 
   const handleCreateBranch = async () => {
-    if (!newBranchName.trim()) { setCreateError("Please enter a branch name."); return; }
+    if (!newBranchName.trim()) { setCreateError(t("am_enter_branch_name_err", "Please enter a branch name.")); return; }
     setCreating(true);
     try {
       const newBranchID = await createBranch(householdID, newBranchName.trim());
@@ -282,7 +284,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
       setNewBranchName("");
       setCreateError("");
     } catch (err) {
-      setCreateError("Failed to create branch: " + err.message);
+      setCreateError(err.message);
     } finally {
       setCreating(false);
     }
@@ -293,8 +295,8 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
       <div className="am-scan-header">
         <div className="am-scan-icon-wrap"><SvgBranch size={22} /></div>
         <div>
-          <h3 className="am-scan-title">Family Branch</h3>
-          <p className="am-scan-sub">Which family branch does this member belong to?</p>
+          <h3 className="am-scan-title">{t("am_family_branch")}</h3>
+          <p className="am-scan-sub">{t("am_which_branch")}</p>
         </div>
       </div>
 
@@ -319,9 +321,9 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
                       color: hasHead ? "#0d7a55" : "#e8a020",
                       fontFamily: "'Poppins', sans-serif", fontWeight: 500
                     }}>
-                      {isBR001 ? "Original Branch · Head Permanent"
-                        : hasHead ? "Branch Head Assigned"
-                          : "⚠ Head Not Yet Assigned"}
+                      {isBR001 ? t("am_original_branch")
+                        : hasHead ? t("am_head_assigned")
+                          : t("am_head_not_assigned")}
                     </span>
                   </span>
                   <span style={{
@@ -338,7 +340,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
             onClick={() => { setShowModal(true); setCreateError(""); setNewBranchName(""); }}
             style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", marginBottom: "1.25rem" }}
           >
-            <IconPlus /> Create New Family Branch
+            <IconPlus /> {t("am_create_branch")}
           </button>
         </div>
       )}
@@ -353,7 +355,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
             onClick={handleConfirm}
             style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
           >
-            Next: ID Scan <IconArrow />
+            {t("am_next_id_scan")} <IconArrow />
           </button>
         </div>
       )}
@@ -363,15 +365,15 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
         <div className="am-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="am-modal" onClick={e => e.stopPropagation()}>
             <div className="am-modal-header">
-              <h4 className="am-modal-title">Create New Family Branch</h4>
+              <h4 className="am-modal-title">{t("am_create_branch_modal_title")}</h4>
               <button className="am-modal-close" onClick={() => setShowModal(false)}><IconX /></button>
             </div>
             <div className="am-modal-body">
-              <Field label="Family Branch Name" required>
+              <Field label={t("am_branch_name_label")} required>
                 <InputField
                   icon={SvgBranch}
                   type="text"
-                  placeholder="e.g. Reyes Family"
+                  placeholder={t("am_branch_name_placeholder")}
                   value={newBranchName}
                   onChange={e => { setNewBranchName(e.target.value); setCreateError(""); }}
                   onKeyDown={e => e.key === "Enter" && handleCreateBranch()}
@@ -380,14 +382,14 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
               {createError && <div className="am-field-error" style={{ marginTop: "0.5rem" }}>⚠️ {createError}</div>}
             </div>
             <div className="am-modal-footer">
-              <button className="am-btn am-btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="am-btn am-btn-ghost" onClick={() => setShowModal(false)}>{t("cancel")}</button>
               <button
                 className="am-btn am-btn-primary"
                 onClick={handleCreateBranch}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
               >
                 {creating ? <SvgLoader size={15} /> : <IconCheck />}
-                {creating ? "Saving..." : "Save Branch"}
+                {creating ? t("am_saving_branch") : t("am_save_branch")}
               </button>
             </div>
           </div>
@@ -399,6 +401,7 @@ function AmFamilyBranchStep({ onConfirm, householdID }) {
 
 // ─── Camera hook ──────────────────────────────────────────────────────────────
 function useCamera() {
+  const { t } = useLanguage();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [active, setActive] = useState(false);
@@ -414,9 +417,9 @@ function useCamera() {
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
       setActive(true);
     } catch {
-      setError("Camera access denied or unavailable. Please use file upload instead.");
+      setError(t("reg_camera_error", "Camera access denied or unavailable. Please use file upload instead."));
     }
-  }, []);
+  }, [t]);
 
   const stop = useCallback(() => {
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
@@ -481,6 +484,7 @@ function SelectField({ icon: Icon, children, ...props }) {
 
 // ─── ID Scan Step (Includes prominent Skip ID button) ──────────────────────────
 function AmIdScanStep({ onConfirm, onSkip }) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
@@ -493,15 +497,15 @@ function AmIdScanStep({ onConfirm, onSkip }) {
     if (!file) return;
     setUploadErr(null);
     if (!file.type.startsWith("image/")) {
-      setUploadErr("Please upload a valid image file (JPG, PNG, WEBP).");
+      setUploadErr(t("reg_upload_invalid", "Please upload a valid image file (JPG, PNG, WEBP)."));
       fileRef.current.value = ""; return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setUploadErr("File too large. Max 10MB.");
+      setUploadErr(t("reg_upload_too_large", "File too large. Max 10MB."));
       fileRef.current.value = ""; return;
     }
     const reader = new FileReader();
-    reader.onerror = () => { setUploadErr("Failed to read file. Try another image."); fileRef.current.value = ""; };
+    reader.onerror = () => { setUploadErr(t("reg_upload_read_error", "Failed to read file. Try another image.")); fileRef.current.value = ""; };
     reader.onload = ev => { setPreview(ev.target.result); setMode("preview"); setUploadErr(null); };
     reader.readAsDataURL(file);
   };
@@ -533,9 +537,9 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         <div className="am-scan-icon-wrap"><SvgIdCard size={22} /></div>
         <div>
           <h3 className="am-scan-title">
-            Scan Your ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span>
+            {t("am_scan_id_title")} <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>({t("optional")})</span>
           </h3>
-          <p className="am-scan-sub">Scan or upload a PhilSys National ID or valid government ID to autofill the form.</p>
+          <p className="am-scan-sub">{t("am_scan_id_sub")}</p>
         </div>
       </div>
 
@@ -544,14 +548,14 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div className="am-dropzone">
             <div className="am-dropzone-icon"><SvgIdCard size={32} /></div>
-            <p className="am-dropzone-title">Position National ID or Government ID within frame</p>
-            <p className="am-dropzone-sub">Accepted: National ID (PhilSys), Driver's License, Passport, Voter's ID, SSS, GSIS, PRC ID</p>
+            <p className="am-dropzone-title">{t("am_dropzone_title")}</p>
+            <p className="am-dropzone-sub">{t("am_accepted_ids")}</p>
             <div className="am-btn-group">
               <button className="am-btn am-btn-primary" onClick={startCamera} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgCamera /> Use Camera
+                <SvgCamera /> {t("reg_use_camera")}
               </button>
               <button className="am-btn am-btn-ghost" onClick={() => fileRef.current?.click()} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgUpload /> Upload Image
+                <SvgUpload /> {t("reg_upload_image")}
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
@@ -579,13 +583,13 @@ function AmIdScanStep({ onConfirm, onSkip }) {
                 transition: "all 0.15s ease",
               }}
             >
-              Skip ID Upload &amp; Continue <SvgArrowRight />
+              {t("am_skip_id_btn")} <SvgArrowRight />
             </button>
           </div>
 
           <div className="am-info-box">
             <SvgInfo2 size={15} />
-            <p>Your ID image is used for identity verification and will be submitted with this member's record.</p>
+            <p>{t("am_id_privacy")}</p>
           </div>
         </div>
       )}
@@ -598,7 +602,7 @@ function AmIdScanStep({ onConfirm, onSkip }) {
               <SvgAlert size={20} />
               <p>{cam.error}</p>
               <button className="am-btn am-btn-ghost" onClick={() => fileRef.current?.click()} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgUpload /> Upload Instead
+                <SvgUpload /> {t("reg_upload_instead")}
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
@@ -609,7 +613,7 @@ function AmIdScanStep({ onConfirm, onSkip }) {
                 <div className="am-camera-guide-id">
                   <div className="am-camera-corner tl" /><div className="am-camera-corner tr" />
                   <div className="am-camera-corner bl" /><div className="am-camera-corner br" />
-                  <div className="am-camera-guide-label">Align ID within frame</div>
+                  <div className="am-camera-guide-label">{t("reg_align_id")}</div>
                 </div>
               </div>
             </div>
@@ -617,10 +621,10 @@ function AmIdScanStep({ onConfirm, onSkip }) {
           {!cam.error && (
             <div className="am-camera-actions">
               <button className="am-btn am-btn-ghost" onClick={() => { cam.stop(); setMode("idle"); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                ← Back
+                ← {t("back")}
               </button>
               <button className="am-btn am-btn-primary" onClick={capturePhoto} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgCamera /> Capture
+                <SvgCamera /> {t("reg_capture")}
               </button>
             </div>
           )}
@@ -631,10 +635,10 @@ function AmIdScanStep({ onConfirm, onSkip }) {
       {mode === "preview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           <div className="am-id-preview-wrap"><img src={preview} alt="ID preview" /></div>
-          <div className="am-preview-notice"><SvgCheck2 size={13} /> Image captured — click Verify to continue</div>
+          <div className="am-preview-notice"><SvgCheck2 size={13} /> {t("am_image_captured")}</div>
           <div className="am-btn-group">
-            <button className="am-btn am-btn-ghost" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> Retake</button>
-            <button className="am-btn am-btn-primary" onClick={confirm} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgCheck2 /> Verify &amp; Extract</button>
+            <button className="am-btn am-btn-ghost" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> {t("reg_retake")}</button>
+            <button className="am-btn am-btn-primary" onClick={confirm} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgCheck2 /> {t("reg_verify_extract")}</button>
           </div>
         </div>
       )}
@@ -643,8 +647,8 @@ function AmIdScanStep({ onConfirm, onSkip }) {
       {mode === "validating" && (
         <div className="am-status-center">
           <div className="am-status-icon loading"><SvgLoader /></div>
-          <p className="am-status-title">Verifying ID…</p>
-          <p className="am-status-sub">Checking that this is a valid government-issued ID</p>
+          <p className="am-status-title">{t("am_verifying_id")}</p>
+          <p className="am-status-sub">{t("am_verifying_id_sub")}</p>
         </div>
       )}
 
@@ -658,17 +662,17 @@ function AmIdScanStep({ onConfirm, onSkip }) {
                 {result.isValid === null ? <SvgAlert size={20} /> : <SvgXCircle size={24} />}
               </span>
               <p className={`am-invalid-title ${result.isValid === null ? "unavailable" : "rejected"}`}>
-                {result.isValid === null ? "Verification Unavailable" : "Invalid ID Detected"}
+                {result.isValid === null ? t("reg_verification_unavailable") : t("am_invalid_id")}
               </p>
             </div>
             <p className="am-invalid-reason">{result.reason}</p>
           </div>
           <div className="am-btn-group">
             {result.isValid === null && (
-              <button className="am-btn am-btn-ghost" onClick={reverify} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> Re-verify</button>
+              <button className="am-btn am-btn-ghost" onClick={reverify} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> {t("reg_reverify")}</button>
             )}
-            <button className="am-btn am-btn-primary" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> Try Different Image</button>
-            <button className="am-btn am-btn-ghost" onClick={onSkip} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Skip ID Upload →</button>
+            <button className="am-btn am-btn-primary" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> {t("reg_try_different", "Try Different Image")}</button>
+            <button className="am-btn am-btn-ghost" onClick={onSkip} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>{t("am_skip_id_arrow")}</button>
           </div>
         </div>
       )}
@@ -677,8 +681,8 @@ function AmIdScanStep({ onConfirm, onSkip }) {
       {mode === "processing" && (
         <div className="am-status-center">
           <div className="am-status-icon loading"><SvgLoader /></div>
-          <p className="am-status-title">Reading your ID…</p>
-          <p className="am-status-sub">Running live OCR, please wait</p>
+          <p className="am-status-title">{t("reg_reading_id", "Reading your ID…")}</p>
+          <p className="am-status-sub">{t("reg_reading_id_sub", "Running live OCR, please wait")}</p>
         </div>
       )}
 
@@ -686,8 +690,8 @@ function AmIdScanStep({ onConfirm, onSkip }) {
       {mode === "done" && (
         <div className="am-status-center">
           <div className="am-status-icon success"><SvgCheckCircle size={38} /></div>
-          <p className="am-status-title">ID Verified — Data Extracted!</p>
-          <p className="am-status-sub">Autofilling your information now</p>
+          <p className="am-status-title">{t("reg_id_verified", "ID Verified — Data Extracted!")}</p>
+          <p className="am-status-sub">{t("reg_autofilling", "Autofilling your information now")}</p>
         </div>
       )}
     </div>
@@ -696,6 +700,7 @@ function AmIdScanStep({ onConfirm, onSkip }) {
 
 // ─── Selfie Step ──────────────────────────────────────────────────────────────
 function AmSelfieStep({ onConfirm }) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [uploadErr, setUploadErr] = useState(null);
@@ -706,10 +711,10 @@ function AmSelfieStep({ onConfirm }) {
     const file = e.target.files[0];
     if (!file) return;
     setUploadErr(null);
-    if (!file.type.startsWith("image/")) { setUploadErr("Please upload a valid image file."); fileRef.current.value = ""; return; }
-    if (file.size > 10 * 1024 * 1024) { setUploadErr("File too large. Max 10MB."); fileRef.current.value = ""; return; }
+    if (!file.type.startsWith("image/")) { setUploadErr(t("reg_upload_invalid", "Please upload a valid image file.")); fileRef.current.value = ""; return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadErr(t("reg_upload_too_large", "File too large. Max 10MB.")); fileRef.current.value = ""; return; }
     const reader = new FileReader();
-    reader.onerror = () => { setUploadErr("Failed to read file."); fileRef.current.value = ""; };
+    reader.onerror = () => { setUploadErr(t("reg_upload_read_error", "Failed to read file.")); fileRef.current.value = ""; };
     reader.onload = ev => { setPreview(ev.target.result); setMode("preview"); setUploadErr(null); };
     reader.readAsDataURL(file);
   };
@@ -723,8 +728,8 @@ function AmSelfieStep({ onConfirm }) {
       <div className="am-scan-header">
         <div className="am-scan-icon-wrap"><SvgSelfie size={22} /></div>
         <div>
-          <h3 className="am-scan-title">Take a Selfie</h3>
-          <p className="am-scan-sub">A clear photo of the member's face is required before proceeding.</p>
+          <h3 className="am-scan-title">{t("reg_selfie_title")}</h3>
+          <p className="am-scan-sub">{t("am_selfie_sub")}</p>
         </div>
       </div>
 
@@ -733,11 +738,11 @@ function AmSelfieStep({ onConfirm }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div className="am-dropzone">
             <div className="am-dropzone-icon-circle"><SvgPerson size={34} /></div>
-            <p className="am-dropzone-title">Face Verification Required</p>
-            <p className="am-dropzone-sub">Look directly at the camera with a neutral expression.</p>
+            <p className="am-dropzone-title">{t("reg_face_required")}</p>
+            <p className="am-dropzone-sub">{t("reg_face_hint")}</p>
             <div className="am-btn-group">
               <button className="am-btn am-btn-primary" onClick={startCamera} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgCamera /> Open Camera
+                <SvgCamera /> {t("reg_open_camera")}
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
@@ -761,13 +766,13 @@ function AmSelfieStep({ onConfirm }) {
               <div className="am-camera-overlay">
                 <div className="am-camera-guide-selfie" />
               </div>
-              <div className="am-camera-selfie-label">Position face within oval</div>
+              <div className="am-camera-selfie-label">{t("reg_position_face")}</div>
             </div>
           )}
           {!cam.error && (
             <div className="am-camera-actions">
-              <button className="am-btn am-btn-ghost" onClick={() => { cam.stop(); setMode("idle"); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← Back</button>
-              <button className="am-btn am-btn-primary" onClick={capturePhoto} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgCamera /> Capture Selfie</button>
+              <button className="am-btn am-btn-ghost" onClick={() => { cam.stop(); setMode("idle"); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← {t("back")}</button>
+              <button className="am-btn am-btn-primary" onClick={capturePhoto} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgCamera /> {t("reg_capture_selfie")}</button>
             </div>
           )}
         </div>
@@ -779,10 +784,10 @@ function AmSelfieStep({ onConfirm }) {
           <div className="am-selfie-preview-center">
             <div className="am-selfie-oval"><img src={preview} alt="Selfie" /></div>
           </div>
-          <div className="am-selfie-success"><SvgCheckCircle size={16} /> Selfie captured successfully</div>
+          <div className="am-selfie-success"><SvgCheckCircle size={16} /> {t("reg_selfie_captured")}</div>
           <div className="am-btn-group">
-            <button className="am-btn am-btn-ghost" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> Retake</button>
-            <button className="am-btn am-btn-primary" onClick={() => onConfirm(preview)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgCheck2 /> Confirm Selfie</button>
+            <button className="am-btn am-btn-ghost" onClick={retake} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgRefresh /> {t("reg_retake")}</button>
+            <button className="am-btn am-btn-primary" onClick={() => onConfirm(preview)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}><SvgCheck2 /> {t("reg_confirm_selfie")}</button>
           </div>
         </div>
       )}
@@ -804,10 +809,25 @@ const BLANK_FORM = {
   isBranchHead: false,
 };
 
-const OUTER_STEPS = ["Family Branch", "ID Scan", "Selfie", "Personal Info", "Address", "Category", "Education"];
-const FORM_TABS = ["Personal Info", "Address", "Category", "Education"];
-
 export default function AddMembers({ onBack, onDone, householdID: propHouseholdID, hhAddress }) {
+  const { t, lang } = useLanguage();
+
+  const OUTER_STEPS = [
+    t("am_family_branch"),
+    t("reg_step_id_scan"),
+    t("reg_step_selfie"),
+    t("reg_step_personal"),
+    t("reg_step_address"),
+    t("reg_step_category"),
+    t("reg_step_education")
+  ];
+  const FORM_TABS = [
+    t("reg_step_personal"),
+    t("reg_step_address"),
+    t("reg_step_category"),
+    t("reg_step_education")
+  ];
+
   const [outerStep, setOuterStep] = useState(0);
   const [familyBranch, setFamilyBranch] = useState(null);
   const [branchName, setBranchName] = useState("");
@@ -877,7 +897,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   }, []);
 
   const set = (field) => (e) => {
-    // REMOVED setMemberError(""); so validation errors stay visible while typing
     const val = e.target.type === "checkbox"
       ? e.target.checked
       : ["contactNumber", "residingSinceYear"].includes(field)
@@ -918,41 +937,41 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     const missing = [];
     
     if (tabNum === 1) {
-      if (!form.firstName.trim()) missing.push("First Name");
-      if (!form.lastName.trim()) missing.push("Last Name");
-      if (!form.birthDate) missing.push("Birth Date");
-      if (!form.birthPlace.trim()) missing.push("Birth Place");
-      if (!form.civilStatus) missing.push("Civil Status");
-      if (!form.residingSinceYear) missing.push("Residing Since Year");
-      else if (!/^\d{4}$/.test(form.residingSinceYear)) missing.push("4-digit Residing Since Year");
-      if (!form.contactNumber.trim()) missing.push("Contact Number");
-      else if (!/^\d{10,15}$/.test(form.contactNumber)) missing.push("Valid Contact Number");
-      if (!form.email.trim()) missing.push("Email Address");
-      else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+      if (!form.firstName.trim()) missing.push(t("reg_first_name"));
+      if (!form.lastName.trim()) missing.push(t("reg_last_name"));
+      if (!form.birthDate) missing.push(t("reg_birth_date"));
+      if (!form.birthPlace.trim()) missing.push(t("reg_birth_place"));
+      if (!form.civilStatus) missing.push(t("reg_civil_status"));
+      if (!form.residingSinceYear) missing.push(t("reg_residing_since"));
+      else if (!/^\d{4}$/.test(form.residingSinceYear)) missing.push(t("reg_residing_since"));
+      if (!form.contactNumber.trim()) missing.push(t("reg_contact_number"));
+      else if (!/^\d{10,15}$/.test(form.contactNumber)) missing.push(t("reg_contact_number"));
+      if (!form.email.trim()) missing.push(t("reg_email"));
+      else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push(t("reg_email"));
     }
     
     if (tabNum === 2 && !form.sameAddress) {
-      if (!form.houseNumber.trim()) missing.push("House / Unit Number");
-      if (!form.street.trim()) missing.push("Street");
-      if (!form.province.trim()) missing.push("Province");
+      if (!form.houseNumber.trim()) missing.push(t("reg_house_number"));
+      if (!form.street.trim()) missing.push(t("reg_street"));
+      if (!form.province.trim()) missing.push(t("reg_province"));
     }
     
     if (tabNum === 3) {
       const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
       if (isPwd) {
-        if (!form.pwdStatus) missing.push("PWD Status");
-        if (!form.disabilityType) missing.push("Disability Type");
+        if (!form.pwdStatus) missing.push(t("reg_pwd_status"));
+        if (!form.disabilityType) missing.push(t("reg_disability_type"));
       }
     }
     
     if (tabNum === 4) {
-      if (!form.educationAttainment) missing.push("Highest Educational Attainment");
-      if (!form.educationStatus) missing.push("Education Status");
-      if (!form.employmentStatus) missing.push("Employment Status");
+      if (!form.educationAttainment) missing.push(t("reg_highest_attainment"));
+      if (!form.educationStatus) missing.push(t("reg_education_status"));
+      if (!form.employmentStatus) missing.push(t("reg_employment_status"));
     }
     
     if (missing.length > 0) { 
-      setMemberError(`Please fill in required fields: ${missing.join(", ")}`); 
+      setMemberError(t("reg_fill_required", missing.join(", "))); 
       return false; 
     }
     
@@ -1025,7 +1044,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const addrPreview = hhAddress
     ? [hhAddress.houseNumber, hhAddress.street, hhAddress.barangay, hhAddress.city].filter(Boolean).join(", ")
-    : "No address found from registration.";
+    : t("am_no_address_found", "No address found from registration.");
 
   const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
@@ -1034,15 +1053,25 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const currentOuter = stepperStep;
   const outerProgress = (currentOuter / (totalOuter - 1)) * 100;
 
+  const CATEGORY_OPTIONS = [
+    { key: "Student", label: t("reg_cat_student") },
+    { key: "Senior Citizen", label: t("reg_cat_senior") },
+    { key: "Solo Parent", label: t("reg_cat_solo_parent") },
+    { key: "OFW", label: t("reg_cat_ofw") },
+    { key: "LGBT", label: t("reg_cat_lgbt") },
+    { key: "Indigenous People", label: t("reg_cat_ip") },
+    { key: "PWD", label: t("reg_cat_pwd") },
+  ];
+
   return (
     <div className="am-root">
       {/* NAVBAR */}
       <nav className="am-nav">
-        <div className="am-nav-logo" onClick={onBack}>
+        <div className="am-nav-logo" onClick={handleBack}>
           <img src={barangayLogo} alt="Barangay Logo" style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           <div className="am-nav-logo-text">
-            Barangay 3S+ Malanday
-            <span className="am-nav-logo-sub">Community Management System</span>
+            {t("app_name")}
+            <span className="am-nav-logo-sub">{t("app_system")}</span>
           </div>
         </div>
         <div className="am-hh-badge">
@@ -1054,13 +1083,13 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       {/* TOAST */}
       <div className={`am-toast ${showToast ? "show" : ""}`}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d7a55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-        Member added successfully.
+        {t("am_toast_added")}
       </div>
 
       <div className="am-page">
         <div className="am-page-header">
-          <h1>Add Household Members</h1>
-          <p>Enter the details of each household member. You can add members one at a time.</p>
+          <h1>{t("am_title")}</h1>
+          <p>{t("am_sub")}</p>
         </div>
 
         {/* MEMBERS LIST — grouped by family branch */}
@@ -1076,7 +1105,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                     <div className="am-branch-group-header">
                       <span className="am-branch-group-icon"><SvgBranch size={14} /></span>
                       <span className="am-branch-group-title">{branchMembers[0]?.branchDisplayName || branch}</span>
-                      <span className="am-branch-group-count">{branchMembers.length} {branchMembers.length === 1 ? "member" : "members"}</span>
+                      <span className="am-branch-group-count">{branchMembers.length} {branchMembers.length === 1 ? t("am_member_single") : t("am_member_plural")}</span>
                     </div>
                     <div className="am-branch-group-body">
                       {branchMembers.map((m) => {
@@ -1087,9 +1116,9 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                             <div className="am-chip-info">
                               <div className="am-chip-name">
                                 {m.fullName}
-                                {m.isBranchHead && <span className="am-chip-badge">⭐ Branch Head</span>}
+                                {m.isBranchHead && <span className="am-chip-badge">{t("am_badge_branch_head")}</span>}
                               </div>
-                              <div className="am-chip-meta">{m.meta || "Added just now"}</div>
+                              <div className="am-chip-meta">{m.meta || t("am_added_just_now")}</div>
                             </div>
                             <button className="am-chip-remove" onClick={() => removeMember(globalIdx)}><IconX /></button>
                           </div>
@@ -1107,8 +1136,8 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
         <div className="am-form-card">
           <div className="am-form-card-header">
             <h3>
-              <IconPlus /> Add New Member
-              <span className="am-member-count-badge">Member {members.length + 1}</span>
+              <IconPlus /> {t("am_add_new_member")}
+              <span className="am-member-count-badge">{t("am_member_num", members.length + 1)}</span>
             </h3>
             <button className="am-btn am-btn-ghost am-btn-sm" onClick={() => {
               setForm({ ...BLANK_FORM }); setTab(1); setOuterStep(0);
@@ -1116,7 +1145,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               setFamilyBranch(null); setBranchName(""); setNeedsHead(false);
               setAutofilledFields(new Set()); manuallyEdited.current = new Set();
             }}>
-              Clear Form
+              {t("am_clear_form")}
             </button>
           </div>
 
@@ -1142,7 +1171,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                 <div className="am-mobile-outer-info">
                   <span className="am-mobile-outer-name">{OUTER_STEPS[currentOuter]}</span>
                   <span className="am-mobile-outer-sub">
-                    {currentOuter < totalOuter - 1 ? `Next: ${OUTER_STEPS[currentOuter + 1]}` : "Last step"}
+                    {currentOuter < totalOuter - 1 ? t("reg_next_step", OUTER_STEPS[currentOuter + 1]) : t("reg_last_step")}
                   </span>
                 </div>
               </div>
@@ -1190,7 +1219,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               />
               <div style={{ marginTop: "1rem" }}>
                 <button className="am-btn am-btn-ghost" onClick={() => setOuterStep(0)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                  ← Back to Family Branch
+                  {t("am_back_to_branch")}
                 </button>
               </div>
             </div>
@@ -1208,7 +1237,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               />
               <div style={{ marginTop: "1rem" }}>
                 <button className="am-btn am-btn-ghost" onClick={() => setOuterStep(1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                  ← Back to ID Scan
+                  {t("am_back_to_id")}
                 </button>
               </div>
             </div>
@@ -1220,13 +1249,13 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               {autofilledFields.size > 0 && tab === 1 && (
                 <div className="am-autofill-banner">
                   <SvgInfo2 size={14} />
-                  <span>Some fields were autofilled from your ID scan. You may edit them before submitting.</span>
+                  <span>{t("reg_autofill_notice")}</span>
                 </div>
               )}
               {autofilledFields.size > 0 && tab === 2 && (
                 <div className="am-autofill-banner">
                   <SvgInfo2 size={14} />
-                  <span>Address fields were partially autofilled from your ID. Please verify.</span>
+                  <span>{t("reg_address_autofill")}</span>
                 </div>
               )}
 
@@ -1237,7 +1266,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                     <span className="am-special-check-label">
                       <span className="am-check-icon-box">{form.sameAddress && "✓"}</span>
                       <span className="am-check-text">
-                        <strong>📍 Same address as Household Head</strong>
+                        <strong>{t("am_same_address_head")}</strong>
                         <span>{addrPreview}</span>
                       </span>
                     </span>
@@ -1267,66 +1296,73 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               {tab === 1 && (
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    <Field label="ID Number" hint="Extracted from your scanned ID or National ID. You may correct this if needed.">
+                    <Field label={t("reg_pcn_label")} hint={t("am_id_number_hint")}>
                       <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
                     </Field>
                     <div className="am-form-grid cols-3">
-                      <Field label="First Name" required><InputField icon={IconUser} type="text" placeholder="Maria" value={form.firstName} onChange={set("firstName")} autofilled={af("firstName")} /></Field>
-                      <Field label="Middle Name"><InputField icon={IconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
-                      <Field label="Last Name" required><InputField icon={IconUser} type="text" placeholder="Dela Cruz" value={form.lastName} onChange={set("lastName")} autofilled={af("lastName")} /></Field>
+                      <Field label={t("reg_first_name")} required><InputField icon={IconUser} type="text" placeholder="Maria" value={form.firstName} onChange={set("firstName")} autofilled={af("firstName")} /></Field>
+                      <Field label={t("reg_middle_name")}><InputField icon={IconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
+                      <Field label={t("reg_last_name")} required><InputField icon={IconUser} type="text" placeholder="Dela Cruz" value={form.lastName} onChange={set("lastName")} autofilled={af("lastName")} /></Field>
                     </div>
                     <div className="am-form-grid cols-3">
-                      <Field label={<>Suffix <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
+                      <Field label={<>{t("reg_suffix")} <span style={{ color: "var(--muted)", fontWeight: 400 }}>({t("optional")})</span></>}>
                         <SelectField icon={IconUser} value={form.suffix} onChange={set("suffix")}>
-                          <option value="">None</option>
+                          <option value="">{t("none")}</option>
                           <option>Jr.</option><option>Sr.</option><option>II</option><option>III</option>
                         </SelectField>
                       </Field>
-                      <Field label="Religion"><InputField icon={IconReligion} type="text" placeholder="Roman Catholic" value={form.religion} onChange={set("religion")} /></Field>
-                      <Field label="Civil Status" required>
+                      <Field label={t("reg_religion")}><InputField icon={IconReligion} type="text" placeholder="Roman Catholic" value={form.religion} onChange={set("religion")} /></Field>
+                      <Field label={t("reg_civil_status")} required>
                         <SelectField icon={IconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
-                          <option value="">Select</option>
-                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
+                          <option value="">{t("select")}</option>
+                          <option value="Single">{t("reg_status_single")}</option>
+                          <option value="Married">{t("reg_status_married")}</option>
+                          <option value="Widowed">{t("reg_status_widowed")}</option>
+                          <option value="Separated">{t("reg_status_separated")}</option>
                         </SelectField>
                       </Field>
                     </div>
                     <div className="am-form-grid cols-3">
-                      <Field label="Birth Date" required><InputField icon={IconCalendar} type="date" max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0]} value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
-                      <Field label="Age"><InputField icon={IconClock} type="number" placeholder="Auto" value={form.age} readOnly /></Field>
-                      <Field label="Birth Place" required><InputField icon={IconPin} type="text" placeholder="Valenzuela City" value={form.birthPlace} onChange={set("birthPlace")} /></Field>
+                      <Field label={t("reg_birth_date")} required><InputField icon={IconCalendar} type="date" max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0]} value={form.birthDate} onChange={set("birthDate")} autofilled={af("birthDate")} /></Field>
+                      <Field label={t("reg_age")}><InputField icon={IconClock} type="number" placeholder={t("reg_age_auto")} value={form.age} readOnly /></Field>
+                      <Field label={t("reg_birth_place")} required><InputField icon={IconPin} type="text" placeholder="Valenzuela City" value={form.birthPlace} onChange={set("birthPlace")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
-                      <Field label="Sex" required>
+                      <Field label={t("reg_sex")} required>
                         <div className="am-radio-group">
-                          {["Male", "Female"].map(v => (
-                            <label key={v} className="am-radio-option">
-                              <input type="radio" name="msex" value={v} checked={form.sex === v} onChange={set("sex")} />
-                              <span className="am-radio-label"><span className="am-radio-dot"></span>{v}</span>
+                          {[
+                            { value: "Male", label: t("reg_sex_male") },
+                            { value: "Female", label: t("reg_sex_female") }
+                          ].map(item => (
+                            <label key={item.value} className="am-radio-option">
+                              <input type="radio" name="msex" value={item.value} checked={form.sex === item.value} onChange={set("sex")} />
+                              <span className="am-radio-label"><span className="am-radio-dot"></span>{item.label}</span>
                             </label>
                           ))}
                         </div>
                       </Field>
-                      <Field label="Gender">
+                      <Field label={t("reg_gender")}>
                         <SelectField icon={IconUser} value={form.gender} onChange={set("gender")}>
-                          <option value="">Select gender</option>
-                          <option>Man</option>
-                          <option>Woman</option>
-                          <option>Non-binary</option>
-                          <option>Prefer not to say</option>
+                          <option value="">{t("reg_select_gender")}</option>
+                          <option value="Man">{t("reg_gender_man")}</option>
+                          <option value="Woman">{t("reg_gender_woman")}</option>
+                          <option value="Non-binary">{t("reg_gender_non_binary")}</option>
+                          <option value="Prefer not to say">{t("reg_gender_prefer_not")}</option>
+                          <option value="Others">{t("reg_opt_others")}</option>
                         </SelectField>
                       </Field>
                     </div>
                     {form.gender === "Others" && (
-                      <Field label="Please specify gender">
-                        <InputField type="text" placeholder="Please specify" value={form.genderOther} onChange={set("genderOther")} />
+                      <Field label={t("reg_specify_gender")}>
+                        <InputField type="text" placeholder={t("reg_please_specify")} value={form.genderOther} onChange={set("genderOther")} />
                       </Field>
                     )}
                     <div className="am-form-grid cols-2">
-                      <Field label="Contact Number" required><InputField icon={IconPhone} type="tel" inputMode="numeric" pattern="[0-9]*" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
-                      <Field label="Email Address" required hint="Used for account notifications."><InputField icon={IconMail} type="email" placeholder="email@example.com" value={form.email} onChange={set("email")} /></Field>
+                      <Field label={t("reg_contact_number")} required><InputField icon={IconPhone} type="tel" inputMode="numeric" pattern="[0-9]*" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
+                      <Field label={t("reg_email")} required hint={t("reg_email_hint")}><InputField icon={IconMail} type="email" placeholder="email@example.com" value={form.email} onChange={set("email")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
-                      <Field label="Residing Since (Year)" required><InputField icon={IconCalendar} type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
+                      <Field label={t("reg_residing_since")} required><InputField icon={IconCalendar} type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={form.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                     </div>
 
                     {familyBranch === "BR-001" ? (
@@ -1336,7 +1372,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                           background: "rgba(13,122,85,0.07)", border: "1px solid rgba(13,122,85,0.18)",
                           fontSize: "0.82rem", color: "#0d7a55", fontFamily: "'Poppins',sans-serif"
                         }}>
-                          ⭐ <strong>Original Branch</strong> — The branch head of the original branch is permanently the registered household head.
+                          {t("am_branch_notice_orig")}
                         </div>
                       </div>
                     ) : needsHead ? (
@@ -1346,7 +1382,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                           background: "rgba(232,160,32,0.09)", border: "1px solid rgba(232,160,32,0.35)",
                           fontSize: "0.82rem", color: "#b37a00", fontFamily: "'Poppins',sans-serif"
                         }}>
-                          ⚠️ <strong>Branch Head Required</strong> — This branch has no head yet. This member will automatically be assigned as the Branch Head.
+                          {t("am_branch_notice_req")}
                         </div>
                       </div>
                     ) : (
@@ -1356,16 +1392,16 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                           background: "rgba(13,122,85,0.05)", border: "1px solid rgba(13,122,85,0.15)",
                           fontSize: "0.82rem", color: "var(--muted)", fontFamily: "'Poppins',sans-serif"
                         }}>
-                          ✅ <strong>Branch Head Already Assigned</strong> — This member will be added as a regular branch member.
+                          {t("am_branch_notice_assigned")}
                         </div>
                       </div>
                     )}
                   </div>
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
-                    <button className="am-btn am-btn-ghost" onClick={() => { setOuterStep(2); setMemberError(""); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← Back</button>
+                    <button className="am-btn am-btn-ghost" onClick={() => { setOuterStep(2); setMemberError(""); }} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>← {t("back")}</button>
 
-                    <button className="am-btn am-btn-primary" onClick={() => goNext(2)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Next: Address <IconArrow /></button>
+                    <button className="am-btn am-btn-primary" onClick={() => goNext(2)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>{t("am_next_address")} <IconArrow /></button>
                   </div>
                 </div>
               )}
@@ -1375,22 +1411,22 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     <div className="am-form-grid cols-2">
-                      <Field label="House / Unit Number" required><InputField icon={IconHome} type="text" placeholder="123" value={form.houseNumber} readOnly={form.sameAddress} onChange={set("houseNumber")} autofilled={af("houseNumber")} /></Field>
-                      <Field label="Street" required><InputField icon={IconHome} type="text" placeholder="Malanday Street" value={form.street} readOnly={form.sameAddress} onChange={set("street")} autofilled={af("street")} /></Field>
+                      <Field label={t("reg_house_number")} required><InputField icon={IconHome} type="text" placeholder="123" value={form.houseNumber} readOnly={form.sameAddress} onChange={set("houseNumber")} autofilled={af("houseNumber")} /></Field>
+                      <Field label={t("reg_street")} required><InputField icon={IconHome} type="text" placeholder="Malanday Street" value={form.street} readOnly={form.sameAddress} onChange={set("street")} autofilled={af("street")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
-                      <Field label="Region" required><InputField icon={IconGlobe} type="text" value={form.region} readOnly /></Field>
-                      <Field label="Province" required><InputField icon={IconPin} type="text" placeholder="Bulacan" value={form.province} readOnly={form.sameAddress} onChange={set("province")} autofilled={af("province")} /></Field>
+                      <Field label={t("reg_region")} required><InputField icon={IconGlobe} type="text" value={form.region} readOnly /></Field>
+                      <Field label={t("reg_province")} required><InputField icon={IconPin} type="text" placeholder="Bulacan" value={form.province} readOnly={form.sameAddress} onChange={set("province")} autofilled={af("province")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
-                      <Field label="City / Municipality" required><InputField icon={IconPin} type="text" value={form.city} readOnly /></Field>
-                      <Field label="Barangay" required><InputField icon={IconPin} type="text" value={form.barangay} readOnly /></Field>
+                      <Field label={t("reg_city")} required><InputField icon={IconPin} type="text" value={form.city} readOnly /></Field>
+                      <Field label={t("reg_barangay")} required><InputField icon={IconPin} type="text" value={form.barangay} readOnly /></Field>
                     </div>
                   </div>
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
-                    <button className="am-btn am-btn-ghost" onClick={() => goBack(1)}>← Back</button>
-                    <button className="am-btn am-btn-primary" onClick={() => goNext(3)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Next: Category <IconArrow /></button>
+                    <button className="am-btn am-btn-ghost" onClick={() => goBack(1)}>← {t("back")}</button>
+                    <button className="am-btn am-btn-primary" onClick={() => goNext(3)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>{t("am_next_category")} <IconArrow /></button>
                   </div>
                 </div>
               )}
@@ -1400,44 +1436,44 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                     <div className="am-checkbox-grid">
-                      {["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"].map(cat => (
-                        <label key={cat} className="am-check-option">
-                          <input type="checkbox" checked={form.categories.includes(cat)} onChange={() => toggleCategory(cat)} />
-                          <span className="am-check-label"><span className="am-check-box">{form.categories.includes(cat) && "✓"}</span>{cat}</span>
+                      {CATEGORY_OPTIONS.map(cat => (
+                        <label key={cat.key} className="am-check-option">
+                          <input type="checkbox" checked={form.categories.includes(cat.key)} onChange={() => toggleCategory(cat.key)} />
+                          <span className="am-check-label"><span className="am-check-box">{form.categories.includes(cat.key) && "✓"}</span>{cat.label}</span>
                         </label>
                       ))}
                     </div>
                     {isPwd && (
                       <div className="am-sub-fields">
-                        <div className="am-sub-fields-title">♿ PWD Details</div>
+                        <div className="am-sub-fields-title">{t("reg_pwd_details")}</div>
                         <div className="am-form-grid cols-2">
-                          <Field label="PWD Status">
+                          <Field label={t("reg_pwd_status")}>
                             <SelectField icon={IconShield} value={form.pwdStatus} onChange={set("pwdStatus")}>
-                              <option value="">Select</option>
-                              <option>Children with Disabilities</option>
-                              <option>Person with Disabilities</option>
+                              <option value="">{t("select")}</option>
+                              <option value="Children with Disabilities">{t("reg_pwd_child")}</option>
+                              <option value="Person with Disabilities">{t("reg_pwd_person")}</option>
                             </SelectField>
                           </Field>
-                          <Field label="Disability Type">
+                          <Field label={t("reg_disability_type")}>
                             <SelectField icon={IconInfo} value={form.disabilityType} onChange={set("disabilityType")}>
-                              <option value="">Select</option>
-                              <option>Physical Disability</option>
-                              <option>Visual Disability</option>
-                              <option>Hearing Disability</option>
-                              <option>Speech Impairment</option>
-                              <option>Intellectual Disability</option>
-                              <option>Learning Disability</option>
-                              <option>Psychosocial Disability</option>
-                              <option>Multiple Disabilities</option>
-                              <option>Chronic Illness</option>
-                              <option>Rare Disease</option>
-                              <option>Others</option>
+                              <option value="">{t("select")}</option>
+                              <option value="Physical Disability">{t("reg_dis_physical")}</option>
+                              <option value="Visual Disability">{t("reg_dis_visual")}</option>
+                              <option value="Hearing Disability">{t("reg_dis_hearing")}</option>
+                              <option value="Speech Impairment">{t("reg_dis_speech")}</option>
+                              <option value="Intellectual Disability">{t("reg_dis_intellectual")}</option>
+                              <option value="Learning Disability">{t("reg_dis_learning")}</option>
+                              <option value="Psychosocial Disability">{t("reg_dis_psychosocial")}</option>
+                              <option value="Multiple Disabilities">{t("reg_dis_multiple")}</option>
+                              <option value="Chronic Illness">{t("reg_dis_chronic")}</option>
+                              <option value="Rare Disease">{t("reg_dis_rare")}</option>
+                              <option value="Others">{t("reg_opt_others")}</option>
                             </SelectField>
                           </Field>
                         </div>
                         {form.disabilityType === "Others" && (
-                          <Field label="Please specify disability type">
-                            <InputField type="text" placeholder="Please specify" value={form.disabilityTypeOther} onChange={set("disabilityTypeOther")} />
+                          <Field label={t("reg_specify_disability")}>
+                            <InputField type="text" placeholder={t("reg_please_specify")} value={form.disabilityTypeOther} onChange={set("disabilityTypeOther")} />
                           </Field>
                         )}
                       </div>
@@ -1445,8 +1481,8 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                   </div>
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
-                    <button className="am-btn am-btn-ghost" onClick={() => goBack(2)}>← Back</button>
-                    <button className="am-btn am-btn-primary" onClick={() => goNext(4)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>Next: Education <IconArrow /></button>
+                    <button className="am-btn am-btn-ghost" onClick={() => goBack(2)}>← {t("back")}</button>
+                    <button className="am-btn am-btn-primary" onClick={() => goNext(4)} style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>{t("am_next_education")} <IconArrow /></button>
                   </div>
                 </div>
               )}
@@ -1456,33 +1492,40 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     <div className="am-form-grid cols-2">
-                      <Field label="Highest Educational Attainment" required>
+                      <Field label={t("reg_highest_attainment")} required>
                         <SelectField icon={IconGradCap} value={form.educationAttainment} onChange={set("educationAttainment")}>
-                          <option value="">Select</option>
-                          <option>Elementary</option><option>High School</option><option>College</option>
-                          <option>Post Graduate</option><option>Vocational</option>
+                          <option value="">{t("select")}</option>
+                          <option value="Elementary">{t("reg_edu_elem")}</option>
+                          <option value="High School">{t("reg_edu_hs")}</option>
+                          <option value="College">{t("reg_edu_college")}</option>
+                          <option value="Post Graduate">{t("reg_edu_post_grad")}</option>
+                          <option value="Vocational">{t("reg_edu_vocational")}</option>
                         </SelectField>
                       </Field>
-                      <Field label="Education Status" required>
+                      <Field label={t("reg_education_status")} required>
                         <SelectField icon={IconBook} value={form.educationStatus} onChange={set("educationStatus")}>
-                          <option value="">Select</option>
-                          <option>In School</option><option>Out of School Youth (OSY)</option><option>Out of School Children (OSC)</option><option>Graduate</option>
+                          <option value="">{t("select")}</option>
+                          <option value="In School">{t("reg_edu_in_school")}</option>
+                          <option value="Out of School Youth (OSY)">{t("reg_edu_osy")}</option>
+                          <option value="Out of School Children (OSC)">{t("reg_edu_osc")}</option>
+                          <option value="Graduate">{t("reg_edu_grad")}</option>
                         </SelectField>
                       </Field>
                     </div>
                     <div className="am-form-grid cols-2">
-                      <Field label="Occupation"><InputField icon={IconBriefcase} type="text" placeholder="Teacher, Student..." value={form.occupation} onChange={set("occupation")} /></Field>
-                      <Field label="Employment Status" required>
+                      <Field label={t("reg_occupation")}><InputField icon={IconBriefcase} type="text" placeholder="Teacher, Student..." value={form.occupation} onChange={set("occupation")} /></Field>
+                      <Field label={t("reg_employment_status")} required>
                         <SelectField icon={IconBriefcase} value={form.employmentStatus} onChange={set("employmentStatus")}>
-                          <option value="">Select</option>
-                          <option>Employed</option><option>Unemployed</option>
+                          <option value="">{t("select")}</option>
+                          <option value="Employed">{t("reg_emp_employed")}</option>
+                          <option value="Unemployed">{t("reg_emp_unemployed")}</option>
                         </SelectField>
                       </Field>
                     </div>
                   </div>
                   {memberError && <div className="am-field-error">⚠️ {memberError}</div>}
                   <div className="am-form-actions">
-                    <button className="am-btn am-btn-ghost" onClick={() => goBack(3)}>← Back</button>
+                    <button className="am-btn am-btn-ghost" onClick={() => goBack(3)}>← {t("back")}</button>
                     
                     <button 
                       className="am-btn am-btn-primary" 
@@ -1491,7 +1534,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                       style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
                     >
                       {isSubmitting ? <SvgLoader size={15} /> : <IconCheck />}
-                      {isSubmitting ? "Adding..." : "Add Member"}
+                      {isSubmitting ? t("am_saving_member") : t("am_save_member_btn")}
                     </button>
                   </div>
                 </div>
@@ -1504,10 +1547,10 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
       {/* BOTTOM BAR */}
       <div className="am-bottom-bar">
         <div className="am-bottom-bar-left">
-          <strong>{members.length} {members.length === 1 ? "member" : "members"}</strong> added so far
+          <strong>{members.length} {members.length === 1 ? t("am_member_single") : t("am_member_plural")}</strong> {lang === 'fil' ? 'ang naidagdag sa ngayon' : 'added so far'}
         </div>
         <button className="am-btn-success-outline" onClick={onDone}>
-          Proceed to Log In <IconArrow />
+          {t("am_proceed_login")} <IconArrow />
         </button>
       </div>
     </div>
