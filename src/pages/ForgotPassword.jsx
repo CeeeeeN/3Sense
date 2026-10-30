@@ -2,15 +2,16 @@ import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useRef } from "react";
 import { forgotHouseholdPassword } from "../services/login";
 import { LockIcon, MailIcon, HomeIcon, ArrowIcon } from "../components/Icons";
+import { useLanguage } from "../context/LanguageContext";
 
-function MobileHeader({ onBack }) {
+function MobileHeader({ onBack, t }) {
   return (
     <div className="mobile-auth-header" onClick={onBack} style={{ cursor: "pointer" }}>
       <img src={barangayLogo} alt="Barangay Logo" />
       <div>
         <div className="mobile-auth-header-text">
           Barangay 3S+ Malanday
-          <span className="mobile-auth-header-sub">Community Management System</span>
+          <span className="mobile-auth-header-sub">{t('landing_community_system')}</span>
         </div>
       </div>
     </div>
@@ -18,6 +19,7 @@ function MobileHeader({ onBack }) {
 }
 
 export default function ForgotPassword({ onBack, onLoginClick, onRegister }) {
+  const { t } = useLanguage();
   const [screen, setScreen]         = useState(1);
   const [screenKey, setScreenKey]   = useState(0);
   const [hhValue, setHhValue]       = useState("");
@@ -86,16 +88,16 @@ export default function ForgotPassword({ onBack, onLoginClick, onRegister }) {
           <img src={barangayLogo} alt="Barangay Logo" style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           <div className="fp-logo-text">
             Barangay 3S+ Malanday
-            <span>Community Management System</span>
+            <span>{t('landing_community_system')}</span>
           </div>
         </div>
         <div className="fp-left-content">
-          <h2>Reset your<br/><span>password.</span></h2>
-          <p>Enter your Household ID and we'll send a password reset link to the household head's registered email.</p>
+          <h2>{t('fp_left_heading')}<br/><span>{t('fp_left_heading_highlight')}</span></h2>
+          <p>{t('fp_left_sub')}</p>
           <div className="recovery-steps">
             {[
-              { label: "Verify Identity",  sub: "Enter your Household ID" },
-              { label: "Check Your Email", sub: "Reset link sent to head's email" },
+              { label: t('fp_step1_label'),  sub: t('fp_step1_sub') },
+              { label: t('fp_step2_label'), sub: t('fp_step2_sub') },
             ].map((step, idx) => {
               const status = stepStatus(idx + 1);
               return (
@@ -120,13 +122,13 @@ export default function ForgotPassword({ onBack, onLoginClick, onRegister }) {
           {/* ── SCREEN 1: Enter Household ID ── */}
           {screen === 1 && (
             <div className="fp-screen" key={`s1-${screenKey}`}>
-              <MobileHeader onBack={onBack} />
-              <div className="fp-screen-tag"><LockIcon /> Password Recovery</div>
-              <h2>Forgot your password?</h2>
-              <p>Enter your Household ID. A password reset link will be sent to the household head's registered email address.</p>
+              <MobileHeader onBack={onBack} t={t} />
+              <div className="fp-screen-tag"><LockIcon /> {t('fp_tag')}</div>
+              <h2>{t('fp_title')}</h2>
+              <p>{t('fp_desc')}</p>
 
               <div className="fp-field">
-                <label className="fp-label">Household ID <span className="req">*</span></label>
+                <label className="fp-label">{t('fp_hh_label')} <span className="req">*</span></label>
                 <div className="fp-input-wrap">
                   <span className="fp-field-icon"><HomeIcon /></span>
                   <input
@@ -139,18 +141,18 @@ export default function ForgotPassword({ onBack, onLoginClick, onRegister }) {
                     onKeyDown={e => e.key === "Enter" && verifyIdentity()}
                   />
                 </div>
-                {hhError && <div className="field-error">Please enter your Household ID.</div>}
-                <div className="field-hint">The reset link will be sent to the household head's email only.</div>
+                {hhError && <div className="field-error">{t('fp_hh_error')}</div>}
+                <div className="field-hint">{t('fp_hh_hint')}</div>
               </div>
 
               <button className="fp-btn-main" onClick={verifyIdentity} disabled={loading}>
-                {loading ? "Sending..." : <> Send Reset Link <ArrowIcon /> </>}
+                {loading ? t('fp_sending') : <> {t('fp_send_btn')} <ArrowIcon /> </>}
               </button>
               <div style={{ display:"flex", justifyContent:"center", marginTop:"1rem" }}>
-                <button className="fp-btn-ghost" onClick={onBack}>← Back to Login</button>
+                <button className="fp-btn-ghost" onClick={onBack}>{t('fp_back_login')}</button>
               </div>
               <div className="fp-bottom-link">
-                Don't have an account? <a onClick={onRegister}>Register Household</a>
+                {t('fp_no_account')} <a onClick={onRegister}>{t('register_title')}</a>
               </div>
             </div>
           )}
@@ -158,35 +160,35 @@ export default function ForgotPassword({ onBack, onLoginClick, onRegister }) {
           {/* ── SCREEN 2: Reset link sent confirmation ── */}
           {screen === 2 && (
             <div className="fp-screen" key={`s2-${screenKey}`}>
-              <MobileHeader onBack={onBack} />
-              <div className="fp-screen-tag"><MailIcon size={12} /> Email Sent</div>
-              <h2>Check your email</h2>
-              <p>A password reset link has been sent to the household head's registered email address.</p>
+              <MobileHeader onBack={onBack} t={t} />
+              <div className="fp-screen-tag"><MailIcon size={12} /> {t('fp_email_sent_tag')}</div>
+              <h2>{t('fp_check_email_title')}</h2>
+              <p>{t('fp_check_email_desc')}</p>
 
               <div className="email-card">
                 <div className="email-card-icon"><MailIcon color="#317D89" /></div>
                 <div>
                   <div className="email-card-value">{maskedEmail}</div>
-                  <div className="email-card-sub">Check your inbox and spam folder</div>
+                  <div className="email-card-sub">{t('fp_check_inbox')}</div>
                 </div>
               </div>
 
               <div className="otp-timer">
-                Link expires in <strong>{formatTime(timeLeft)}</strong>
+                {t('fp_link_expires')} <strong>{formatTime(timeLeft)}</strong>
                 {canResend && (
-                  <button className="resend-btn" onClick={resendLink}>Resend Link</button>
+                  <button className="resend-btn" onClick={resendLink}>{t('fp_resend')}</button>
                 )}
               </div>
 
               <div style={{ background:"rgba(49,125,137,0.06)", border:"1px solid rgba(49,125,137,0.18)", borderRadius:"10px", padding:"0.9rem 1.1rem", marginTop:"1rem", fontSize:"0.83rem", color:"#4a5e5a", lineHeight:"1.7" }}>
-                  Click the link in your email to reset your password. Once reset, return here and log in with your new password.
+                  {t('fp_instruction')}
               </div>
 
               <button className="fp-btn-main" onClick={onLoginClick} style={{ marginTop:"1.5rem" }}>
-                Back to Login <ArrowIcon />
+                {t('fp_back_login_btn')} <ArrowIcon />
               </button>
               <div style={{ display:"flex", justifyContent:"center", marginTop:"0.75rem" }}>
-                <button className="fp-btn-ghost" onClick={() => goScreen(1)}>← Change Household ID</button>
+                <button className="fp-btn-ghost" onClick={() => goScreen(1)}>{t('fp_change_hh')}</button>
               </div>
             </div>
           )}

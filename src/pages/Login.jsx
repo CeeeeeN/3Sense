@@ -5,76 +5,27 @@ import { LoginLockIcon, LoginHomeIcon, LoginArrowIcon, LoginEyeIcon, LoginEyeOff
 import ErrorMessage from "../components/ErrorMessage";
 import { useLanguage } from "../context/LanguageContext";
 
-const LOGIN_FEATURES = [
-  {
-    title: "Manage your household",
-    desc: "Keep your household profile and members up to date.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        <polyline points="9 22 9 12 15 12 15 22" />
-      </svg>
-    ),
-  },
-  {
-    title: "Track document requests",
-    desc: "Follow the status of clearances and certificates in real time.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-      </svg>
-    ),
-  },
-  {
-    title: "Stay informed",
-    desc: "Get barangay announcements relevant to your category.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-    ),
-  },
-  {
-    title: "Emergency access",
-    desc: "Reach hotlines and safety guidelines in one tap.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
-    ),
-  },
-];
-
-function MobileHeader({ onBack }) {
+function MobileHeader({ onBack, t }) {
   return (
     <div className="mobile-auth-header" onClick={onBack} style={{ cursor: "pointer" }}>
       <img src={barangayLogo} alt="Barangay Logo" />
       <div>
         <div className="mobile-auth-header-text">
           Barangay 3S+ Malanday
-          <span className="mobile-auth-header-sub">Community Management System</span>
+          <span className="mobile-auth-header-sub">{t("landing_community_system")}</span>
         </div>
       </div>
     </div>
   );
 }
 
-function ScreenTag({ step, icon }) {
-  return (
-    <div className="screen-tag">
-      {icon}
-      {step}
-    </div>
-  );
-}
+function ProfileCard({ profile, selected, onSelect, t }) {
+  const roleDisplay = profile.role === "Household Head"
+    ? t("profile_household_head")
+    : profile.role === "Branch Head"
+    ? t("profile_branch_head")
+    : t("login_member_label");
 
-function ProfileCard({ profile, selected, onSelect }) {
   return (
     <div
       className={`profile-card ${selected ? "selected" : ""}`}
@@ -103,7 +54,7 @@ function ProfileCard({ profile, selected, onSelect }) {
           profile.role === "Branch Head" ? "badge-head" : "badge-member"
           }`}>
           {profile.role === "Member" ? <MemberIcon /> : <HouseholdHeadIcon />}
-          {profile.role}
+          {roleDisplay}
         </div>
       </div>
       <div className="profile-check">{selected ? "✓" : ""}</div>
@@ -118,15 +69,12 @@ function PinDot({ filled, error }) {
   return <div className={cls} />;
 }
 
-const LOCKED_MESSAGE = "Too many incorrect attempts. Your account has been temporarily locked. Please try again in 15 minutes.";
-
 function formatCountdown(totalSeconds) {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// ADDED onAddMember to props
 export default function Login({ onBack, onForgotPassword, onSuccess, onRegister, onActivate, onAddMember }) {
   const { lang, setLang, t } = useLanguage();
   const [screen, setScreen] = useState("credentials");
@@ -141,7 +89,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   const [pinError, setPinError] = useState(false);
   const [firstPin, setFirstPin] = useState("");
   const [isConfirmingPin, setIsConfirmingPin] = useState(false);
-  const [pinLabel, setPinLabel] = useState("Enter PIN");
+  const [pinLabel, setPinLabel] = useState(t("login_enter_pin"));
   const [hasExistingPin, setHasExistingPin] = useState(false);
   const [redirectProgress, setRedirectProgress] = useState(0);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -152,6 +100,52 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
   const [now, setNow] = useState(() => Date.now());
   const lockRemaining = lockedUntil ? Math.max(0, Math.ceil((lockedUntil - now) / 1000)) : 0;
   const isLocked = lockRemaining > 0;
+
+  const loginFeatures = [
+    {
+      title: t("login_feat_manage"),
+      desc: t("login_feat_manage_desc"),
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ),
+    },
+    {
+      title: t("login_feat_track"),
+      desc: t("login_feat_track_desc"),
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      ),
+    },
+    {
+      title: t("login_feat_informed"),
+      desc: t("login_feat_informed_desc"),
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      ),
+    },
+    {
+      title: t("login_feat_emergency"),
+      desc: t("login_feat_emergency_desc"),
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      ),
+    },
+  ];
 
   function startLock(seconds) {
     const t = Date.now();
@@ -173,8 +167,6 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
   }
 
-  
-
   function switchScreen(s) {
     setScreen(s);
     setScreenKey(k => k + 1);
@@ -195,16 +187,12 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
         "linear-gradient(135deg,#e8a020,#f5c04a)",
       ];
       const mapped = result.residents.map((m, i) => {
-        const fullName = [m.firstName, m.lastName].filter(Boolean).join(" ") || `Member ${i + 1}`;
+        const fullName = [m.firstName, m.lastName].filter(Boolean).join(" ") || `${t("login_member_label")} ${i + 1}`;
         const initials = ((m.firstName?.[0] || "") + (m.lastName?.[0] || "M")).toUpperCase();
 
-        // FIX: Apply the "BR-001" fallback for legacy residents missing a branchID
         const activeBranchID = m.branchID || "BR-001";
-
-        // Find which branch this member belongs to using the fallback ID
         const myBranch = result.branches?.find(b => b.id === activeBranchID);
 
-        // Normalize role — backward compat with old "head" value
         const rawRole = m.role || "Member";
         const isHouseholdHead = rawRole === "Household Head" || rawRole === "head";
         const isBranchHead = !isHouseholdHead &&
@@ -219,13 +207,13 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           name: fullName,
           initials: initials || "M",
           role: displayRole,
-          branchID: activeBranchID, // Replaced the null fallback with activeBranchID
+          branchID: activeBranchID,
           isBranchHead: isHouseholdHead || isBranchHead,
           color: COLORS[i % COLORS.length],
           profilePhoto: m.profilePhoto || null,
         };
       });
-      // head always first
+
       mapped.sort((a) => (a.role === "Household Head" ? -1 : a.role === "Branch Head" ? 0 : 1));
       setProfiles(mapped);
       setBranches(result.branches || []);
@@ -233,7 +221,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
     } catch (err) {
       let message = err.message || "An unexpected error occurred.";
       if (message.includes("auth/invalid-credential") || message.includes("auth/user-not-found") || message.includes("auth/wrong-password")) {
-        message = "Incorrect Household Number or Password. Please try again.";
+        message = t("login_incorrect_credentials");
       }
       setErrorMsg(message);
     } finally {
@@ -249,10 +237,10 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
       const status = await getMemberPinStatus(hhNumber.trim(), selectedProfile.id);
       if (status.hasPin) {
         setHasExistingPin(true);
-        setPinLabel("Enter your PIN");
+        setPinLabel(t("login_enter_pin"));
       } else {
         setHasExistingPin(false);
-        setPinLabel("Create your PIN");
+        setPinLabel(t("login_create_pin"));
       }
       if (status.locked) startLock(status.remainingSeconds);
       else setLockedUntil(0);
@@ -291,20 +279,20 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           } else if (result.code === "NO_PIN") {
             setHasExistingPin(false);
             setPinValue("");
-            setPinLabel("Create your PIN");
+            setPinLabel(t("login_create_pin"));
           } else {
             if (result.code === "LOCKED") {
               setPinMessage("");
               startLock(result.remainingSeconds || 15 * 60);
             } else {
-              setPinMessage(result.message || "Incorrect PIN.");
+              setPinMessage(result.message || t("login_wrong_pin"));
             }
             setPinError(true);
-            setPinLabel("Wrong PIN. Try again.");
+            setPinLabel(t("login_wrong_pin"));
             setTimeout(() => {
               setPinError(false);
               setPinValue("");
-              setPinLabel("Enter your PIN");
+              setPinLabel(t("login_enter_pin"));
             }, 700);
           }
         } else {
@@ -313,7 +301,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
             setFirstPin(pinValue);
             setPinValue("");
             setIsConfirmingPin(true);
-            setPinLabel("Confirm your PIN");
+            setPinLabel(t("login_confirm_pin"));
           } else {
             if (pinValue === firstPin) {
               try {
@@ -321,16 +309,16 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               } catch (err) {
                 setPinMessage(err.message || "Unable to save your PIN. Please try again.");
                 setPinValue(""); setFirstPin("");
-                setIsConfirmingPin(false); setPinLabel("Create your PIN");
+                setIsConfirmingPin(false); setPinLabel(t("login_create_pin"));
                 return;
               }
               loginSuccess();
             } else {
               setPinError(true);
-              setPinLabel("PINs do not match. Try again.");
+              setPinLabel(t("login_pin_mismatch"));
               setTimeout(() => {
                 setPinError(false); setPinValue(""); setFirstPin("");
-                setIsConfirmingPin(false); setPinLabel("Create your PIN");
+                setIsConfirmingPin(false); setPinLabel(t("login_create_pin"));
               }, 700);
             }
           }
@@ -338,7 +326,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [pinValue, isConfirmingPin, firstPin, hasExistingPin, hhNumber, selectedProfile, isLocked]);
+  }, [pinValue, isConfirmingPin, firstPin, hasExistingPin, hhNumber, selectedProfile, isLocked, t]);
 
   function loginSuccess() {
     switchScreen("success");
@@ -365,10 +353,10 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
 
   async function handleForgotPin() {
     if (isLocked) return;
-    if (!window.confirm("Reset your PIN? A notification will be sent to your registered email.")) return;
+    if (!window.confirm(t("login_reset_pin_confirm"))) return;
     try {
       const masked = await resetMemberPin(hhNumber.trim(), selectedProfile?.id);
-      alert(`PIN reset successfully. A notification was sent to ${masked}.\nYou will be asked to create a new PIN on your next login.`);
+      alert(t("login_reset_pin_success", masked));
       switchScreen("profiles");
     } catch (err) {
       alert("Error: " + err.message);
@@ -384,27 +372,26 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           <img src={barangayLogo} alt="Barangay Logo" style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           <div className="left-logo-text">
             Barangay 3S+ Malanday
-            <span>Community Management System</span>
+            <span>{t("landing_community_system")}</span>
           </div>
         </div>
         <div className="left-content">
-         <h2>Your barangay, <span style={{ color: "#D9E232" }}>at your fingertips.</span></h2>
-         <p>Sign in to manage your household, request documents, and access barangay services.</p>
+          <h2>{t("login_left_heading")} <span style={{ color: "#D9E232" }}>{t("login_left_heading_highlight")}</span></h2>
+          <p>{t("login_left_sub")}</p>
          
-            {/* REPLACE the old feature-pills div with this */}
-            <ul className="left-features">
-              {LOGIN_FEATURES.map((f) => (
-                <li className="left-feature" key={f.title}>
-                  <span className="left-feature-icon">{f.icon}</span>
-                  <div className="left-feature-text">
-                    <h4>{f.title}</h4>
-                    <p>{f.desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        <div className="left-footer">© 2026 Barangay 3S+ Malanday. All rights reserved.</div>
+          <ul className="left-features">
+            {loginFeatures.map((f) => (
+              <li className="left-feature" key={f.title}>
+                <span className="left-feature-icon">{f.icon}</span>
+                <div className="left-feature-text">
+                  <h4>{f.title}</h4>
+                  <p>{f.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="left-footer">{t("footer_rights", 2026)}</div>
       </div>
 
       {/* RIGHT PANEL */}
@@ -414,34 +401,34 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {/* ── STEP 1: Credentials ── */}
           {screen === "credentials" && (
             <div key={screenKey} className="screen-enter">
-              <MobileHeader onBack={onBack} />
-              <div className="act-screen-tag"> <LoginLockIcon /> Step 1 of 3 </div>
-              <h2 className="screen-title">Welcome back!</h2>
-              <p className="screen-sub">Enter your Household Number and password to continue.</p>
+              <MobileHeader onBack={onBack} t={t} />
+              <div className="act-screen-tag"> <LoginLockIcon /> {t("login_step_of", 1, 3)} </div>
+              <h2 className="screen-title">{t("login_welcome")}</h2>
+              <p className="screen-sub">{t("login_welcome_sub")}</p>
 
               <div className="field">
-                <label>Household Number</label>
+                <label>{t("login_hh_number")}</label>
                 <div className="input-wrap">
                   <span className="field-icon"><LoginHomeIcon /></span>
                   <input type="text" placeholder="e.g. MAL-2026-00142"
                     value={hhNumber} 
                     onChange={e => {
                       setHhNumber(e.target.value);
-                      setErrorMsg(""); // Clear error when they start typing
+                      setErrorMsg("");
                     }}
                     autoComplete="off" onKeyDown={e => e.key === "Enter" && handleLogin()} />
                 </div>
               </div>
 
               <div className="field">
-                <label>Password</label>
+                <label>{t("login_password")}</label>
                 <div className="input-wrap has-toggle">
                   <span className="field-icon"><LoginLockIcon /></span>
-                  <input type={showPw ? "text" : "password"} placeholder="Enter your password"
+                  <input type={showPw ? "text" : "password"} placeholder={t("act_pw_placeholder", "Enter your password")}
                     value={password} 
                     onChange={e => {
                       setPassword(e.target.value);
-                      setErrorMsg(""); // Clear error when they start typing
+                      setErrorMsg("");
                     }}
                     onKeyDown={e => e.key === "Enter" && handleLogin()} />
                   <button className="toggle-pw" onClick={() => setShowPw(v => !v)} type="button">
@@ -451,10 +438,9 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-                <button className="btn-ghost-sm" onClick={onForgotPassword}>{t("login_forgot_password", "Forgot password?")}</button>
+                <button className="btn-ghost-sm" onClick={onForgotPassword}>{t("login_forgot_password")}</button>
               </div>
 
-              {/*Display the custom ErrorMessage if login fails*/}
               {errorMsg && (
                 <ErrorMessage 
                   message={errorMsg} 
@@ -464,16 +450,16 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               )}
 
               <button className="act-btn-main" onClick={handleLogin} disabled={!hhNumber.trim() || !password || loginLoading}>
-                {loginLoading ? t("login_signing_in", "Signing in...") : <> {t("login_sign_in", "Login")} <LoginArrowIcon /> </>}
+                {loginLoading ? t("login_signing_in") : <> {t("login_sign_in")} <LoginArrowIcon /> </>}
               </button>
 
               <div className="divider">{t("or", "or")}</div>
 
               <div className="act-bottom-link">
-                {t("login_no_account", "Don't have an account?")} <a onClick={onRegister}>{t("landing_register_btn", "Register Household")}</a>
+                {t("login_no_account")} <a onClick={onRegister}>{t("landing_register_btn")}</a>
               </div>
               <div className="act-bottom-link" style={{ marginTop: "0.5rem" }}>
-                {t("login_need_activation", "Have an approval email?")} <a onClick={onActivate}>{t("login_activate", "Activate Account")}</a>
+                {t("login_need_activation")} <a onClick={onActivate}>{t("login_activate")}</a>
               </div>
             </div>
           )}
@@ -481,10 +467,10 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {/* ── STEP 2: Profile Selection ── */}
           {screen === "profiles" && (
             <div key={screenKey} className="screen-enter">
-              <MobileHeader onBack={onBack} />
-              <div className="act-screen-tag"> <LoginLockIcon /> Step 2 of 3 </div>
-              <h2 className="screen-title">Select Your Profile</h2>
-              <p className="screen-sub">Choose which household member you are to continue.</p>
+              <MobileHeader onBack={onBack} t={t} />
+              <div className="act-screen-tag"> <LoginLockIcon /> {t("login_step_of", 2, 3)} </div>
+              <h2 className="screen-title">{t("login_step_profile")}</h2>
+              <p className="screen-sub">{t("login_step_profile_sub")}</p>
 
               <div className="profile-groups">
                 {branches.map(branch => {
@@ -497,7 +483,6 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                       key={branch.id}
                       className={`branch-card${hasSelected ? " has-selection" : ""}`}
                     >
-                      {/* Branch Header */}
                       <button
                         onClick={() => toggleBranch(branch.id)}
                         className={`branch-header-btn${isExpanded ? " expanded" : ""}`}
@@ -518,7 +503,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                               })()}
                             </div>
                             <div className="branch-member-sub">
-                              {branchProfiles.length} {branchProfiles.length === 1 ? "Member" : "Members"}
+                              {branchProfiles.length} {branchProfiles.length === 1 ? t("login_member_label") : t("login_members_label")}
                             </div>
                           </div>
                         </div>
@@ -531,14 +516,13 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                         </div>
                       </button>
 
-                      {/* Members list */}
                       {isExpanded && (
                         <div className="branch-members-body">
                           <div className="profile-grid">
                             {branchProfiles.map(profile => (
                               <ProfileCard key={profile.id} profile={profile}
                                 selected={selectedProfile?.id === profile.id}
-                                onSelect={setSelectedProfile} />
+                                onSelect={setSelectedProfile} t={t} />
                             ))}
                           </div>
                         </div>
@@ -549,7 +533,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               <button className="act-btn-main" onClick={handleContinueToPin} disabled={!selectedProfile}>
-                {t("login_continue", "Continue")} <LoginArrowIcon />
+                {t("login_continue")} <LoginArrowIcon />
               </button>
 
               <button
@@ -577,11 +561,11 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                   <line x1="20" y1="8" x2="20" y2="14" />
                   <line x1="23" y1="11" x2="17" y2="11" />
                 </svg>
-                Add New Member
+                {t("login_add_new_member")}
               </button>
 
               <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
-                <button className="btn-ghost-sm" onClick={() => switchScreen("credentials")}>{t("back", "← Back")}</button>
+                <button className="btn-ghost-sm" onClick={() => switchScreen("credentials")}>{t("reg_back", "← Back")}</button>
               </div>
             </div>
           )}
@@ -589,17 +573,17 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
           {/* ── STEP 3: PIN ── */}
           {screen === "pin" && (
             <div key={screenKey} className="screen-enter">
-              <MobileHeader onBack={onBack} />
-              <div className="act-screen-tag"> <LoginLockIcon /> Step 3 of 3 </div>
+              <MobileHeader onBack={onBack} t={t} />
+              <div className="act-screen-tag"> <LoginLockIcon /> {t("login_step_of", 3, 3)} </div>
               <h2 className="screen-title">
                 {hasExistingPin
-                  ? "Enter Your PIN"
-                  : isConfirmingPin ? "Confirm Your PIN" : "Create Your PIN"}
+                  ? t("login_enter_pin")
+                  : isConfirmingPin ? t("login_confirm_pin") : t("login_create_pin")}
               </h2>
               <p className="screen-sub">
                 {hasExistingPin
-                  ? "Enter your 4-digit PIN to access your profile."
-                  : "Set a 4-digit PIN to secure your profile."}
+                  ? t("login_enter_pin_sub")
+                  : t("login_create_pin_sub")}
               </p>
 
               <div className="pin-profile-mini">
@@ -623,7 +607,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <span className="mini-name">{selectedProfile?.name}</span>
               </div>
 
-              <div className="pin-label">{isLocked ? "Account temporarily locked" : pinLabel}</div>
+              <div className="pin-label">{isLocked ? t("login_account_locked") : pinLabel}</div>
               <div className="pin-dots">
                 {[0, 1, 2, 3].map(i => (
                   <PinDot key={i} filled={i < pinValue.length} error={pinError} />
@@ -632,10 +616,10 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
 
               {isLocked ? (
                 <div style={{ marginBottom: "1rem" }}>
-                  <ErrorMessage message={LOCKED_MESSAGE} />
+                  <ErrorMessage message={t("login_locked_message")} />
                   <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
                     <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Time remaining
+                      {t("login_time_remaining")}
                     </div>
                     <div
                       role="timer"
@@ -659,9 +643,9 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "0.5rem" }}>
-                <button className="btn-ghost-sm" onClick={() => switchScreen("profiles")}>← Back to Profiles</button>
+                <button className="btn-ghost-sm" onClick={() => switchScreen("profiles")}>{t("login_back_to_profiles")}</button>
                 {hasExistingPin && (
-                  <button className="btn-ghost-sm" onClick={handleForgotPin} disabled={isLocked} style={isLocked ? { opacity: 0.45, cursor: "not-allowed" } : undefined}>Forgot PIN?</button>
+                  <button className="btn-ghost-sm" onClick={handleForgotPin} disabled={isLocked} style={isLocked ? { opacity: 0.45, cursor: "not-allowed" } : undefined}>{t("login_forgot_pin")}</button>
                 )}
               </div>
             </div>
@@ -682,13 +666,13 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
-                <h2 className="screen-title" style={{ marginBottom: "0.5rem" }}>Login Successful!</h2>
-                <p className="screen-sub" style={{ marginBottom: "2rem" }}>Redirecting you to your dashboard...</p>
+                <h2 className="screen-title" style={{ marginBottom: "0.5rem" }}>{t("login_success_title")}</h2>
+                <p className="screen-sub" style={{ marginBottom: "2rem" }}>{t("login_redirecting")}</p>
                 <div style={{ width: "100%", height: "4px", background: "var(--border)", borderRadius: "100px", overflow: "hidden" }}>
                   <div style={{ height: "100%", background: "var(--teal)", borderRadius: "100px", width: `${redirectProgress}%`, transition: "width 2s ease" }} />
                 </div>
                 <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.75rem", fontFamily: "'Inter',sans-serif" }}>
-                  Taking you to <strong>{selectedProfile?.name}</strong>'s dashboard
+                  {t("login_taking_to")} <strong>{selectedProfile?.name}</strong>{t("login_taking_to_suffix")}
                 </p>
               </div>
             </div>
