@@ -29,9 +29,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import TransferRequestsTab from "../components/TransferRequestsTab"; 
 import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab"; 
 
+import { Plus } from "lucide-react";
+import AdminAddHouseholdPanel from "../components/AdminAddHouseholdPanel";
+
 export default function HouseholdManagement() {
   const queryClient = useQueryClient(); 
   const { showAlert, showConfirm } = useAlert(); 
+
+  const [showAddPanel, setShowAddPanel] = useState(false);
 
   // ── TABS ──
   const [activeTab, setActiveTab] = useState("requests");
@@ -518,9 +523,21 @@ export default function HouseholdManagement() {
   return (
     <AdminLayout>
       <div className="requests-container">
-        <div className="requests-header">
-          <h1 className="requests-title">Household Management</h1>
-          <p className="requests-subtitle">Manage household registrations, residents, and transfer requests.</p>
+        <div className="requests-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 className="requests-title">Household Management</h1>
+            <p className="requests-subtitle">Manage household registrations, residents, and transfer requests.</p>
+          </div>
+          <button
+            onClick={() => setShowAddPanel(true)}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '8px', background: '#0f766e', color: 'white', 
+              border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600',
+              boxShadow: '0 2px 4px rgba(15, 118, 110, 0.2)'
+            }}
+          >
+            <Plus size={18} /> Add Household
+          </button>
         </div>
 
         <div className="req-tabs">
@@ -1187,6 +1204,13 @@ export default function HouseholdManagement() {
         </div>
       )}
 
+      <AdminAddHouseholdPanel 
+        isOpen={showAddPanel} 
+        onClose={() => setShowAddPanel(false)} 
+        adminName={adminName} 
+        adminRole={adminRole} 
+      />
+      
     </AdminLayout>
   );
 }
