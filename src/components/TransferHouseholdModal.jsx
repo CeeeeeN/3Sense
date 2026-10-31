@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { submitHouseholdTransfer, fetchHouseholdBranchesForTransfer } from "../services/services";
 import ErrorMessage from "../components/ErrorMessage";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function TransferHouseholdModal({ onClose, currentHouseholdID, userData, memberID, onNavigate }) {
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [transferType, setTransferType] = useState(""); // "existing" or "new"
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +64,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       try {
         const { exists, branches } = await fetchHouseholdBranchesForTransfer(target);
         if (!exists) {
-          setTargetError("Household ID not found in database.");
+          setTargetError(t('th_err_not_found'));
           setAvailableBranches([]);
           setForm(f => ({ ...f, targetBranchID: "" }));
         } else {
@@ -73,7 +75,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
         }
       } catch (err) {
         console.error("Failed to fetch branches", err);
-        setTargetError("Error verifying household.");
+        setTargetError(t('th_err_verify'));
       } finally {
         setLoadingBranches(false);
       }
@@ -100,9 +102,9 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
     if (transferType === "existing") {
       const targetHH = form.targetHouseholdID?.trim();
       if (!targetHH) {
-        errs.targetHouseholdID = "Target Household ID is required.";
+        errs.targetHouseholdID = t('th_err_target_required');
       } else if (targetHH.length < 8) {
-        errs.targetHouseholdID = "Please enter a valid Target Household ID.";
+        errs.targetHouseholdID = t('th_err_target_valid');
       } else if (targetError) {
         errs.targetHouseholdID = targetError;
       }
@@ -112,34 +114,34 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       const email = form.newEmail?.trim();
 
       if (!hNum) {
-        errs.newHouseNumber = "Please provide your house or unit number.";
+        errs.newHouseNumber = t('th_err_house_num');
       }
       if (!street) {
-        errs.newStreet = "Please provide your street or purok name.";
+        errs.newStreet = t('th_err_street');
       } else if (street.length < 3) {
-        errs.newStreet = "Street or purok name must be at least 3 characters.";
+        errs.newStreet = t('th_err_street_len');
       }
       if (!email) {
-        errs.newEmail = "Contact email is required.";
+        errs.newEmail = t('th_err_email_req');
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errs.newEmail = "A valid email address is required to receive your new Household ID.";
+        errs.newEmail = t('th_err_email_valid');
       }
     }
 
     const reasonText = form.reason?.trim();
     if (!reasonText) {
-      errs.reason = "Please provide a reason for the transfer.";
+      errs.reason = t('th_err_reason_req');
     } else if (reasonText.length < 10) {
-      errs.reason = "Please provide a clearer reason for the transfer (minimum 10 characters).";
+      errs.reason = t('th_err_reason_len');
     }
 
     if (!form.proofFile) {
-      errs.proofFile = "Please upload a valid proof document or ID.";
+      errs.proofFile = t('th_err_proof_req');
     }
 
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
-      setErrorMsg("Please fill in all required fields.");
+      setErrorMsg(t('th_err_fill_all'));
       return;
     }
     // -------------------------------
@@ -196,8 +198,8 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
       <div className="pf-modal" style={{ maxWidth: '550px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>Household Transfer Request</h3>
-            <p>Move your profile to a different household</p>
+            <h3>{t('th_modal_title')}</h3>
+            <p>{t('th_modal_desc')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -219,12 +221,12 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
                 <div style={{ lineHeight: "1.5" }}>
-                  <strong style={{ display: "block", color: "#78350f", marginBottom: "4px", fontSize: "0.9rem" }}>Admin Approval Required</strong>
-                  Household transfers involve legal residency records. All requests will be reviewed by the Barangay Administration before any changes are applied.
+                  <strong style={{ display: "block", color: "#78350f", marginBottom: "4px", fontSize: "0.9rem" }}>{t('th_admin_approval_title')}</strong>
+                  {t('th_admin_approval_desc')}
                 </div>
               </div>
 
-              <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>What would you like to do?</div>
+              <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>{t('th_choose_prompt')}</div>
 
               <button 
                 onClick={() => { setTransferType("existing"); setErrors({}); setErrorMsg(""); }}
@@ -239,8 +241,8 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>Join an Existing Household</div>
-                  <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>Move into another registered household using their ID.</div>
+                  <div style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>{t('th_join_existing_title')}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>{t('th_join_existing_desc')}</div>
                 </div>
               </button>
 
@@ -257,8 +259,8 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>Create a New Household</div>
-                  <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>Branch off and register a brand new household.</div>
+                  <div style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>{t('th_create_new_title')}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>{t('th_create_new_desc')}</div>
                 </div>
               </button>
             </div>
@@ -268,7 +270,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               
               <div className="pf-field">
-                <label className="pf-lbl">Current Household ID <span className="req">*</span></label>
+                <label className="pf-lbl">{t('th_lbl_current_hh')} <span className="req">*</span></label>
                 <input 
                   className="pf-inp" 
                   placeholder="e.g. MAL-2026-00000"
@@ -282,7 +284,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               {transferType === "existing" && (
                 <div style={{ display: "flex", gap: "1rem" }}>
                   <div className="pf-field" style={{ flex: 2 }}>
-                    <label className="pf-lbl">Target Household ID <span className="req">*</span></label>
+                    <label className="pf-lbl">{t('th_lbl_target_hh')} <span className="req">*</span></label>
                     <input 
                       className={`pf-inp ${errors.targetHouseholdID || targetError ? 'error' : ''}`} 
                       style={(errors.targetHouseholdID || targetError) ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
@@ -298,7 +300,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   </div>
                   
                   <div className="pf-field" style={{ flex: 1 }}>
-                    <label className="pf-lbl">Target Branch</label>
+                    <label className="pf-lbl">{t('th_lbl_target_branch')}</label>
                     <select 
                       className="pf-inp" 
                       style={{ padding: "0.6rem", background: loadingBranches ? "#f1f5f9" : "#fff" }}
@@ -307,9 +309,9 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                       disabled={loadingBranches || availableBranches.length === 0}
                     >
                       {loadingBranches ? (
-                        <option value="">Loading...</option>
+                        <option value="">{t('th_branch_loading_option')}</option>
                       ) : availableBranches.length === 0 ? (
-                        <option value="">Not Found</option>
+                        <option value="">{t('th_branch_not_found_option')}</option>
                       ) : (
                         availableBranches.map(b => (
                           <option key={b.id} value={b.id}>{b.name}</option>
@@ -325,7 +327,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                 <>
                   <div style={{ display: "flex", gap: "1rem" }}>
                     <div className="pf-field" style={{ flex: 1 }}>
-                      <label className="pf-lbl">New House/Unit Number <span className="req">*</span></label>
+                      <label className="pf-lbl">{t('th_lbl_new_house')} <span className="req">*</span></label>
                       <input 
                         className={`pf-inp ${errors.newHouseNumber ? 'error' : ''}`} 
                         style={errors.newHouseNumber ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
@@ -340,7 +342,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                       )}
                     </div>
                     <div className="pf-field" style={{ flex: 2 }}>
-                      <label className="pf-lbl">New Street / Purok <span className="req">*</span></label>
+                      <label className="pf-lbl">{t('th_lbl_new_street')} <span className="req">*</span></label>
                       <input 
                         className={`pf-inp ${errors.newStreet ? 'error' : ''}`} 
                         style={errors.newStreet ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
@@ -357,12 +359,12 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   </div>
                   
                   <div className="pf-field">
-                    <label className="pf-lbl">Contact Email <span className="req">*</span></label>
+                    <label className="pf-lbl">{t('th_lbl_contact_email')} <span className="req">*</span></label>
                     <input 
                       type="email"
                       className={`pf-inp ${errors.newEmail ? 'error' : ''}`} 
                       style={errors.newEmail ? { borderColor: '#dc2626', background: '#fef2f2' } : {}}
-                      placeholder="We will send your new Household ID here" 
+                      placeholder={t('th_email_placeholder')} 
                       value={form.newEmail} 
                       onChange={e => updateField("newEmail", e.target.value)} 
                     />
@@ -372,7 +374,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                       </div>
                     )}
                     <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
-                      This email will be used to activate your new household account.
+                      {t('th_email_hint')}
                     </div>
                   </div>
                 </>
@@ -380,11 +382,11 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
 
               {/* ── SHARED FIELDS ── */}
               <div className="pf-field">
-                <label className="pf-lbl">Reason for Transfer <span className="req">*</span></label>
+                <label className="pf-lbl">{t('th_lbl_reason')} <span className="req">*</span></label>
                 <textarea 
                   className={`pf-inp ${errors.reason ? 'error' : ''}`} 
                   rows="3" 
-                  placeholder="Please briefly explain why you are requesting this transfer..."
+                  placeholder={t('th_reason_placeholder')}
                   value={form.reason}
                   onChange={e => updateField("reason", e.target.value)}
                   style={{ 
@@ -401,7 +403,7 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               </div>
 
               <div className="pf-field">
-                <label className="pf-lbl">Proof Document <span className="req">*</span></label>
+                <label className="pf-lbl">{t('th_lbl_proof')} <span className="req">*</span></label>
                 <label className="dr-upload-box" style={{ 
                   padding: "20px", 
                   textAlign: "center", 
@@ -434,8 +436,8 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
                   ) : (
                     <div>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={errors.proofFile ? "#dc2626" : "#64748b"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 8px" }}><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-                      <div style={{ fontSize: "0.85rem", color: errors.proofFile ? "#991b1b" : "#475569", fontWeight: 500 }}>Upload ID or Proof of Residency</div>
-                      <div style={{ fontSize: "0.75rem", color: errors.proofFile ? "#b91c1c" : "#94a3b8", marginTop: "4px" }}>JPG, PNG or PDF (Max 5MB)</div>
+                      <div style={{ fontSize: "0.85rem", color: errors.proofFile ? "#991b1b" : "#475569", fontWeight: 500 }}>{t('th_upload_prompt')}</div>
+                      <div style={{ fontSize: "0.75rem", color: errors.proofFile ? "#b91c1c" : "#94a3b8", marginTop: "4px" }}>{t('th_upload_sub')}</div>
                     </div>
                   )}
                 </label>
@@ -461,9 +463,9 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "#dcfce7", color: "#166534", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
-              <h3 style={{ margin: "0 0 0.5rem 0", color: "#111827", fontSize: "1.25rem" }}>Request Submitted</h3>
+              <h3 style={{ margin: "0 0 0.5rem 0", color: "#111827", fontSize: "1.25rem" }}>{t('th_submitted_title')}</h3>
               <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: "1.5", margin: 0 }}>
-                Your request to {transferType === "new" ? "create a new household" : "transfer to an existing household"} has been sent to the Barangay Administration. You will be notified once it is approved.
+                {t('th_submitted_desc', transferType)}
               </p>
             </div>
           )}
@@ -473,13 +475,13 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
         <div className="pf-modal-foot" style={{ justifyContent: step === 3 ? "center" : "space-between" }}>
           {step < 3 && (
             <button className="pf-btn-ghost" onClick={() => step === 1 ? onClose() : setStep(1)} disabled={isSubmitting}>
-              {step === 1 ? "Cancel" : "← Back"}
+              {step === 1 ? t('cancel') : t('profile_btn_back')}
             </button>
           )}
           
           {step === 1 && (
             <button className="pf-btn-primary" onClick={handleNext} disabled={!transferType}>
-              Next Step →
+              {t('th_btn_next')}
             </button>
           )}
           
@@ -489,13 +491,13 @@ export default function TransferHouseholdModal({ onClose, currentHouseholdID, us
               onClick={handleSubmit} 
               disabled={isSubmitting || loadingBranches}
             >
-              {isSubmitting ? "Submitting..." : "Submit Request"}
+              {isSubmitting ? t('th_btn_submitting') : t('th_btn_submit')}
             </button>
           )}
 
           {step === 3 && (
             <button className="pf-btn-ghost" onClick={onClose} style={{ width: "100%", justifyContent: "center" }}>
-              Done
+              {t('rm_btn_done')}
             </button>
           )}
         </div>

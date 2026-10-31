@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import ErrorMessage from "./ErrorMessage";
+import { useLanguage } from "../context/LanguageContext";
 import { getHouseholdResidents, removeHouseholdMember } from "../services/services";
 
 const IconTrash = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>;
 
 export default function RemoveMemberModal({ onClose, householdID, currentHeadID }) {
+  const { t } = useLanguage();
   const [step, setStep] = useState("loading"); // "loading", "list", "pin", "success"
   const [members, setMembers] = useState([]);
   const [targetMember, setTargetMember] = useState(null);
@@ -78,8 +80,8 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
         {/* HEADER */}
         <div className="pf-modal-head" style={{ borderBottom: step === "pin" ? "1px solid #fee2e2" : "1px solid #e5e7eb" }}>
           <div>
-            <h3 style={{ color: step === "pin" ? "#b91c1c" : "var(--text)" }}>Remove Member</h3>
-            <p>Delete a member from your household</p>
+            <h3 style={{ color: step === "pin" ? "#b91c1c" : "var(--text)" }}>{t('rm_title', 'Remove Member')}</h3>
+            <p>{t('rm_desc', 'Delete a member from your household')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose} disabled={isSubmitting}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -94,7 +96,7 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
           {/* LOADING STATE */}
           {step === "loading" && (
             <div style={{ textAlign: "center", color: "var(--muted)", padding: "2rem" }}>
-              Loading household members...
+              {t('rm_loading', 'Loading household members...')}
             </div>
           )}
 
@@ -105,7 +107,7 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
               
               {members.length === 0 && !errorMsg ? (
                 <div style={{ textAlign: "center", color: "var(--muted)", padding: "2rem", background: "#f8fafc", borderRadius: "8px" }}>
-                  You are the only member in this household.
+                  {t('rm_only_member', 'You are the only member in this household.')}
                 </div>
               ) : (
                 members.map(m => {
@@ -130,7 +132,7 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
                           cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
                         }}
                       >
-                        <IconTrash /> Remove
+                        <IconTrash /> {t('rm_btn_remove', 'Remove')}
                       </button>
                     </div>
                   )
@@ -146,13 +148,13 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
                 background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "12px",
                 color: "#991b1b", fontSize: "0.85rem", marginBottom: "1.25rem", lineHeight: "1.4"
               }}>
-                <strong>Security Authorization Required:</strong><br/>
-                To proceed with deletion, please ask <strong>{targetMember?.firstName || "this member"}</strong> to enter their 4-digit PIN below to authorize their removal.
+                <strong>{t('rm_security_title', 'Security Authorization Required:')}</strong><br/>
+                {t('rm_security_desc', targetMember?.firstName || 'this member')}
               </div>
 
               <div className="pf-field">
                 <label className="pf-lbl" style={{ textAlign: "center", display: "block" }}>
-                  Enter {targetMember?.firstName}'s PIN <span className="req">*</span>
+                  {t('rm_enter_pin_lbl', targetMember?.firstName || '')} <span className="req">*</span>
                 </label>
                 <input
                   type="password"
@@ -200,9 +202,9 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
               <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "#dcfce7", color: "#166534", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
-              <h3 style={{ margin: "0 0 0.5rem 0", color: "#111827", fontSize: "1.1rem" }}>Member Removed</h3>
+              <h3 style={{ margin: "0 0 0.5rem 0", color: "#111827", fontSize: "1.1rem" }}>{t('rm_success_title', 'Member Removed')}</h3>
               <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}>
-                {targetMember?.firstName} has been successfully deleted from your household.
+                {t('rm_success_desc', targetMember?.firstName || '')}
               </p>
             </div>
           )}
@@ -213,7 +215,7 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
         <div className="pf-modal-foot" style={{ justifyContent: step === "pin" ? "space-between" : "flex-end", background: "#f8fafc" }}>
           {step === "pin" && (
             <button className="pf-btn-ghost" onClick={() => setStep("list")} disabled={isSubmitting}>
-              ← Back
+              {t('profile_btn_back', '← Back')}
             </button>
           )}
           
@@ -224,11 +226,11 @@ export default function RemoveMemberModal({ onClose, householdID, currentHeadID 
               disabled={isSubmitting}
               style={{ background: "#dc2626", borderColor: "#dc2626" }}
             >
-              {isSubmitting ? "Removing..." : "Confirm Removal"}
+              {isSubmitting ? t('rm_btn_removing', 'Removing...') : t('rm_btn_confirm', 'Confirm Removal')}
             </button>
           ) : (
             <button className="pf-btn-ghost" onClick={onClose}>
-              {step === "success" ? "Done" : "Close"}
+              {step === "success" ? t('rm_btn_done', 'Done') : t('rm_btn_close', 'Close')}
             </button>
           )}
         </div>
