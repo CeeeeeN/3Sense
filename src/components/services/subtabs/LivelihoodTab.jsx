@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BriefcaseIcon } from "../../Icons";
 import { db } from "../../../firebase/firebase";
 import {
@@ -36,19 +36,78 @@ const formatDate = (dateStr) => {
 
 const getTagStyle = (str = "") => {
   const s = str.toLowerCase();
-  if (s.includes("food") || s.includes("process")) return { label: "Manufacturing", color: "#1e8a5e" };
+  if (s.includes("food") || s.includes("process")) return { label: "Manufacturing", color: "#17714d" };
   if (s.includes("business") || s.includes("negosyo")) return { label: "Business", color: "#1a56a0" };
   if (s.includes("craft") || s.includes("sew")) return { label: "Crafts", color: "#703381" };
-  if (s.includes("farm") || s.includes("garden")) return { label: "Agriculture", color: "#ca8a04" };
+  if (s.includes("farm") || s.includes("garden")) return { label: "Agriculture", color: "#8a6d00" };
   if (s.includes("tech") || s.includes("computer")) return { label: "Technology", color: "#0369a1" };
   return { label: "Training", color: "#1a56a0" };
 };
 
 const REG_STATUS_STYLE = {
-  pending: { label: "Pending", color: "#ca8a04", bg: "rgba(202,138,4,0.1)" },
-  approved: { label: "Approved", color: "#1e8a5e", bg: "rgba(30,138,94,0.1)" },
-  rejected: { label: "Rejected", color: "#e03e3e", bg: "rgba(224,62,62,0.1)" },
-  completed: { label: "Completed", color: "#5e7a99", bg: "rgba(94,122,153,0.1)" },
+  pending:   { label: "Pending",   color: "#8a6d00", bg: "rgba(202,138,4,0.14)",  icon: "clock" },
+  approved:  { label: "Approved",  color: "#17714d", bg: "rgba(30,138,94,0.13)",  icon: "check" },
+  rejected:  { label: "Rejected",  color: "#b71c1c", bg: "rgba(224,62,62,0.12)",  icon: "x" },
+  completed: { label: "Completed", color: "#3f5d7e", bg: "rgba(94,122,153,0.14)", icon: "flag" },
+};
+
+// ── Icons ──────────────────────────────────────────────────────────
+const Ico = ({ size = 22, children }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+);
+const ICONS = {
+  calendar: <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
+  clock:    <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+  pin:      <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></>,
+  check:    <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>,
+  x:        <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
+  flag:     <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></>,
+  file:     <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>,
+  upload:   <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>,
+  list:     <><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>,
+};
+
+const ArrowRight = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+);
+const ArrowLeft = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+);
+const BigCheck = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+);
+
+// ── Description that clamps to 3 lines and expands with "more..." ───
+function ExpandableDesc({ text }) {
+  const [open, setOpen] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => { if (!open) setOverflowing(el.scrollHeight > el.clientHeight + 1); };
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [text, open]);
+
+  return (
+    <div className="lv-desc-wrap">
+      <div ref={ref} className={`lv-desc${open ? " is-open" : ""}`}>{text}</div>
+      {(overflowing || open) && (
+        <button type="button" className="lv-more" onClick={() => setOpen(o => !o)}>
+          {open ? "Show less" : "Read more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+const BLANK_FORM = {
+  firstName: "", middleName: "", lastName: "",
+  address: "", contact: "", email: "",
+  idFile: "", programId: "",
 };
 
 // ── Component ──────────────────────────────────────────────────────
@@ -58,6 +117,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   const [regNum, setRegNum] = useState("");
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const topRef = useRef(null);
 
   // ── Programs from Firestore (livelihood only) ────────────────────
   const [programs, setPrograms] = useState([]);
@@ -71,11 +131,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   const [loadingMyRegs, setLoadingMyRegs] = useState(false);
 
   // ── Form ─────────────────────────────────────────────────────────
-  const [form, setForm] = useState({
-    firstName: "", middleName: "", lastName: "",
-    address: "", contact: "", email: "",
-    idFile: "", programId: "",
-  });
+  const [form, setForm] = useState(BLANK_FORM);
 
   // Pre-fill from userData
   useEffect(() => {
@@ -92,6 +148,11 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       }));
     }
   }, [userData]);
+
+  // Bring the person back to the top whenever the screen or step changes
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [view, step]);
 
   // ── Real-time: Livelihood Programs ONLY ─────────────────────────
   useEffect(() => {
@@ -129,7 +190,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   // ── Real-time: Approved Slot Counts (Scoped & Bounded) ──────────
   useEffect(() => {
     if (programs.length === 0) return;
-    
+
     const unsubs = programs.map((prog) => {
       // BOUNDED QUERY: Only fetch registrations for THIS specific program, capped at 300.
       const q = query(
@@ -159,17 +220,17 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
     setLoadingMyRegs(true);
 
-    const [queryField, queryValue] = userUID 
-      ? ["UID", userUID] 
-      : activeUserId 
-        ? ["userID", activeUserId] 
+    const [queryField, queryValue] = userUID
+      ? ["UID", userUID]
+      : activeUserId
+        ? ["userID", activeUserId]
         : ["householdID", hid];
 
     const q = query(
       collection(db, "livelihoodRegistrations"),
       where(queryField, "==", queryValue)
     );
-    
+
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       // Sort client-side to avoid composite index requirements
@@ -185,7 +246,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   // ── Slot helpers ─────────────────────────────────────────────────
   const getApprovedCount = (programId) => programApprovedCounts[programId] || 0;
-  
+
   const getSlotsLeft = (prog) => {
     if (!prog.slots) return null;
     return prog.slots - getApprovedCount(prog.id);
@@ -200,18 +261,18 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   const validateStep1 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = "Required.";
-    if (!form.lastName.trim()) e.lastName = "Required.";
-    if (!form.address.trim()) e.address = "Required.";
-    if (!String(form.contact || "").trim()) e.contact = "Required.";
-    if (!form.idFile) e.idFile = "Please upload a valid ID or Barangay Clearance.";
+    if (!form.firstName.trim()) e.firstName = "Please type your first name.";
+    if (!form.lastName.trim()) e.lastName = "Please type your last name.";
+    if (!form.address.trim()) e.address = "Please type your address.";
+    if (!String(form.contact || "").trim()) e.contact = "Please type your phone number.";
+    if (!form.idFile) e.idFile = "Please add a photo or scan of your valid ID or Barangay Clearance.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.programId) e.programId = "Please select a program.";
+    if (!form.programId) e.programId = "Please tap the program you want to join.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -225,13 +286,13 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       try {
         const reg = generateRegNum();
         const timeLabel = [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ");
-        
-        // <-- EXTRACT PERMANENT UID HERE
+
+        // Permanent UID
         const userUID = userData?.UID || getSaved("UID", null);
 
         await addDoc(collection(db, "livelihoodRegistrations"), {
           regNum: reg,
-          UID: userUID, // <-- INJECTED UID
+          UID: userUID,
           firstName: form.firstName,
           middleName: form.middleName || "",
           lastName: form.lastName,
@@ -257,7 +318,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
         setStep(4);
       } catch (err) {
         console.error("Submit error:", err);
-        setErrors({ submit: "Failed to submit. Please try again." });
+        setErrors({ submit: "Sorry, your registration could not be sent. Please try again." });
       }
       setSubmitting(false);
       return;
@@ -267,129 +328,125 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   const resetForm = () => {
     setStep(1); setErrors({});
-    setForm({ firstName: "", middleName: "", lastName: "", address: "", contact: "", email: "", idFile: "", programId: "" });
+    setForm(BLANK_FORM);
     setView("main");
   };
 
-  const STEP_LABELS = ["Personal Info", "Choose Program", "Confirmation"];
+  const STEP_LABELS = ["Your information", "Choose a program", "Check and send"];
+
+  const BackButton = ({ label, onClick }) => (
+    <button type="button" className="vz-back" onClick={onClick}>
+      <ArrowLeft /> {label}
+    </button>
+  );
+
+  const Hero = () => (
+    <div className="svc-hero svc-hero--green bz-hero">
+      <div className="svc-hero__inner">
+        <div className="svc-hero__left">
+          <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BriefcaseIcon /></span>Barangay Livelihood Program</div>
+          <h2 className="svc-hero__title">Livelihood Skills Training</h2>
+          <p className="svc-hero__sub">Learn new skills to improve your work or your income. Choose a training program below and register.</p>
+        </div>
+      </div>
+    </div>
+  );
 
   // ════════════════════════════════════════════════════════════════
   // VIEW: MAIN
   // ════════════════════════════════════════════════════════════════
   if (view === "main") return (
-    <div className="lh-page">
-      {/* Hero */}
-      <div className="svc-hero svc-hero--green">
-        <div className="svc-hero__inner">
-          <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow">
-              <span className="svc-hero__eyebrow-icon"><BriefcaseIcon /></span>
-              Barangay Livelihood Program
-            </div>
-            <h2 className="svc-hero__title">Livelihood Skills Training</h2>
-            <p className="svc-hero__sub">Explore skills training and livelihood opportunities designed to help residents develop practical skills and improve their employment or income opportunities.</p>
-            <div className="svc-hero__law">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              Program coordination: Subject to available training programs and eligibility requirements
-            </div>
-          </div>
-          <div className="svc-hero__right">
-            <button className="sv-btn-primary" style={{ fontSize: "0.8rem" }} onClick={() => setView("myregs")}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-              My Registrations
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="bz-page">
+      <Hero />
 
-      {/* Programs */}
-      <div className="lh-programs-section">
-        <div className="lh-section-label">Available Livelihood Programs</div>
-        {loadingPrograms ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>Loading programs…</div>
-        ) : programs.length === 0 ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>No livelihood programs available at the moment. Check back later.</div>
-        ) : (
-          <div className="lh-programs-grid">
-            {programs.map(p => {
-              const slotsLeft = getSlotsLeft(p);
-              const approved = getApprovedCount(p.id);
-              const full = slotsLeft !== null && slotsLeft <= 0;
-              const low = slotsLeft !== null && slotsLeft > 0 && slotsLeft <= 5;
-              const tag = getTagStyle(p.demographic || p.title);
-              const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
-              const activeReg = userActiveRegForProgram(p.id);
-              const disabled = full || !!activeReg;
+      <div className="bz-wrap" ref={topRef}>
+        <button type="button" className="vz-choice lv-myregs" onClick={() => setView("myregs")}>
+          <span className="vz-choice__icon vz-choice__icon--teal"><Ico size={30}>{ICONS.list}</Ico></span>
+          <span className="vz-choice__body">
+            <span className="vz-choice__title">My registrations</span>
+            <span className="vz-choice__desc">See the programs you have already registered for.</span>
+          </span>
+          <span className="vz-choice__arrow"><ArrowRight /></span>
+        </button>
 
-              let btnLabel = "Register Now →";
-              if (full) btnLabel = "Program Full";
-              else if (activeReg && (activeReg.status || "").toLowerCase() === "approved") btnLabel = "Already Approved ✓";
-              else if (activeReg) btnLabel = "Already Registered";
+        <section className="bz-card">
+          <h3 className="bz-heading">Available training programs</h3>
+          <p className="bz-text">Tap the green Register button on the program you want to join.</p>
 
-              return (
-                <div key={p.id} className={`lh-prog-card${full ? " lh-prog-card--full" : ""}`}>
-                  <div className="lh-prog-card__head">
-                    <span className="lh-prog-card__tag" style={{ background: `${tag.color}15`, color: tag.color }}>{tag.label}</span>
-                    {slotsLeft !== null && (
-                      <span className={`lh-prog-card__slots${full ? " lh-prog-card__slots--full" : low ? " lh-prog-card__slots--low" : ""}`}>
-                        {full ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}
-                      </span>
-                    )}
-                  </div>
-                  <div className="lh-prog-card__name">{p.title}</div>
-                  <div className="lh-prog-card__desc">{p.description || "—"}</div>
-                  <div className="lh-prog-card__meta">
-                    {p.date && (
-                      <span className="lh-prog-meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                        {formatDate(p.date)}
-                      </span>
-                    )}
-                    {timeLabel && (
-                      <span className="lh-prog-meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                        {timeLabel}
-                      </span>
-                    )}
-                    {p.location && (
-                      <span className="lh-prog-meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                        {p.location}
-                      </span>
-                    )}
-                  </div>
-                  {p.slots > 0 && (
-                    <div className="lh-prog-card__slots-bar">
-                      <div className="lh-prog-card__slots-fill" style={{
-                        width: `${Math.min((approved / p.slots) * 100, 100)}%`,
-                        background: full ? "#e03e3e" : low ? "#ca8a04" : "#1e8a5e",
-                      }} />
+          {loadingPrograms ? (
+            <div className="lv-empty">Loading programs…</div>
+          ) : programs.length === 0 ? (
+            <div className="lv-empty">There are no livelihood programs right now. Please check back later.</div>
+          ) : (
+            <div className="lv-grid">
+              {programs.map(p => {
+                const slotsLeft = getSlotsLeft(p);
+                const approved = getApprovedCount(p.id);
+                const full = slotsLeft !== null && slotsLeft <= 0;
+                const low = slotsLeft !== null && slotsLeft > 0 && slotsLeft <= 5;
+                const tag = getTagStyle(p.demographic || p.title);
+                const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
+                const activeReg = userActiveRegForProgram(p.id);
+                const activeStatus = (activeReg?.status || "").toLowerCase();
+                const disabled = full || !!activeReg;
+
+                let btnLabel = "Register now";
+                if (full) btnLabel = "Program full";
+                else if (activeReg && activeStatus === "approved") btnLabel = "You are approved";
+                else if (activeReg) btnLabel = "You already registered";
+
+                return (
+                  <article key={p.id} className={`lv-card${full ? " is-full" : ""}`}>
+                    <div className="lv-card__head">
+                      <span className="lv-tag" style={{ background: `${tag.color}1a`, color: tag.color }}>{tag.label}</span>
+                      {slotsLeft !== null && (
+                        <span className={`lv-slots${full ? " is-full" : low ? " is-low" : ""}`}>
+                          {full ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {activeReg && !full && (
-                    <div style={{
-                      marginTop: "8px", fontSize: "0.78rem", padding: "5px 10px", borderRadius: "6px",
-                      background: (activeReg.status || "").toLowerCase() === "approved" ? "rgba(30,138,94,0.08)" : "rgba(202,138,4,0.08)",
-                      color: (activeReg.status || "").toLowerCase() === "approved" ? "#1e8a5e" : "#a16207",
-                    }}>
-                      {(activeReg.status || "").toLowerCase() === "approved"
-                        ? "✓ Your registration is approved"
-                        : "⏳ Your registration is pending review"}
-                    </div>
-                  )}
-                  <button
-                    className="sv-btn-primary"
-                    disabled={disabled}
-                    style={{ fontSize: "0.78rem", marginTop: "0.75rem", width: "100%", justifyContent: "center", opacity: disabled ? 0.5 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
-                    onClick={() => { if (!disabled) { set("programId", p.id); setView("register"); setStep(1); } }}
-                  >
-                    {btnLabel}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+
+                    <h4 className="lv-card__title">{p.title}</h4>
+                    <ExpandableDesc text={p.description || "—"} />
+
+                    <ul className="lv-meta">
+                      {p.date && <li><Ico>{ICONS.calendar}</Ico><span>{formatDate(p.date)}</span></li>}
+                      {timeLabel && <li><Ico>{ICONS.clock}</Ico><span>{timeLabel}</span></li>}
+                      {p.location && <li><Ico>{ICONS.pin}</Ico><span>{p.location}</span></li>}
+                    </ul>
+
+                    {p.slots > 0 && (
+                      <div className="lv-bar" aria-hidden="true">
+                        <div className="lv-bar__fill" style={{
+                          width: `${Math.min((approved / p.slots) * 100, 100)}%`,
+                          background: full ? "#c62828" : low ? "#b7791f" : "#1e8a5e",
+                        }} />
+                      </div>
+                    )}
+
+                    {activeReg && !full && (
+                      <div className={`lv-status-note${activeStatus === "approved" ? " is-ok" : ""}`}>
+                        <Ico size={20}>{activeStatus === "approved" ? ICONS.check : ICONS.clock}</Ico>
+                        {activeStatus === "approved" ? "Your registration is approved." : "Your registration is waiting for review."}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      className="lv-register"
+                      disabled={disabled}
+                      onClick={() => { if (!disabled) { set("programId", p.id); setView("register"); setStep(1); } }}
+                    >
+                      {btnLabel}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <div className="bz-legal bd-legal">Program coordination: subject to available training programs and eligibility requirements</div>
       </div>
     </div>
   );
@@ -398,49 +455,50 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   // VIEW: MY REGISTRATIONS
   // ════════════════════════════════════════════════════════════════
   if (view === "myregs") return (
-    <div className="lh-page">
-      <div className="po-form-topbar">
-        <button className="vawc-back-btn" onClick={() => setView("main")}>‹ Back</button>
-        <div className="po-form-topbar__title">My Registrations</div>
-      </div>
-      <div style={{ padding: "1.25rem 1.75rem" }}>
-        {loadingMyRegs ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>Loading…</div>
-        ) : myRegs.length === 0 ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "12px", opacity: 0.4 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-            <p>You have no registrations yet.</p>
-          </div>
-        ) : (
-          <div className="lh-regs-list">
-            {myRegs.map(r => {
-              const rawStatus = (r.status || "pending").toLowerCase();
-              const sc = REG_STATUS_STYLE[rawStatus] || REG_STATUS_STYLE.pending;
-              return (
-                <div key={r.id} className="lh-reg-card">
-                  <div className="lh-reg-card__top">
-                    <div>
-                      <div className="lh-reg-card__program">{r.programName || "—"}</div>
-                      <div className="lh-reg-card__date">{r.programDate ? formatDate(r.programDate) : "—"}</div>
+    <div className="bz-page">
+      <Hero />
+
+      <div className="bz-wrap" ref={topRef}>
+        <section className="bz-card">
+          <BackButton label="Back to programs" onClick={() => setView("main")} />
+          <h3 className="bz-heading">My registrations</h3>
+          <p className="bz-text">These are the programs you registered for.</p>
+
+          {loadingMyRegs ? (
+            <div className="lv-empty">Loading…</div>
+          ) : myRegs.length === 0 ? (
+            <div className="lv-empty">You have not registered for any program yet.</div>
+          ) : (
+            <div className="lv-regs">
+              {myRegs.map(r => {
+                const rawStatus = (r.status || "pending").toLowerCase();
+                const sc = REG_STATUS_STYLE[rawStatus] || REG_STATUS_STYLE.pending;
+                return (
+                  <article key={r.id} className="lv-reg">
+                    <div className="lv-reg__top">
+                      <div>
+                        <div className="lv-reg__name">{r.programName || "—"}</div>
+                        <div className="lv-reg__date">{r.programDate ? formatDate(r.programDate) : "—"}</div>
+                      </div>
+                      <span className="lv-badge" style={{ background: sc.bg, color: sc.color }}>
+                        <Ico size={20}>{ICONS[sc.icon]}</Ico> {sc.label}
+                      </span>
                     </div>
-                    <span className="lh-reg-status" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
-                  </div>
-                  <div className="lh-reg-card__ref">Ref: {r.regNum || r.id}</div>
-                  {rawStatus === "rejected" && r.rejectReason && (
-                    <div style={{ marginTop: "6px", fontSize: "0.8rem", color: "#e03e3e", background: "rgba(224,62,62,0.07)", padding: "6px 10px", borderRadius: "6px" }}>
-                      Reason: {r.rejectReason}
-                    </div>
-                  )}
-                  {rawStatus === "pending" && (
-                    <div style={{ marginTop: "6px", fontSize: "0.78rem", color: "#a16207" }}>
-                      ⏳ Awaiting admin review
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <div className="lv-reg__ref">Reference number: <strong>{r.regNum || r.id}</strong></div>
+                    {rawStatus === "rejected" && r.rejectReason && (
+                      <div className="lv-reg__alert">Reason: {r.rejectReason}</div>
+                    )}
+                    {rawStatus === "pending" && (
+                      <div className="lv-reg__wait"><Ico size={20}>{ICONS.clock}</Ico> Waiting for the admin to review it.</div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          <BackButton label="Back to programs" onClick={() => setView("main")} />
+        </section>
       </div>
     </div>
   );
@@ -448,194 +506,228 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   // ════════════════════════════════════════════════════════════════
   // VIEW: REGISTER FORM
   // ════════════════════════════════════════════════════════════════
+  const programTimeLabel = [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ");
+
   return (
-    <div className="lh-page">
-      <div className="po-form-topbar">
-        <button className="vawc-back-btn" onClick={() => { step > 1 ? setStep(s => s - 1) : setView("main"); setErrors({}); }}>
-          ‹ {step > 1 ? "Back" : "Back to Programs"}
-        </button>
-        <div className="po-form-topbar__title">Register for Training</div>
-      </div>
+    <div className="bz-page">
+      <Hero />
 
-      {step < 4 && (
-        <div className="lh-steps">
-          {STEP_LABELS.map((label, i) => {
-            const n = i + 1; const done = n < step; const active = n === step;
-            return (
-              <div key={i} className="dr-step-item">
-                <div className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
-                  {done ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : n}
+      <div className="bz-wrap" ref={topRef}>
+        {step < 4 && (
+          <section className="bz-card">
+            <BackButton label="Back to programs" onClick={() => { setView("main"); setErrors({}); }} />
+
+            {/* Steps */}
+            <ol className="lv-steps" aria-label="Registration steps">
+              {STEP_LABELS.map((label, i) => {
+                const n = i + 1;
+                const done = n < step;
+                const active = n === step;
+                return (
+                  <li key={label} className={`lv-steps__item${done ? " is-done" : active ? " is-active" : ""}`} aria-current={active ? "step" : undefined}>
+                    <span className="lv-steps__dot">
+                      {done
+                        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        : n}
+                    </span>
+                    <span className="lv-steps__label">{label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            {/* Which program */}
+            {selectedProgram && step !== 2 && (
+              <div className="lv-chosen">
+                <div className="lv-chosen__label">You are registering for</div>
+                <div className="lv-chosen__title">{selectedProgram.title}</div>
+                <ul className="lv-meta lv-meta--inline">
+                  {selectedProgram.date && <li><Ico size={20}>{ICONS.calendar}</Ico><span>{formatDate(selectedProgram.date)}</span></li>}
+                  {programTimeLabel && <li><Ico size={20}>{ICONS.clock}</Ico><span>{programTimeLabel}</span></li>}
+                  {selectedProgram.location && <li><Ico size={20}>{ICONS.pin}</Ico><span>{selectedProgram.location}</span></li>}
+                </ul>
+              </div>
+            )}
+
+            {/* ── Step 1 ── */}
+            {step === 1 && (
+              <div className="bf-form lv-form">
+                <h3 className="bz-heading">Your information</h3>
+
+                <div className="bf-field">
+                  <label className="bf-label" htmlFor="lv-first">First name <span className="bf-pill bf-pill--req">Required</span></label>
+                  <input id="lv-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
+                  {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
                 </div>
-                <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
-                {i < STEP_LABELS.length - 1 && <div className={`dr-step-line${done ? " dr-step-line--done" : ""}`} />}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="lh-form-body">
-        {/* ── Step 1: Personal Info ── */}
-        {step === 1 && (
-          <div className="lh-form-section">
-            <div className="dr-field-row">
-              <div className="dr-field">
-                <label className="sv-label">First Name <span className="sv-required">*</span></label>
-                <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
-                {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Middle Name</label>
-                <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Last Name <span className="sv-required">*</span></label>
-                <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
-                {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
-              </div>
-            </div>
-            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">Complete Address <span className="sv-required">*</span></label>
-              <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday" />
-              {errors.address && <span className="sv-error-msg">{errors.address}</span>}
-            </div>
-            <div className="dr-field-row" style={{ marginTop: "0.75rem" }}>
-              <div className="dr-field">
-                <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
-                <input className={`sv-input${errors.contact ? " sv-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
-                {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Email <span className="sv-optional">(Optional)</span></label>
-                <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
-              </div>
-            </div>
-            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">Valid ID or Barangay Clearance <span className="sv-required">*</span></label>
-              <label className={`dr-upload-box${errors.idFile ? " dr-upload-box--error" : ""}`}>
-                <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: "none" }} onChange={e => e.target.files[0] && set("idFile", e.target.files[0].name)} />
-                {form.idFile
-                  ? <div className="dr-upload-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>{form.idFile}</div>
-                  : <div className="dr-upload-placeholder">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                    <span>Click to upload</span>
-                    <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
+                <div className="bf-field">
+                  <label className="bf-label" htmlFor="lv-middle">Middle name <span className="bf-pill">Optional</span></label>
+                  <input id="lv-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
+                </div>
+                <div className="bf-field">
+                  <label className="bf-label" htmlFor="lv-last">Last name <span className="bf-pill bf-pill--req">Required</span></label>
+                  <input id="lv-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+                  {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
+                </div>
+                <div className="bf-field">
+                  <label className="bf-label" htmlFor="lv-address">Home address <span className="bf-pill bf-pill--req">Required</span></label>
+                  <input id="lv-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday" />
+                  {errors.address && <div className="bf-error">{errors.address}</div>}
+                </div>
+                <div className="bf-row">
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="lv-contact">Phone number <span className="bf-pill bf-pill--req">Required</span></label>
+                    <input id="lv-contact" className={`bf-input${errors.contact ? " bf-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="0912 345 6789" />
+                    {errors.contact && <div className="bf-error">{errors.contact}</div>}
                   </div>
-                }
-              </label>
-              {errors.idFile && <span className="sv-error-msg">{errors.idFile}</span>}
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 2: Choose Program ── */}
-        {step === 2 && (
-          <div className="lh-form-section">
-            <p className="dr-step-hint">Select the livelihood training program you want to join.</p>
-            {loadingPrograms ? (
-              <div style={{ padding: "30px 0", textAlign: "center", color: "#9ca3af" }}>Loading programs…</div>
-            ) : (
-              <div className="lh-prog-select-list">
-                {programs.map(p => {
-                  const slotsLeft = getSlotsLeft(p);
-                  const full = slotsLeft !== null && slotsLeft <= 0;
-                  const selected = form.programId === p.id;
-                  const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
-                  const activeReg = userActiveRegForProgram(p.id);
-                  const disabled = full || !!activeReg;
-                  return (
-                    <button key={p.id}
-                      className={`lh-prog-select-item${selected ? " lh-prog-select-item--active" : ""}${disabled ? " lh-prog-select-item--disabled" : ""}`}
-                      disabled={disabled}
-                      onClick={() => !disabled && set("programId", p.id)}
-                    >
-                      <div className="lh-prog-select-item__check">
-                        {selected && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-                      </div>
-                      <div className="lh-prog-select-item__body">
-                        <div className="lh-prog-select-item__name">
-                          {p.title}
-                          {full && <span className="lh-full-badge">Full</span>}
-                          {activeReg && !full && <span className="lh-full-badge" style={{ background: "rgba(202,138,4,0.15)", color: "#a16207" }}>Registered</span>}
-                        </div>
-                        {(p.date || timeLabel) && <div className="lh-prog-select-item__meta">{formatDate(p.date)}{timeLabel ? ` · ${timeLabel}` : ""}</div>}
-                        {p.location && <div className="lh-prog-select-item__meta">{p.location}</div>}
-                      </div>
-                      {slotsLeft !== null && (
-                        <div className="lh-prog-select-item__slots" style={{ color: full ? "#e03e3e" : slotsLeft <= 5 ? "#ca8a04" : "#1e8a5e" }}>
-                          {full ? "Full" : `${slotsLeft} left`}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {errors.programId && <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>{errors.programId}</span>}
-          </div>
-        )}
-
-        {/* ── Step 3: Review ── */}
-        {step === 3 && (
-          <div className="lh-form-section">
-            <p className="dr-step-hint">Review your information before submitting.</p>
-            <div className="dr-review-grid">
-              {[
-                { label: "Full Name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "), full: true },
-                { label: "Address", value: form.address, full: true },
-                { label: "Contact", value: form.contact },
-                { label: "Email", value: form.email || "—" },
-                { label: "ID Uploaded", value: form.idFile || "—", full: true },
-                { label: "Program", value: selectedProgram?.title || "—", full: true },
-                { label: "Date", value: formatDate(selectedProgram?.date) },
-                { label: "Time", value: [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ") || "—" },
-                { label: "Location", value: selectedProgram?.location || "—", full: true },
-              ].map((r, i) => (
-                <div key={i} className={`dr-review-row${r.full ? " dr-review-row--full" : ""}`}>
-                  <span className="dr-review-label">{r.label}</span>
-                  <span className="dr-review-value">{r.value}</span>
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="lv-email">Email <span className="bf-pill">Optional</span></label>
+                    <input id="lv-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
+                  </div>
                 </div>
-              ))}
-            </div>
-            {errors.submit && (
-              <div style={{ marginTop: "12px", color: "#e03e3e", fontSize: "0.85rem", padding: "10px", background: "rgba(224,62,62,0.07)", borderRadius: "8px" }}>
-                {errors.submit}
+
+                <div className="bf-field">
+                  <div className="bf-label">Valid ID or Barangay Clearance <span className="bf-pill bf-pill--req">Required</span></div>
+                  <label className={`bf-photo${form.idFile ? " is-filled" : ""}${errors.idFile ? " is-error" : ""}`}>
+                    <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: "none" }} onChange={e => e.target.files[0] && set("idFile", e.target.files[0].name)} />
+                    <Ico size={28}>{form.idFile ? ICONS.check : ICONS.upload}</Ico>
+                    <span className="bf-photo__text">
+                      {form.idFile ? (
+                        <>
+                          <strong>ID added</strong>
+                          <small>{form.idFile} · Tap to change</small>
+                        </>
+                      ) : (
+                        <>
+                          <strong>Tap here to add your ID</strong>
+                          <small>A photo or scan. JPG, PNG or PDF, up to 5MB</small>
+                        </>
+                      )}
+                    </span>
+                  </label>
+                  {errors.idFile && <div className="bf-error">{errors.idFile}</div>}
+                </div>
               </div>
             )}
-          </div>
+
+            {/* ── Step 2 ── */}
+            {step === 2 && (
+              <div className="lv-form">
+                <h3 className="bz-heading">Choose a program</h3>
+                <p className="bz-text">Tap the program you want to join.</p>
+
+                {loadingPrograms ? (
+                  <div className="lv-empty">Loading programs…</div>
+                ) : (
+                  <div className="lv-picks" role="radiogroup" aria-label="Programs">
+                    {programs.map(p => {
+                      const slotsLeft = getSlotsLeft(p);
+                      const full = slotsLeft !== null && slotsLeft <= 0;
+                      const selected = form.programId === p.id;
+                      const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
+                      const activeReg = userActiveRegForProgram(p.id);
+                      const disabled = full || !!activeReg;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`lv-pick${selected ? " is-active" : ""}`}
+                          disabled={disabled}
+                          onClick={() => !disabled && set("programId", p.id)}
+                        >
+                          <span className="lv-pick__check">
+                            {selected && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+                          </span>
+                          <span className="lv-pick__body">
+                            <span className="lv-pick__name">
+                              {p.title}
+                              {full && <span className="lv-pick__badge lv-pick__badge--full">Full</span>}
+                              {activeReg && !full && <span className="lv-pick__badge">Already registered</span>}
+                            </span>
+                            {(p.date || timeLabel) && <span className="lv-pick__meta">{formatDate(p.date)}{timeLabel ? ` · ${timeLabel}` : ""}</span>}
+                            {p.location && <span className="lv-pick__meta">{p.location}</span>}
+                          </span>
+                          {slotsLeft !== null && (
+                            <span className={`lv-pick__slots${full ? " is-full" : slotsLeft <= 5 ? " is-low" : ""}`}>
+                              {full ? "Full" : `${slotsLeft} left`}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {errors.programId && <div className="bf-error">{errors.programId}</div>}
+              </div>
+            )}
+
+            {/* ── Step 3 ── */}
+            {step === 3 && (
+              <div className="lv-form">
+                <h3 className="bz-heading">Check your information</h3>
+                <p className="bz-text">Please check that everything is correct, then tap the green button to send.</p>
+
+                <dl className="lv-review">
+                  {[
+                    { label: "Full name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
+                    { label: "Address", value: form.address },
+                    { label: "Phone number", value: form.contact },
+                    { label: "Email", value: form.email || "—" },
+                    { label: "ID added", value: form.idFile || "—" },
+                    { label: "Program", value: selectedProgram?.title || "—" },
+                    { label: "Date", value: formatDate(selectedProgram?.date) },
+                    { label: "Time", value: programTimeLabel || "—" },
+                    { label: "Place", value: selectedProgram?.location || "—" },
+                  ].map((r) => (
+                    <div key={r.label} className="lv-review__row">
+                      <dt>{r.label}</dt>
+                      <dd>{r.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {errors.submit && <div className="bf-alert" style={{ marginTop: "0.9rem" }}>{errors.submit}</div>}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="lv-actions">
+              <button type="button" className="bf-submit lv-actions__next" onClick={handleNext} disabled={submitting}>
+                {submitting ? "Sending, please wait..." : step === 3 ? "Send My Registration" : "Next"}
+                {!submitting && step < 3 && <ArrowRight />}
+              </button>
+              {step > 1 && (
+                <button type="button" className="bf-secondary lv-actions__prev" onClick={() => { setStep(s => s - 1); setErrors({}); }} disabled={submitting}>
+                  <ArrowLeft /> Previous step
+                </button>
+              )}
+            </div>
+          </section>
         )}
 
         {/* ── Step 4: Success ── */}
         {step === 4 && (
-          <div className="lh-success-wrap">
-            <div className="po-submitted-icon">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+          <section className="bz-card">
+            <div className="bf-done">
+              <span className="bf-done__icon"><BigCheck /></span>
+              <h3 className="bz-heading">Registration sent. Thank you!</h3>
+              <p className="bz-text">You registered for <strong>{selectedProgram?.title}</strong>. Please wait for the admin to review it.</p>
+
+              <div className="bt-ref">
+                <div className="bt-ref__label">Your registration number</div>
+                <div className="bt-ref__num">{regNum}</div>
+                <div className="bt-ref__hint">Write this number down. You can use it to follow your registration.</div>
+              </div>
+
+              <div className="bf-done__btns">
+                <button type="button" className="bf-secondary" onClick={() => setView("myregs")}>View my registrations</button>
+                <button type="button" className="bf-secondary" onClick={resetForm}>Done</button>
+              </div>
             </div>
-            <h3 className="po-submitted-title">Registration Submitted!</h3>
-            <p className="po-submitted-sub">You have successfully registered for <strong>{selectedProgram?.title}</strong>. Please wait for admin approval.</p>
-            <div className="po-ref-box" style={{ borderColor: "rgba(30,138,94,0.2)", background: "rgba(30,138,94,0.05)" }}>
-              <div className="po-ref-label">Registration Number</div>
-              <div className="po-ref-num" style={{ color: "#1e8a5e" }}>{regNum}</div>
-              <div className="po-ref-hint">Save this to track your registration status</div>
-            </div>
-            <div className="po-submitted-btns">
-              <button className="sv-btn-primary" style={{ background: "#1e8a5e" }} onClick={() => setView("myregs")}>View My Registrations</button>
-              <button className="sv-btn-ghost" onClick={resetForm}>Done</button>
-            </div>
-          </div>
+          </section>
         )}
       </div>
-
-      {step < 4 && (
-        <div className="po-form-actions">
-          <button className="sv-btn-ghost" onClick={() => { step > 1 ? setStep(s => s - 1) : setView("main"); setErrors({}); }}>
-            {step === 1 ? "Cancel" : "Previous"}
-          </button>
-          <button className="sv-btn-primary" style={{ background: "#1e8a5e" }} onClick={handleNext} disabled={submitting}>
-            {submitting ? "Submitting…" : step === 3 ? "Submit Registration" : "Next →"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
