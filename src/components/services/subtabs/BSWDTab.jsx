@@ -170,16 +170,12 @@ export default function BSWDTab({ userData, householdID }) {
   return (
     <div className="bz-page">
       {/* Title */}
-      <div className="svc-hero svc-hero--teal">
+      <div className="svc-hero svc-hero--teal bz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
             <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>BSWD</div>
             <h2 className="svc-hero__title">Barangay Social Welfare and Development</h2>
             <p className="svc-hero__sub">Seek information and assistance for social welfare concerns, including support for individuals and families in need of community services.</p>
-            <div className="svc-hero__law">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              Coordination: Barangay social welfare services and the appropriate city or municipal social welfare office
-            </div>
           </div>
         </div>
       </div>
@@ -267,18 +263,18 @@ export default function BSWDTab({ userData, householdID }) {
                 <div className="bf-form">
                   <div className="bf-field">
                     <label className="bf-label" htmlFor="bf-location">Where did you see them? <span className="bf-pill bf-pill--req">Required</span></label>
-                    <input id="bf-location" className={`bf-input${reportErrors.location ? " bf-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="Example: McArthur Highway" disabled={isSubmitting} />
+                    <input id="bf-location" className={`bf-input${reportErrors.location ? " bf-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="Street or place, for example: McArthur Highway" disabled={isSubmitting} />
                     {reportErrors.location && <div className="bf-error">{reportErrors.location}</div>}
                   </div>
 
                   <div className="bf-field">
                     <label className="bf-label" htmlFor="bf-landmark">Anything nearby? <span className="bf-pill">Optional</span></label>
-                    <input id="bf-landmark" className="bf-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder="Example: near the 7-Eleven" disabled={isSubmitting} />
+                    <input id="bf-landmark" className="bf-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder="For example: near the 7-Eleven or Petron" disabled={isSubmitting} />
                   </div>
 
                   <div className="bf-field">
                     <label className="bf-label" htmlFor="bf-lastseen">When did you see them? <span className="bf-pill">Optional</span></label>
-                    <input id="bf-lastseen" className="bf-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder="Example: today at 2:30 PM" disabled={isSubmitting} />
+                    <input id="bf-lastseen" className="bf-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder="For example: today at 2:30 PM, corner of 5th St" disabled={isSubmitting} />
                   </div>
 
                   <div className="bf-field">
@@ -357,7 +353,7 @@ export default function BSWDTab({ userData, householdID }) {
                 <div className="bf-form">
                   <div className="bf-field">
                     <label className="bf-label" htmlFor="bf-about">Who is this about? <span className="bf-pill bf-pill--req">Required</span></label>
-                    <input id="bf-about" className={`bf-input${tipErrors.about ? " bf-input--error" : ""}`} value={tipForm.about} onChange={e => setT("about", e.target.value)} placeholder="Name or describe the person" disabled={isTipSubmitting} />
+                    <input id="bf-about" className={`bf-input${tipErrors.about ? " bf-input--error" : ""}`} value={tipForm.about} onChange={e => setT("about", e.target.value)} placeholder="Name if you know it, or describe the person" disabled={isTipSubmitting} />
                     {tipErrors.about && <div className="bf-error">{tipErrors.about}</div>}
                   </div>
 
@@ -369,7 +365,7 @@ export default function BSWDTab({ userData, householdID }) {
 
                   <div className="bf-field">
                     <label className="bf-label" htmlFor="bf-contact">Your phone or email <span className="bf-pill">Optional</span></label>
-                    <input id="bf-contact" className="bf-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder="If you want us to contact you" disabled={isTipSubmitting} />
+                    <input id="bf-contact" className="bf-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder="Only fill this in if you want us to contact you" disabled={isTipSubmitting} />
                   </div>
 
                   {tipErrors.submit && <div className="bf-alert">{tipErrors.submit}</div>}

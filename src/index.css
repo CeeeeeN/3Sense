@@ -17867,6 +17867,592 @@ h4,
   }
 }
 
+
+/* =====================================================================
+   LIVELIHOOD PAGE (lv-*): big program cards and a simple 3-step form.
+   Reuses bz-*, vz-*, bf-*, bt-* styles.
+   ===================================================================== */
+
+.lv-empty {
+  padding: 1.6rem 0.5rem;
+  text-align: center;
+  font-size: 1.1rem;
+  color: #4a6582;
+  line-height: 1.6;
+}
+
+/* Program grid */
+.lv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.lv-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 2px solid #c5d6e8;
+  border-radius: 14px;
+  padding: 1rem 1.05rem 1.1rem;
+  box-shadow: var(--sv-card-shadow);
+}
+
+.lv-card.is-full {
+  opacity: 0.8;
+}
+
+.lv-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.lv-tag {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 800;
+  border-radius: 100px;
+  padding: 0.25rem 0.8rem;
+}
+
+.lv-slots {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #17714d;
+}
+
+.lv-slots.is-low {
+  color: #8a6d00;
+}
+
+.lv-slots.is-full {
+  color: #b71c1c;
+}
+
+.lv-card__title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0f1f35;
+  line-height: 1.3;
+  margin: 0 0 0.45rem;
+}
+
+.lv-desc-wrap {
+  flex: 1;
+  margin-bottom: 0.7rem;
+}
+
+.lv-desc {
+  font-size: 1.05rem;
+  color: #33475e;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lv-desc.is-open {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.lv-more {
+  margin-top: 0.3rem;
+  padding: 0.35rem 0;
+  min-height: 40px;
+  background: none;
+  border: none;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e6f7b;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.lv-more:hover {
+  color: #25636e;
+}
+
+.lv-meta {
+  list-style: none;
+  margin: 0 0 0.8rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lv-meta li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 1.02rem;
+  color: #0f1f35;
+  line-height: 1.45;
+}
+
+.lv-meta li svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: #1e8a5e;
+}
+
+.lv-meta--inline {
+  margin: 0.4rem 0 0;
+}
+
+.lv-bar {
+  height: 8px;
+  background: #e3ecf5;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 0.8rem;
+}
+
+.lv-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+}
+
+.lv-status-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #8a6d00;
+  background: #fffbeb;
+  border: 2px solid #fcd34d;
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.lv-status-note.is-ok {
+  color: #14532d;
+  background: #e8f7ef;
+  border-color: #9fd8b9;
+}
+
+.lv-status-note svg {
+  flex-shrink: 0;
+}
+
+.lv-register {
+  width: 100%;
+  min-height: 58px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #fff;
+  background: #1e8a5e;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lv-register:hover:not(:disabled) {
+  background: #17714d;
+}
+
+.lv-register:focus-visible {
+  outline: 3px solid #1e8a5e;
+  outline-offset: 3px;
+}
+
+.lv-register:disabled {
+  background: #8a99a8;
+  cursor: not-allowed;
+}
+
+/* My registrations */
+.lv-regs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.lv-reg {
+  background: #fff;
+  border: 2px solid #c5d6e8;
+  border-radius: 14px;
+  padding: 0.95rem 1.05rem;
+}
+
+.lv-reg__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.lv-reg__name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f1f35;
+  line-height: 1.3;
+}
+
+.lv-reg__date {
+  font-size: 1.02rem;
+  color: #4a6582;
+  margin-top: 0.1rem;
+}
+
+.lv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  border-radius: 100px;
+  padding: 0.4rem 0.95rem;
+}
+
+.lv-reg__ref {
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #e3ecf5;
+  font-size: 1.02rem;
+  color: #33475e;
+}
+
+.lv-reg__ref strong {
+  font-family: 'Poppins', sans-serif;
+  color: #0f1f35;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.lv-reg__alert {
+  margin-top: 0.7rem;
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: #9b1c1c;
+  background: #fde8e8;
+  border: 2px solid #f5b5b5;
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+}
+
+.lv-reg__wait {
+  margin-top: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.02rem;
+  color: #8a6d00;
+}
+
+/* Registration steps */
+.lv-steps {
+  list-style: none;
+  margin: 0 0 1.1rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.lv-steps__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  padding-top: 0.6rem;
+  border-top: 5px solid #d8e4f0;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #6b87a6;
+  line-height: 1.3;
+}
+
+.lv-steps__dot {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  background: #fff;
+  border: 2.5px solid #b9cde2;
+  color: #6b87a6;
+}
+
+.lv-steps__item.is-active {
+  border-top-color: #1e8a5e;
+  color: #14532d;
+}
+
+.lv-steps__item.is-active .lv-steps__dot {
+  background: #1e8a5e;
+  border-color: #1e8a5e;
+  color: #fff;
+}
+
+.lv-steps__item.is-done {
+  border-top-color: #1e8a5e;
+  color: #17714d;
+}
+
+.lv-steps__item.is-done .lv-steps__dot {
+  background: #2DB17B;
+  border-color: #2DB17B;
+  color: #fff;
+}
+
+/* Which program banner */
+.lv-chosen {
+  background: #e8f7ef;
+  border: 2px solid #9fd8b9;
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.lv-chosen__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #3f6b55;
+}
+
+.lv-chosen__title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #14532d;
+  line-height: 1.3;
+}
+
+.lv-chosen .lv-meta li {
+  font-size: 1rem;
+  color: #14532d;
+}
+
+/* Form pieces */
+.lv-form .bz-heading {
+  margin-bottom: 0.5rem;
+}
+
+.bf-photo.is-error {
+  border-color: #c62828;
+}
+
+/* Program picker (step 2) */
+.lv-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.lv-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  min-height: 84px;
+  text-align: left;
+  background: #fff;
+  border: 2.5px solid #aabfd6;
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.lv-pick:hover:not(:disabled) {
+  border-color: #1e8a5e;
+}
+
+.lv-pick:focus-visible {
+  outline: 3px solid #1e8a5e;
+  outline-offset: 3px;
+}
+
+.lv-pick.is-active {
+  border-color: #1e8a5e;
+  background: #e8f7ef;
+  box-shadow: 0 0 0 4px rgba(30, 138, 94, 0.18);
+}
+
+.lv-pick:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lv-pick__check {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2.5px solid #aabfd6;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.lv-pick.is-active .lv-pick__check {
+  background: #1e8a5e;
+  border-color: #1e8a5e;
+}
+
+.lv-pick__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lv-pick__name {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #0f1f35;
+  line-height: 1.35;
+}
+
+.lv-pick__badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #8a6d00;
+  background: #fff3cd;
+  border-radius: 100px;
+  padding: 0.12rem 0.6rem;
+}
+
+.lv-pick__badge--full {
+  color: #9b1c1c;
+  background: #fde8e8;
+}
+
+.lv-pick__meta {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #33475e;
+  line-height: 1.45;
+}
+
+.lv-pick__slots {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #17714d;
+  white-space: nowrap;
+}
+
+.lv-pick__slots.is-low {
+  color: #8a6d00;
+}
+
+.lv-pick__slots.is-full {
+  color: #b71c1c;
+}
+
+/* Review (step 3) */
+.lv-review {
+  margin: 0;
+  background: #fff;
+  border: 2px solid #c5d6e8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lv-review__row {
+  padding: 0.7rem 1rem;
+}
+
+.lv-review__row + .lv-review__row {
+  border-top: 1px solid #e3ecf5;
+}
+
+.lv-review dt {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #5e7a99;
+  margin: 0;
+}
+
+.lv-review dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #0f1f35;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* Action buttons */
+.lv-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 1.3rem;
+}
+
+.lv-actions .bf-submit {
+  margin-top: 0;
+  background: #1e8a5e;
+}
+
+.lv-actions .bf-submit:hover:not(:disabled) {
+  background: #17714d;
+}
+
+.lv-actions .bf-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 56px;
+}
+
+@media (max-width: 800px) {
+  .lv-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .lv-steps__item {
+    font-size: 0.85rem;
+  }
+
+  .lv-pick {
+    flex-wrap: wrap;
+  }
+
+  .lv-pick__slots {
+    width: 100%;
+    padding-left: 2.6rem;
+  }
+}
+
 /* ===================== SCAN PAGE ===================== */
 
 .scan-desktop-block {
