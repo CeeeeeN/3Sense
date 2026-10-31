@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
-import { collection, query, where, orderBy, onSnapshot, limit, or } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, or, and } from "firebase/firestore";
 import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -84,12 +84,19 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const residentID = propMemberID || getSaved("memberID", null);
   const householdID = propHouseholdID || getSaved("householdID", null);
 
-  // Helper to build the hybrid query conditions
+  // Helper to build the hybrid query conditions safely
   const buildIdentityQuery = () => {
-    const conditions = [where("residentID", "==", residentID)];
+    const strictResidentMatch = and(
+      where("householdID", "==", householdID),
+      where("residentID", "==", residentID)
+    );
+    
+    const conditions = [strictResidentMatch];
+    
     if (userUID) {
       conditions.push(where("UID", "==", userUID));
     }
+    
     return or(...conditions);
   };
 
