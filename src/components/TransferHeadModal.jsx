@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { getHouseholdResidents, transferHouseholdHeadRole, verifyResidentPIN } from "../services/services";
 import ErrorMessage from "./ErrorMessage"; // <-- IMPORT ERROR MESSAGE
+import { useLanguage } from "../context/LanguageContext";
 
 export default function TransferHeadModal({ onClose, householdID, currentHeadID, onLogout }) {
+  const { t } = useLanguage();
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTargetID, setSelectedTargetID] = useState("");
@@ -79,8 +81,8 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
       <div className="pf-modal" style={{ maxWidth: '450px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>Transfer Head Role</h3>
-            <p>Assign your administrative privileges to another member</p>
+            <h3>{t('profile_transfer_head', 'Transfer Head Role')}</h3>
+            <p>{t('profile_transfer_head_desc')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose} disabled={isSubmitting}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -99,20 +101,20 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <div style={{ lineHeight: "1.5" }}>
-              <strong style={{ display: "block", color: "#7f1d1d", marginBottom: "4px", fontSize: "0.9rem" }}>Warning: Irreversible Action</strong>
-              By transferring the Household Head role, you will immediately lose your ability to manage household members, approve transfers, and update primary household data. You will be logged out upon completion.
+              <strong style={{ display: "block", color: "#7f1d1d", marginBottom: "4px", fontSize: "0.9rem" }}>{t('th_warning_title', 'Warning: Irreversible Action')}</strong>
+              {t('th_warning_desc')}
             </div>
           </div>
 
           <div className="pf-field">
-            <label className="pf-lbl">Select New Household Head</label>
+            <label className="pf-lbl">{t('th_select_head', 'Select New Household Head')}</label>
             {loading ? (
               <div style={{ padding: "12px", background: "#f1f5f9", borderRadius: "6px", color: "#64748b", fontSize: "0.85rem", textAlign: "center" }}>
-                Loading household members...
+                {t('th_loading_members', 'Loading household members...')}
               </div>
             ) : residents.length === 0 ? (
               <div style={{ padding: "12px", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "6px", color: "#92400e", fontSize: "0.85rem" }}>
-                There are no other eligible members in this household. You must add a member before transferring the role.
+                {t('th_no_eligible')}
               </div>
             ) : (
               <select 
@@ -133,7 +135,7 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
 
           <div className="pf-field">
             <label className="pf-lbl" style={{ textAlign: "center", display: "block" }}>
-              Enter PIN to Confirm <span className="req">*</span>
+              {t('th_enter_pin', 'Enter PIN to Confirm')} <span className="req">*</span>
             </label>
             <input 
               type="password" 
@@ -177,7 +179,7 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
 
         <div className="pf-modal-foot" style={{ justifyContent: "space-between" }}>
           <button className="pf-btn-ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('cancel')}
           </button>
           
           <button 
@@ -186,7 +188,7 @@ export default function TransferHeadModal({ onClose, householdID, currentHeadID,
             onClick={handleSubmit} 
             disabled={isSubmitting || residents.length === 0 || !selectedTargetID}
           >
-            {isSubmitting ? "Verifying..." : "Confirm Transfer"}
+            {isSubmitting ? t('th_verifying', 'Verifying...') : t('th_confirm_btn', 'Confirm Transfer')}
           </button>
         </div>
       </div>

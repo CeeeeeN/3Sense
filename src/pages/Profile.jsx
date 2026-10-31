@@ -79,10 +79,11 @@ const IconChevronRight = () => <svg width="20" height="20" viewBox="0 0 24 24" f
 
 // ── Components ──
 function InfoItem({ label, value }) {
+  const { t } = useLanguage();
   return (
     <div className="pf-info-item">
       <div className="pf-info-label">{label}</div>
-      <div className={`pf-info-val${!value ? " empty" : ""}`}>{value || "Not provided"}</div>
+      <div className={`pf-info-val${!value ? " empty" : ""}`}>{value || t('profile_not_provided', 'Not provided')}</div>
     </div>
   );
 }
@@ -124,18 +125,19 @@ function formatHistoryDate(isoString) {
 // ── Action Modals ──
 
 function HelpFaqModal({ onClose }) {
+  const { t } = useLanguage();
   const faqs = [
     {
-      q: "How do I request a Barangay Clearance?",
-      a: "Go to Services → Barangay Clearance, fill in the form, and submit. Your request will be processed within 1–3 working days."
+      q: t('help_faq_q1'),
+      a: t('help_faq_a1')
     },
     {
-      q: "What documents are accepted as valid ID?",
-      a: "PhilSys ID, Passport, Driver's License, SSS/GSIS ID, Voter's ID, and other government-issued IDs are accepted."
+      q: t('help_faq_q2'),
+      a: t('help_faq_a2')
     },
     {
-      q: "How do I report an emergency?",
-      a: "Use the Emergency tab in the app to alert the Barangay or call the emergency hotline directly."
+      q: t('help_faq_q3'),
+      a: t('help_faq_a3')
     }
   ];
 
@@ -144,14 +146,14 @@ function HelpFaqModal({ onClose }) {
       <div className="pf-modal" style={{ maxWidth: '540px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>Help & FAQ</h3>
-            <p>Frequently asked questions</p>
+            <h3>{t('profile_settings_help', 'Help & FAQ')}</h3>
+            <p>{t('help_faq_sub', 'Frequently asked questions')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
         <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem', fontFamily: 'Poppins, sans-serif' }}>
-            Frequently Asked Questions
+            {t('help_faq_heading', 'Frequently Asked Questions')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {faqs.map((faq, i) => (
@@ -184,11 +186,11 @@ function HelpFaqModal({ onClose }) {
             }}
           >
             <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--teal)', marginBottom: '0.25rem' }}>
-              Still need help?
+              {t('help_still_need', 'Still need help?')}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: '1.45' }}>
-              Visit the Barangay Hall during office hours<br />
-              Mon – Fri, 8:00 AM – 5:00 PM
+              {t('help_visit_hall')}<br />
+              {t('help_office_hours', 'Mon - Fri, 8:00 AM - 5:00 PM')}
             </div>
           </div>
         </div>
@@ -198,6 +200,7 @@ function HelpFaqModal({ onClose }) {
 }
 
 function ContactModal({ onClose }) {
+  const { t } = useLanguage();
   const contacts = [
     {
       icon: (
@@ -206,7 +209,7 @@ function ContactModal({ onClose }) {
           <circle cx="12" cy="10" r="3" />
         </svg>
       ),
-      label: "Address",
+      label: t('contact_address_label', 'Address'),
       value: "MH Del Pilar St. Malanday, 1444 Valenzuela, Philippines"
     },
     {
@@ -215,7 +218,7 @@ function ContactModal({ onClose }) {
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
         </svg>
       ),
-      label: "Hotline",
+      label: t('contact_hotline_label', 'Hotline'),
       value: "(02) 8-962-7327"
     },
     {
@@ -225,7 +228,7 @@ function ContactModal({ onClose }) {
           <polyline points="22,6 12,13 2,6" />
         </svg>
       ),
-      label: "Email",
+      label: t('contact_email_label', 'Email'),
       value: "malanday.valenzuelacity@gmail.com"
     },
     {
@@ -235,7 +238,7 @@ function ContactModal({ onClose }) {
           <polyline points="12 6 12 12 16 14" />
         </svg>
       ),
-      label: "Office Hours",
+      label: t('contact_hours_label', 'Office Hours'),
       value: "Monday – Friday, 8:00 AM – 5:00 PM"
     }
   ];
@@ -245,14 +248,14 @@ function ContactModal({ onClose }) {
       <div className="pf-modal" style={{ maxWidth: '540px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>Contact Barangay</h3>
-            <p>Get in touch with the local office</p>
+            <h3>{t('contact_title', 'Contact Barangay')}</h3>
+            <p>{t('contact_sub', 'Get in touch with the local office')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
         <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem', fontFamily: 'Poppins, sans-serif' }}>
-            Get in Touch
+            {t('contact_heading', 'Get in Touch')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {contacts.map((row, i) => (
@@ -302,10 +305,10 @@ function ContactModal({ onClose }) {
             }}
           >
             <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#b45309', marginBottom: '0.25rem' }}>
-              ⚠ For Emergencies
+              {t('contact_emergency_label', 'For Emergencies')}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: '1.45' }}>
-              Use the Emergency tab in the app for immediate assistance or call 911.
+              {t('contact_emergency_desc')}
             </div>
           </div>
         </div>
@@ -315,11 +318,12 @@ function ContactModal({ onClose }) {
 }
 
 function AboutModal({ onClose }) {
+  const { t } = useLanguage();
   const details = [
-    { label: "Developer", value: "3S+ Sense Dev" },
-    { label: "Jurisdiction", value: "Brgy. Malanday, Valenzuela City" },
-    { label: "Build", value: "2026 Release" },
-    { label: "Platform", value: "Web & PWA" },
+    { label: t('about_developer_label', 'Developer'), value: "3S+ Sense Dev" },
+    { label: t('about_jurisdiction_label', 'Jurisdiction'), value: "Brgy. Malanday, Valenzuela City" },
+    { label: t('about_build_label', 'Build'), value: "2026 Release" },
+    { label: t('about_platform_label', 'Platform'), value: "Web & PWA" },
   ];
 
   return (
@@ -327,8 +331,8 @@ function AboutModal({ onClose }) {
       <div className="pf-modal" style={{ maxWidth: '520px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>About 3S+ Malanday</h3>
-            <p>System information and version</p>
+            <h3>{t('about_title', 'About 3S+ Malanday')}</h3>
+            <p>{t('about_sub', 'System information and version')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
@@ -357,7 +361,7 @@ function AboutModal({ onClose }) {
               3S+ Sense
             </div>
             <div style={{ fontSize: '0.82rem', color: 'var(--muted)', marginTop: '2px' }}>
-              Barangay Service Management System
+              {t('about_system', 'Barangay Service Management System')}
             </div>
             <div
               style={{
@@ -395,8 +399,8 @@ function AboutModal({ onClose }) {
           </div>
 
           <div style={{ fontSize: '0.75rem', color: 'var(--muted)', textAlign: 'center', marginTop: '1.5rem', lineHeight: '1.5' }}>
-            © 2026 Barangay 3S+ Malanday.<br />
-            All rights reserved.
+            {t('about_copyright')}
+
           </div>
         </div>
       </div>
@@ -405,43 +409,44 @@ function AboutModal({ onClose }) {
 }
 
 function PrivacyModal({ onClose }) {
+  const { t } = useLanguage();
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="pf-modal" style={{ maxWidth: '560px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>Privacy Policy</h3>
-            <p>How we handle your data</p>
+            <h3>{t('profile_settings_privacy', 'Privacy Policy')}</h3>
+            <p>{t('privacy_sub', 'How we handle your data')}</p>
           </div>
           <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
         </div>
         <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
           <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '0.98rem', color: 'var(--text)', marginBottom: '0.45rem' }}>
-            Data Privacy Notice
+            {t('privacy_notice_title', 'Data Privacy Notice')}
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
-            Barangay 3S+ Malanday collects your personal information in compliance with Republic Act No. 10173, also known as the Data Privacy Act of 2012.
+            {t('privacy_notice_desc')}
           </p>
 
           <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-            What We Collect
+            {t('privacy_collect_title', 'What We Collect')}
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
-            We collect personal details including your name, address, contact information, and household data solely for the purpose of delivering barangay services.
+            {t('privacy_collect_desc')}
           </p>
 
           <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-            How We Use It
+            {t('privacy_use_title', 'How We Use It')}
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
-            Your data is used to process barangay clearances, certificates, and other service requests. We do not share your data with third parties without your consent.
+            {t('privacy_use_desc')}
           </p>
 
           <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-            Your Rights
+            {t('privacy_rights_title', 'Your Rights')}
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '0' }}>
-            You have the right to access, correct, and request deletion of your personal data. For concerns, contact the Barangay Secretary at Barangay Hall.
+            {t('privacy_rights_desc')}
           </p>
         </div>
       </div>
@@ -527,7 +532,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
         // Auto-logout if profile was transferred to a new household
         if (err.message.includes("not found")) {
-          alert("Your profile has been transferred. Please log in again using your new Household ID.");
+          alert(t('profile_transferred_relogin', 'Your profile has been transferred. Please log in again using your new Household ID.'));
           localStorage.removeItem("brgy_session"); // Wipe the dead session
           if (onNavigate) onNavigate("logout");    // Kick back to login screen
         }
@@ -641,7 +646,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       setProfilePic(secureUrl);
     } catch (err) {
       console.error("Error saving profile pic:", err);
-      alert("Failed to save profile picture permanently. Please try again.");
+      alert(t('profile_pic_save_failed', 'Failed to save profile picture permanently. Please try again.'));
     } finally {
       setUploadingPic(false);
     }
@@ -678,7 +683,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
   const save = async () => {
     if (!householdID || !memberID) {
-      alert("Missing household or member info.");
+      alert(t('profile_missing_info', 'Missing household or member info.'));
       return;
     }
     setSaving(true);
@@ -690,7 +695,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       setData(payload);
       setOpen(false);
     } catch (err) {
-      alert("Failed to save: " + err.message);
+      alert(t('profile_failed_save', err.message));
     } finally {
       setSaving(false);
     }
@@ -739,9 +744,56 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const normalizedDraftCategories = normalizeCategories(draft.categories);
   const isPwd = normalizedDataCategories.includes("PWD");
   const draftPwd = normalizedDraftCategories.includes("PWD");
+  const tabs = [t('profile_tab_personal'), t('profile_tab_address'), t('profile_tab_category'), t('profile_tab_education'), t('profile_tab_household')];
 
   const currentStatus = data.adminStatus || "Clear Case";
-  const sInfo = STATUS_MAP[currentStatus] || STATUS_MAP["Clear Case"];
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case "Pending Case":
+        return {
+          label: t('profile_status_pending', 'Pending Case'),
+          cls: "pending",
+          color: "#e8a020",
+          desc: t('profile_status_desc_pending', 'This resident has a case currently under review.')
+        };
+      case "Violation":
+        return {
+          label: t('profile_status_violation', 'Violation'),
+          cls: "violation",
+          color: "#e03e3e",
+          desc: t('profile_status_desc_violation', 'This resident has a recorded violation.')
+        };
+      case "Clear Case":
+      default:
+        return {
+          label: t('profile_status_clear', 'Clear Case'),
+          cls: "clear",
+          color: "#0d7a55",
+          desc: t('profile_status_desc_clear', 'This resident has no pending cases or violations on record.')
+        };
+    }
+  };
+  const getRoleLabel = (r) => {
+    if (r === "Household Head" || r === "head") return t('profile_household_head');
+    if (r === "Branch Head") return t('profile_branch_head');
+    if (r === "Member" || !r) return t('profile_member');
+    return r;
+  };
+
+  const getCategoryLabel = (cat) => {
+    switch (cat) {
+      case "Student": return t('reg_cat_student');
+      case "Senior Citizen": return t('reg_cat_senior');
+      case "Solo Parent": return t('reg_cat_solo_parent');
+      case "OFW": return t('reg_cat_ofw');
+      case "LGBT": return t('reg_cat_lgbt');
+      case "Indigenous People": return t('reg_cat_ip');
+      case "PWD": return t('reg_cat_pwd');
+      default: return cat;
+    }
+  };
+
+  const sInfo = getStatusInfo(currentStatus);
   const statusHistory = Array.isArray(data.statusHistory) ? data.statusHistory : [];
 
   const handlePicFile = async (e) => {
@@ -761,7 +813,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   };
 
   const handleRemovePic = async () => {
-    if (!window.confirm("Are you sure you want to remove your profile picture?")) return;
+    if (!window.confirm(t('profile_remove_pic_confirm', 'Are you sure you want to remove your profile picture?'))) return;
 
     setPicMenuOpen(false);
     setUploadingPic(true);
@@ -776,7 +828,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       setData(prev => ({ ...prev, profilePhoto: null }));
     } catch (err) {
       console.error("Error removing profile pic:", err);
-      alert("Failed to remove profile picture.");
+      alert(t('profile_remove_pic_failed', 'Failed to remove profile picture.'));
     } finally {
       setUploadingPic(false);
     }
@@ -824,7 +876,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
       {loading && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "var(--muted)", fontSize: "0.9rem" }}>
-          Loading profile...
+          {t('profile_loading')}
         </div>
       )}
 
@@ -832,11 +884,11 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         <div className="pf-page">
           <div className="pf-page-header">
             <div>
-              <h1>My Profile</h1>
-              <p>Manage your personal information and barangay records.</p>
+              <h1>{t('profile_page_heading')}</h1>
+              <p>{t('profile_page_sub')}</p>
             </div>
             <button className="pf-btn-primary" onClick={openModal}>
-              <IconEdit /> Edit Profile
+              <IconEdit /> {t('profile_edit_btn')}
             </button>
           </div>
 
@@ -845,7 +897,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               <div className="pf-avatar-wrap">
                 <div className="pf-avatar-ring">
                   {uploadingPic ? (
-                    <div className="pf-avatar-placeholder" style={{ fontSize: "0.85rem", color: "var(--teal)", fontWeight: "600" }}>Saving...</div>
+                    <div className="pf-avatar-placeholder" style={{ fontSize: "0.85rem", color: "var(--teal)", fontWeight: "600" }}>{t('profile_saving_pic')}</div>
                   ) : profilePic ? (
                     <img src={profilePic} alt="Profile" className="pf-avatar-img" />
                   ) : (
@@ -855,7 +907,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <button
                   className="pf-avatar-cam-btn"
                   onClick={() => setPicMenuOpen(v => !v)}
-                  aria-label="Change profile picture"
+                  aria-label={t('profile_change_photo_aria', 'Change profile picture')}
                 >
                   <IconCamera />
                 </button>
@@ -870,56 +922,56 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                       onChange={handlePicFile}
                     />
                     <button className="pf-pic-menu-item" onClick={() => picInputRef.current?.click()}>
-                      <IconUpload /> Upload Photo
+                      <IconUpload /> {t('profile_pic_upload')}
                     </button>
                     <button className="pf-pic-menu-item" onClick={openCamera}>
-                      <IconCamera /> Take Picture
+                      <IconCamera /> {t('profile_pic_take')}
                     </button>
                     {profilePic && (
                       <button className="pf-pic-menu-item danger" onClick={handleRemovePic}>
-                        <IconTrash /> Remove Photo
+                        <IconTrash /> {t('profile_pic_remove')}
                       </button>
                     )}
                     <div className="pf-pic-menu-divider" />
                     <button className="pf-pic-menu-item muted" onClick={() => setPicMenuOpen(false)}>
-                      Cancel
+                      {t('cancel')}
                     </button>
                   </div>
                 )}
               </div>
-              <div className="pf-avatar-hint">Tap camera to change photo</div>
+              <div className="pf-avatar-hint">{t('profile_pic_hint')}</div>
             </div>
 
             <div className="pf-hero-identity">
-              <div className="pf-hero-name">{fullName || "Your Full Name"}</div>
-              <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {userRole || "Member"}</div>
+              <div className="pf-hero-name">{fullName || t('profile_full_name_fallback')}</div>
+              <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {getRoleLabel(userRole)}</div>
               
               {/* DISPLAY PERMANENT UID HERE */}
               {data.UID && (
                 <div className="pf-hero-family-number" style={{ color: "#0d7a55", fontWeight: "600", marginTop: "4px", fontSize: "0.95rem" }}>
-                  Barangay UID: {data.UID}
+                  {t('profile_uid_prefix')}{data.UID}
                 </div>
               )}
 
               {data.familyNumber && (
                 <div className="pf-hero-family-number">
-                  Family Number: {data.familyNumber}
+                  {t('profile_family_number_prefix')}{data.familyNumber}
                 </div>
               )}
               
-              <div className="pf-hero-verified"><span className="pf-hero-dot" /> Verified Resident</div>
+              <div className="pf-hero-verified"><span className="pf-hero-dot" /> {t('profile_verified_resident')}</div>
               <div className="pf-hero-divider" />
               <div className="pf-hero-meta">
                 <div className="pf-hero-meta-item">
-                  <div className="pf-hero-ml">Barangay</div>
+                  <div className="pf-hero-ml">{t('profile_meta_barangay')}</div>
                   <div className="pf-hero-mv">{data.barangay || "—"}</div>
                 </div>
                 <div className="pf-hero-meta-item">
-                  <div className="pf-hero-ml">City</div>
+                  <div className="pf-hero-ml">{t('profile_meta_city')}</div>
                   <div className="pf-hero-mv">{data.city || "—"}</div>
                 </div>
                 <div className="pf-hero-meta-item">
-                  <div className="pf-hero-ml">Record</div>
+                  <div className="pf-hero-ml">{t('profile_meta_record')}</div>
                   <div className="pf-hero-mv" style={{ color: sInfo.color }}>{sInfo.label}</div>
                 </div>
               </div>
@@ -930,103 +982,103 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <div className="pf-hero-qr-img-wrap">
                   {qrUrl
                     ? <img src={qrUrl} alt="Personal QR Code" className="pf-hero-qr-img" />
-                    : <div className="pf-hero-qr-generating">Generating...</div>
+                    : <div className="pf-hero-qr-generating">{t('profile_qr_generating')}</div>
                   }
                 </div>
-                <div className="pf-hero-qr-label">Scan to Verify</div>
+                <div className="pf-hero-qr-label">{t('profile_qr_scan_label')}</div>
                 <button className="pf-btn-dl" onClick={downloadQR} disabled={!qrUrl}>
-                  <IconDl /> Download QR
+                  <IconDl /> {t('profile_download_qr_btn')}
                 </button>
               </div>
             </div>
           </div>
 
-          <Card icon={ProfileIconUser} title="Personal Information">
+          <Card icon={ProfileIconUser} title={t('profile_card_personal')}>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div className="pf-info-grid c3">
-                <InfoItem label="First Name" value={data.firstName} />
-                <InfoItem label="Middle Name" value={data.middleName} />
-                <InfoItem label="Last Name" value={data.lastName} />
+                <InfoItem label={t('profile_lbl_first_name')} value={data.firstName} />
+                <InfoItem label={t('profile_lbl_middle_name')} value={data.middleName} />
+                <InfoItem label={t('profile_lbl_last_name')} value={data.lastName} />
               </div>
               <div className="pf-info-grid">
-                <InfoItem label="Date of Birth" value={data.birthDate} />
-                <InfoItem label="Birth Place" value={data.birthPlace} />
-                <InfoItem label="Sex" value={data.sex} />
-                <InfoItem label="Gender" value={data.gender === "Others" ? (data.genderOther || "Others") : data.gender} />
-                <InfoItem label="Civil Status" value={data.civilStatus} />
-                <InfoItem label="Citizenship" value={data.citizenship} />
-                <InfoItem label="Religion" value={data.religion} />
-                <InfoItem label="Residing Since" value={data.residingSinceYear} />
-                <InfoItem label="Contact Number" value={data.contactNumber} />
-                <InfoItem label="Email Address" value={data.email} />
+                <InfoItem label={t('profile_lbl_dob')} value={data.birthDate} />
+                <InfoItem label={t('profile_lbl_birth_place')} value={data.birthPlace} />
+                <InfoItem label={t('profile_lbl_sex')} value={data.sex === "Male" ? t('reg_sex_male', 'Male') : data.sex === "Female" ? t('reg_sex_female', 'Female') : data.sex} />
+                <InfoItem label={t('profile_lbl_gender')} value={data.gender === "Others" ? (data.genderOther || "Others") : data.gender} />
+                <InfoItem label={t('profile_lbl_civil_status')} value={data.civilStatus} />
+                <InfoItem label={t('profile_lbl_citizenship')} value={data.citizenship} />
+                <InfoItem label={t('profile_lbl_religion')} value={data.religion} />
+                <InfoItem label={t('profile_lbl_residing_since')} value={data.residingSinceYear} />
+                <InfoItem label={t('profile_lbl_contact')} value={data.contactNumber} />
+                <InfoItem label={t('profile_lbl_email')} value={data.email} />
               </div>
             </div>
           </Card>
 
-          <Card icon={ProfileIconPin} title="Address Information">
+          <Card icon={ProfileIconPin} title={t('profile_card_address')}>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div className="pf-info-grid">
-                <InfoItem label="House / Unit Number" value={data.houseNumber} />
-                <InfoItem label="Street" value={data.street} />
-                <InfoItem label="Barangay" value={data.barangay} />
-                <InfoItem label="City / Municipality" value={data.city} />
-                <InfoItem label="Province" value={data.province} />
-                <InfoItem label="Region" value={data.region} />
+                <InfoItem label={t('profile_lbl_house_unit')} value={data.houseNumber} />
+                <InfoItem label={t('profile_lbl_street')} value={data.street} />
+                <InfoItem label={t('profile_lbl_barangay')} value={data.barangay} />
+                <InfoItem label={t('profile_lbl_city')} value={data.city} />
+                <InfoItem label={t('profile_lbl_province')} value={data.province} />
+                <InfoItem label={t('profile_lbl_region')} value={data.region} />
               </div>
             </div>
           </Card>
 
-          <Card icon={IconTag} title="Category">
+          <Card icon={IconTag} title={t('profile_card_category')}>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div className="pf-cat-grid">
                 {data.categories && data.categories.length > 0
                   ? data.categories.map(cat => (
                     <div key={cat} className="pf-chip on">
-                      {cat}
+                      {getCategoryLabel(cat)}
                     </div>
                   ))
-                  : <div className="pf-chip off">No categories assigned</div>
+                  : <div className="pf-chip off">{t('profile_no_categories')}</div>
                 }
               </div>
               {isPwd && (
                 <div className="pf-subfields">
-                  <div className="pf-subtitle">♿ PWD Details</div>
+                  <div className="pf-subtitle">{t('profile_pwd_details')}</div>
                   <div className="pf-info-grid">
-                    <InfoItem label="PWD Status" value={data.pwdStatus} />
-                    <InfoItem label="Disability Type" value={data.disabilityType === "Others" ? (data.disabilityTypeOther || "Others") : data.disabilityType} />
+                    <InfoItem label={t('profile_lbl_pwd_status')} value={data.pwdStatus} />
+                    <InfoItem label={t('profile_lbl_disability_type')} value={data.disabilityType === "Others" ? (data.disabilityTypeOther || "Others") : data.disabilityType} />
                   </div>
                 </div>
               )}
             </div>
           </Card>
 
-          <Card icon={IconGrad} title="Education & Employment">
+          <Card icon={IconGrad} title={t('profile_card_education')}>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div className="pf-info-grid">
-                <InfoItem label="Highest Educational Attainment" value={data.educationAttainment} />
-                <InfoItem label="Education Status" value={data.educationStatus} />
-                <InfoItem label="Occupation" value={data.occupation} />
-                <InfoItem label="Employment Status" value={data.employmentStatus} />
+                <InfoItem label={t('profile_lbl_edu_attainment')} value={data.educationAttainment} />
+                <InfoItem label={t('profile_lbl_edu_status')} value={data.educationStatus} />
+                <InfoItem label={t('profile_lbl_occupation')} value={data.occupation} />
+                <InfoItem label={t('profile_lbl_employment_status')} value={data.employmentStatus} />
               </div>
             </div>
           </Card>
 
-          <Card icon={IconHome2} title="Household Information">
+          <Card icon={IconHome2} title={t('profile_card_household')}>
             <div className="pf-info-grid c3">
-              <InfoItem label="Household Number" value={householdID} />
-              {data.familyNumber && <InfoItem label="Family Number" value={data.familyNumber} />}
-              <InfoItem label="Total Members" value={data.totalMembers} />
-              <InfoItem label="Classification" value={data.householdClassification} />
+              <InfoItem label={t('profile_lbl_hh_number')} value={householdID} />
+              {data.familyNumber && <InfoItem label={t('profile_lbl_family_number')} value={data.familyNumber} />}
+              <InfoItem label={t('profile_lbl_total_members')} value={data.totalMembers} />
+              <InfoItem label={t('profile_lbl_hh_classification')} value={data.householdClassification} />
             </div>
           </Card>
 
-          <Card icon={ProfileIconShield} title="Barangay Record Status" tag="Circumstances">
+          <Card icon={ProfileIconShield} title={t('profile_card_status')} tag={t('profile_card_status_tag')}>
             <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
               <div className={`pf-status-badge ${sInfo.cls}`}>
                 <span className="pf-sdot" />{sInfo.label}
               </div>
               <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
-                <strong style={{ color: "var(--text)", fontFamily: "'Poppins',sans-serif", fontSize: "0.82rem" }}>Current Standing: </strong>
+                <strong style={{ color: "var(--text)", fontFamily: "'Poppins',sans-serif", fontSize: "0.82rem" }}>{t('profile_current_standing')}</strong>
                 {sInfo.desc}
               </div>
             </div>
@@ -1035,12 +1087,12 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "0.9rem 1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 {data.adminRemarks && (
                   <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.55 }}>
-                    <strong style={{ fontFamily: "'Poppins',sans-serif" }}>Remarks: </strong>{data.adminRemarks}
+                    <strong style={{ fontFamily: "'Poppins',sans-serif" }}>{t('profile_remarks_prefix')}</strong>{data.adminRemarks}
                   </div>
                 )}
                 {data.adminIncident && (
                   <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
-                    <strong style={{ fontFamily: "'Poppins',sans-serif", color: "var(--text)" }}>Incident: </strong>{data.adminIncident}
+                    <strong style={{ fontFamily: "'Poppins',sans-serif", color: "var(--text)" }}>{t('profile_incident_prefix')}</strong>{data.adminIncident}
                   </div>
                 )}
               </div>
@@ -1048,7 +1100,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
             {data.adminLastUpdatedBy && (
               <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginBottom: "1rem", fontStyle: "italic" }}>
-                Last updated by <strong style={{ fontStyle: "normal" }}>{data.adminLastUpdatedBy}</strong>
+                {t('profile_last_updated_by')}<strong style={{ fontStyle: "normal" }}>{data.adminLastUpdatedBy}</strong>
                 {data.adminLastUpdatedByPosition ? ` (${data.adminLastUpdatedByPosition})` : ""}
                 {data.adminLastUpdatedAt ? ` · ${data.adminLastUpdatedAt}` : ""}
               </div>
@@ -1056,7 +1108,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
             <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
               <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>
-                Case History
+                {t('profile_case_history')}
               </div>
 
               {statusHistory.length > 0 ? (
@@ -1076,7 +1128,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0, marginTop: 5 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>
-                          Status set to "{entry.status}"
+                          {t('profile_status_set_to')}"{entry.status}"
                           {entry.remarks ? ` — ${entry.remarks}` : ""}
                         </div>
                         {entry.incident && (
@@ -1085,7 +1137,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                           </div>
                         )}
                         <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>
-                          {formatHistoryDate(entry.setAt)} · by {byLine}
+                          {formatHistoryDate(entry.setAt)}{t('profile_by_prefix')}{byLine}
                         </div>
                       </div>
                     </div>
@@ -1093,30 +1145,30 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 })
               ) : (
                 <div style={{ fontSize: "0.82rem", color: "var(--muted)", fontStyle: "italic" }}>
-                  No status changes recorded yet.
+                  {t('profile_no_status_changes')}
                 </div>
               )}
             </div>
           </Card>
 
           {/* ADVANCED TRANSACTION HISTORY (From Incoming Branch) */}
-          <Card icon={IconHistory} title="Service & Transaction History">
+          <Card icon={IconHistory} title={t('profile_card_transactions')}>
             <div className="pf-table-wrap">
               <table className="pf-table">
                 <thead>
                   <tr>
-                    <th>Service Name</th>
-                    <th>Ref #</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Category</th>
+                    <th>{t('profile_tx_col_service')}</th>
+                    <th>{t('profile_tx_col_ref')}</th>
+                    <th>{t('profile_tx_col_date')}</th>
+                    <th>{t('profile_tx_col_status')}</th>
+                    <th>{t('profile_tx_col_category')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {txLoading ? (
-                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>Loading transactions...</td></tr>
+                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>{t('profile_tx_loading')}</td></tr>
                   ) : transactions.length === 0 ? (
-                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>No transactions found.</td></tr>
+                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>{t('profile_tx_empty')}</td></tr>
                   ) : (
                     transactions.slice((txPage - 1) * txPerPage, txPage * txPerPage).map((tx, i) => {
                       const dateStr = tx.date?.toDate
@@ -1154,7 +1206,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                                   </svg>
                                 )}
-                                Return: {returnDateStr}
+                                {t('profile_tx_return_prefix')}{returnDateStr}
                               </div>
                             )}
                           </td>
@@ -1164,16 +1216,16 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                               <span className={`pf-tx-badge ${statusLower}`}>
                                 <span className="pf-tx-bdot" />
-                                {tx.status}
+                                {tx.status === "Unreturned" ? t('status_unreturned') : tx.status === "Overdue" ? t('status_overdue') : tx.status}
                               </span>
                               {isUnreturned && (
                                 <div style={{ fontSize: "0.65rem", color: "#c2410c", fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
-                                  Contact barangay!
+                                  {t('profile_tx_contact_brgy')}
                                 </div>
                               )}
                               {isOverdue && (
                                 <div style={{ fontSize: "0.65rem", color: "#dc2626", fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
-                                  Past due date!
+                                  {t('profile_tx_past_due')}
                                 </div>
                               )}
                             </div>
@@ -1197,8 +1249,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
                   <div style={{ flex: 1, lineHeight: "1.6" }}>
-                    <strong style={{ display: "block", color: "#9a3412", marginBottom: "2px" }}>⚠ Unreturned Equipment — Immediate Action Required</strong>
-                    The Barangay has formally reported that equipment you rented has not been returned. Please visit the <strong>Barangay Hall</strong> immediately to return the equipment or clarify the situation. Continued non-return may result in further action.
+                    <strong style={{ display: "block", color: "#9a3412", marginBottom: "2px" }}>{t('profile_unreturned_banner_title')}</strong>
+                    {t('profile_unreturned_banner_text')}
                   </div>
                 </div>
               )}
@@ -1213,8 +1265,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
                   <div style={{ flex: 1, lineHeight: "1.6" }}>
-                    <strong style={{ display: "block", color: "#991b1b", marginBottom: "2px" }}>Overdue Equipment Return</strong>
-                    You have equipment that has not been returned by its scheduled return date. Please return the equipment to the Barangay Hall as soon as possible to avoid further penalties. The status will update to <strong>Returned</strong> once the admin records the return.
+                    <strong style={{ display: "block", color: "#991b1b", marginBottom: "2px" }}>{t('profile_overdue_banner_title')}</strong>
+                    {t('profile_overdue_banner_text')}
                   </div>
                 </div>
               )}
@@ -1230,10 +1282,10 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                       border: "none", cursor: txPage === 1 ? "not-allowed" : "pointer"
                     }}
                   >
-                    Prev
+                    {t('profile_tx_prev')}
                   </button>
                   <div style={{ fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", color: "var(--text)", margin: "0 0.5rem" }}>
-                    Page {txPage} of {totalPages}
+                    {t('profile_tx_page_info', txPage, totalPages)}
                   </div>
                   <button
                     onClick={() => setTxPage(p => Math.min(totalPages, p + 1))}
@@ -1245,7 +1297,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                       border: "none", cursor: txPage === totalPages ? "not-allowed" : "pointer"
                     }}
                   >
-                    Next
+                    {t('profile_tx_next')}
                   </button>
                 </div>
               )}
@@ -1308,7 +1360,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <SettingRow 
                   icon={ProfileIconUser} 
                   title={t('profile_transfer_head', 'Transfer Head Role')} 
-                  description="Assign the Household Head role to another member" 
+                  description={t('profile_transfer_head_desc')} 
                   onClick={() => setActiveModal('transferHead')} 
                 />
               )}
@@ -1317,7 +1369,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <SettingRow 
                   icon={IconTrash} 
                   title={t('profile_remove_member', 'Remove Member')} 
-                  description="Permanently delete a member from this household" 
+                  description={t('profile_remove_member_desc')} 
                   onClick={() => setActiveModal('removeMember')} 
                 />
               )}
@@ -1325,14 +1377,14 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <SettingRow 
                   icon={ProfileIconUser} 
                   title={t('profile_transfer_branch', 'Transfer Branch Head Role')} 
-                  description="Assign the Branch Head role to another member" 
+                  description={t('profile_transfer_branch_desc')} 
                   onClick={() => setActiveModal('transferBranchHead')} 
                 />
               )}
               <SettingRow 
                 icon={IconBell} 
                 title={t('profile_settings_notif', 'Push Notifications')} 
-                description="Receive important updates & notifications" 
+                description={t('profile_settings_notif_desc')} 
                 action={
                   <label className="pf-toggle-switch" style={{ position: "relative", display: "inline-block", width: "40px", height: "24px" }}>
                     <input 
@@ -1357,7 +1409,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               <SettingRow 
                 icon={IconTransfer} 
                 title={t('profile_transfer_household', 'Transfer Household')} 
-                description="Move your profile to a different household" 
+                description={t('profile_transfer_household_desc')} 
                 onClick={() => setActiveModal('transfer')} 
               />
             </Card>
@@ -1448,8 +1500,8 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           <div className="pf-modal" style={{ maxWidth: "460px" }}>
             <div className="pf-modal-head">
               <div>
-                <h3>Take Profile Picture</h3>
-                <p>Align your face inside the frame and capture</p>
+                <h3>{t('profile_cam_title')}</h3>
+                <p>{t('profile_cam_desc')}</p>
               </div>
               <button className="pf-modal-close" onClick={closeCamera}><ProfileIconX /></button>
             </div>
@@ -1470,10 +1522,10 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
               )}
             </div>
             <div className="pf-modal-foot" style={{ justifyContent: "flex-end" }}>
-              <button className="pf-btn-ghost" onClick={closeCamera}>Cancel</button>
+              <button className="pf-btn-ghost" onClick={closeCamera}>{t('cancel')}</button>
               {!cameraError && (
                 <button className="pf-btn-primary" onClick={capturePhoto}>
-                  <IconCamera /> Capture & Save
+                  <IconCamera /> {t('profile_cam_capture')}
                 </button>
               )}
             </div>
@@ -1487,16 +1539,16 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           <div className="pf-modal">
             <div className="pf-modal-head">
               <div>
-                <h3>Edit Profile</h3>
-                <p>Fill in your personal information</p>
+                <h3>{t('profile_edit_btn')}</h3>
+                <p>{t('profile_edit_sub')}</p>
               </div>
               <button className="pf-modal-close" onClick={closeModal}><ProfileIconX /></button>
             </div>
 
             <div className="pf-modal-tabs">
-              {TABS.map((t, i) => (
+              {tabs.map((tabLabel, i) => (
                 <div key={i} className={`pf-modal-tab${i === tab ? " active" : i < tab ? " done" : ""}`} onClick={() => setTab(i)}>
-                  <div className="pf-tab-num">{i < tab ? "✓" : i + 1}</div>{t}
+                  <div className="pf-tab-num">{i < tab ? "✓" : i + 1}</div>{tabLabel}
                 </div>
               ))}
             </div>
@@ -1504,77 +1556,77 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             <div className="pf-modal-body">
               {tab === 0 && <>
                 <div className="fg c3">
-                  <Field label="First Name" req><input className="pf-inp" placeholder="Maria" value={draft.firstName} onChange={set("firstName")} /></Field>
-                  <Field label="Middle Name"><input className="pf-inp" placeholder="Santos" value={draft.middleName} onChange={set("middleName")} /></Field>
-                  <Field label="Last Name" req><input className="pf-inp" placeholder="Dela Cruz" value={draft.lastName} onChange={set("lastName")} /></Field>
+                  <Field label={t('profile_lbl_first_name')} req><input className="pf-inp" placeholder="Maria" value={draft.firstName} onChange={set("firstName")} /></Field>
+                  <Field label={t('profile_lbl_middle_name')}><input className="pf-inp" placeholder="Santos" value={draft.middleName} onChange={set("middleName")} /></Field>
+                  <Field label={t('profile_lbl_last_name')} req><input className="pf-inp" placeholder="Dela Cruz" value={draft.lastName} onChange={set("lastName")} /></Field>
                 </div>
                 <div className="fg c3">
-                  <Field label="Suffix">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.suffix} onChange={set("suffix")}><option value="">None</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option></select></div>
+                  <Field label={t('profile_lbl_suffix')}>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.suffix} onChange={set("suffix")}><option value="">{t('none', 'None')}</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option></select></div>
                   </Field>
-                  <Field label="Religion"><input className="pf-inp" placeholder="Roman Catholic" value={draft.religion} onChange={set("religion")} /></Field>
-                  <Field label="Civil Status">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.civilStatus} onChange={set("civilStatus")}><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select></div>
+                  <Field label={t('profile_lbl_religion')}><input className="pf-inp" placeholder="Roman Catholic" value={draft.religion} onChange={set("religion")} /></Field>
+                  <Field label={t('profile_lbl_civil_status')}>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.civilStatus} onChange={set("civilStatus")}><option value="">{t('select', 'Select')}</option><option value="Single">{t('reg_civil_single', 'Single')}</option><option value="Married">{t('reg_civil_married', 'Married')}</option><option value="Widowed">{t('reg_civil_widowed', 'Widowed')}</option><option value="Separated">{t('reg_civil_separated', 'Separated')}</option></select></div>
                   </Field>
                 </div>
                 <div className="fg c3">
-                  <Field label="Date of Birth" req><input className="pf-inp" type="date" value={draft.birthDate} onChange={set("birthDate")} /></Field>
-                  <Field label="Birth Place"><input className="pf-inp" placeholder="Valenzuela City" value={draft.birthPlace} onChange={set("birthPlace")} /></Field>
-                  <Field label="Citizenship"><input className="pf-inp" placeholder="Filipino" value={draft.citizenship} onChange={set("citizenship")} /></Field>
+                  <Field label={t('profile_lbl_dob')} req><input className="pf-inp" type="date" value={draft.birthDate} onChange={set("birthDate")} /></Field>
+                  <Field label={t('profile_lbl_birth_place')}><input className="pf-inp" placeholder="Valenzuela City" value={draft.birthPlace} onChange={set("birthPlace")} /></Field>
+                  <Field label={t('profile_lbl_citizenship')}><input className="pf-inp" placeholder="Filipino" value={draft.citizenship} onChange={set("citizenship")} /></Field>
                 </div>
                 <div className="fg">
-                  <Field label="Sex" req>
+                  <Field label={t('profile_lbl_sex')} req>
                     <div className="pf-radio-row">
                       {["Male", "Female"].map(v => (
                         <label key={v} className="pf-radio-opt">
                           <input type="radio" name="sex" value={v} checked={draft.sex === v} onChange={set("sex")} />
-                          <span className="pf-radio-lbl">{v}</span>
+                          <span className="pf-radio-lbl">{v === "Male" ? t('reg_sex_male', 'Male') : t('reg_sex_female', 'Female')}</span>
                         </label>
                       ))}
                     </div>
                   </Field>
-                  <Field label="Gender">
+                  <Field label={t('profile_lbl_gender')}>
                     <div className="pf-sel-wrap">
                       <select className="pf-sel" value={draft.gender} onChange={set("gender")}>
-                        <option value="">Select gender</option>
-                        <option>Man</option>
-                        <option>Woman</option>
-                        <option>Non-binary</option>
-                        <option>Prefer not to say</option>
+                        <option value="">{t('reg_select_gender', 'Select gender')}</option>
+                        <option value="Man">{t('reg_gender_man', 'Man')}</option>
+                        <option value="Woman">{t('reg_gender_woman', 'Woman')}</option>
+                        <option value="Non-binary">{t('reg_gender_non_binary', 'Non-binary')}</option>
+                        <option value="Prefer not to say">{t('reg_gender_prefer_not', 'Prefer not to say')}</option>
                       </select>
                     </div>
                   </Field>
                 </div>
                 {draft.gender === "Others" && (
                   <div className="fg c1">
-                    <Field label="Please specify gender">
+                    <Field label={t('profile_lbl_specify_gender')}>
                       <input className="pf-inp" placeholder="Please specify" value={draft.genderOther || ""} onChange={set("genderOther")} />
                     </Field>
                   </div>
                 )}
                 <div className="fg">
-                  <Field label="Contact Number"><input className="pf-inp" type="tel" placeholder="09XX XXX XXXX" value={draft.contactNumber} onChange={set("contactNumber")} /></Field>
-                  <Field label="Email Address"><input className="pf-inp" type="email" placeholder="email@example.com" value={draft.email} onChange={set("email")} /></Field>
+                  <Field label={t('profile_lbl_contact')}><input className="pf-inp" type="tel" placeholder="09XX XXX XXXX" value={draft.contactNumber} onChange={set("contactNumber")} /></Field>
+                  <Field label={t('profile_lbl_email')}><input className="pf-inp" type="email" placeholder="email@example.com" value={draft.email} onChange={set("email")} /></Field>
                 </div>
                 <div className="fg">
-                  <Field label="Residing Since (Year)" req><input className="pf-inp" type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={draft.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
+                  <Field label={t('profile_lbl_residing_since_year')} req><input className="pf-inp" type="number" min="1900" max={new Date().getFullYear()} placeholder="e.g. 2010" value={draft.residingSinceYear} onChange={set("residingSinceYear")} /></Field>
                 </div>
               </>}
 
               {tab === 1 && <>
                 <div className="fg">
-                  <Field label="House / Unit Number" req><input className="pf-inp" placeholder="123" value={draft.houseNumber} onChange={set("houseNumber")} /></Field>
-                  <Field label="Street" req><input className="pf-inp" placeholder="Malanday Street" value={draft.street} onChange={set("street")} /></Field>
+                  <Field label={t('profile_lbl_house_unit')} req><input className="pf-inp" placeholder="123" value={draft.houseNumber} onChange={set("houseNumber")} /></Field>
+                  <Field label={t('profile_lbl_street')} req><input className="pf-inp" placeholder="Malanday Street" value={draft.street} onChange={set("street")} /></Field>
                 </div>
                 <div className="fg">
-                  <Field label="Region">
+                  <Field label={t('profile_lbl_region')}>
                     <input className="pf-inp" value="NCR" readOnly />
                   </Field>
-                  <Field label="Province"><input className="pf-inp" placeholder="Metro Manila" value={draft.province} onChange={set("province")} readOnly={draft.sameAddress} /></Field>
+                  <Field label={t('profile_lbl_province')}><input className="pf-inp" placeholder="Metro Manila" value={draft.province} onChange={set("province")} readOnly={draft.sameAddress} /></Field>
                 </div>
                 <div className="fg">
-                  <Field label="City / Municipality"><input className="pf-inp" value="Valenzuela City" readOnly /></Field>
-                  <Field label="Barangay"><input className="pf-inp" value="Malanday" readOnly /></Field>
+                  <Field label={t('profile_lbl_city')}><input className="pf-inp" value="Valenzuela City" readOnly /></Field>
+                  <Field label={t('profile_lbl_barangay')}><input className="pf-inp" value="Malanday" readOnly /></Field>
                 </div>
               </>}
 
@@ -1588,7 +1640,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                           <input type="checkbox" checked={draftCategories.includes(cat)} onChange={() => toggleCat(cat)} />
                           <span className="pf-chk-lbl">
                             <span className="pf-chk-box">{draftCategories.includes(cat) ? "✓" : ""}</span>
-                            {cat}
+                            {cat === "Student" ? t('reg_cat_student') : cat === "Senior Citizen" ? t('reg_cat_senior') : cat === "Solo Parent" ? t('reg_cat_solo_parent') : cat === "OFW" ? t('reg_cat_ofw') : cat === "LGBT" ? t('reg_cat_lgbt') : cat === "Indigenous People" ? t('reg_cat_ip') : cat === "PWD" ? t('reg_cat_pwd') : cat}
                           </span>
                         </label>
                       ))}
@@ -1597,31 +1649,31 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 })()}
                 {draftPwd && (
                   <div className="pf-subfields">
-                    <div className="pf-subtitle">♿ PWD Details</div>
+                    <div className="pf-subtitle">{t('profile_pwd_details')}</div>
                     <div className="fg">
-                      <Field label="PWD Status">
-                        <div className="pf-sel-wrap"><select className="pf-sel" value={draft.pwdStatus} onChange={set("pwdStatus")}><option value="">Select</option><option>Children with Disabilities</option><option>Person with Disabilities</option></select></div>
+                      <Field label={t('profile_lbl_pwd_status')}>
+                        <div className="pf-sel-wrap"><select className="pf-sel" value={draft.pwdStatus} onChange={set("pwdStatus")}><option value="">{t('select', 'Select')}</option><option value="Children with Disabilities">{t('reg_pwd_child', 'Children with Disabilities')}</option><option value="Person with Disabilities">{t('reg_pwd_person', 'Person with Disabilities')}</option></select></div>
                       </Field>
-                      <Field label="Disability Type">
+                      <Field label={t('profile_lbl_disability_type')}>
                         <div className="pf-sel-wrap"><select className="pf-sel" value={draft.disabilityType} onChange={set("disabilityType")}>
-                          <option value="">Select</option>
-                          <option>Physical Disability</option>
-                          <option>Visual Disability</option>
-                          <option>Hearing Disability</option>
-                          <option>Speech Impairment</option>
-                          <option>Intellectual Disability</option>
-                          <option>Learning Disability</option>
-                          <option>Psychosocial Disability</option>
-                          <option>Multiple Disabilities</option>
-                          <option>Chronic Illness</option>
-                          <option>Rare Disease</option>
-                          <option>Others</option>
+                          <option value="">{t('select', 'Select')}</option>
+                          <option value="Physical Disability">{t('reg_dis_physical', 'Physical Disability')}</option>
+                          <option value="Visual Disability">{t('reg_dis_visual', 'Visual Disability')}</option>
+                          <option value="Hearing Disability">{t('reg_dis_hearing', 'Hearing Disability')}</option>
+                          <option value="Speech Impairment">{t('reg_dis_speech', 'Speech Impairment')}</option>
+                          <option value="Intellectual Disability">{t('reg_dis_intellectual', 'Intellectual Disability')}</option>
+                          <option value="Learning Disability">{t('reg_dis_learning', 'Learning Disability')}</option>
+                          <option value="Psychosocial Disability">{t('reg_dis_psychosocial', 'Psychosocial Disability')}</option>
+                          <option value="Multiple Disabilities">{t('reg_dis_multiple', 'Multiple Disabilities')}</option>
+                          <option value="Chronic Illness">{t('reg_dis_chronic', 'Chronic Illness')}</option>
+                          <option value="Rare Disease">{t('reg_dis_rare', 'Rare Disease')}</option>
+                          <option value="Others">{t('others', 'Others')}</option>
                         </select></div>
                       </Field>
                     </div>
                     {draft.disabilityType === "Others" && (
                       <div className="fg c1">
-                        <Field label="Please specify disability type">
+                        <Field label={t('profile_lbl_specify_disability')}>
                           <input className="pf-inp" placeholder="Please specify" value={draft.disabilityTypeOther || ""} onChange={set("disabilityTypeOther")} />
                         </Field>
                       </div>
@@ -1632,26 +1684,26 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
               {tab === 3 && <>
                 <div className="fg">
-                  <Field label="Highest Educational Attainment">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.educationAttainment} onChange={set("educationAttainment")}><option value="">Select</option><option>Elementary</option><option>High School</option><option>College</option><option>Post Graduate</option><option>Vocational</option></select></div>
+                  <Field label={t('profile_lbl_edu_attainment')}>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.educationAttainment} onChange={set("educationAttainment")}><option value="">{t('select', 'Select')}</option><option value="Elementary">{t('reg_edu_elem', 'Elementary')}</option><option value="High School">{t('reg_edu_hs', 'High School')}</option><option value="College">{t('reg_edu_college', 'College')}</option><option value="Post Graduate">{t('reg_edu_post_grad', 'Post Graduate')}</option><option value="Vocational">{t('reg_edu_vocational', 'Vocational')}</option></select></div>
                   </Field>
-                  <Field label="Education Status">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.educationStatus} onChange={set("educationStatus")}><option value="">Select</option><option>In School</option><option>Out of School Youth (OSY)</option><option>Graduate</option></select></div>
+                  <Field label={t('profile_lbl_edu_status')}>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.educationStatus} onChange={set("educationStatus")}><option value="">{t('select', 'Select')}</option><option value="In School">{t('reg_edu_in_school', 'In School')}</option><option value="Out of School Youth (OSY)">{t('reg_edu_osy', 'Out of School Youth (OSY)')}</option><option value="Graduate">{t('reg_edu_grad', 'Graduate')}</option></select></div>
                   </Field>
                 </div>
                 <div className="fg">
-                  <Field label="Occupation"><input className="pf-inp" placeholder="e.g. Teacher, Student" value={draft.occupation} onChange={set("occupation")} /></Field>
-                  <Field label="Employment Status">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.employmentStatus} onChange={set("employmentStatus")}><option value="">Select</option><option>Employed</option><option>Unemployed</option><option>Self-employed</option><option>Student</option></select></div>
+                  <Field label={t('profile_lbl_occupation')}><input className="pf-inp" placeholder="e.g. Teacher, Student" value={draft.occupation} onChange={set("occupation")} /></Field>
+                  <Field label={t('profile_lbl_employment_status')}>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.employmentStatus} onChange={set("employmentStatus")}><option value="">{t('select', 'Select')}</option><option value="Employed">{t('reg_emp_employed', 'Employed')}</option><option value="Unemployed">{t('reg_emp_unemployed', 'Unemployed')}</option><option value="Self-employed">{t('reg_emp_self', 'Self-employed')}</option><option value="Student">{t('reg_emp_student', 'Student')}</option></select></div>
                   </Field>
                 </div>
               </>}
 
               {tab === 4 && <>
                 <div className="fg">
-                  <Field label="Total Members"><input className="pf-inp" type="number" min="1" placeholder="e.g. 4" value={draft.totalMembers} onChange={set("totalMembers")} /></Field>
-                  <Field label="Household Classification">
-                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.householdClassification} onChange={set("householdClassification")}><option value="">Select</option><option>Owner</option><option>Rental</option><option>Co-habit / Shared</option><option>Informal Settler</option></select></div>
+                  <Field label={t('profile_lbl_total_members')}><input className="pf-inp" type="number" min="1" placeholder="e.g. 4" value={draft.totalMembers} onChange={set("totalMembers")} /></Field>
+                  <Field label={t('profile_lbl_household_classification')}>
+                    <div className="pf-sel-wrap"><select className="pf-sel" value={draft.householdClassification} onChange={set("householdClassification")}><option value="">{t('select', 'Select')}</option><option value="Owner">{t('reg_class_owned', 'Owner')}</option><option value="Rental">{t('reg_class_rented', 'Rental')}</option><option value="Co-habit / Shared">{t('reg_class_rent_free_owner', 'Co-habit / Shared')}</option><option value="Informal Settler">{t('reg_class_informal', 'Informal Settler')}</option></select></div>
                   </Field>
                 </div>
               </>}
@@ -1659,12 +1711,12 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
             <div className="pf-modal-foot">
               <button className="pf-btn-ghost" onClick={tab === 0 ? closeModal : () => setTab(t => t - 1)}>
-                {tab === 0 ? "Cancel" : "← Back"}
+                {tab === 0 ? t('cancel') : t('profile_btn_back')}
               </button>
               <div style={{ display: "flex", gap: "0.65rem" }}>
-                {tab < TABS.length - 1
-                  ? <button className="pf-btn-primary" onClick={() => setTab(t => t + 1)}>Next <ProfileIconArrow /></button>
-                  : <button className="pf-btn-primary" onClick={save} disabled={saving}><IconSave /> {saving ? "Saving..." : "Save Changes"}</button>
+                {tab < tabs.length - 1
+                  ? <button className="pf-btn-primary" onClick={() => setTab(t => t + 1)}>{t('profile_btn_next')} <ProfileIconArrow /></button>
+                  : <button className="pf-btn-primary" onClick={save} disabled={saving}><IconSave /> {saving ? t('profile_btn_saving') : t('profile_save_changes')}</button>
                 }
               </div>
             </div>

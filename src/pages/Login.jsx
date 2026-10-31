@@ -23,8 +23,8 @@ function ProfileCard({ profile, selected, onSelect, t }) {
   const roleDisplay = profile.role === "Household Head"
     ? t("profile_household_head")
     : profile.role === "Branch Head"
-    ? t("profile_branch_head")
-    : t("login_member_label");
+      ? t("profile_branch_head")
+      : t("login_member_label");
 
   return (
     <div
@@ -193,6 +193,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
         const activeBranchID = m.branchID || "BR-001";
         const myBranch = result.branches?.find(b => b.id === activeBranchID);
 
+        // Normalize role — backward compat with old "head" value
         const rawRole = m.role || "Member";
         const isHouseholdHead = rawRole === "Household Head" || rawRole === "head";
         const isBranchHead = !isHouseholdHead &&
@@ -378,7 +379,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
         <div className="left-content">
           <h2>{t("login_left_heading")} <span style={{ color: "#D9E232" }}>{t("login_left_heading_highlight")}</span></h2>
           <p>{t("login_left_sub")}</p>
-         
+
           <ul className="left-features">
             {loginFeatures.map((f) => (
               <li className="left-feature" key={f.title}>
@@ -411,7 +412,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <div className="input-wrap">
                   <span className="field-icon"><LoginHomeIcon /></span>
                   <input type="text" placeholder="e.g. MAL-2026-00142"
-                    value={hhNumber} 
+                    value={hhNumber}
                     onChange={e => {
                       setHhNumber(e.target.value);
                       setErrorMsg("");
@@ -425,7 +426,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                 <div className="input-wrap has-toggle">
                   <span className="field-icon"><LoginLockIcon /></span>
                   <input type={showPw ? "text" : "password"} placeholder={t("act_pw_placeholder", "Enter your password")}
-                    value={password} 
+                    value={password}
                     onChange={e => {
                       setPassword(e.target.value);
                       setErrorMsg("");
@@ -442,10 +443,10 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
               </div>
 
               {errorMsg && (
-                <ErrorMessage 
-                  message={errorMsg} 
-                  onDismiss={() => setErrorMsg("")} 
-                  style={{ marginBottom: "1rem" }} 
+                <ErrorMessage
+                  message={errorMsg}
+                  onDismiss={() => setErrorMsg("")}
+                  style={{ marginBottom: "1rem" }}
                 />
               )}
 
@@ -516,6 +517,7 @@ export default function Login({ onBack, onForgotPassword, onSuccess, onRegister,
                         </div>
                       </button>
 
+                      {/* Members list */}
                       {isExpanded && (
                         <div className="branch-members-body">
                           <div className="profile-grid">

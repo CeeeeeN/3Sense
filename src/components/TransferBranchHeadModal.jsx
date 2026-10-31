@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { getHouseholdResidents, transferBranchHeadRole, verifyResidentPIN } from "../services/services";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function TransferBranchHeadModal({ onClose, householdID, currentBranchID, currentHeadID, onLogout }) {
+  const { t } = useLanguage();
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTargetID, setSelectedTargetID] = useState("");
@@ -69,8 +71,8 @@ export default function TransferBranchHeadModal({ onClose, householdID, currentB
       <div className="pf-modal" style={{ maxWidth: '450px' }}>
         <div className="pf-modal-head">
           <div>
-            <h3>Transfer Branch Head Role</h3>
-            <p>Assign your administrative privileges to another member of {currentBranchID || "BR-001"}</p>
+            <h3>{t('profile_transfer_branch', 'Transfer Branch Head Role')}</h3>
+            <p>{t('profile_transfer_branch_desc')} ({currentBranchID || "BR-001"})</p>
           </div>
           <button className="pf-modal-close" onClick={onClose} disabled={isSubmitting}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -89,20 +91,20 @@ export default function TransferBranchHeadModal({ onClose, householdID, currentB
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <div style={{ lineHeight: "1.5" }}>
-              <strong style={{ display: "block", color: "#7f1d1d", marginBottom: "4px", fontSize: "0.9rem" }}>Warning: Irreversible Action</strong>
-              By transferring the Branch Head role, you will immediately lose your ability to manage this branch's members. You will be logged out upon completion.
+              <strong style={{ display: "block", color: "#7f1d1d", marginBottom: "4px", fontSize: "0.9rem" }}>{t('th_warning_title', 'Warning: Irreversible Action')}</strong>
+              {t('th_branch_warning_desc')}
             </div>
           </div>
 
           <div className="pf-field">
-            <label className="pf-lbl">Select New Branch Head</label>
+            <label className="pf-lbl">{t('th_branch_select', 'Select New Branch Head')}</label>
             {loading ? (
               <div style={{ padding: "12px", background: "#f1f5f9", borderRadius: "6px", color: "#64748b", fontSize: "0.85rem", textAlign: "center" }}>
-                Loading branch members...
+                {t('th_branch_loading', 'Loading branch members...')}
               </div>
             ) : residents.length === 0 ? (
               <div style={{ padding: "12px", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "6px", color: "#92400e", fontSize: "0.85rem" }}>
-                There are no other eligible members in this branch. You must add a member before transferring the role.
+                {t('th_branch_no_eligible')}
               </div>
             ) : (
               <select 
@@ -123,7 +125,7 @@ export default function TransferBranchHeadModal({ onClose, householdID, currentB
 
           {/* <-- NEW PIN INPUT FIELD --> */}
           <div className="pf-field">
-            <label className="pf-lbl">Enter PIN to Confirm <span className="req">*</span></label>
+            <label className="pf-lbl">{t('th_enter_pin', 'Enter PIN to Confirm')} <span className="req">*</span></label>
             <input 
               type="password" 
               className="pf-inp" 
@@ -146,7 +148,7 @@ export default function TransferBranchHeadModal({ onClose, householdID, currentB
 
         <div className="pf-modal-foot" style={{ justifyContent: "space-between" }}>
           <button className="pf-btn-ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {t('cancel')}
           </button>
           
           <button 
@@ -155,7 +157,7 @@ export default function TransferBranchHeadModal({ onClose, householdID, currentB
             onClick={handleSubmit} 
             disabled={isSubmitting || residents.length === 0 || !selectedTargetID || !pin}
           >
-            {isSubmitting ? "Verifying..." : "Confirm Transfer"}
+            {isSubmitting ? t('th_verifying', 'Verifying...') : t('th_confirm_btn', 'Confirm Transfer')}
           </button>
         </div>
       </div>
