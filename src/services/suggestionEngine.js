@@ -133,6 +133,16 @@ const dictionary = {
     statement: "The local barangay system, internet connection, or printer went offline, halting all digital processing.",
     actions: ["Switch to the manual logbook fallback system to continue receiving requests.", "Inform waiting residents of the estimated time until the system is restored."],
     strategy: ["Invest in a backup internet connection (e.g., prepaid pocket WiFi) and a UPS for the main server.", "Ensure the manual fallback procedure is officially documented and practiced."]
+  },
+  "Lack Of Barangay Patrol / Tanod": {
+    statement: "Residents feel unsafe or unassisted due to the absence or low visibility of barangay tanods and patrols in their area.",
+    actions: ["Adjust current shift schedules to ensure tanod visibility in reported blind spots.", "Deploy a roving patrol immediately to the concerned neighborhood."],
+    strategy: ["Map out high-risk areas to optimize daily and nightly patrol routes.", "Recruit and train additional volunteer tanods to bolster community security."]
+  },
+  "Loiterers / Tambay": {
+    statement: "Groups of individuals are reportedly loitering in streets or public areas, causing noise, obstruction, or safety concerns for residents.",
+    actions: ["Dispatch a tanod unit to safely disperse the loiterers and issue a verbal warning.", "Verify if the group is violating other local ordinances, such as public drinking or noise curfews."],
+    strategy: ["Strictly enforce local anti-loitering and curfew ordinances with standard penalties.", "Increase the frequency of random nightly patrols in identified loitering hotspots."]
   }
 };
 
