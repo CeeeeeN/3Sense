@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { IconUser, IconCalendar, IconClock, IconPin, IconHome, IconGlobe, IconPhone, IconMail, IconHeart, IconBriefcase, IconGradCap, IconBook, IconShield, IconInfo, IconReligion, IconPlus, IconArrow, IconCheck, IconX } from "../components/Icons";
 import { addHouseholdMember, createBranch } from "../services/addMembers";
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -16,8 +16,50 @@ const AVATAR_COLORS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BACKEND PLACEHOLDER: validateIsGovernmentId
+// HOUSEHOLD HEAD ADDRESS FETCHING & NORMALIZATION
 // ─────────────────────────────────────────────────────────────────────────────
+function normalizeAddress(data) {
+  if (!data || typeof data !== "object") return null;
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const src = isObj(data.address) ? data.address : isObj(data.hhAddress) ? data.hhAddress : isObj(data.householdHead?.address) ? data.householdHead.address : data;
+  const pick = (...keys) => {
+    for (const k of keys) {
+      const v = src[k] ?? data[k];
+      if (v !== undefined && v !== null && String(v).trim() !== "") return String(v);
+    }
+    return "";
+  };
+  const addr = {
+    houseNumber: pick("houseNumber", "houseNo", "unitNumber"),
+    street: pick("street"),
+    region: pick("region") || "NCR",
+    province: pick("province"),
+    city: pick("city", "municipality") || "Valenzuela City",
+    barangay: pick("barangay") || "Malanday",
+  };
+  if (!addr.houseNumber && !addr.street && !addr.province) return null;
+  return addr;
+}
+
+async function fetchHouseholdAddress(householdID) {
+  if (!householdID) return null;
+  try {
+    const hhSnap = await getDoc(doc(db, "households", householdID));
+    if (hhSnap.exists()) {
+      const addr = normalizeAddress(hhSnap.data());
+      if (addr) return addr;
+    }
+    const brSnap = await getDoc(doc(db, "households", householdID, "branches", "BR-001"));
+    if (brSnap.exists()) {
+      const addr = normalizeAddress(brSnap.data());
+      if (addr) return addr;
+    }
+  } catch (err) {
+    console.warn("[fetchHouseholdAddress] Fetch error:", err);
+  }
+  return null;
+}
+
 async function validateIsGovernmentId(imageBase64) {
   try {
     return new Promise((resolve) =>
@@ -57,14 +99,11 @@ async function performLiveOCR(imageBase64) {
     }
 
     const text = result.ParsedResults[0].ParsedText;
-    console.log("Live OCR Extracted Text:\n", text);
-
     let data = {
       idNumber: "", firstName: "", middleName: "", lastName: "",
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    // Match PhilSys / National ID PCN (4-4-4-4 format) or standard numeric IDs
     const idMatch = text.match(/\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}/) || text.match(/\d{4}\s*\d{4}\s*\d{4}\s*\d{4}/);
     if (idMatch) {
       data.idNumber = idMatch[0].replace(/[\s–]/g, '-'); 
@@ -482,7 +521,7 @@ function SelectField({ icon: Icon, children, ...props }) {
   );
 }
 
-// ─── ID Scan Step (Includes prominent Skip ID button) ──────────────────────────
+// ─── ID Scan Step ─────────────────────────────────────────────────────────────
 function AmIdScanStep({ onConfirm, onSkip }) {
   const { t } = useLanguage();
   const [mode, setMode] = useState("idle");
@@ -543,7 +582,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       </div>
 
-      {/* IDLE */}
       {mode === "idle" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div className="am-dropzone">
@@ -562,7 +600,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
             {uploadErr && <div className="am-upload-error"><SvgAlert size={14} /> {uploadErr}</div>}
           </div>
 
-          {/* SKIP BUTTON */}
           <div style={{ display: "flex", justifyContent: "center", marginTop: "0.4rem" }}>
             <button
               type="button"
@@ -594,7 +631,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       )}
 
-      {/* CAMERA */}
       {mode === "camera" && (
         <div className="am-camera-wrap">
           {cam.error ? (
@@ -631,7 +667,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       )}
 
-      {/* PREVIEW */}
       {mode === "preview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           <div className="am-id-preview-wrap"><img src={preview} alt="ID preview" /></div>
@@ -643,7 +678,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       )}
 
-      {/* VALIDATING */}
       {mode === "validating" && (
         <div className="am-status-center">
           <div className="am-status-icon loading"><SvgLoader /></div>
@@ -652,7 +686,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       )}
 
-      {/* INVALID */}
       {mode === "invalid" && result && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           <div className="am-invalid-preview"><img src={preview} alt="Rejected ID" /></div>
@@ -677,7 +710,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       )}
 
-      {/* PROCESSING */}
       {mode === "processing" && (
         <div className="am-status-center">
           <div className="am-status-icon loading"><SvgLoader /></div>
@@ -686,7 +718,6 @@ function AmIdScanStep({ onConfirm, onSkip }) {
         </div>
       )}
 
-      {/* DONE */}
       {mode === "done" && (
         <div className="am-status-center">
           <div className="am-status-icon success"><SvgCheckCircle size={38} /></div>
@@ -733,7 +764,6 @@ function AmSelfieStep({ onConfirm }) {
         </div>
       </div>
 
-      {/* IDLE */}
       {mode === "idle" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div className="am-dropzone">
@@ -751,7 +781,6 @@ function AmSelfieStep({ onConfirm }) {
         </div>
       )}
 
-      {/* CAMERA */}
       {mode === "camera" && (
         <div className="am-camera-wrap">
           {cam.error ? (
@@ -778,7 +807,6 @@ function AmSelfieStep({ onConfirm }) {
         </div>
       )}
 
-      {/* PREVIEW */}
       {mode === "preview" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           <div className="am-selfie-preview-center">
@@ -850,6 +878,24 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
   const toastRef = useRef(null);
   const householdID = propHouseholdID || searchParams.get("hhID");
 
+  const [resolvedAddress, setResolvedAddress] = useState(hhAddress || null);
+  const [addrLoading, setAddrLoading] = useState(false);
+  const [addrError, setAddrError] = useState("");
+
+  useEffect(() => {
+    if (hhAddress) { setResolvedAddress(hhAddress); return; }
+    if (!householdID) return;
+
+    let cancelled = false;
+    setAddrLoading(true);
+    fetchHouseholdAddress(householdID)
+      .then(addr => { if (!cancelled) setResolvedAddress(addr); })
+      .catch(err => { console.error("[AddMembers] Address fetch error:", err); })
+      .finally(() => { if (!cancelled) setAddrLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [hhAddress, householdID]);
+
   const handleBack = () => {
     if (onBack) onBack();
     else navigate(-1);
@@ -867,7 +913,6 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     }
   }, [showToast]);
 
-  // ─── OCR autofill ───────────────────────────────────────────────────────────
   const applyOcr = useCallback((data) => {
     const mapping = {
       firstName: "firstName", middleName: "middleName", lastName: "lastName",
@@ -924,15 +969,53 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     categories: f.categories.includes(val) ? f.categories.filter(c => c !== val) : [...f.categories, val],
   }));
 
-  const handleSameAddress = (checked) => {
-    if (checked && hhAddress) {
-      setForm(f => ({ ...f, sameAddress: true, houseNumber: hhAddress.houseNumber || "", street: hhAddress.street || "", region: hhAddress.region || "", province: hhAddress.province || "", city: hhAddress.city || "", barangay: hhAddress.barangay || "" }));
-    } else {
-      setForm(f => ({ ...f, sameAddress: false, houseNumber: "", street: "", region: "NCR", province: "", city: "Valenzuela City", barangay: "Malanday" }));
+  const handleToggleSameAddress = async () => {
+    const nextState = !form.sameAddress;
+    setAddrError("");
+
+    if (!nextState) {
+      setForm(prev => ({
+        ...prev,
+        sameAddress: false,
+        houseNumber: "",
+        street: "",
+        region: "NCR",
+        province: "",
+        city: "Valenzuela City",
+        barangay: "Malanday"
+      }));
+      return;
+    }
+
+    let addr = resolvedAddress;
+    if (!addr && householdID) {
+      setAddrLoading(true);
+      try {
+        addr = await fetchHouseholdAddress(householdID);
+        if (addr) setResolvedAddress(addr);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setAddrLoading(false);
+      }
+    }
+
+    setForm(prev => ({
+      ...prev,
+      sameAddress: true,
+      houseNumber: addr?.houseNumber || prev.houseNumber || "123",
+      street: addr?.street || prev.street || "Malanday Street",
+      region: addr?.region || "NCR",
+      province: addr?.province || prev.province || "Metro Manila",
+      city: addr?.city || "Valenzuela City",
+      barangay: addr?.barangay || "Malanday"
+    }));
+
+    if (!addr) {
+      setAddrError("Address not found in database. Default placeholder applied—you can adjust details below.");
     }
   };
 
-  // ─── Validation ─────────────────────────────────────────────────────────────
   const validateTab = (tabNum) => {
     const missing = [];
     
@@ -1003,9 +1086,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
     
     try {
+      // Includes both branchID and familyBranch to ensure full backward compatibility with Login.jsx profile selection
       await addHouseholdMember(householdID, {
         ...form,
         branchID: familyBranch,
+        familyBranch: familyBranch,
         idImage,
         selfieImage,
         categories: form.categories || [],
@@ -1042,9 +1127,11 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
 
   const removeMember = (i) => setMembers(m => m.filter((_, idx) => idx !== i));
 
-  const addrPreview = hhAddress
-    ? [hhAddress.houseNumber, hhAddress.street, hhAddress.barangay, hhAddress.city].filter(Boolean).join(", ")
-    : t("am_no_address_found", "No address found from registration.");
+  const addrPreview = addrLoading 
+    ? "Loading address..." 
+    : resolvedAddress 
+      ? [resolvedAddress.houseNumber, resolvedAddress.street, resolvedAddress.barangay, resolvedAddress.city].filter(Boolean).join(", ")
+      : t("am_no_address_found", "No address found from registration.");
 
   const isPwd = Array.isArray(form.categories) && form.categories.includes("PWD");
 
@@ -1144,6 +1231,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
               setIdImage(null); setSelfieImage(null);
               setFamilyBranch(null); setBranchName(""); setNeedsHead(false);
               setAutofilledFields(new Set()); manuallyEdited.current = new Set();
+              setAddrError("");
             }}>
               {t("am_clear_form")}
             </button>
@@ -1201,7 +1289,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
             />
           )}
 
-          {/* ── STEP 1: ID SCAN (WITH SKIP BUTTON INTEGRATION) ── */}
+          {/* ── STEP 1: ID SCAN ── */}
           {outerStep === 1 && (
             <div>
               <AmIdScanStep
@@ -1259,18 +1347,52 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                 </div>
               )}
 
+              {/* ── RELIABLE ADDRESS TOGGLE BUTTON ── */}
               {tab === 2 && (
-                <div className="am-special-checks">
-                  <label className="am-special-check">
-                    <input type="checkbox" checked={form.sameAddress} onChange={e => handleSameAddress(e.target.checked)} />
-                    <span className="am-special-check-label">
-                      <span className="am-check-icon-box">{form.sameAddress && "✓"}</span>
-                      <span className="am-check-text">
-                        <strong>{t("am_same_address_head")}</strong>
-                        <span>{addrPreview}</span>
-                      </span>
-                    </span>
-                  </label>
+                <div className="am-special-checks" style={{ marginBottom: "1.25rem" }}>
+                  <button
+                    type="button"
+                    onClick={handleToggleSameAddress}
+                    disabled={addrLoading}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      padding: "14px 18px",
+                      borderRadius: "10px",
+                      border: form.sameAddress ? "2px solid #0d7a55" : "1px solid #cbd5e1",
+                      background: form.sameAddress ? "rgba(13,122,85,0.08)" : "#f8fafc",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      boxSizing: "border-box"
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "20px",
+                        height: "20px",
+                        borderRadius: "5px",
+                        border: form.sameAddress ? "2px solid #0d7a55" : "2px solid #94a3b8",
+                        background: form.sameAddress ? "#0d7a55" : "#ffffff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0
+                      }}
+                    >
+                      {form.sameAddress && (
+                        <span style={{ color: "#ffffff", fontWeight: "bold", fontSize: "12px" }}>✓</span>
+                      )}
+                    </div>
+                    <div>
+                      <strong style={{ display: "block", fontSize: "0.92rem", color: "#1e293b" }}>
+                         {t("am_same_address_head")}
+                      </strong>
+                      <span style={{ fontSize: "0.82rem", color: "#64748b" }}>{addrPreview}</span>
+                    </div>
+                  </button>
+                  {addrError && <div className="am-field-error" style={{ marginTop: "0.5rem" }}>⚠️ {addrError}</div>}
                 </div>
               )}
 
@@ -1411,12 +1533,12 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
                 <div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     <div className="am-form-grid cols-2">
-                      <Field label={t("reg_house_number")} required><InputField icon={IconHome} type="text" placeholder="123" value={form.houseNumber} readOnly={form.sameAddress} onChange={set("houseNumber")} autofilled={af("houseNumber")} /></Field>
-                      <Field label={t("reg_street")} required><InputField icon={IconHome} type="text" placeholder="Malanday Street" value={form.street} readOnly={form.sameAddress} onChange={set("street")} autofilled={af("street")} /></Field>
+                      <Field label={t("reg_house_number")} required><InputField icon={IconHome} type="text" placeholder="123" value={form.houseNumber} onChange={set("houseNumber")} autofilled={af("houseNumber")} /></Field>
+                      <Field label={t("reg_street")} required><InputField icon={IconHome} type="text" placeholder="Malanday Street" value={form.street} onChange={set("street")} autofilled={af("street")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
                       <Field label={t("reg_region")} required><InputField icon={IconGlobe} type="text" value={form.region} readOnly /></Field>
-                      <Field label={t("reg_province")} required><InputField icon={IconPin} type="text" placeholder="Bulacan" value={form.province} readOnly={form.sameAddress} onChange={set("province")} autofilled={af("province")} /></Field>
+                      <Field label={t("reg_province")} required><InputField icon={IconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} autofilled={af("province")} /></Field>
                     </div>
                     <div className="am-form-grid cols-2">
                       <Field label={t("reg_city")} required><InputField icon={IconPin} type="text" value={form.city} readOnly /></Field>
@@ -1549,7 +1671,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
         <div className="am-bottom-bar-left">
           <strong>{members.length} {members.length === 1 ? t("am_member_single") : t("am_member_plural")}</strong> {lang === 'fil' ? 'ang naidagdag sa ngayon' : 'added so far'}
         </div>
-        <button className="am-btn-success-outline" onClick={onDone}>
+        <button className="am-btn-success-outline" onClick={handleDone}>
           {t("am_proceed_login")} <IconArrow />
         </button>
       </div>
