@@ -143,6 +143,16 @@ const dictionary = {
     statement: "Groups of individuals are reportedly loitering in streets or public areas, causing noise, obstruction, or safety concerns for residents.",
     actions: ["Dispatch a tanod unit to safely disperse the loiterers and issue a verbal warning.", "Verify if the group is violating other local ordinances, such as public drinking or noise curfews."],
     strategy: ["Strictly enforce local anti-loitering and curfew ordinances with standard penalties.", "Increase the frequency of random nightly patrols in identified loitering hotspots."]
+  },
+  "Privacy / Confidentiality Concerns": {
+    statement: "Residents reported that sensitive conversations were overheard or personal information was mishandled in public view.",
+    actions: ["Immediately relocate the resident to a private room for sensitive discussions (e.g., VAWC).", "Issue a verbal reminder to the current shift regarding the strict confidentiality protocol."],
+    strategy: ["Reconfigure the physical layout of the barangay hall to ensure dedicated, sound-dampened private spaces.", "Conduct a mandatory Data Privacy Act (DPA) and confidentiality refresher seminar for all staff."]
+  },
+  "Suggestion / Request": {
+    statement: "The resident provided a constructive idea, request for a new program, or a recommendation for barangay improvement.",
+    actions: ["Acknowledge the suggestion by replying and thanking the resident for their proactive feedback.", "Forward the idea to the relevant barangay committee for initial review."],
+    strategy: ["Consolidate all resident suggestions monthly to guide future barangay ordinances and budget allocations.", "Launch an official 'Community Ideas' board to publicly track and implement the best resident suggestions."]
   }
 };
 
