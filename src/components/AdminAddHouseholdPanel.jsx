@@ -1,10 +1,26 @@
-import React, { useState } from 'react';
-import { doc, collection, runTransaction, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAlert } from '../context/AlertContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { X, Save, User, MapPin, Mail, Tag, BookOpen, Home } from 'lucide-react';
 import { logTransaction } from '../services/logger';
+
+const INITIAL_FORM = {
+  idNumber: "",
+  firstName: "", lastName: "", middleName: "", suffix: "",
+  birthDate: "", birthPlace: "", sex: "Male", gender: "", genderOther: "",
+  civilStatus: "", religion: "", religionOther: "",
+  citizenship: "Filipino", citizenshipOther: "", residingSinceYear: "",
+  contactNumber: "", email: "",
+  houseNumber: "", street: "", subdivision: "", province: "",
+  categories: [],
+  pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
+  educationAttainment: "", postGradLevel: "", educationStatus: "",
+  occupation: "", employmentStatus: "",
+  totalMembers: "1", householdClassification: ""
+};
 
 const generateResidentUID = () => {
   const year = new Date().getFullYear();
@@ -17,25 +33,42 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
-
-  const initialForm = {
-    idNumber: "",
-    firstName: "", lastName: "", middleName: "", suffix: "",
-    birthDate: "", birthPlace: "", sex: "Male", gender: "", genderOther: "",
-    civilStatus: "", religion: "", religionOther: "",
-    citizenship: "Filipino", citizenshipOther: "", residingSinceYear: "",
-    contactNumber: "", email: "",
-    houseNumber: "", street: "", subdivision: "", province: "",
-    categories: [],
-    pwdStatus: "", disabilityType: "", disabilityTypeOther: "",
-    educationAttainment: "", postGradLevel: "", educationStatus: "",
-    occupation: "", employmentStatus: "",
-    totalMembers: "1", householdClassification: ""
-  };
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(INITIAL_FORM);
 
   const todayStr = new Date().toISOString().split("T")[0];
-  const currentYear = new Date().getFullYear();
+
+  const handleClose = useCallback(() => {
+    if (isSubmitting) return;
+    setForm(INITIAL_FORM);
+    setErrors({});
+    onClose();
+  }, [isSubmitting, onClose]);
+
+  // Prevent background scrolling and support Escape key while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !isSubmitting) {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, isSubmitting, handleClose]);
+
+  if (!isOpen) return null;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,7 +80,7 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
       if (name === "residingSinceYear") newValue = newValue.slice(0, 4);
     }
 
-    setForm({ ...form, [name]: newValue });
+    setForm(prev => ({ ...prev, [name]: newValue }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
   };
 
@@ -62,7 +95,7 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
 
   const validateForm = () => {
     const newErrors = {};
-    const nameRegex = /^[a-zA-ZñÑ\s\-\.]+$/;
+    const nameRegex = /^[a-zA-ZñÑ\s\-.]+$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!form.firstName.trim()) newErrors.firstName = "Required.";
@@ -229,7 +262,7 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
       logTransaction(adminName, adminRole, "Created Household (Pending Act)", `Manually created unactivated household ${generatedHouseholdID} for ${fullName}`);
       
       await showAlert("Success", `Household ${generatedHouseholdID} created successfully. An activation email has been sent.`);
-      setForm(initialForm);
+      setForm(INITIAL_FORM);
       setErrors({});
       onClose();
 
@@ -242,148 +275,473 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
   };
 
   const inputStyle = (errorField) => ({
-    width: '100%', padding: '8px 12px', borderRadius: '6px', fontSize: '0.9rem',
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    fontSize: '0.9rem',
     border: errorField ? '1px solid #ef4444' : '1px solid #cbd5e1',
-    background: errorField ? '#fef2f2' : 'white', outline: 'none'
+    background: errorField ? '#fef2f2' : 'white',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s ease',
   });
-  const labelStyle = { display: 'block', fontSize: '0.85rem', color: '#475569', marginBottom: '4px', fontWeight: 500 };
-  const sectionHeaderStyle = { display: 'flex', alignItems: 'center', gap: '8px', color: '#0f766e', margin: '0 0 16px 0', borderTop: '1px solid #e2e8f0', paddingTop: '24px' };
+  const labelStyle = {
+    display: 'block',
+    fontSize: '0.85rem',
+    color: '#475569',
+    marginBottom: '4px',
+    fontWeight: 500,
+  };
+  const sectionHeaderStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    color: '#0f766e',
+    margin: '0 0 16px 0',
+    borderTop: '1px solid #e2e8f0',
+    paddingTop: '20px',
+  };
 
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1040, opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? 'auto' : 'none', transition: 'opacity 0.2s' }} />
-      
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: '600px', background: '#fff', zIndex: 1050, boxShadow: '-4px 0 20px rgba(0,0,0,0.15)', transform: isOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s ease-in-out', display: 'flex', flexDirection: 'column' }}>
-        
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>Add Comprehensive Household</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={24} /></button>
+  const modalContent = (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-household-modal-title"
+      className="ahh-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) {
+          handleClose();
+        }
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(3px)',
+        WebkitBackdropFilter: 'blur(3px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}
+    >
+      <style>{`
+        .ahh-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        .ahh-grid-address {
+          display: grid;
+          grid-template-columns: 1fr 2fr;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        @media (max-width: 640px) {
+          .ahh-grid-2, .ahh-grid-address {
+            grid-template-columns: 1fr;
+          }
+          .ahh-modal-container {
+            max-height: 94vh !important;
+            border-radius: 12px !important;
+          }
+          .ahh-form-body {
+            padding: 16px !important;
+          }
+          .ahh-modal-header {
+            padding: 14px 16px !important;
+          }
+          .ahh-modal-footer {
+            padding: 12px 16px !important;
+          }
+        }
+      `}</style>
+
+      <div
+        className="ahh-modal-container"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: '680px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          overflow: 'hidden',
+          position: 'relative',
+          animation: 'modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="ahh-modal-header"
+          style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: '#f8fafc',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(15, 118, 110, 0.1)',
+                color: '#0f766e',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Home size={20} />
+            </div>
+            <div>
+              <h2
+                id="add-household-modal-title"
+                style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}
+              >
+                Add Comprehensive Household
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                Register a new household and initial resident profile.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            aria-label="Close"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              color: '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '8px',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f1f5f9';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#64748b';
+            }}
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          
+        {/* Scrollable Form Body */}
+        <form
+          id="admin-add-household-form"
+          onSubmit={handleSubmit}
+          className="ahh-form-body"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '24px',
+            minHeight: 0,
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {/* PERSONAL INFO */}
-          <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f766e', margin: '0 0 16px 0' }}><User size={18} /> Personal Information</h4>
+          <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f766e', margin: '0 0 16px 0' }}>
+            <User size={18} /> Personal Information
+          </h4>
           
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>PhilSys Card Number (PCN) <span style={{color:'#94a3b8'}}>(Optional)</span></label>
-            <input name="idNumber" value={form.idNumber} onChange={handleChange} placeholder="e.g. 1234-5678-9012-0000" style={inputStyle(false)} />
+            <label style={labelStyle}>PhilSys Card Number (PCN) <span style={{ color: '#94a3b8' }}>(Optional)</span></label>
+            <input
+              name="idNumber"
+              value={form.idNumber}
+              onChange={handleChange}
+              placeholder="e.g. 1234-5678-9012-0000"
+              style={inputStyle(false)}
+            />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>First Name *</label>
-              <input name="firstName" value={form.firstName} onChange={handleChange} style={inputStyle(errors.firstName)} />
+              <input
+                name="firstName"
+                value={form.firstName}
+                onChange={handleChange}
+                style={inputStyle(errors.firstName)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Last Name *</label>
-              <input name="lastName" value={form.lastName} onChange={handleChange} style={inputStyle(errors.lastName)} />
+              <input
+                name="lastName"
+                value={form.lastName}
+                onChange={handleChange}
+                style={inputStyle(errors.lastName)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Middle Name</label>
-              <input name="middleName" value={form.middleName} onChange={handleChange} style={inputStyle(false)} />
+              <input
+                name="middleName"
+                value={form.middleName}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Suffix</label>
-              <select name="suffix" value={form.suffix} onChange={handleChange} style={inputStyle(false)}>
-                <option value="">None</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option><option>IV</option>
+              <select
+                name="suffix"
+                value={form.suffix}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              >
+                <option value="">None</option>
+                <option>Jr.</option>
+                <option>Sr.</option>
+                <option>II</option>
+                <option>III</option>
+                <option>IV</option>
               </select>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>Birth Date *</label>
-              <input type="date" name="birthDate" max={todayStr} value={form.birthDate} onChange={handleChange} style={inputStyle(errors.birthDate)} />
+              <input
+                type="date"
+                name="birthDate"
+                max={todayStr}
+                value={form.birthDate}
+                onChange={handleChange}
+                style={inputStyle(errors.birthDate)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Birth Place *</label>
-              <input name="birthPlace" value={form.birthPlace} onChange={handleChange} style={inputStyle(errors.birthPlace)} />
+              <input
+                name="birthPlace"
+                value={form.birthPlace}
+                onChange={handleChange}
+                style={inputStyle(errors.birthPlace)}
+              />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>Sex</label>
-              <select name="sex" value={form.sex} onChange={handleChange} style={inputStyle(false)}>
-                <option>Male</option><option>Female</option>
+              <select
+                name="sex"
+                value={form.sex}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              >
+                <option>Male</option>
+                <option>Female</option>
               </select>
             </div>
             <div>
               <label style={labelStyle}>Civil Status *</label>
-              <select name="civilStatus" value={form.civilStatus} onChange={handleChange} style={inputStyle(errors.civilStatus)}>
+              <select
+                name="civilStatus"
+                value={form.civilStatus}
+                onChange={handleChange}
+                style={inputStyle(errors.civilStatus)}
+              >
                 <option value="">Select status</option>
-                <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Cohabitation</option>
+                <option>Single</option>
+                <option>Married</option>
+                <option>Widowed</option>
+                <option>Separated</option>
+                <option>Cohabitation</option>
               </select>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
-              <label style={labelStyle}>Gender <span style={{color:'#94a3b8'}}>(Optional)</span></label>
-              <select name="gender" value={form.gender} onChange={handleChange} style={inputStyle(false)}>
-                <option value="">Select gender</option><option>Man</option><option>Woman</option><option>Non-binary</option><option>Prefer not to say</option><option>Others</option>
+              <label style={labelStyle}>Gender <span style={{ color: '#94a3b8' }}>(Optional)</span></label>
+              <select
+                name="gender"
+                value={form.gender}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              >
+                <option value="">Select gender</option>
+                <option>Man</option>
+                <option>Woman</option>
+                <option>Non-binary</option>
+                <option>Prefer not to say</option>
+                <option>Others</option>
               </select>
-              {form.gender === "Others" && <input name="genderOther" placeholder="Specify" value={form.genderOther} onChange={handleChange} style={{...inputStyle(false), marginTop: '8px'}} />}
+              {form.gender === "Others" && (
+                <input
+                  name="genderOther"
+                  placeholder="Specify"
+                  value={form.genderOther}
+                  onChange={handleChange}
+                  style={{ ...inputStyle(false), marginTop: '8px' }}
+                />
+              )}
             </div>
             <div>
               <label style={labelStyle}>Religion</label>
-              <select name="religion" value={form.religion} onChange={handleChange} style={inputStyle(false)}>
-                <option value="">Select religion</option><option>Roman Catholic</option><option>Islam</option><option>Iglesia ni Cristo</option><option>Evangelical</option><option>None</option><option>Others</option>
+              <select
+                name="religion"
+                value={form.religion}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              >
+                <option value="">Select religion</option>
+                <option>Roman Catholic</option>
+                <option>Islam</option>
+                <option>Iglesia ni Cristo</option>
+                <option>Evangelical</option>
+                <option>None</option>
+                <option>Others</option>
               </select>
-              {form.religion === "Others" && <input name="religionOther" placeholder="Specify" value={form.religionOther} onChange={handleChange} style={{...inputStyle(false), marginTop: '8px'}} />}
+              {form.religion === "Others" && (
+                <input
+                  name="religionOther"
+                  placeholder="Specify"
+                  value={form.religionOther}
+                  onChange={handleChange}
+                  style={{ ...inputStyle(false), marginTop: '8px' }}
+                />
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>Citizenship</label>
-              <select name="citizenship" value={form.citizenship} onChange={handleChange} style={inputStyle(false)}>
-                <option>Filipino</option><option>Dual Citizen</option><option>Foreign National</option><option>Naturalized Filipino</option><option>Others</option>
+              <select
+                name="citizenship"
+                value={form.citizenship}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              >
+                <option>Filipino</option>
+                <option>Dual Citizen</option>
+                <option>Foreign National</option>
+                <option>Naturalized Filipino</option>
+                <option>Others</option>
               </select>
-              {form.citizenship === "Others" && <input name="citizenshipOther" placeholder="Specify" value={form.citizenshipOther} onChange={handleChange} style={{...inputStyle(false), marginTop: '8px'}} />}
+              {form.citizenship === "Others" && (
+                <input
+                  name="citizenshipOther"
+                  placeholder="Specify"
+                  value={form.citizenshipOther}
+                  onChange={handleChange}
+                  style={{ ...inputStyle(false), marginTop: '8px' }}
+                />
+              )}
             </div>
             <div>
               <label style={labelStyle}>Residing Since (Year) *</label>
-              <input type="text" maxLength="4" placeholder="e.g. 2010" name="residingSinceYear" value={form.residingSinceYear} onChange={handleChange} style={inputStyle(errors.residingSinceYear)} />
+              <input
+                type="text"
+                maxLength="4"
+                placeholder="e.g. 2010"
+                name="residingSinceYear"
+                value={form.residingSinceYear}
+                onChange={handleChange}
+                style={inputStyle(errors.residingSinceYear)}
+              />
             </div>
           </div>
 
           {/* CONTACT & ACCOUNT */}
           <h4 style={sectionHeaderStyle}><Mail size={18} /> Contact & Account Access</h4>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>Contact Number *</label>
-              <input type="tel" name="contactNumber" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={handleChange} style={inputStyle(errors.contactNumber)} />
+              <input
+                type="tel"
+                name="contactNumber"
+                placeholder="09XX XXX XXXX"
+                value={form.contactNumber}
+                onChange={handleChange}
+                style={inputStyle(errors.contactNumber)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Email Address *</label>
-              <input type="email" name="email" placeholder="email@example.com" value={form.email} onChange={handleChange} style={inputStyle(errors.email)} />
+              <input
+                type="email"
+                name="email"
+                placeholder="email@example.com"
+                value={form.email}
+                onChange={handleChange}
+                style={inputStyle(errors.email)}
+              />
             </div>
           </div>
           
           {/* ADDRESS */}
           <h4 style={sectionHeaderStyle}><MapPin size={18} /> Address</h4>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-address">
             <div>
               <label style={labelStyle}>House / Unit No.</label>
-              <input name="houseNumber" value={form.houseNumber} onChange={handleChange} style={inputStyle(false)} />
+              <input
+                name="houseNumber"
+                value={form.houseNumber}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Street *</label>
-              <input name="street" value={form.street} onChange={handleChange} style={inputStyle(errors.street)} />
+              <input
+                name="street"
+                value={form.street}
+                onChange={handleChange}
+                style={inputStyle(errors.street)}
+              />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>Subdivision / Village</label>
-              <input name="subdivision" value={form.subdivision} onChange={handleChange} style={inputStyle(false)} />
+              <input
+                name="subdivision"
+                value={form.subdivision}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Province *</label>
-              <input name="province" placeholder="e.g. Metro Manila" value={form.province} onChange={handleChange} style={inputStyle(errors.province)} />
+              <input
+                name="province"
+                placeholder="e.g. Metro Manila"
+                value={form.province}
+                onChange={handleChange}
+                style={inputStyle(errors.province)}
+              />
             </div>
           </div>
 
@@ -392,7 +750,12 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
             {["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"].map((cat) => (
               <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.categories.includes(cat)} onChange={() => toggleCategory(cat)} style={{ width: '16px', height: '16px', accentColor: '#0f766e' }} />
+                <input
+                  type="checkbox"
+                  checked={form.categories.includes(cat)}
+                  onChange={() => toggleCategory(cat)}
+                  style={{ width: '16px', height: '16px', accentColor: '#0f766e' }}
+                />
                 {cat}
               </label>
             ))}
@@ -400,24 +763,46 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
 
           {form.categories.includes("PWD") && (
             <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px dashed #cbd5e1', marginBottom: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="ahh-grid-2">
                 <div>
                   <label style={labelStyle}>PWD Status *</label>
-                  <select name="pwdStatus" value={form.pwdStatus} onChange={handleChange} style={inputStyle(errors.pwdStatus)}>
-                    <option value="">Select status</option><option>Children with Disabilities</option><option>Person with Disabilities</option>
+                  <select
+                    name="pwdStatus"
+                    value={form.pwdStatus}
+                    onChange={handleChange}
+                    style={inputStyle(errors.pwdStatus)}
+                  >
+                    <option value="">Select status</option>
+                    <option>Children with Disabilities</option>
+                    <option>Person with Disabilities</option>
                   </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Disability Type *</label>
-                  <select name="disabilityType" value={form.disabilityType} onChange={handleChange} style={inputStyle(errors.disabilityType)}>
-                    <option value="">Select type</option><option>Physical Disability</option><option>Visual Disability</option><option>Hearing Disability</option><option>Speech Impairment</option><option>Others</option>
+                  <select
+                    name="disabilityType"
+                    value={form.disabilityType}
+                    onChange={handleChange}
+                    style={inputStyle(errors.disabilityType)}
+                  >
+                    <option value="">Select type</option>
+                    <option>Physical Disability</option>
+                    <option>Visual Disability</option>
+                    <option>Hearing Disability</option>
+                    <option>Speech Impairment</option>
+                    <option>Others</option>
                   </select>
                 </div>
               </div>
               {form.disabilityType === "Others" && (
                 <div style={{ marginTop: '12px' }}>
                   <label style={labelStyle}>Specify Disability</label>
-                  <input name="disabilityTypeOther" value={form.disabilityTypeOther} onChange={handleChange} style={inputStyle(false)} />
+                  <input
+                    name="disabilityTypeOther"
+                    value={form.disabilityTypeOther}
+                    onChange={handleChange}
+                    style={inputStyle(false)}
+                  />
                 </div>
               )}
             </div>
@@ -425,66 +810,175 @@ export default function AdminAddHouseholdPanel({ isOpen, onClose, adminName, adm
 
           {/* EDUCATION & EMPLOYMENT */}
           <h4 style={sectionHeaderStyle}><BookOpen size={18} /> Education & Employment</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div className="ahh-grid-2">
             <div>
               <label style={labelStyle}>Highest Attainment *</label>
-              <select name="educationAttainment" value={form.educationAttainment} onChange={handleChange} style={inputStyle(errors.educationAttainment)}>
-                <option value="">Select</option><option>Elementary</option><option>High School</option><option>College</option><option>Post Graduate</option><option>Vocational</option>
+              <select
+                name="educationAttainment"
+                value={form.educationAttainment}
+                onChange={handleChange}
+                style={inputStyle(errors.educationAttainment)}
+              >
+                <option value="">Select</option>
+                <option>Elementary</option>
+                <option>High School</option>
+                <option>College</option>
+                <option>Post Graduate</option>
+                <option>Vocational</option>
               </select>
             </div>
             <div>
               <label style={labelStyle}>Education Status *</label>
-              <select name="educationStatus" value={form.educationStatus} onChange={handleChange} style={inputStyle(errors.educationStatus)}>
-                <option value="">Select</option><option>In School</option><option>Out of School Youth (OSY)</option><option>Out of School Children (OSC)</option><option>Graduate</option>
+              <select
+                name="educationStatus"
+                value={form.educationStatus}
+                onChange={handleChange}
+                style={inputStyle(errors.educationStatus)}
+              >
+                <option value="">Select</option>
+                <option>In School</option>
+                <option>Out of School Youth (OSY)</option>
+                <option>Out of School Children (OSC)</option>
+                <option>Graduate</option>
               </select>
             </div>
           </div>
           {form.educationAttainment === "Post Graduate" && (
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>Post Graduate Level</label>
-              <select name="postGradLevel" value={form.postGradLevel} onChange={handleChange} style={inputStyle(false)}>
-                <option value="">Select</option><option>Masters</option><option>Doctorate</option>
+              <select
+                name="postGradLevel"
+                value={form.postGradLevel}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              >
+                <option value="">Select</option>
+                <option>Masters</option>
+                <option>Doctorate</option>
               </select>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+          <div className="ahh-grid-2" style={{ marginBottom: '16px' }}>
             <div>
               <label style={labelStyle}>Occupation (If Applicable)</label>
-              <input name="occupation" placeholder="e.g. Teacher" value={form.occupation} onChange={handleChange} style={inputStyle(false)} />
+              <input
+                name="occupation"
+                placeholder="e.g. Teacher"
+                value={form.occupation}
+                onChange={handleChange}
+                style={inputStyle(false)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Employment Status *</label>
-              <select name="employmentStatus" value={form.employmentStatus} onChange={handleChange} style={inputStyle(errors.employmentStatus)}>
-                <option value="">Select</option><option>Employed</option><option>Unemployed</option>
+              <select
+                name="employmentStatus"
+                value={form.employmentStatus}
+                onChange={handleChange}
+                style={inputStyle(errors.employmentStatus)}
+              >
+                <option value="">Select</option>
+                <option>Employed</option>
+                <option>Unemployed</option>
               </select>
             </div>
           </div>
 
           {/* HOUSEHOLD DETAILS */}
           <h4 style={sectionHeaderStyle}><Home size={18} /> Household Details</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+          <div className="ahh-grid-2" style={{ marginBottom: '24px' }}>
             <div>
               <label style={labelStyle}>Total Members *</label>
-              <input type="number" name="totalMembers" min="1" value={form.totalMembers} onChange={handleChange} style={inputStyle(errors.totalMembers)} />
+              <input
+                type="number"
+                name="totalMembers"
+                min="1"
+                value={form.totalMembers}
+                onChange={handleChange}
+                style={inputStyle(errors.totalMembers)}
+              />
             </div>
             <div>
               <label style={labelStyle}>Classification *</label>
-              <select name="householdClassification" value={form.householdClassification} onChange={handleChange} style={inputStyle(errors.householdClassification)}>
-                <option value="">Select</option><option>Owned</option><option>Owned, Lot Rented</option><option>Rented</option><option>Rent-Free with Consent</option><option>Informal Settler</option>
+              <select
+                name="householdClassification"
+                value={form.householdClassification}
+                onChange={handleChange}
+                style={inputStyle(errors.householdClassification)}
+              >
+                <option value="">Select</option>
+                <option>Owned</option>
+                <option>Owned, Lot Rented</option>
+                <option>Rented</option>
+                <option>Rent-Free with Consent</option>
+                <option>Informal Settler</option>
               </select>
             </div>
           </div>
 
         </form>
 
-        {/* ACTIONS */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-          <button type="button" onClick={() => { setForm(initialForm); setErrors({}); onClose(); }} style={{ padding: '10px 18px', background: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
-          <button type="button" onClick={handleSubmit} disabled={isSubmitting} style={{ padding: '10px 18px', background: '#0f766e', border: 'none', borderRadius: '6px', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', cursor: isSubmitting ? 'not-allowed' : 'pointer', fontWeight: 500 }}>
+        {/* ACTIONS / FOOTER */}
+        <div
+          className="ahh-modal-footer"
+          style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #e2e8f0',
+            background: '#f8fafc',
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            style={{
+              padding: '9px 18px',
+              background: 'white',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              color: '#475569',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+              fontSize: '0.9rem',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="admin-add-household-form"
+            disabled={isSubmitting}
+            style={{
+              padding: '9px 20px',
+              background: isSubmitting ? '#94a3b8' : '#0f766e',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              boxShadow: '0 2px 4px rgba(15, 118, 110, 0.2)',
+              transition: 'all 0.15s ease',
+            }}
+          >
             <Save size={18} /> {isSubmitting ? 'Processing...' : 'Create Account'}
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }

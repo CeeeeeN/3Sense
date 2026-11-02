@@ -5,6 +5,7 @@ import {
   collection, onSnapshot, query, where,
   addDoc, serverTimestamp, orderBy, limit
 } from "firebase/firestore";
+import { useLanguage } from "../../../context/LanguageContext";
 
 // ── SESSION HELPER ─────────────────────────────────────────────────
 const getSaved = (key, fallback) => {
@@ -34,23 +35,6 @@ const formatDate = (dateStr) => {
   return d.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
 };
 
-const getTagStyle = (str = "") => {
-  const s = str.toLowerCase();
-  if (s.includes("food") || s.includes("process")) return { label: "Manufacturing", color: "#17714d" };
-  if (s.includes("business") || s.includes("negosyo")) return { label: "Business", color: "#1a56a0" };
-  if (s.includes("craft") || s.includes("sew")) return { label: "Crafts", color: "#703381" };
-  if (s.includes("farm") || s.includes("garden")) return { label: "Agriculture", color: "#8a6d00" };
-  if (s.includes("tech") || s.includes("computer")) return { label: "Technology", color: "#0369a1" };
-  return { label: "Training", color: "#1a56a0" };
-};
-
-const REG_STATUS_STYLE = {
-  pending:   { label: "Pending",   color: "#8a6d00", bg: "rgba(202,138,4,0.14)",  icon: "clock" },
-  approved:  { label: "Approved",  color: "#17714d", bg: "rgba(30,138,94,0.13)",  icon: "check" },
-  rejected:  { label: "Rejected",  color: "#b71c1c", bg: "rgba(224,62,62,0.12)",  icon: "x" },
-  completed: { label: "Completed", color: "#3f5d7e", bg: "rgba(94,122,153,0.14)", icon: "flag" },
-};
-
 // ── Icons ──────────────────────────────────────────────────────────
 const Ico = ({ size = 22, children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
@@ -78,7 +62,7 @@ const BigCheck = () => (
 );
 
 // ── Description that clamps to 3 lines and expands with "more..." ───
-function ExpandableDesc({ text }) {
+function ExpandableDesc({ text, moreLabel, lessLabel }) {
   const [open, setOpen] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
   const ref = useRef(null);
@@ -97,7 +81,7 @@ function ExpandableDesc({ text }) {
       <div ref={ref} className={`lv-desc${open ? " is-open" : ""}`}>{text}</div>
       {(overflowing || open) && (
         <button type="button" className="lv-more" onClick={() => setOpen(o => !o)}>
-          {open ? "Show less" : "Read more"}
+          {open ? lessLabel : moreLabel}
         </button>
       )}
     </div>
@@ -112,6 +96,7 @@ const BLANK_FORM = {
 
 // ── Component ──────────────────────────────────────────────────────
 export default function LivelihoodTab({ userData, householdID, userName }) {
+  const { t } = useLanguage();
   const [view, setView] = useState("main");
   const [step, setStep] = useState(1);
   const [regNum, setRegNum] = useState("");
@@ -156,7 +141,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   // ── Real-time: Livelihood Programs ONLY ─────────────────────────
   useEffect(() => {
-    // BOUNDED QUERY: Cap to the 50 most recent active livelihood programs
     const q = query(
       collection(db, "Programs"),
       where("programType", "==", "livelihood"),
@@ -192,7 +176,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     if (programs.length === 0) return;
 
     const unsubs = programs.map((prog) => {
-      // BOUNDED QUERY: Only fetch registrations for THIS specific program, capped at 300.
       const q = query(
         collection(db, "livelihoodRegistrations"),
         where("programId", "==", prog.id),
@@ -233,7 +216,6 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort client-side to avoid composite index requirements
       docs.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
       setMyRegs(docs);
       setLoadingMyRegs(false);
@@ -243,6 +225,29 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     });
     return () => unsub();
   }, [userData, householdID]);
+
+  const getTagStyle = (str = "") => {
+    const s = str.toLowerCase();
+    if (s.includes("food") || s.includes("process")) return { label: t("lh_tag_manufacturing"), color: "#17714d" };
+    if (s.includes("business") || s.includes("negosyo")) return { label: t("lh_tag_business"), color: "#1a56a0" };
+    if (s.includes("craft") || s.includes("sew")) return { label: t("lh_tag_crafts"), color: "#703381" };
+    if (s.includes("farm") || s.includes("garden")) return { label: t("lh_tag_agriculture"), color: "#8a6d00" };
+    if (s.includes("tech") || s.includes("computer")) return { label: t("lh_tag_technology"), color: "#0369a1" };
+    return { label: t("lh_tag_training"), color: "#1a56a0" };
+  };
+
+  const getStatusInfo = (rawStatus) => {
+    switch (rawStatus) {
+      case "approved":
+        return { label: t("lh_myregs_status_approved"), color: "#17714d", bg: "rgba(30,138,94,0.13)", icon: "check" };
+      case "rejected":
+        return { label: t("lh_myregs_status_rejected"), color: "#b71c1c", bg: "rgba(224,62,62,0.12)", icon: "x" };
+      case "completed":
+        return { label: t("lh_myregs_status_completed"), color: "#3f5d7e", bg: "rgba(94,122,153,0.14)", icon: "flag" };
+      default:
+        return { label: t("lh_myregs_status_pending"), color: "#8a6d00", bg: "rgba(202,138,4,0.14)", icon: "clock" };
+    }
+  };
 
   // ── Slot helpers ─────────────────────────────────────────────────
   const getApprovedCount = (programId) => programApprovedCounts[programId] || 0;
@@ -261,18 +266,18 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   const validateStep1 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = "Please type your first name.";
-    if (!form.lastName.trim()) e.lastName = "Please type your last name.";
-    if (!form.address.trim()) e.address = "Please type your address.";
-    if (!String(form.contact || "").trim()) e.contact = "Please type your phone number.";
-    if (!form.idFile) e.idFile = "Please add a photo or scan of your valid ID or Barangay Clearance.";
+    if (!form.firstName.trim()) e.firstName = t("lh_err_first_name");
+    if (!form.lastName.trim()) e.lastName = t("lh_err_last_name");
+    if (!form.address.trim()) e.address = t("lh_err_address");
+    if (!String(form.contact || "").trim()) e.contact = t("lh_err_contact");
+    if (!form.idFile) e.idFile = t("lh_err_id");
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.programId) e.programId = "Please tap the program you want to join.";
+    if (!form.programId) e.programId = t("lh_err_program");
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -318,7 +323,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
         setStep(4);
       } catch (err) {
         console.error("Submit error:", err);
-        setErrors({ submit: "Sorry, your registration could not be sent. Please try again." });
+        setErrors({ submit: t("lh_err_submit") });
       }
       setSubmitting(false);
       return;
@@ -332,7 +337,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     setView("main");
   };
 
-  const STEP_LABELS = ["Your information", "Choose a program", "Check and send"];
+  const STEP_LABELS = [t("lh_step1_label"), t("lh_step2_label"), t("lh_step3_label")];
 
   const BackButton = ({ label, onClick }) => (
     <button type="button" className="vz-back" onClick={onClick}>
@@ -344,9 +349,9 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     <div className="svc-hero svc-hero--green bz-hero">
       <div className="svc-hero__inner">
         <div className="svc-hero__left">
-          <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BriefcaseIcon /></span>Barangay Livelihood Program</div>
-          <h2 className="svc-hero__title">Livelihood Skills Training</h2>
-          <p className="svc-hero__sub">Learn new skills to improve your work or your income. Choose a training program below and register.</p>
+          <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BriefcaseIcon /></span>{t("lh_eyebrow")}</div>
+          <h2 className="svc-hero__title">{t("lh_title")}</h2>
+          <p className="svc-hero__sub">{t("lh_sub")}</p>
         </div>
       </div>
     </div>
@@ -363,20 +368,20 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
         <button type="button" className="vz-choice lv-myregs" onClick={() => setView("myregs")}>
           <span className="vz-choice__icon vz-choice__icon--teal"><Ico size={30}>{ICONS.list}</Ico></span>
           <span className="vz-choice__body">
-            <span className="vz-choice__title">My registrations</span>
-            <span className="vz-choice__desc">See the programs you have already registered for.</span>
+            <span className="vz-choice__title">{t("lh_choice_myregs_title")}</span>
+            <span className="vz-choice__desc">{t("lh_choice_myregs_desc")}</span>
           </span>
           <span className="vz-choice__arrow"><ArrowRight /></span>
         </button>
 
         <section className="bz-card">
-          <h3 className="bz-heading">Available training programs</h3>
-          <p className="bz-text">Tap the green Register button on the program you want to join.</p>
+          <h3 className="bz-heading">{t("lh_main_heading")}</h3>
+          <p className="bz-text">{t("lh_main_sub")}</p>
 
           {loadingPrograms ? (
-            <div className="lv-empty">Loading programs…</div>
+            <div className="lv-empty">{t("lh_loading_programs")}</div>
           ) : programs.length === 0 ? (
-            <div className="lv-empty">There are no livelihood programs right now. Please check back later.</div>
+            <div className="lv-empty">{t("lh_empty_programs")}</div>
           ) : (
             <div className="lv-grid">
               {programs.map(p => {
@@ -390,10 +395,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                 const activeStatus = (activeReg?.status || "").toLowerCase();
                 const disabled = full || !!activeReg;
 
-                let btnLabel = "Register now";
-                if (full) btnLabel = "Program full";
-                else if (activeReg && activeStatus === "approved") btnLabel = "You are approved";
-                else if (activeReg) btnLabel = "You already registered";
+                let btnLabel = t("lh_btn_register_now");
+                if (full) btnLabel = t("lh_btn_program_full");
+                else if (activeReg && activeStatus === "approved") btnLabel = t("lh_btn_you_approved");
+                else if (activeReg) btnLabel = t("lh_btn_already_registered");
 
                 return (
                   <article key={p.id} className={`lv-card${full ? " is-full" : ""}`}>
@@ -401,13 +406,17 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                       <span className="lv-tag" style={{ background: `${tag.color}1a`, color: tag.color }}>{tag.label}</span>
                       {slotsLeft !== null && (
                         <span className={`lv-slots${full ? " is-full" : low ? " is-low" : ""}`}>
-                          {full ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}
+                          {full ? t("lh_slots_full") : (typeof t("lh_slots_left") === "function" ? t("lh_slots_left")(slotsLeft) : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`)}
                         </span>
                       )}
                     </div>
 
                     <h4 className="lv-card__title">{p.title}</h4>
-                    <ExpandableDesc text={p.description || "—"} />
+                    <ExpandableDesc
+                      text={p.description || "—"}
+                      moreLabel={t("lh_read_more")}
+                      lessLabel={t("lh_show_less")}
+                    />
 
                     <ul className="lv-meta">
                       {p.date && <li><Ico>{ICONS.calendar}</Ico><span>{formatDate(p.date)}</span></li>}
@@ -427,7 +436,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                     {activeReg && !full && (
                       <div className={`lv-status-note${activeStatus === "approved" ? " is-ok" : ""}`}>
                         <Ico size={20}>{activeStatus === "approved" ? ICONS.check : ICONS.clock}</Ico>
-                        {activeStatus === "approved" ? "Your registration is approved." : "Your registration is waiting for review."}
+                        {activeStatus === "approved" ? t("lh_status_note_approved") : t("lh_status_note_waiting")}
                       </div>
                     )}
 
@@ -446,7 +455,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           )}
         </section>
 
-        <div className="bz-legal bd-legal">Program coordination: subject to available training programs and eligibility requirements</div>
+        <div className="bz-legal bd-legal">{t("lh_legal")}</div>
       </div>
     </div>
   );
@@ -460,19 +469,19 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
       <div className="bz-wrap" ref={topRef}>
         <section className="bz-card">
-          <BackButton label="Back to programs" onClick={() => setView("main")} />
-          <h3 className="bz-heading">My registrations</h3>
-          <p className="bz-text">These are the programs you registered for.</p>
+          <BackButton label={t("lh_back_to_programs")} onClick={() => setView("main")} />
+          <h3 className="bz-heading">{t("lh_myregs_heading")}</h3>
+          <p className="bz-text">{t("lh_myregs_sub")}</p>
 
           {loadingMyRegs ? (
-            <div className="lv-empty">Loading…</div>
+            <div className="lv-empty">{t("lh_myregs_loading")}</div>
           ) : myRegs.length === 0 ? (
-            <div className="lv-empty">You have not registered for any program yet.</div>
+            <div className="lv-empty">{t("lh_myregs_empty")}</div>
           ) : (
             <div className="lv-regs">
               {myRegs.map(r => {
                 const rawStatus = (r.status || "pending").toLowerCase();
-                const sc = REG_STATUS_STYLE[rawStatus] || REG_STATUS_STYLE.pending;
+                const sc = getStatusInfo(rawStatus);
                 return (
                   <article key={r.id} className="lv-reg">
                     <div className="lv-reg__top">
@@ -484,12 +493,12 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                         <Ico size={20}>{ICONS[sc.icon]}</Ico> {sc.label}
                       </span>
                     </div>
-                    <div className="lv-reg__ref">Reference number: <strong>{r.regNum || r.id}</strong></div>
+                    <div className="lv-reg__ref">{t("lh_myregs_ref")} <strong>{r.regNum || r.id}</strong></div>
                     {rawStatus === "rejected" && r.rejectReason && (
-                      <div className="lv-reg__alert">Reason: {r.rejectReason}</div>
+                      <div className="lv-reg__alert">{t("lh_myregs_reason")} {r.rejectReason}</div>
                     )}
                     {rawStatus === "pending" && (
-                      <div className="lv-reg__wait"><Ico size={20}>{ICONS.clock}</Ico> Waiting for the admin to review it.</div>
+                      <div className="lv-reg__wait"><Ico size={20}>{ICONS.clock}</Ico> {t("lh_myregs_waiting")}</div>
                     )}
                   </article>
                 );
@@ -497,7 +506,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             </div>
           )}
 
-          <BackButton label="Back to programs" onClick={() => setView("main")} />
+          <BackButton label={t("lh_back_to_programs")} onClick={() => setView("main")} />
         </section>
       </div>
     </div>
@@ -515,10 +524,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
       <div className="bz-wrap" ref={topRef}>
         {step < 4 && (
           <section className="bz-card">
-            <BackButton label="Back to programs" onClick={() => { setView("main"); setErrors({}); }} />
+            <BackButton label={t("lh_back_to_programs")} onClick={() => { setView("main"); setErrors({}); }} />
 
             {/* Steps */}
-            <ol className="lv-steps" aria-label="Registration steps">
+            <ol className="lv-steps" aria-label={t("lh_step1_label")}>
               {STEP_LABELS.map((label, i) => {
                 const n = i + 1;
                 const done = n < step;
@@ -539,7 +548,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             {/* Which program */}
             {selectedProgram && step !== 2 && (
               <div className="lv-chosen">
-                <div className="lv-chosen__label">You are registering for</div>
+                <div className="lv-chosen__label">{t("lh_chosen_label")}</div>
                 <div className="lv-chosen__title">{selectedProgram.title}</div>
                 <ul className="lv-meta lv-meta--inline">
                   {selectedProgram.date && <li><Ico size={20}>{ICONS.calendar}</Ico><span>{formatDate(selectedProgram.date)}</span></li>}
@@ -552,54 +561,54 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             {/* ── Step 1 ── */}
             {step === 1 && (
               <div className="bf-form lv-form">
-                <h3 className="bz-heading">Your information</h3>
+                <h3 className="bz-heading">{t("lh_form_step1_heading")}</h3>
 
                 <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-first">First name <span className="bf-pill bf-pill--req">Required</span></label>
-                  <input id="lv-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
+                  <label className="bf-label" htmlFor="lv-first">{t("lh_lbl_first_name")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                  <input id="lv-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder={t("lh_ph_first_name")} />
                   {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
                 </div>
                 <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-middle">Middle name <span className="bf-pill">Optional</span></label>
-                  <input id="lv-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
+                  <label className="bf-label" htmlFor="lv-middle">{t("lh_lbl_middle_name")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                  <input id="lv-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder={t("lh_ph_middle_name")} />
                 </div>
                 <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-last">Last name <span className="bf-pill bf-pill--req">Required</span></label>
-                  <input id="lv-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+                  <label className="bf-label" htmlFor="lv-last">{t("lh_lbl_last_name")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                  <input id="lv-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder={t("lh_ph_last_name")} />
                   {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
                 </div>
                 <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-address">Home address <span className="bf-pill bf-pill--req">Required</span></label>
-                  <input id="lv-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday" />
+                  <label className="bf-label" htmlFor="lv-address">{t("lh_lbl_address")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                  <input id="lv-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder={t("lh_ph_address")} />
                   {errors.address && <div className="bf-error">{errors.address}</div>}
                 </div>
                 <div className="bf-row">
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="lv-contact">Phone number <span className="bf-pill bf-pill--req">Required</span></label>
-                    <input id="lv-contact" className={`bf-input${errors.contact ? " bf-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="0912 345 6789" />
+                    <label className="bf-label" htmlFor="lv-contact">{t("lh_lbl_contact")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <input id="lv-contact" className={`bf-input${errors.contact ? " bf-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder={t("lh_ph_contact")} />
                     {errors.contact && <div className="bf-error">{errors.contact}</div>}
                   </div>
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="lv-email">Email <span className="bf-pill">Optional</span></label>
-                    <input id="lv-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
+                    <label className="bf-label" htmlFor="lv-email">{t("lh_lbl_email")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="lv-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder={t("lh_ph_email")} />
                   </div>
                 </div>
 
                 <div className="bf-field">
-                  <div className="bf-label">Valid ID or Barangay Clearance <span className="bf-pill bf-pill--req">Required</span></div>
+                  <div className="bf-label">{t("lh_lbl_id")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></div>
                   <label className={`bf-photo${form.idFile ? " is-filled" : ""}${errors.idFile ? " is-error" : ""}`}>
                     <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: "none" }} onChange={e => e.target.files[0] && set("idFile", e.target.files[0].name)} />
                     <Ico size={28}>{form.idFile ? ICONS.check : ICONS.upload}</Ico>
                     <span className="bf-photo__text">
                       {form.idFile ? (
                         <>
-                          <strong>ID added</strong>
-                          <small>{form.idFile} · Tap to change</small>
+                          <strong>{t("lh_id_added")}</strong>
+                          <small>{form.idFile} · {t("lh_id_change")}</small>
                         </>
                       ) : (
                         <>
-                          <strong>Tap here to add your ID</strong>
-                          <small>A photo or scan. JPG, PNG or PDF, up to 5MB</small>
+                          <strong>{t("lh_id_add")}</strong>
+                          <small>{t("lh_id_hint")}</small>
                         </>
                       )}
                     </span>
@@ -612,11 +621,11 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             {/* ── Step 2 ── */}
             {step === 2 && (
               <div className="lv-form">
-                <h3 className="bz-heading">Choose a program</h3>
-                <p className="bz-text">Tap the program you want to join.</p>
+                <h3 className="bz-heading">{t("lh_form_step2_heading")}</h3>
+                <p className="bz-text">{t("lh_form_step2_sub")}</p>
 
                 {loadingPrograms ? (
-                  <div className="lv-empty">Loading programs…</div>
+                  <div className="lv-empty">{t("lh_loading_programs")}</div>
                 ) : (
                   <div className="lv-picks" role="radiogroup" aria-label="Programs">
                     {programs.map(p => {
@@ -642,15 +651,15 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                           <span className="lv-pick__body">
                             <span className="lv-pick__name">
                               {p.title}
-                              {full && <span className="lv-pick__badge lv-pick__badge--full">Full</span>}
-                              {activeReg && !full && <span className="lv-pick__badge">Already registered</span>}
+                              {full && <span className="lv-pick__badge lv-pick__badge--full">{t("lh_slots_full")}</span>}
+                              {activeReg && !full && <span className="lv-pick__badge">{t("lh_btn_already_registered")}</span>}
                             </span>
                             {(p.date || timeLabel) && <span className="lv-pick__meta">{formatDate(p.date)}{timeLabel ? ` · ${timeLabel}` : ""}</span>}
                             {p.location && <span className="lv-pick__meta">{p.location}</span>}
                           </span>
                           {slotsLeft !== null && (
                             <span className={`lv-pick__slots${full ? " is-full" : slotsLeft <= 5 ? " is-low" : ""}`}>
-                              {full ? "Full" : `${slotsLeft} left`}
+                              {full ? t("lh_slots_full") : (typeof t("lh_slots_left") === "function" ? t("lh_slots_left")(slotsLeft) : `${slotsLeft} left`)}
                             </span>
                           )}
                         </button>
@@ -665,20 +674,20 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             {/* ── Step 3 ── */}
             {step === 3 && (
               <div className="lv-form">
-                <h3 className="bz-heading">Check your information</h3>
-                <p className="bz-text">Please check that everything is correct, then tap the green button to send.</p>
+                <h3 className="bz-heading">{t("lh_form_step3_heading")}</h3>
+                <p className="bz-text">{t("lh_form_step3_sub")}</p>
 
                 <dl className="lv-review">
                   {[
-                    { label: "Full name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
-                    { label: "Address", value: form.address },
-                    { label: "Phone number", value: form.contact },
-                    { label: "Email", value: form.email || "—" },
-                    { label: "ID added", value: form.idFile || "—" },
-                    { label: "Program", value: selectedProgram?.title || "—" },
-                    { label: "Date", value: formatDate(selectedProgram?.date) },
-                    { label: "Time", value: programTimeLabel || "—" },
-                    { label: "Place", value: selectedProgram?.location || "—" },
+                    { label: t("lh_rev_fullname"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
+                    { label: t("lh_rev_address"),  value: form.address },
+                    { label: t("lh_rev_phone"),    value: form.contact },
+                    { label: t("lh_rev_email"),    value: form.email || "—" },
+                    { label: t("lh_rev_id"),       value: form.idFile || "—" },
+                    { label: t("lh_rev_program"),  value: selectedProgram?.title || "—" },
+                    { label: t("lh_rev_date"),     value: formatDate(selectedProgram?.date) },
+                    { label: t("lh_rev_time"),     value: programTimeLabel || "—" },
+                    { label: t("lh_rev_place"),    value: selectedProgram?.location || "—" },
                   ].map((r) => (
                     <div key={r.label} className="lv-review__row">
                       <dt>{r.label}</dt>
@@ -694,12 +703,12 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
             {/* Actions */}
             <div className="lv-actions">
               <button type="button" className="bf-submit lv-actions__next" onClick={handleNext} disabled={submitting}>
-                {submitting ? "Sending, please wait..." : step === 3 ? "Send My Registration" : "Next"}
+                {submitting ? t("lh_btn_submitting") : step === 3 ? t("lh_btn_submit") : t("lh_btn_next")}
                 {!submitting && step < 3 && <ArrowRight />}
               </button>
               {step > 1 && (
                 <button type="button" className="bf-secondary lv-actions__prev" onClick={() => { setStep(s => s - 1); setErrors({}); }} disabled={submitting}>
-                  <ArrowLeft /> Previous step
+                  <ArrowLeft /> {t("lh_btn_prev")}
                 </button>
               )}
             </div>
@@ -711,18 +720,22 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           <section className="bz-card">
             <div className="bf-done">
               <span className="bf-done__icon"><BigCheck /></span>
-              <h3 className="bz-heading">Registration sent. Thank you!</h3>
-              <p className="bz-text">You registered for <strong>{selectedProgram?.title}</strong>. Please wait for the admin to review it.</p>
+              <h3 className="bz-heading">{t("lh_success_heading")}</h3>
+              <p className="bz-text">
+                {typeof t("lh_success_desc") === "function"
+                  ? t("lh_success_desc")(selectedProgram?.title || "")
+                  : `You registered for ${selectedProgram?.title}. Please wait for the admin to review it.`}
+              </p>
 
               <div className="bt-ref">
-                <div className="bt-ref__label">Your registration number</div>
+                <div className="bt-ref__label">{t("lh_success_ref_label")}</div>
                 <div className="bt-ref__num">{regNum}</div>
-                <div className="bt-ref__hint">Write this number down. You can use it to follow your registration.</div>
+                <div className="bt-ref__hint">{t("lh_success_ref_hint")}</div>
               </div>
 
               <div className="bf-done__btns">
-                <button type="button" className="bf-secondary" onClick={() => setView("myregs")}>View my registrations</button>
-                <button type="button" className="bf-secondary" onClick={resetForm}>Done</button>
+                <button type="button" className="bf-secondary" onClick={() => setView("myregs")}>{t("lh_success_btn_view")}</button>
+                <button type="button" className="bf-secondary" onClick={resetForm}>{t("lh_success_btn_done")}</button>
               </div>
             </div>
           </section>

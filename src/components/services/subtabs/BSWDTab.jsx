@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { HeartIcon, ServiceMapPinIcon, SendIcon } from "../../Icons";
 import { submitBSWDReport, submitBSWDTip } from "../../../services/services";
 import { createNotification } from "../../../services/notifications";
+import { useLanguage } from "../../../context/LanguageContext";
 
 // ── SESSION HELPER ────────────────────────────────────────────────────────────
 const getSaved = (key, fallback) => {
@@ -34,16 +35,11 @@ const BigCheck = () => (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
 );
 
-const FACTS = [
-  { icon: <PeopleIcon />, label: "Who can use this", value: "Anyone who sees a person in need" },
-  { icon: <LockIcon />,   label: "Your privacy",     value: "You can stay anonymous" },
-  { icon: <ClockIcon />,  label: "What happens next", value: "Our officer follows up in 24 to 48 hours" },
-];
-
 const BLANK_REPORT = { name: "", location: "", landmark: "", lastSeen: "", description: "", photo: "" };
 const BLANK_TIP = { about: "", tip: "", contact: "" };
 
 export default function BSWDTab({ userData, householdID }) {
+  const { t } = useLanguage();
   const [view, setView] = useState(null); // null | "report" | "tip"
   const topRef = useRef(null);
 
@@ -75,10 +71,16 @@ export default function BSWDTab({ userData, householdID }) {
   const setR = (k, v) => setReportForm(f => ({ ...f, [k]: v }));
   const setT = (k, v) => setTipForm(f => ({ ...f, [k]: v }));
 
+  const facts = [
+    { icon: <PeopleIcon />, label: t("bswd_fact_who_label"), value: t("bswd_fact_who_val") },
+    { icon: <LockIcon />,   label: t("bswd_fact_privacy_label"), value: t("bswd_fact_privacy_val") },
+    { icon: <ClockIcon />,  label: t("bswd_fact_next_label"), value: t("bswd_fact_next_val") },
+  ];
+
   const submitReport = async () => {
     const e = {};
-    if (!reportForm.location.trim()) e.location = "Please tell us where you saw the person.";
-    if (!reportForm.description.trim()) e.description = "Please describe the person and what they need.";
+    if (!reportForm.location.trim()) e.location = t("bswd_rep_err_location");
+    if (!reportForm.description.trim()) e.description = t("bswd_rep_err_desc");
     if (Object.keys(e).length) { setReportErrors(e); return; }
 
     setIsSubmitting(true);
@@ -122,7 +124,7 @@ export default function BSWDTab({ userData, householdID }) {
       setReportFile(null);
     } catch (err) {
       console.error("BSWD Report failed:", err);
-      setReportErrors({ submit: "Sorry, the report could not be sent. Please try again." });
+      setReportErrors({ submit: t("bswd_rep_err_submit") });
     } finally {
       setIsSubmitting(false);
     }
@@ -130,8 +132,8 @@ export default function BSWDTab({ userData, householdID }) {
 
   const submitTip = async () => {
     const e = {};
-    if (!tipForm.about.trim()) e.about = "Please tell us who this is about.";
-    if (!tipForm.tip.trim()) e.tip = "Please tell us what you know.";
+    if (!tipForm.about.trim()) e.about = t("bswd_tip_err_about");
+    if (!tipForm.tip.trim()) e.tip = t("bswd_tip_err_tip");
     if (Object.keys(e).length) { setTipErrors(e); return; }
 
     setIsTipSubmitting(true);
@@ -155,7 +157,7 @@ export default function BSWDTab({ userData, householdID }) {
       setTipSubmitted(true);
     } catch (err) {
       console.error("BSWD Tip failed:", err);
-      setTipErrors({ submit: "Sorry, your information could not be sent. Please try again." });
+      setTipErrors({ submit: t("bswd_tip_err_submit") });
     } finally {
       setIsTipSubmitting(false);
     }
@@ -163,7 +165,7 @@ export default function BSWDTab({ userData, householdID }) {
 
   const BackButton = () => (
     <button type="button" className="vz-back" onClick={() => setView(null)}>
-      <ArrowLeft /> Back to start
+      <ArrowLeft /> {t("bswd_back_start")}
     </button>
   );
 
@@ -173,9 +175,9 @@ export default function BSWDTab({ userData, householdID }) {
       <div className="svc-hero svc-hero--teal bz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>BSWD</div>
-            <h2 className="svc-hero__title">Barangay Social Welfare and Development</h2>
-            <p className="svc-hero__sub">Seek information and assistance for social welfare concerns, including support for individuals and families in need of community services.</p>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>{t("bswd_eyebrow")}</div>
+            <h2 className="svc-hero__title">{t("bswd_hero_title")}</h2>
+            <p className="svc-hero__sub">{t("bswd_sub")}</p>
           </div>
         </div>
       </div>
@@ -185,9 +187,9 @@ export default function BSWDTab({ userData, householdID }) {
         {/* ═════════ START SCREEN ═════════ */}
         {view === null && (
           <>
-            <section className="bz-glance" aria-label="Quick facts">
-              {FACTS.map((f) => (
-                <div className="bz-fact" key={f.label}>
+            <section className="bz-glance" aria-label={t("bswd_fact_who_label")}>
+              {facts.map((f, i) => (
+                <div className="bz-fact" key={i}>
                   <span className="bz-fact__icon bz-fact__icon--teal">{f.icon}</span>
                   <div>
                     <div className="bz-fact__label">{f.label}</div>
@@ -198,15 +200,15 @@ export default function BSWDTab({ userData, householdID }) {
             </section>
 
             <section className="bz-card">
-              <h3 className="bz-heading">What would you like to do?</h3>
-              <p className="bz-text">Tap one of the big buttons below.</p>
+              <h3 className="bz-heading">{t("bswd_choice_heading")}</h3>
+              <p className="bz-text">{t("bswd_choice_sub")}</p>
 
               <div className="vz-choices">
                 <button type="button" className="vz-choice" onClick={() => setView("report")}>
                   <span className="vz-choice__icon vz-choice__icon--teal"><ServiceMapPinIcon /></span>
                   <span className="vz-choice__body">
-                    <span className="vz-choice__title">I saw someone who needs help.</span>
-                    <span className="vz-choice__desc">Report a homeless or displaced person.</span>
+                    <span className="vz-choice__title">{t("bswd_choice_report_title")}</span>
+                    <span className="vz-choice__desc">{t("bswd_choice_report_desc")}</span>
                   </span>
                   <span className="vz-choice__arrow"><ArrowRight /></span>
                 </button>
@@ -214,8 +216,8 @@ export default function BSWDTab({ userData, householdID }) {
                 <button type="button" className="vz-choice" onClick={() => setView("tip")}>
                   <span className="vz-choice__icon vz-choice__icon--green"><SendIcon /></span>
                   <span className="vz-choice__body">
-                    <span className="vz-choice__title">I have information to share.</span>
-                    <span className="vz-choice__desc">Send a tip about someone we may be able to help.</span>
+                    <span className="vz-choice__title">{t("bswd_choice_tip_title")}</span>
+                    <span className="vz-choice__desc">{t("bswd_choice_tip_desc")}</span>
                   </span>
                   <span className="vz-choice__arrow"><ArrowRight /></span>
                 </button>
@@ -223,11 +225,9 @@ export default function BSWDTab({ userData, householdID }) {
             </section>
 
             <section className="bz-card bz-card--about">
-              <h3 className="bz-heading">About BSWD</h3>
-              <p className="bz-text">
-                BSWD, the Barangay Social Welfare and Development office, helps with social welfare concerns, including support for individuals and families who need community services.
-              </p>
-              <div className="bz-legal">Coordination: Barangay social welfare services and the appropriate city or municipal social welfare office</div>
+              <h3 className="bz-heading">{t("bswd_about_heading")}</h3>
+              <p className="bz-text">{t("bswd_about_desc")}</p>
+              <div className="bz-legal">{t("bswd_legal")}</div>
             </section>
           </>
         )}
@@ -240,51 +240,51 @@ export default function BSWDTab({ userData, householdID }) {
             {reportSubmitted ? (
               <div className="bf-done">
                 <span className="bf-done__icon"><BigCheck /></span>
-                <h3 className="bz-heading">Report sent. Thank you!</h3>
-                <p className="bz-text">Our BSWD officer will follow up within 24 to 48 hours.</p>
+                <h3 className="bz-heading">{t("bswd_rep_done_heading")}</h3>
+                <p className="bz-text">{t("bswd_rep_done_sub")}</p>
                 <div className="bf-done__btns">
                   <button type="button" className="bf-secondary" onClick={() => { setReportForm(BLANK_REPORT); setReportSubmitted(false); setReportFile(null); }}>
-                    Report another person
+                    {t("bswd_rep_btn_another")}
                   </button>
                   <button type="button" className="bf-secondary" onClick={() => { setReportForm(BLANK_REPORT); setReportSubmitted(false); setReportFile(null); setView(null); }}>
-                    Done
+                    {t("bswd_rep_btn_done")}
                   </button>
                 </div>
               </div>
             ) : (
               <>
-                <h3 className="bz-heading">Report a person who needs help</h3>
-                <p className="bz-text">Fill in what you know. You can skip anything marked optional.</p>
+                <h3 className="bz-heading">{t("bswd_rep_form_heading")}</h3>
+                <p className="bz-text">{t("bswd_rep_form_sub")}</p>
 
                 <div className="bz-note bf-tip">
-                  <strong>Tip:</strong> The more you tell us, the faster we can find them. Mention nearby stores or street corners, and what the person is wearing.
+                  <strong>{t("bswd_rep_tip_strong")}</strong> {t("bswd_rep_tip_text")}
                 </div>
 
                 <div className="bf-form">
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-location">Where did you see them? <span className="bf-pill bf-pill--req">Required</span></label>
-                    <input id="bf-location" className={`bf-input${reportErrors.location ? " bf-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="Street or place, for example: McArthur Highway" disabled={isSubmitting} />
+                    <label className="bf-label" htmlFor="bf-location">{t("bswd_rep_lbl_location")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <input id="bf-location" className={`bf-input${reportErrors.location ? " bf-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder={t("bswd_rep_ph_location")} disabled={isSubmitting} />
                     {reportErrors.location && <div className="bf-error">{reportErrors.location}</div>}
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-landmark">Anything nearby? <span className="bf-pill">Optional</span></label>
-                    <input id="bf-landmark" className="bf-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder="For example: near the 7-Eleven or Petron" disabled={isSubmitting} />
+                    <label className="bf-label" htmlFor="bf-landmark">{t("bswd_rep_lbl_landmark")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-landmark" className="bf-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder={t("bswd_rep_ph_landmark")} disabled={isSubmitting} />
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-lastseen">When did you see them? <span className="bf-pill">Optional</span></label>
-                    <input id="bf-lastseen" className="bf-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder="For example: today at 2:30 PM, corner of 5th St" disabled={isSubmitting} />
+                    <label className="bf-label" htmlFor="bf-lastseen">{t("bswd_rep_lbl_lastseen")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-lastseen" className="bf-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder={t("bswd_rep_ph_lastseen")} disabled={isSubmitting} />
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-desc">Describe the person <span className="bf-pill bf-pill--req">Required</span></label>
-                    <textarea id="bf-desc" className={`bf-textarea${reportErrors.description ? " bf-input--error" : ""}`} rows={4} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder="Clothes, about how old, and what help they may need" disabled={isSubmitting} />
+                    <label className="bf-label" htmlFor="bf-desc">{t("bswd_rep_lbl_desc")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <textarea id="bf-desc" className={`bf-textarea${reportErrors.description ? " bf-input--error" : ""}`} rows={4} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder={t("bswd_rep_ph_desc")} disabled={isSubmitting} />
                     {reportErrors.description && <div className="bf-error">{reportErrors.description}</div>}
                   </div>
 
                   <div className="bf-field">
-                    <div className="bf-label">Photo <span className="bf-pill">Optional</span></div>
+                    <div className="bf-label">{t("bswd_rep_lbl_photo")} <span className="bf-pill">{t("bswd_pill_optional")}</span></div>
                     <label className={`bf-photo${reportForm.photo ? " is-filled" : ""}`} style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? "not-allowed" : "pointer" }}>
                       <input
                         type="file" accept="image/*" style={{ display: "none" }} disabled={isSubmitting}
@@ -297,13 +297,13 @@ export default function BSWDTab({ userData, householdID }) {
                       <span className="bf-photo__text">
                         {reportForm.photo ? (
                           <>
-                            <strong>Photo added</strong>
-                            <small>{reportForm.photo} · Tap to change</small>
+                            <strong>{t("bswd_rep_photo_added")}</strong>
+                            <small>{reportForm.photo} · {t("bswd_rep_photo_change")}</small>
                           </>
                         ) : (
                           <>
-                            <strong>Tap here to add a photo</strong>
-                            <small>Show the surroundings so we can find the spot</small>
+                            <strong>{t("bswd_rep_photo_add")}</strong>
+                            <small>{t("bswd_rep_photo_hint")}</small>
                           </>
                         )}
                       </span>
@@ -311,14 +311,14 @@ export default function BSWDTab({ userData, householdID }) {
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-name">Your name <span className="bf-pill">Optional</span></label>
-                    <input id="bf-name" className="bf-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder="Leave empty to stay anonymous" disabled={isSubmitting} />
+                    <label className="bf-label" htmlFor="bf-name">{t("bswd_rep_lbl_name")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-name" className="bf-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder={t("bswd_rep_ph_name")} disabled={isSubmitting} />
                   </div>
 
                   {reportErrors.submit && <div className="bf-alert">{reportErrors.submit}</div>}
 
                   <button type="button" className="bf-submit" onClick={submitReport} disabled={isSubmitting}>
-                    <SendIcon /> {isSubmitting ? "Sending, please wait..." : "Send Report"}
+                    <SendIcon /> {isSubmitting ? t("bswd_rep_btn_submitting") : t("bswd_rep_btn_submit")}
                   </button>
                 </div>
               </>
@@ -334,44 +334,44 @@ export default function BSWDTab({ userData, householdID }) {
             {tipSubmitted ? (
               <div className="bf-done">
                 <span className="bf-done__icon"><BigCheck /></span>
-                <h3 className="bz-heading">Information received. Thank you!</h3>
-                <p className="bz-text">We have sent what you told us to the BSWD officer.</p>
+                <h3 className="bz-heading">{t("bswd_tip_done_heading")}</h3>
+                <p className="bz-text">{t("bswd_tip_done_sub")}</p>
                 <div className="bf-done__btns">
                   <button type="button" className="bf-secondary" onClick={() => { setTipForm(BLANK_TIP); setTipSubmitted(false); }}>
-                    Send more information
+                    {t("bswd_tip_btn_more")}
                   </button>
                   <button type="button" className="bf-secondary" onClick={() => { setTipForm(BLANK_TIP); setTipSubmitted(false); setView(null); }}>
-                    Done
+                    {t("bswd_tip_btn_done")}
                   </button>
                 </div>
               </div>
             ) : (
               <>
-                <h3 className="bz-heading">Share information with us</h3>
-                <p className="bz-text">Do you know something that could help us assist a homeless person? Tell us here.</p>
+                <h3 className="bz-heading">{t("bswd_tip_form_heading")}</h3>
+                <p className="bz-text">{t("bswd_tip_form_sub")}</p>
 
                 <div className="bf-form">
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-about">Who is this about? <span className="bf-pill bf-pill--req">Required</span></label>
-                    <input id="bf-about" className={`bf-input${tipErrors.about ? " bf-input--error" : ""}`} value={tipForm.about} onChange={e => setT("about", e.target.value)} placeholder="Name if you know it, or describe the person" disabled={isTipSubmitting} />
+                    <label className="bf-label" htmlFor="bf-about">{t("bswd_tip_lbl_about")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <input id="bf-about" className={`bf-input${tipErrors.about ? " bf-input--error" : ""}`} value={tipForm.about} onChange={e => setT("about", e.target.value)} placeholder={t("bswd_tip_ph_about")} disabled={isTipSubmitting} />
                     {tipErrors.about && <div className="bf-error">{tipErrors.about}</div>}
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-tip">What do you know? <span className="bf-pill bf-pill--req">Required</span></label>
-                    <textarea id="bf-tip" className={`bf-textarea${tipErrors.tip ? " bf-input--error" : ""}`} rows={4} value={tipForm.tip} onChange={e => setT("tip", e.target.value)} placeholder="Anything that may help us" disabled={isTipSubmitting} />
+                    <label className="bf-label" htmlFor="bf-tip">{t("bswd_tip_lbl_tip")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <textarea id="bf-tip" className={`bf-textarea${tipErrors.tip ? " bf-input--error" : ""}`} rows={4} value={tipForm.tip} onChange={e => setT("tip", e.target.value)} placeholder={t("bswd_tip_ph_tip")} disabled={isTipSubmitting} />
                     {tipErrors.tip && <div className="bf-error">{tipErrors.tip}</div>}
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="bf-contact">Your phone or email <span className="bf-pill">Optional</span></label>
-                    <input id="bf-contact" className="bf-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder="Only fill this in if you want us to contact you" disabled={isTipSubmitting} />
+                    <label className="bf-label" htmlFor="bf-contact">{t("bswd_tip_lbl_contact")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-contact" className="bf-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder={t("bswd_tip_ph_contact")} disabled={isTipSubmitting} />
                   </div>
 
                   {tipErrors.submit && <div className="bf-alert">{tipErrors.submit}</div>}
 
                   <button type="button" className="bf-submit" onClick={submitTip} disabled={isTipSubmitting}>
-                    <SendIcon /> {isTipSubmitting ? "Sending, please wait..." : "Send Information"}
+                    <SendIcon /> {isTipSubmitting ? t("bswd_tip_btn_submitting") : t("bswd_tip_btn_submit")}
                   </button>
                 </div>
               </>

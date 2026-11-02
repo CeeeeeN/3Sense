@@ -4,6 +4,7 @@ import { db } from "../../../firebase/firebase";
 import { submitIncidentReport } from "../../../services/services";
 import { createNotification } from "../../../services/notifications";
 import { SirenIcon, SendIcon, PhoneCallIcon } from "../../Icons";
+import { useLanguage } from "../../../context/LanguageContext";
 
 const HOTLINE = "0927-373-6727";
 const HOTLINE_TEL = "tel:09273736727";
@@ -14,17 +15,23 @@ const INCIDENT_TYPES = [
   "Illegal Parking / Obstruction", "Suspicious Person / Activity", "Domestic Dispute", "Other",
 ];
 
-// Values are saved to the database, so they are unchanged
-const URGENCY_LEVELS = [
-  { value: "emergency", label: "Emergency",         desc: "Immediate danger to life or property" },
-  { value: "urgent",    label: "Urgent",            desc: "Needs response within the hour" },
-  { value: "docs",      label: "For documentation", desc: "No immediate danger, for records only" },
-];
+const INCIDENT_TYPE_MAP = {
+  "Fight / Physical Altercation": "po_type_fight",
+  "Noise Complaint": "po_type_noise",
+  "Theft / Robbery": "po_type_theft",
+  "Disturbance / Disorderly Conduct": "po_type_disturbance",
+  "Public Intoxication": "po_type_intoxication",
+  "Vandalism / Property Damage": "po_type_vandalism",
+  "Illegal Parking / Obstruction": "po_type_parking",
+  "Suspicious Person / Activity": "po_type_suspicious",
+  "Domestic Dispute": "po_type_domestic",
+  "Other": "po_type_other",
+};
 
 const STATUS_CONFIG = {
-  received:  { label: "Received",  color: "#25636e", bg: "rgba(49,125,137,0.12)" },
-  responded: { label: "Responded", color: "#8a6d00", bg: "rgba(189,189,100,0.22)" },
-  resolved:  { label: "Resolved",  color: "#17714d", bg: "rgba(45,177,123,0.14)" },
+  received:  { color: "#25636e", bg: "rgba(49,125,137,0.12)" },
+  responded: { color: "#8a6d00", bg: "rgba(189,189,100,0.22)" },
+  resolved:  { color: "#17714d", bg: "rgba(45,177,123,0.14)" },
 };
 
 // ── SESSION HELPER ────────────────────────────────────────────────────────────
@@ -87,6 +94,7 @@ const BLANK_FORM = {
 };
 
 export default function PeaceOrderTab({ userData, householdID }) {
+  const { t } = useLanguage();
   const [view, setView] = useState("home");
   const [refNum, setRefNum] = useState("");
   const [trackInput, setTrackInput] = useState("");
@@ -114,24 +122,36 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const [errors, setErrors] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const urgencyLevels = [
+    { value: "emergency", label: t("po_urg_emergency_label"), desc: t("po_urg_emergency_desc") },
+    { value: "urgent",    label: t("po_urg_urgent_label"),    desc: t("po_urg_urgent_desc") },
+    { value: "docs",      label: t("po_urg_docs_label"),      desc: t("po_urg_docs_desc") },
+  ];
+
+  const getStatusLabel = (statusKey) => {
+    if (statusKey === "responded") return t("po_track_status_responded");
+    if (statusKey === "resolved") return t("po_track_status_resolved");
+    return t("po_track_status_received");
+  };
+
   const validate = () => {
     const e = {};
     const today = getTodayStr();
     const nowTime = getCurrentTimeStr();
-    if (!form.incidentType) e.incidentType = "Please choose what kind of incident it was.";
-    if (!form.location.trim()) e.location = "Please tell us where it happened.";
+    if (!form.incidentType) e.incidentType = t("po_err_type");
+    if (!form.location.trim()) e.location = t("po_err_location");
     if (!form.date) {
-      e.date = "Please choose the date.";
+      e.date = t("po_err_date_req");
     } else if (form.date > today) {
-      e.date = "The date cannot be in the future.";
+      e.date = t("po_err_date_future");
     }
     if (!form.time) {
-      e.time = "Please choose the time.";
+      e.time = t("po_err_time_req");
     } else if (form.date === today && form.time > nowTime) {
-      e.time = "The time cannot be in the future.";
+      e.time = t("po_err_time_future");
     }
-    if (!form.description.trim()) e.description = "Please describe what happened.";
-    if (!form.urgency) e.urgency = "Please choose how urgent it is.";
+    if (!form.description.trim()) e.description = t("po_err_desc");
+    if (!form.urgency) e.urgency = t("po_err_urgency");
     return e;
   };
 
@@ -180,7 +200,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
       setView("submitted");
     } catch (error) {
       console.error("Failed to submit incident report:", error);
-      setErrors({ submit: "Sorry, the report could not be sent. Please try again." });
+      setErrors({ submit: t("po_err_submit") });
     } finally {
       setIsSubmitting(false);
     }
@@ -189,7 +209,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const handleTrack = async () => {
     setTrackError(""); setTrackResult(null);
     const key = trackInput.trim();
-    if (!key) { setTrackError("Please type your reference number."); return; }
+    if (!key) { setTrackError(t("po_track_err_empty")); return; }
     setIsSearching(true);
     try {
       let reportData = null;
@@ -202,24 +222,29 @@ export default function PeaceOrderTab({ userData, householdID }) {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) reportData = docSnap.data();
       }
-      if (!reportData) { setTrackError("We could not find a report with that number. Please check it and try again."); setIsSearching(false); return; }
+      if (!reportData) { setTrackError(t("po_track_err_notfound")); setIsSearching(false); return; }
 
       let reportDate = "Unknown Date";
       if (reportData.createdAt?.toDate) reportDate = reportData.createdAt.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       else if (reportData.date) reportDate = reportData.date;
 
-      const timeline = reportData.updates || [`${reportDate} – Report received and under review by Barangay Tanod`];
+      const fallbackTimelineItem = typeof t("po_track_default_timeline") === "function" ? t("po_track_default_timeline")(reportDate) : `${reportDate} – Report received and under review by Barangay Tanod`;
+      const timeline = reportData.updates && reportData.updates.length ? reportData.updates : [fallbackTimelineItem];
+      
+      const rawType = reportData.incidentType || reportData.type || "Incident Report";
+      const displayType = INCIDENT_TYPE_MAP[rawType] ? t(INCIDENT_TYPE_MAP[rawType]) : rawType;
+
       setTrackResult({
         ref: key,
         status: (reportData.status || "received").toLowerCase(),
-        type: reportData.incidentType || reportData.type || "Incident Report",
+        type: displayType,
         location: reportData.location || "N/A",
         date: reportDate,
         updates: timeline
       });
     } catch (error) {
       console.error("Error searching for report:", error);
-      setTrackError("Something went wrong while searching. Please try again.");
+      setTrackError(t("po_track_err_generic"));
     } finally {
       setIsSearching(false);
     }
@@ -227,9 +252,9 @@ export default function PeaceOrderTab({ userData, householdID }) {
 
   const goHome = () => { setView("home"); setErrors({}); setTrackResult(null); setTrackError(""); };
 
-  const BackButton = ({ label = "Back to start" }) => (
+  const BackButton = ({ label }) => (
     <button type="button" className="vz-back" onClick={goHome}>
-      <ArrowLeft /> {label}
+      <ArrowLeft /> {label || t("po_back_start")}
     </button>
   );
 
@@ -239,9 +264,9 @@ export default function PeaceOrderTab({ userData, householdID }) {
       <div className="svc-hero svc-hero--navy bz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><SirenIcon /></span>Barangay Tanod</div>
-            <h2 className="svc-hero__title">Peace and Order</h2>
-            <p className="svc-hero__sub">Report community disturbances and safety concerns, request assistance, and help maintain peace and order within the barangay.</p>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><SirenIcon /></span>{t("po_eyebrow")}</div>
+            <h2 className="svc-hero__title">{t("po_title")}</h2>
+            <p className="svc-hero__sub">{t("po_sub")}</p>
           </div>
         </div>
       </div>
@@ -253,17 +278,17 @@ export default function PeaceOrderTab({ userData, householdID }) {
           <div className="vz-emergency__text">
             <span className="vz-emergency__icon"><Ico size={24}>{ICONS.warning}</Ico></span>
             <div>
-              <div className="vz-emergency__title">Need the Tanod right now?</div>
-              <div className="vz-emergency__sub">Call for fights, theft, or any danger.</div>
+              <div className="vz-emergency__title">{t("po_hotline_title")}</div>
+              <div className="vz-emergency__sub">{t("po_hotline_sub")}</div>
             </div>
           </div>
           <div className="vz-emergency__btns">
             <a href={HOTLINE_TEL} className="vz-emergency__btn vz-emergency__btn--stack">
               <PhoneCallIcon />
               <span className="vz-emergency__body">
-                <span className="vz-emergency__call">Tap to call</span>
+                <span className="vz-emergency__call">{t("po_hotline_tap")}</span>
                 <strong>{HOTLINE}</strong>
-                <small>Barangay Tanod hotline</small>
+                <small>{t("po_hotline_label")}</small>
               </span>
             </a>
           </div>
@@ -273,15 +298,15 @@ export default function PeaceOrderTab({ userData, householdID }) {
         {view === "home" && (
           <>
             <section className="bz-card">
-              <h3 className="bz-heading">What would you like to do?</h3>
-              <p className="bz-text">Tap one of the big buttons below.</p>
+              <h3 className="bz-heading">{t("po_choice_heading")}</h3>
+              <p className="bz-text">{t("po_choice_sub")}</p>
 
               <div className="vz-choices">
                 <button type="button" className="vz-choice" onClick={() => setView("report")}>
                   <span className="vz-choice__icon vz-choice__icon--teal"><Ico size={30}>{ICONS.report}</Ico></span>
                   <span className="vz-choice__body">
-                    <span className="vz-choice__title">I want to report a problem.</span>
-                    <span className="vz-choice__desc">File an incident report online. You can stay anonymous.</span>
+                    <span className="vz-choice__title">{t("po_choice_report_title")}</span>
+                    <span className="vz-choice__desc">{t("po_choice_report_desc")}</span>
                   </span>
                   <span className="vz-choice__arrow"><ArrowRight /></span>
                 </button>
@@ -289,15 +314,15 @@ export default function PeaceOrderTab({ userData, householdID }) {
                 <button type="button" className="vz-choice" onClick={() => setView("track")}>
                   <span className="vz-choice__icon vz-choice__icon--purple"><Ico size={30}>{ICONS.search}</Ico></span>
                   <span className="vz-choice__body">
-                    <span className="vz-choice__title">I want to check my report.</span>
-                    <span className="vz-choice__desc">See what happened to a report, using your reference number.</span>
+                    <span className="vz-choice__title">{t("po_choice_track_title")}</span>
+                    <span className="vz-choice__desc">{t("po_choice_track_desc")}</span>
                   </span>
                   <span className="vz-choice__arrow"><ArrowRight /></span>
                 </button>
               </div>
             </section>
 
-            <div className="bz-legal bd-legal">Service focus: Community safety and public order</div>
+            <div className="bz-legal bd-legal">{t("po_legal")}</div>
           </>
         )}
 
@@ -305,13 +330,13 @@ export default function PeaceOrderTab({ userData, householdID }) {
         {view === "report" && (
           <section className="bz-card">
             <BackButton />
-            <h3 className="bz-heading">Report a problem</h3>
-            <p className="bz-text">Fill in what you know. Fields marked required must be filled in.</p>
+            <h3 className="bz-heading">{t("po_rep_heading")}</h3>
+            <p className="bz-text">{t("po_rep_sub")}</p>
 
             <div className="bf-form">
               {/* About you */}
               <div className="bf-group">
-                <div className="bf-group__title">About you <span className="bf-pill">All optional</span></div>
+                <div className="bf-group__title">{t("po_group_about")} <span className="bf-pill">{t("po_group_about_pill")}</span></div>
 
                 <label className={`bf-check${form.isAnonymous ? " is-on" : ""}`}>
                   <input
@@ -320,23 +345,23 @@ export default function PeaceOrderTab({ userData, householdID }) {
                     checked={form.isAnonymous}
                     onChange={e => { set("isAnonymous", e.target.checked); if (e.target.checked) { set("reporterName", ""); set("contact", ""); set("reporterAddress", ""); } }}
                   />
-                  <span>Report anonymously. Your name will not be recorded.</span>
+                  <span>{t("po_anon_checkbox")}</span>
                 </label>
 
                 {!form.isAnonymous && (
                   <div className="bf-form bf-form--tight">
                     <div className="bf-field">
-                      <label className="bf-label" htmlFor="po-name">Your name</label>
-                      <input id="po-name" className="bf-input" value={form.reporterName} onChange={e => set("reporterName", e.target.value)} placeholder="Juan Dela Cruz" />
+                      <label className="bf-label" htmlFor="po-name">{t("po_lbl_name")}</label>
+                      <input id="po-name" className="bf-input" value={form.reporterName} onChange={e => set("reporterName", e.target.value)} placeholder={t("po_ph_name")} />
                     </div>
                     <div className="bf-row">
                       <div className="bf-field">
-                        <label className="bf-label" htmlFor="po-contact">Phone number</label>
-                        <input id="po-contact" className="bf-input" value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="0912 345 6789" />
+                        <label className="bf-label" htmlFor="po-contact">{t("po_lbl_phone")}</label>
+                        <input id="po-contact" className="bf-input" value={form.contact} onChange={e => set("contact", e.target.value)} placeholder={t("po_ph_phone")} />
                       </div>
                       <div className="bf-field">
-                        <label className="bf-label" htmlFor="po-address">Your address</label>
-                        <input id="po-address" className="bf-input" value={form.reporterAddress} onChange={e => set("reporterAddress", e.target.value)} placeholder="Purok / Street" />
+                        <label className="bf-label" htmlFor="po-address">{t("po_lbl_address")}</label>
+                        <input id="po-address" className="bf-input" value={form.reporterAddress} onChange={e => set("reporterAddress", e.target.value)} placeholder={t("po_ph_address")} />
                       </div>
                     </div>
                   </div>
@@ -345,27 +370,29 @@ export default function PeaceOrderTab({ userData, householdID }) {
 
               {/* What happened */}
               <div className="bf-group">
-                <div className="bf-group__title">What happened</div>
+                <div className="bf-group__title">{t("po_group_happened")}</div>
 
                 <div className="bf-form bf-form--tight">
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="po-type">What kind of problem was it? <span className="bf-pill bf-pill--req">Required</span></label>
+                    <label className="bf-label" htmlFor="po-type">{t("po_lbl_type")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
                     <select id="po-type" className={`bf-input bf-select${errors.incidentType ? " bf-input--error" : ""}`} value={form.incidentType} onChange={e => set("incidentType", e.target.value)}>
-                      <option value="">Choose from the list...</option>
-                      {INCIDENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      <option value="">{t("po_ph_type")}</option>
+                      {INCIDENT_TYPES.map(val => (
+                        <option key={val} value={val}>{t(INCIDENT_TYPE_MAP[val] || val)}</option>
+                      ))}
                     </select>
                     {errors.incidentType && <div className="bf-error">{errors.incidentType}</div>}
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="po-location">Where did it happen? <span className="bf-pill bf-pill--req">Required</span></label>
-                    <input id="po-location" className={`bf-input${errors.location ? " bf-input--error" : ""}`} value={form.location} onChange={e => set("location", e.target.value)} placeholder="Street, Purok, or a landmark nearby" />
+                    <label className="bf-label" htmlFor="po-location">{t("po_lbl_location")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <input id="po-location" className={`bf-input${errors.location ? " bf-input--error" : ""}`} value={form.location} onChange={e => set("location", e.target.value)} placeholder={t("po_ph_location")} />
                     {errors.location && <div className="bf-error">{errors.location}</div>}
                   </div>
 
                   <div className="bf-row">
                     <div className="bf-field">
-                      <label className="bf-label" htmlFor="po-date">What day? <span className="bf-pill bf-pill--req">Required</span></label>
+                      <label className="bf-label" htmlFor="po-date">{t("po_lbl_date")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
                       <input
                         id="po-date"
                         className={`bf-input${errors.date ? " bf-input--error" : ""}`}
@@ -389,7 +416,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
                       {errors.date && <div className="bf-error">{errors.date}</div>}
                     </div>
                     <div className="bf-field">
-                      <label className="bf-label" htmlFor="po-time">What time? <span className="bf-pill bf-pill--req">Required</span></label>
+                      <label className="bf-label" htmlFor="po-time">{t("po_lbl_time")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
                       <input
                         id="po-time"
                         className={`bf-input${errors.time ? " bf-input--error" : ""}`}
@@ -403,7 +430,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
                             const nowTime = getCurrentTimeStr();
                             if (val > nowTime) {
                               set("time", nowTime);
-                              setErrors(errs => ({ ...errs, time: "The time cannot be in the future." }));
+                              setErrors(errs => ({ ...errs, time: t("po_err_time_future") }));
                               return;
                             }
                           }
@@ -419,15 +446,15 @@ export default function PeaceOrderTab({ userData, householdID }) {
                   </div>
 
                   <div className="bf-field">
-                    <label className="bf-label" htmlFor="po-desc">Tell us what happened <span className="bf-pill bf-pill--req">Required</span></label>
-                    <textarea id="po-desc" className={`bf-textarea${errors.description ? " bf-input--error" : ""}`} rows={4} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Who was involved, what they did, and anything else we should know" />
+                    <label className="bf-label" htmlFor="po-desc">{t("po_lbl_desc")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <textarea id="po-desc" className={`bf-textarea${errors.description ? " bf-input--error" : ""}`} rows={4} value={form.description} onChange={e => set("description", e.target.value)} placeholder={t("po_ph_desc")} />
                     {errors.description && <div className="bf-error">{errors.description}</div>}
                   </div>
 
                   <div className="bf-field">
-                    <div className="bf-label">How urgent is it? <span className="bf-pill bf-pill--req">Required</span></div>
+                    <div className="bf-label">{t("po_lbl_urgency")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></div>
                     <div className="bf-urgency" role="radiogroup" aria-label="Urgency level">
-                      {URGENCY_LEVELS.map(u => (
+                      {urgencyLevels.map(u => (
                         <button
                           type="button"
                           key={u.value}
@@ -446,7 +473,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
                   </div>
 
                   <div className="bf-field">
-                    <div className="bf-label">Photo <span className="bf-pill">Optional</span></div>
+                    <div className="bf-label">{t("po_lbl_photo")} <span className="bf-pill">{t("bswd_pill_optional")}</span></div>
                     <label className={`bf-photo${form.photo ? " is-filled" : ""}`}>
                       <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
                         if (e.target.files[0]) {
@@ -458,13 +485,13 @@ export default function PeaceOrderTab({ userData, householdID }) {
                       <span className="bf-photo__text">
                         {form.photo ? (
                           <>
-                            <strong>Photo added</strong>
-                            <small>{form.photo} · Tap to change</small>
+                            <strong>{t("po_photo_added")}</strong>
+                            <small>{form.photo} · {t("po_photo_change")}</small>
                           </>
                         ) : (
                           <>
-                            <strong>Tap here to add a photo</strong>
-                            <small>A picture can help the Tanod understand the problem</small>
+                            <strong>{t("po_photo_add")}</strong>
+                            <small>{t("po_photo_hint")}</small>
                           </>
                         )}
                       </span>
@@ -476,7 +503,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
               {errors.submit && <div className="bf-alert">{errors.submit}</div>}
 
               <button type="button" className="bf-submit" onClick={handleSubmit} disabled={isSubmitting}>
-                <SendIcon /> {isSubmitting ? "Sending, please wait..." : "Send Report"}
+                <SendIcon /> {isSubmitting ? t("po_btn_submitting") : t("po_btn_submit")}
               </button>
             </div>
           </section>
@@ -487,21 +514,21 @@ export default function PeaceOrderTab({ userData, householdID }) {
           <section className="bz-card">
             <div className="bf-done">
               <span className="bf-done__icon"><BigCheck /></span>
-              <h3 className="bz-heading">Report sent. Thank you!</h3>
-              <p className="bz-text">The Barangay Tanod has received your report and will respond.</p>
+              <h3 className="bz-heading">{t("po_sub_heading")}</h3>
+              <p className="bz-text">{t("po_sub_desc")}</p>
 
               <div className="bt-ref">
-                <div className="bt-ref__label">Your reference number</div>
+                <div className="bt-ref__label">{t("po_sub_ref_label")}</div>
                 <div className="bt-ref__num">{refNum}</div>
-                <div className="bt-ref__hint">Write this number down. You will need it to check your report later.</div>
+                <div className="bt-ref__hint">{t("po_sub_ref_hint")}</div>
               </div>
 
               <div className="bf-done__btns">
                 <button type="button" className="bf-secondary" onClick={() => { setTrackInput(refNum); setView("track"); }}>
-                  Check this report
+                  {t("po_sub_btn_check")}
                 </button>
                 <button type="button" className="bf-secondary" onClick={() => { setForm(BLANK_FORM); goHome(); }}>
-                  Done
+                  {t("po_sub_btn_done")}
                 </button>
               </div>
             </div>
@@ -512,25 +539,25 @@ export default function PeaceOrderTab({ userData, householdID }) {
         {view === "track" && (
           <section className="bz-card">
             <BackButton />
-            <h3 className="bz-heading">Check your report</h3>
-            <p className="bz-text">Type the reference number you received when you sent your report.</p>
+            <h3 className="bz-heading">{t("po_track_heading")}</h3>
+            <p className="bz-text">{t("po_track_sub")}</p>
 
             <div className="bf-form">
               <div className="bf-field">
-                <label className="bf-label" htmlFor="po-ref">Reference number</label>
+                <label className="bf-label" htmlFor="po-ref">{t("po_track_lbl_ref")}</label>
                 <input
                   id="po-ref"
                   className={`bf-input bt-input${trackError ? " bf-input--error" : ""}`}
                   value={trackInput}
                   onChange={e => { setTrackInput(e.target.value); setTrackError(""); setTrackResult(null); }}
-                  placeholder="Type it here"
+                  placeholder={t("po_track_ph_ref")}
                   onKeyDown={e => e.key === "Enter" && handleTrack()}
                 />
                 {trackError && <div className="bf-error">{trackError}</div>}
               </div>
 
               <button type="button" className="bf-submit" onClick={handleTrack} disabled={isSearching}>
-                <Ico size={24}>{ICONS.search}</Ico> {isSearching ? "Searching, please wait..." : "Find My Report"}
+                <Ico size={24}>{ICONS.search}</Ico> {isSearching ? t("po_track_btn_finding") : t("po_track_btn_find")}
               </button>
             </div>
 
@@ -541,22 +568,22 @@ export default function PeaceOrderTab({ userData, householdID }) {
                 <div className="bt-result">
                   <div className="bt-result__head">
                     <div>
-                      <div className="bt-result__label">Reference number</div>
+                      <div className="bt-result__label">{t("po_track_lbl_ref")}</div>
                       <div className="bt-result__ref">{trackResult.ref}</div>
                     </div>
                     <span className="bt-badge" style={{ background: sc.bg, color: sc.color }}>
-                      <Ico size={20}>{ICONS[STATUS_ICON[statusKey]]}</Ico> {sc.label}
+                      <Ico size={20}>{ICONS[STATUS_ICON[statusKey]]}</Ico> {getStatusLabel(statusKey)}
                     </span>
                   </div>
 
                   <div className="bt-details">
-                    <div className="bt-detail"><span className="bt-detail__icon"><Ico size={22}>{ICONS.tag}</Ico></span><div><div className="bt-detail__label">Type of problem</div><div className="bt-detail__value">{trackResult.type}</div></div></div>
-                    <div className="bt-detail"><span className="bt-detail__icon"><Ico size={22}>{ICONS.pin}</Ico></span><div><div className="bt-detail__label">Where</div><div className="bt-detail__value">{trackResult.location}</div></div></div>
-                    <div className="bt-detail"><span className="bt-detail__icon"><Ico size={22}>{ICONS.calendar}</Ico></span><div><div className="bt-detail__label">Date filed</div><div className="bt-detail__value">{trackResult.date}</div></div></div>
+                    <div className="bt-detail"><span className="bt-detail__icon"><Ico size={22}>{ICONS.tag}</Ico></span><div><div className="bt-detail__label">{t("po_track_detail_type")}</div><div className="bt-detail__value">{trackResult.type}</div></div></div>
+                    <div className="bt-detail"><span className="bt-detail__icon"><Ico size={22}>{ICONS.pin}</Ico></span><div><div className="bt-detail__label">{t("po_track_detail_where")}</div><div className="bt-detail__value">{trackResult.location}</div></div></div>
+                    <div className="bt-detail"><span className="bt-detail__icon"><Ico size={22}>{ICONS.calendar}</Ico></span><div><div className="bt-detail__label">{t("po_track_detail_date")}</div><div className="bt-detail__value">{trackResult.date}</div></div></div>
                   </div>
 
                   <div className="bt-timeline">
-                    <div className="bt-timeline__title">What happened so far</div>
+                    <div className="bt-timeline__title">{t("po_track_timeline_title")}</div>
                     <ol className="bt-timeline__list">
                       {trackResult.updates.map((u, i) => {
                         const last = i === trackResult.updates.length - 1;
