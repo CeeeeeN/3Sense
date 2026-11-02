@@ -1,38 +1,18 @@
-import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, limit } from "firebase/firestore";
+import { useState, useEffect, useCallback } from "react";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
-import { useAlert } from "../../context/AlertContext";
-import { useLanguage } from "../../context/LanguageContext";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
   catch { return fallback; }
 };
 
-// Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
-const normalizePHMobile = (value) => {
-  let d = String(value || "").replace(/\D/g, "");
-  if (d.startsWith("63") && d.length >= 12) d = "0" + d.slice(2);
-  else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
-  return d.slice(0, 11);
-};
-
-const isValidPHMobile = (value) => /^09\d{9}$/.test(value);
-
-const formatSize = (bytes) => {
-  if (!bytes && bytes !== 0) return "";
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
 function ValidityReminderBanner() {
-  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
@@ -43,8 +23,8 @@ function ValidityReminderBanner() {
       background: "#fffbeb",
       border: "1px solid #fcd34d",
       borderRadius: "10px",
-      padding: "10px 14px",
-      marginBottom: "0.75rem",
+      padding: "14px 16px",
+      marginBottom: "18px",
       fontSize: "14px",
       color: "#92400e",
     }}>
@@ -55,13 +35,16 @@ function ValidityReminderBanner() {
       </svg>
       <div style={{ flex: 1 }}>
         <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
-          {t("doc_validity_title", "Document Validity Reminder")}
+          Document Validity Reminder
         </strong>
-        {t("doc_validity_desc", "Barangay documents issued through this system are valid for 6 months from the date of issuance. Please ensure you use your document within this period. After expiry, a new request will be required.")}
+        Barangay documents issued through this system are valid for{" "}
+        <strong>6 months</strong> from the date of issuance. Please ensure
+        you use your document within this period. After expiry, a new
+        request will be required.
       </div>
       <button
         onClick={() => setDismissed(true)}
-        aria-label={t("close", "Dismiss reminder")}
+        aria-label="Dismiss reminder"
         style={{
           background: "none",
           border: "none",
@@ -80,54 +63,33 @@ function ValidityReminderBanner() {
   );
 }
 
-function StepIndicator({ step, onStepClick }) {
-  const { t } = useLanguage();
-  const stepLabels = [
-    t("doc_step1", "Select Document"),
-    t("doc_step2", "Personal Details"),
-    t("doc_step3", "Review"),
-    t("doc_step4", "Done")
-  ];
-
+function StepIndicator({ step }) {
   return (
-    <ol className="dr-steps" aria-label={t("doc_request_progress", "Request progress")}>
-      {stepLabels.map((label, i) => {
+    <div className="dr-steps">
+      {STEP_LABELS.map((label, i) => {
         const num = i + 1;
-        const finished = step === 4;
-        const done = num < step || finished;
-        const active = num === step && !finished;
-        // Completed steps are clickable so people can jump back and edit (not after submission)
-        const clickable = done && !finished;
-        const Node = clickable ? "button" : "div";
-        const nodeProps = clickable
-          ? { type: "button", onClick: () => onStepClick(num), "aria-label": `Go back to ${label}` }
-          : {};
-
+        const done = num < step;
+        const active = num === step;
         return (
-          <li key={label} className="dr-step-item" aria-current={active ? "step" : undefined}>
-            <Node className={`dr-step-node${clickable ? " dr-step-node--link" : ""}`} {...nodeProps}>
-              <span className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
-                {done
-                  ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  : num}
-              </span>
-              <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
-            </Node>
-            {i < stepLabels.length - 1 && (
-              <span className={`dr-step-line${done ? " dr-step-line--done" : ""}`} aria-hidden="true" />
-            )}
-          </li>
+          <div key={i} className="dr-step-item">
+            <div className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
+              {done
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                : num}
+            </div>
+            <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
+            {i < STEP_LABELS.length - 1 && <div className={`dr-step-line${done ? " dr-step-line--done" : ""}`} />}
+          </div>
         );
       })}
-    </ol>
+    </div>
   );
 }
 
 function Step1({ docTypes, selected, onSelect }) {
-  const { t } = useLanguage();
   return (
     <div className="dr-step1">
-      <p className="dr-step-hint">{t("doc_step1_hint", "Select the document you need. You must choose one to proceed.")}</p>
+      <p className="dr-step-hint">Select the document you need. You must choose one to proceed.</p>
       <div className="dr-doc-list">
         {docTypes.map(d => (
           <button
@@ -158,51 +120,17 @@ function Step1({ docTypes, selected, onSelect }) {
 }
 
 function Step2({ docType, form, setForm, errors }) {
-  const { t } = useLanguage();
-  const { showAlert } = useAlert();
-  const [previewUrl, setPreviewUrl] = useState(null);
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
 
-  // Thumbnail for image uploads; revoked when the file changes or the step unmounts
-  useEffect(() => {
-    const f = form.validIdFile;
-    if (f && f.type && f.type.startsWith("image/")) {
-      const url = URL.createObjectURL(f);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setPreviewUrl(null);
-  }, [form.validIdFile]);
-
-  const handleFile = async (e) => {
-    const input = e.target;
-    const file = input.files[0];
+  const handleFile = (e) => {
+    const file = e.target.files[0];
     if (!file) return;
-
-    // Reset so choosing the same file again after removing it still fires onChange
-    input.value = "";
-
-    if (file.size > MAX_FILE_SIZE) {
-      await showAlert(t("doc_err_file_large", "File Too Large"), t("doc_err_file_size", "File must be under 5MB."));
-      return;
-    }
-
+    if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB."); return; }
     set("validId", file.name);
     set("validIdFile", file);
   };
-
-  const removeFile = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    set("validId", "");
-    set("validIdFile", null);
-  };
-
-  const isPdf = form.validIdFile?.type === "application/pdf" || /\.pdf$/i.test(form.validId || "");
-  const isOther = form.purposeOption === "Other";
 
   return (
     <div className="dr-step2">
@@ -216,150 +144,118 @@ function Step2({ docType, form, setForm, errors }) {
         </div>
       )}
 
-      {/* ── Personal information ── */}
-      <section className="dr-card">
-        <div className="dr-card__title">Personal Information</div>
-        <div className="dr-grid">
-          <div className="dr-field">
-            <label className="sv-label">First Name <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
-            {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Middle Name</label>
-            <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Last Name <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
-            {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Date of Birth <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.dob ? " sv-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
-            {errors.dob && <span className="sv-error-msg">{errors.dob}</span>}
-          </div>
+      <div className="dr-section-label">Basic Information</div>
+      <div className="dr-field-row">
+        <div className="dr-field">
+          <label className="sv-label">First Name <span className="sv-required">*</span></label>
+          <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
+          {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
+        </div>
+        <div className="dr-field">
+          <label className="sv-label">Middle Name</label>
+          <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
+        </div>
+        <div className="dr-field">
+          <label className="sv-label">Last Name <span className="sv-required">*</span></label>
+          <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+          {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
+        </div>
+      </div>
+      <div className="dr-field-row">
+        <div className="dr-field">
+          <label className="sv-label">Date of Birth <span className="sv-required">*</span></label>
+          <input className={`sv-input${errors.dob ? " sv-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+          {errors.dob && <span className="sv-error-msg">{errors.dob}</span>}
+        </div>
+        <div className="dr-field">
+          <label className="sv-label">Civil Status</label>
+          <select className="sv-input sv-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
+            {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="dr-field">
+          <label className="sv-label">Residing Since (Year) <span className="sv-required">*</span></label>
+          <input className={`sv-input${errors.residingSince ? " sv-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="e.g. 2010" />
+          {errors.residingSince && <span className="sv-error-msg">{errors.residingSince}</span>}
+        </div>
+      </div>
+      <div className="dr-field">
+        <label className="sv-label">Complete Address <span className="sv-required">*</span></label>
+        <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
+        {errors.address && <span className="sv-error-msg">{errors.address}</span>}
+      </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+        <div className="dr-field">
+          <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
+          <input className={`sv-input${errors.contact ? " sv-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder="+63 912 345 6789" />
+          {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
+        </div>
+        <div className="dr-field">
+          <label className="sv-label">Email Address</label>
+          <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
+        </div>
+        <div className="dr-field">
+          <label className="sv-label">Purpose of Request <span className="sv-required">*</span></label>
+          <select
+            className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
+            value={form.purposeOption}
+            onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
+          >
+            <option value="">— Select purpose —</option>
+            {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            <option value="Other">Other</option>
+          </select>
+          {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
+        </div>
+      </div>
+
+      {form.purposeOption === "Other" && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+          <div />
+          <div />
           <div className="dr-field">
-            <label className="sv-label">Civil Status</label>
-            <select className="sv-input sv-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
-              {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Residing Since <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.residingSince ? " sv-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="Year, e.g. 2010" />
-            {errors.residingSince && <span className="sv-error-msg">{errors.residingSince}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
+            <label className="sv-label">Please specify <span className="sv-required">*</span></label>
             <input
-              className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
-              type="tel"
-              inputMode="numeric"
-              maxLength={11}
-              value={form.contact}
-              onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
-              onBlur={e => set("contact", normalizePHMobile(e.target.value))}
-              placeholder="09123456789"
+              className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
+              value={form.purposeOther}
+              onChange={e => set("purposeOther", e.target.value)}
+              placeholder="Describe your purpose..."
             />
-            {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Email Address</label>
-            <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
-          </div>
-
-          <div className="dr-field dr-span-4">
-            <label className="sv-label">Complete Address <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
-            {errors.address && <span className="sv-error-msg">{errors.address}</span>}
+            {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
           </div>
         </div>
-      </section>
+      )}
 
-      {/* ── Request details: purpose + valid ID ── */}
-      <section className="dr-card">
-        <div className="dr-card__title">Request Details</div>
-        <div className="dr-grid">
-          <div className="dr-field dr-span-2">
-            <label className="sv-label">Purpose of Request <span className="sv-required">*</span></label>
-            <select
-              className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
-              value={form.purposeOption}
-              onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
-            >
-              <option value="">— Select purpose —</option>
-              {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              <option value="Other">Other</option>
-            </select>
-            {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
-          </div>
-
-          {isOther && (
-            <div className="dr-field dr-span-2">
-              <label className="sv-label">Please specify <span className="sv-required">*</span></label>
-              <input
-                className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
-                value={form.purposeOther}
-                onChange={e => set("purposeOther", e.target.value)}
-                placeholder="Describe your purpose..."
-              />
-              {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
+      <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>File Upload</div>
+      <div className="dr-field">
+        <label className="sv-label">Upload Valid ID <span className="sv-required">*</span></label>
+        <label className={`dr-upload-box${errors.validId ? " dr-upload-box--error" : ""}`}>
+          <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
+          {form.validId ? (
+            <div className="dr-upload-done">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              <span>{form.validId}</span>
+            </div>
+          ) : (
+            <div className="dr-upload-placeholder">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+              <span>Click to upload</span>
+              <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
             </div>
           )}
+        </label>
+        {errors.validId && <span className="sv-error-msg">{errors.validId}</span>}
+      </div>
 
-          <div className={`dr-field ${isOther ? "dr-span-4" : "dr-span-2"}`}>
-            <label className="sv-label">Upload Valid ID <span className="sv-required">*</span></label>
-            <label className={`dr-upload-box dr-upload-box--compact${form.validId ? " dr-upload-box--filled" : ""}${errors.validId ? " dr-upload-box--error" : ""}`}>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
-              {form.validId ? (
-                <div className="dr-upload-file">
-                  {previewUrl ? (
-                    <img className="dr-upload-thumb" src={previewUrl} alt="Uploaded ID preview" />
-                  ) : (
-                    <div className="dr-upload-file-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                    </div>
-                  )}
-                  <div className="dr-upload-file-meta">
-                    <span className="dr-upload-file-name" title={form.validId}>{form.validId}</span>
-                    <span className="dr-upload-file-sub">
-                      {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Click to replace
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="dr-upload-remove"
-                    onClick={removeFile}
-                    aria-label="Remove uploaded ID"
-                    title="Remove"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                  </button>
-                </div>
-              ) : (
-                <div className="dr-upload-placeholder">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                  <span>Click to upload</span>
-                  <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
-                </div>
-              )}
-            </label>
-            {errors.validId && <span className="sv-error-msg">{errors.validId}</span>}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Document-specific fields ── */}
       {extraFields.length > 0 && (
-        <section className="dr-card">
-          <div className="dr-card__title">Additional Information</div>
-          <div className="dr-grid">
+        <>
+          <div className="dr-section-label" style={{ marginTop: "1.5rem" }}>Additional Information</div>
+          <div className="dr-field-row dr-field-row--wrap">
             {extraFields.map(f => {
               if (f.type === "checkbox") {
                 return (
-                  <div className="dr-field dr-span-4" key={f.id}>
+                  <div className="dr-field dr-field--full" key={f.id}>
                     <label className={`dr-checkbox-label${errors[f.id] ? " dr-checkbox-label--error" : ""}`}>
                       <input type="checkbox" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} className="dr-checkbox" />
                       <span>{f.label} {f.required && <span className="sv-required">*</span>}</span>
@@ -369,7 +265,7 @@ function Step2({ docType, form, setForm, errors }) {
                 );
               }
               return (
-                <div className="dr-field dr-span-2" key={f.id}>
+                <div className="dr-field" key={f.id}>
                   <label className="sv-label">{f.label} {f.required && <span className="sv-required">*</span>}</label>
                   <input className={`sv-input${errors[f.id] ? " sv-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
                   {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
@@ -377,36 +273,35 @@ function Step2({ docType, form, setForm, errors }) {
               );
             })}
           </div>
-        </section>
+        </>
       )}
     </div>
   );
 }
 
 function Step3({ docType, form }) {
-  const { t } = useLanguage();
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
     ? (form.purposeOther || "Other")
     : form.purposeOption;
   const rows = [
-    { label: t("doc_type", "Document Type"), value: docType?.documentName || docType?.title || docType?.name, full: true },
-    { label: t("doc_full_name", "Full Name"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
-    { label: t("profile_birthdate", "Date of Birth"), value: form.dob },
-    { label: t("profile_civil_status", "Civil Status"), value: form.civilStatus },
-    { label: t("profile_residing_since", "Residing Since"), value: form.residingSince ? (typeof t("doc_residing_present") === "function" ? t("doc_residing_present", form.residingSince) : `${form.residingSince} up to present`) : "—" },
-    { label: t("doc_address", "Address"), value: form.address, full: true },
-    { label: t("profile_contact", "Contact Number"), value: form.contact },
-    { label: t("profile_email", "Email"), value: form.email || "—" },
-    { label: t("doc_purpose", "Purpose"), value: effectivePurpose || "—", full: true },
-    { label: t("doc_id_uploaded", "Valid ID Uploaded"), value: form.validId || "—" },
+    { label: "Document Type", value: docType?.documentName || docType?.title || docType?.name, full: true },
+    { label: "Full Name", value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
+    { label: "Date of Birth", value: form.dob },
+    { label: "Civil Status", value: form.civilStatus },
+    { label: "Residing Since", value: form.residingSince ? `${form.residingSince} up to present` : "—" },
+    { label: "Address", value: form.address, full: true },
+    { label: "Contact Number", value: form.contact },
+    { label: "Email", value: form.email || "—" },
+    { label: "Purpose", value: effectivePurpose || "—", full: true },
+    { label: "Valid ID Uploaded", value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
-    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? t("doc_confirmed", "✓ Confirmed") : t("doc_not_confirmed", "Not confirmed") })),
+    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
   ];
 
   return (
     <div className="dr-step3">
-      <p className="dr-step-hint">{t("doc_review_hint")}</p>
+      <p className="dr-step-hint">Please review your information before submitting. All fields are read-only.</p>
 
       <div style={{
         display: "flex",
@@ -416,7 +311,7 @@ function Step3({ docType, form }) {
         border: "1px solid #fcd34d",
         borderRadius: "8px",
         padding: "10px 14px",
-        marginBottom: "0.75rem",
+        marginBottom: "16px",
         fontSize: "13px",
         color: "#92400e",
       }}>
@@ -424,7 +319,7 @@ function Step3({ docType, form }) {
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        <span>{t("doc_review_validity")}</span>
+        <span>Reminder: This document will be valid for <strong>6 months</strong> from the date of issuance.</span>
       </div>
 
       <div className="dr-review-grid">
@@ -440,7 +335,6 @@ function Step3({ docType, form }) {
 }
 
 function Step4({ refNum, onReset }) {
-  const { t } = useLanguage();
   return (
     <div className="sv-success-wrap">
       <div className="sv-success-icon" style={{ width: 64, height: 64 }}>
@@ -448,39 +342,36 @@ function Step4({ refNum, onReset }) {
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
         </svg>
       </div>
-      <h3 className="sv-success-title">{t("doc_submitted_title", "Request Submitted!")}</h3>
-      <p className="sv-success-sub">{t("doc_submitted_sub", "Your document request has been received by the barangay.")}</p>
+      <h3 className="sv-success-title">Request Submitted!</h3>
+      <p className="sv-success-sub">Your document request has been received by the barangay.</p>
       <div className="dr-ref-box">
-        <span className="dr-ref-label">{t("reference_number", "Reference Number")}</span>
+        <span className="dr-ref-label">Reference Number</span>
         <span className="dr-ref-num">{refNum}</span>
       </div>
       <div className="dr-success-info">
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></svg>
-          <span>{t("doc_sms_notif", "You will receive an SMS notification once your request is processed.")}</span>
+          <span>You will receive an SMS notification once your request is processed.</span>
         </div>
         <div className="dr-success-info-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          <span>{t("doc_processing_time", "Processing time: 2–3 business days.")}</span>
+          <span>Processing time: 2–3 business days.</span>
         </div>
         <div className="dr-success-info-item" style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "8px 10px", marginTop: "4px" }}>
           <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
-          <span>{t("doc_validity_note", "Your document will be valid for 6 months from the date of issuance.")}</span>
+          <span>Your document will be valid for <strong>6 months</strong> from the date of issuance.</span>
         </div>
       </div>
-      <button className="sv-btn-primary" onClick={onReset}>{t("doc_submit_another", "Submit Another Request")}</button>
+      <button className="sv-btn-primary" onClick={onReset}>Submit Another Request</button>
     </div>
   );
 }
 
 export default function DocumentsTab({ userData, householdID, userName }) {
-  const { t } = useLanguage();
-  const residentID = userData?.residentID || getSaved("memberID", null);
-  const userUID = userData?.UID || getSaved("UID", null);
-
+  const residentID = userData?.residentID || userData?.id || getSaved("memberID", null);
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -495,58 +386,85 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   });
 
   useEffect(() => {
-    const q = query(
-      collection(db, "documents"),
-      limit(50)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
       setDocTypes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (userData) {
-      const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city]
+  // ─── BUG FIX (R19): Robust resident auto-fill fetch logic ───
+  const loadResidentData = useCallback(async () => {
+    let sourceData = userData;
+
+    // Fallback 1: Try Session LocalStorage
+    if (!sourceData || (!sourceData.firstName && !sourceData.lastName)) {
+      try {
+        const sessionData = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+        if (sessionData.firstName || sessionData.lastName) {
+          sourceData = sessionData;
+        }
+      } catch (err) {
+        console.error("Failed to parse session data:", err);
+      }
+    }
+
+    // Fallback 2: Direct Firestore query if props/session are insufficient
+    if ((!sourceData || !sourceData.firstName) && householdID && residentID) {
+      try {
+        const resSnap = await getDoc(doc(db, "households", householdID, "residents", residentID));
+        if (resSnap.exists()) {
+          sourceData = resSnap.data();
+        }
+      } catch (err) {
+        console.error("Failed to fetch resident from Firestore:", err);
+      }
+    }
+
+    if (sourceData) {
+      const rawRes = sourceData.residentData || sourceData;
+      const fullAddress = rawRes.address || [rawRes.houseNumber, rawRes.street, rawRes.barangay || "Malanday", rawRes.city || "Valenzuela City"]
         .filter(Boolean).join(", ");
+
       setForm(f => ({
         ...f,
-        firstName: userData.firstName || "",
-        middleName: userData.middleName || "",
-        lastName: userData.lastName || "",
-        dob: userData.birthDate || "",
-        civilStatus: userData.civilStatus || "Single",
-        address: fullAddress,
-        contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
-        email: userData.email || "",
-        residingSince: userData.residingSinceYear ? String(userData.residingSinceYear) : "",
+        firstName: rawRes.firstName || f.firstName || "",
+        middleName: rawRes.middleName || f.middleName || "",
+        lastName: rawRes.lastName || f.lastName || "",
+        dob: rawRes.birthDate || rawRes.dob || f.dob || "",
+        civilStatus: rawRes.civilStatus || f.civilStatus || "Single",
+        address: fullAddress || f.address || "",
+        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || f.contact || ""),
+        email: rawRes.email || f.email || "",
+        residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || f.residingSince || ""),
       }));
     }
-  }, [userData]);
+  }, [userData, householdID, residentID]);
+
+  useEffect(() => {
+    loadResidentData();
+  }, [loadResidentData]);
 
   const validateStep1 = () => {
-    if (!docType) { setErrors({ docType: t("doc_err_select", "Please select a document type.") }); return false; }
+    if (!docType) { setErrors({ docType: "Please select a document type." }); return false; }
     return true;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = t("doc_err_required", "Required.");
-    if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
-    if (!form.dob) e.dob = t("doc_err_required", "Required.");
-    if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
-    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
-    else if (!isValidPHMobile(form.contact)) e.contact = t("doc_err_mobile", "Enter a valid 11-digit mobile number (e.g. 09123456789).");
-    if (!form.residingSince) e.residingSince = t("doc_err_required", "Required.");
-    if (!form.purposeOption) e.purposeOption = t("doc_err_required", "Required.");
-    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = t("doc_err_specify_purpose", "Please specify your purpose.");
-    if (!form.validId) e.validId = t("doc_err_upload_id", "Please upload a valid ID.");
+    if (!form.firstName.trim()) e.firstName = "Required.";
+    if (!form.lastName.trim()) e.lastName = "Required.";
+    if (!form.dob) e.dob = "Required.";
+    if (!form.address.trim()) e.address = "Required.";
+    if (!String(form.contact || "").trim()) e.contact = "Required.";
+    if (!form.residingSince) e.residingSince = "Required.";
+    if (!form.purposeOption) e.purposeOption = "Required.";
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
+    if (!form.validId) e.validId = "Please upload a valid ID.";
     const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = t("doc_err_confirm", "You must confirm this to proceed."); }
-      else { if (!form[f.id]?.toString().trim()) e[f.id] = t("doc_err_required", "Required."); }
+      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
+      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -581,13 +499,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         });
 
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-
-        const submissionForm = {
-          ...form,
-          purpose: effectivePurpose,
-          validIdUrl: uploadedIdUrl,
-          UID: userUID
-        };
+        const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
 
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
@@ -613,20 +525,25 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setStep(s => s + 1);
   };
 
+  // ─── BUG FIX (R19): Reset transient fields & re-populate personal info ───
   const handleReset = () => {
-    setStep(1); setDocType(null); setErrors({});
-    setForm({ firstName: "", middleName: "", lastName: "", dob: "", civilStatus: "Single", address: "", contact: "", email: "", ctc: "", residingSince: "", purposeOption: "", purposeOther: "", validId: "", validIdFile: null });
-  };
-
-  const goToStep = (n) => {
-    if (isSubmitting) return;
+    setStep(1);
+    setDocType(null);
     setErrors({});
-    setStep(n);
+    // Reset transient request inputs while maintaining personal info
+    setForm(prev => ({
+      ...prev,
+      purposeOption: "",
+      purposeOther: "",
+      validId: "",
+      validIdFile: null,
+    }));
+    loadResidentData();
   };
 
   return (
     <div className="dr-wizard">
-      <div className="dr-wizard-header"><StepIndicator step={step} onStepClick={goToStep} /></div>
+      <div className="dr-wizard-header"><StepIndicator step={step} /></div>
 
       <div className="dr-wizard-body">
         {(step === 1 || step === 2) && <ValidityReminderBanner />}
@@ -641,9 +558,9 @@ export default function DocumentsTab({ userData, householdID, userName }) {
 
       {step < 4 && (
         <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-          {step > 1 && <button className="sv-btn-ghost" onClick={() => goToStep(step - 1)} disabled={isSubmitting}>{t("back", "Previous")}</button>}
+          {step > 1 && <button className="sv-btn-ghost" onClick={() => { setErrors({}); setStep(s => s - 1); }} disabled={isSubmitting}>Previous</button>}
           <button className="sv-btn-primary" onClick={handleNext} disabled={isSubmitting}>
-            {isSubmitting ? t("doc_uploading", "Uploading ID...") : (step === 3 ? t("doc_submit_btn", "Submit Request") : t("doc_next", "Next"))}
+            {isSubmitting ? "Uploading ID..." : (step === 3 ? "Submit Request" : "Next")}
           </button>
         </div>
       )}
