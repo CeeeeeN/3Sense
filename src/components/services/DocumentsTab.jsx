@@ -98,7 +98,7 @@ function StepIndicator({ step, onStepClick }) {
           </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
