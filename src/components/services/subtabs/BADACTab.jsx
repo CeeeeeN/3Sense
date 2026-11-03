@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { BadgeIcon } from "../../Icons";
+import { useLanguage } from "../../../context/LanguageContext";
 
-// ── Content (wording kept from the original page) ────────────────────────────
 const PHONE = "(044) 000-0000";
-const HOURS = "Monday – Friday · 8:00 AM – 5:00 PM";
-const ADDRESS = "Barangay 3S+ Hall, Malanday, Valenzuela City";
-
 const telHref = (n) => `tel:${n.replace(/[^0-9+]/g, "")}`;
 
 // Small helper so every icon shares the same stroke style
@@ -36,45 +33,52 @@ const ICONS = {
   chevron:  <><polyline points="6 9 12 15 18 9" /></>,
 };
 
-const FACTS = [
-  { icon: "gift", label: "Cost",    value: "All services are free" },
-  { icon: "lock", label: "Privacy", value: "Strictly confidential" },
-  { icon: "door", label: "Visiting", value: "Walk in, no appointment needed" },
-];
-
-const STEPS = [
-  { icon: "building",  title: "Visit the BADAC Office",    desc: "Go to Barangay 3S+ Hall and look for the BADAC desk. Walk-in only — no appointment needed. All visits are strictly confidential." },
-  { icon: "clipboard", title: "Interview & Profiling",     desc: "A trained BADAC officer will conduct a private, non-judgmental interview to understand your situation and needs." },
-  { icon: "flask",     title: "Free Drug Testing",         desc: "Voluntary and free drug testing is available on-site. Results are confidential and will not be shared without your consent." },
-  { icon: "clinic",    title: "Evaluation at VADAO",       desc: "If needed, you will be referred to VADAO (Valenzuela Anti-Drug Abuse Office) for further evaluation and support planning." },
-  { icon: "heart",     title: "Rehabilitation (If Needed)", desc: "Appropriate rehabilitation programs will be recommended. These are voluntary, free, and tailored to your situation." },
-];
-
-const WHO = [
-  { icon: "user",  title: "18 Years Old and Above", desc: "Services are available to adults. Minors must be accompanied by a parent or guardian." },
-  { icon: "check", title: "Voluntary Only",         desc: "Participation is completely voluntary. No one will be forced to undergo testing or rehabilitation." },
-  { icon: "home",  title: "Barangay Residents",     desc: "Priority is given to residents of Barangay 3S+ Malanday. Others may be referred to their local BADAC." },
-];
-
-const FREE_ITEMS = ["Counseling & Guidance", "Drug Testing", "VADAO Referral", "Rehabilitation Coordination", "Family Support"];
-
-const EDU = [
-  { icon: "pulse",   title: "It's a Health Issue",     desc: "Drug dependency is recognized as a medical condition — not a moral failure. It can happen to anyone and is treatable with proper support." },
-  { icon: "refresh", title: "Recovery Is Possible",    desc: "Many residents have successfully recovered through community-based rehabilitation. Early intervention significantly improves outcomes." },
-  { icon: "family",  title: "Family Support Matters",  desc: "Family involvement is one of the strongest factors in successful recovery. BADAC provides guidance for families of affected individuals." },
-];
-
-const FAQS = [
-  { q: "Will my information be shared with police?",                  a: "No. BADAC strictly follows confidentiality protocols. Your visit and information will not be disclosed to law enforcement without your explicit consent, unless required by a court order." },
-  { q: "Is there any fee for BADAC services?",                        a: "All BADAC services are completely FREE — including counseling, drug testing, and rehabilitation referral." },
-  { q: "Can I bring someone with me?",                                a: "Yes. You may bring a trusted family member or friend for support. All persons present are required to maintain confidentiality." },
-  { q: "What if I am not a drug user but concerned about someone?",   a: "You can visit the BADAC office for guidance on how to help a family member or loved one. Concerned citizens are welcome." },
-  { q: "What is the difference between BADAC and the police?",        a: "BADAC is a barangay-level welfare body focused on rehabilitation and support — not law enforcement. Visiting BADAC is not the same as surrendering to police." },
-];
-
 // ── BADAC Tab ────────────────────────────────────────────────────────────────
 export default function BADACTab() {
+  const { t } = useLanguage();
   const [openFaq, setOpenFaq] = useState(null);
+
+  const facts = [
+    { icon: "gift", label: t("badac_fact_cost_label"), value: t("badac_fact_cost_val") },
+    { icon: "lock", label: t("badac_fact_privacy_label"), value: t("badac_fact_privacy_val") },
+    { icon: "door", label: t("badac_fact_visit_label"), value: t("badac_fact_visit_val") },
+  ];
+
+  const steps = [
+    { icon: "building", title: t("badac_step1_title"), desc: t("badac_step1_desc") },
+    { icon: "clipboard", title: t("badac_step2_title"), desc: t("badac_step2_desc") },
+    { icon: "flask", title: t("badac_step3_title"), desc: t("badac_step3_desc") },
+    { icon: "clinic", title: t("badac_step4_title"), desc: t("badac_step4_desc") },
+    { icon: "heart", title: t("badac_step5_title"), desc: t("badac_step5_desc") },
+  ];
+
+  const who = [
+    { icon: "user", title: t("badac_who1_title"), desc: t("badac_who1_desc") },
+    { icon: "check", title: t("badac_who2_title"), desc: t("badac_who2_desc") },
+    { icon: "home", title: t("badac_who3_title"), desc: t("badac_who3_desc") },
+  ];
+
+  const freeItems = [
+    t("badac_free_counseling"),
+    t("badac_free_drug_test"),
+    t("badac_free_vadao"),
+    t("badac_free_rehab"),
+    t("badac_free_family"),
+  ];
+
+  const edu = [
+    { icon: "pulse", title: t("badac_edu1_title"), desc: t("badac_edu1_desc") },
+    { icon: "refresh", title: t("badac_edu2_title"), desc: t("badac_edu2_desc") },
+    { icon: "family", title: t("badac_edu3_title"), desc: t("badac_edu3_desc") },
+  ];
+
+  const faqs = [
+    { q: t("badac_faq1_q"), a: t("badac_faq1_a") },
+    { q: t("badac_faq2_q"), a: t("badac_faq2_a") },
+    { q: t("badac_faq3_q"), a: t("badac_faq3_a") },
+    { q: t("badac_faq4_q"), a: t("badac_faq4_a") },
+    { q: t("badac_faq5_q"), a: t("badac_faq5_a") },
+  ];
 
   return (
     <div className="bz-page">
@@ -82,18 +86,18 @@ export default function BADACTab() {
       <div className="svc-hero svc-hero--amber bz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BadgeIcon /></span>BADAC</div>
-            <h2 className="svc-hero__title">Barangay Anti-Drug Abuse Council</h2>
-            <p className="svc-hero__sub">Seek guidance or report concerns related to illegal drug activities and access information about community-based drug prevention and rehabilitation support.</p>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><BadgeIcon /></span>{t("badac_eyebrow")}</div>
+            <h2 className="svc-hero__title">{t("badac_hero_title")}</h2>
+            <p className="svc-hero__sub">{t("badac_sub")}</p>
           </div>
         </div>
       </div>
 
       <div className="bz-wrap">
         {/* Quick facts */}
-        <section className="bz-glance" aria-label="Quick facts">
-          {FACTS.map((f) => (
-            <div className="bz-fact" key={f.label}>
+        <section className="bz-glance" aria-label={t("badac_facts_title")}>
+          {facts.map((f, i) => (
+            <div className="bz-fact" key={i}>
               <span className="bz-fact__icon bz-fact__icon--amber"><Ico>{ICONS[f.icon]}</Ico></span>
               <div>
                 <div className="bz-fact__label">{f.label}</div>
@@ -107,30 +111,30 @@ export default function BADACTab() {
         <section className="bz-card bd-contact">
           <div className="bd-contact__main">
             <div>
-              <h3 className="bz-heading">Call or visit BADAC</h3>
-              <p className="bz-text bd-contact__text">Your visit, name, and information will never be shared without your consent.</p>
+              <h3 className="bz-heading">{t("badac_contact_heading")}</h3>
+              <p className="bz-text bd-contact__text">{t("badac_contact_sub")}</p>
             </div>
             <a href={telHref(PHONE)} className="bd-callbtn">
               <Ico size={24}>{ICONS.phone}</Ico>
               <span>
-                <small>Tap to call</small>
+                <small>{t("badac_contact_tap")}</small>
                 {PHONE}
               </span>
             </a>
           </div>
           <div className="bd-contact__rows">
-            <div className="bd-contact__row"><span className="bd-contact__icon"><Ico size={22}>{ICONS.clock}</Ico></span>{HOURS}</div>
-            <div className="bd-contact__row"><span className="bd-contact__icon"><Ico size={22}>{ICONS.pin}</Ico></span>{ADDRESS}</div>
+            <div className="bd-contact__row"><span className="bd-contact__icon"><Ico size={22}>{ICONS.clock}</Ico></span>{t("badac_contact_hours")}</div>
+            <div className="bd-contact__row"><span className="bd-contact__icon"><Ico size={22}>{ICONS.pin}</Ico></span>{t("badac_contact_address")}</div>
           </div>
         </section>
 
         {/* How it works */}
         <section className="bz-card">
-          <h3 className="bz-heading">How it works</h3>
-          <p className="bz-text">Here is what to expect, one step at a time.</p>
+          <h3 className="bz-heading">{t("badac_steps_heading")}</h3>
+          <p className="bz-text">{t("badac_steps_sub")}</p>
           <ol className="bd-steps">
-            {STEPS.map((s, i) => (
-              <li className="bd-step" key={s.title}>
+            {steps.map((s, i) => (
+              <li className="bd-step" key={i}>
                 <span className="bd-step__icon">
                   <Ico size={28}>{ICONS[s.icon]}</Ico>
                   <span className="bd-step__num">{i + 1}</span>
@@ -146,10 +150,10 @@ export default function BADACTab() {
 
         {/* Who can avail */}
         <section className="bz-card">
-          <h3 className="bz-heading">Who can get help?</h3>
+          <h3 className="bz-heading">{t("badac_who_heading")}</h3>
           <div className="bd-grid bd-grid--3">
-            {WHO.map((w) => (
-              <div className="bd-tile" key={w.title}>
+            {who.map((w, i) => (
+              <div className="bd-tile" key={i}>
                 <span className="bd-tile__icon"><Ico size={28}>{ICONS[w.icon]}</Ico></span>
                 <div className="bd-tile__title">{w.title}</div>
                 <div className="bd-tile__desc">{w.desc}</div>
@@ -160,10 +164,10 @@ export default function BADACTab() {
 
         {/* Free services */}
         <section className="bz-card">
-          <h3 className="bz-heading">All of these services are free</h3>
+          <h3 className="bz-heading">{t("badac_free_heading")}</h3>
           <ul className="bd-free">
-            {FREE_ITEMS.map((item) => (
-              <li className="bd-free__item" key={item}>
+            {freeItems.map((item, i) => (
+              <li className="bd-free__item" key={i}>
                 <span className="bd-free__check">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 </span>
@@ -175,10 +179,10 @@ export default function BADACTab() {
 
         {/* Understanding */}
         <section className="bz-card">
-          <h3 className="bz-heading">Understanding drug abuse</h3>
+          <h3 className="bz-heading">{t("badac_edu_heading")}</h3>
           <div className="bd-grid bd-grid--3">
-            {EDU.map((e) => (
-              <div className="bd-tile bd-tile--soft" key={e.title}>
+            {edu.map((e, i) => (
+              <div className="bd-tile bd-tile--soft" key={i}>
                 <span className="bd-tile__icon bd-tile__icon--teal"><Ico size={28}>{ICONS[e.icon]}</Ico></span>
                 <div className="bd-tile__title">{e.title}</div>
                 <div className="bd-tile__desc">{e.desc}</div>
@@ -189,13 +193,13 @@ export default function BADACTab() {
 
         {/* FAQ */}
         <section className="bz-card">
-          <h3 className="bz-heading">Common questions</h3>
-          <p className="bz-text">Tap a question to see the answer.</p>
+          <h3 className="bz-heading">{t("badac_faq_heading")}</h3>
+          <p className="bz-text">{t("badac_faq_sub")}</p>
           <div className="bd-faqs">
-            {FAQS.map((faq, i) => {
+            {faqs.map((faq, i) => {
               const open = openFaq === i;
               return (
-                <div key={faq.q} className={`bd-faq${open ? " is-open" : ""}`}>
+                <div key={i} className={`bd-faq${open ? " is-open" : ""}`}>
                   <button type="button" className="bd-faq__q" aria-expanded={open} onClick={() => setOpenFaq(open ? null : i)}>
                     <span>{faq.q}</span>
                     <span className="bd-faq__chev"><Ico size={22}>{ICONS.chevron}</Ico></span>
@@ -208,7 +212,7 @@ export default function BADACTab() {
         </section>
 
         {/* Legal footnote */}
-        <div className="bz-legal bd-legal">Legal reference: RA 9165, the Comprehensive Dangerous Drugs Act of 2002</div>
+        <div className="bz-legal bd-legal">{t("badac_legal")}</div>
       </div>
     </div>
   );

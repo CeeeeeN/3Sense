@@ -3,8 +3,6 @@ import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
-import { useAlert } from "../../context/AlertContext";
-import { useLanguage } from "../../context/LanguageContext";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -55,7 +53,6 @@ const BigCheck = () => (
 
 // ── Validity reminder (big yellow notice, can be dismissed) ───────────────────
 function ValidityReminderBanner() {
-  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
@@ -86,16 +83,8 @@ function StepIndicator({ step, onStepClick }) {
     <ol className="lv-steps lv-steps--4" aria-label={t("doc_request_progress", "Request progress")}>
       {stepLabels.map((label, i) => {
         const num = i + 1;
-        const finished = step === 4;
-        const done = num < step || finished;
-        const active = num === step && !finished;
-        // Completed steps are clickable so people can jump back and edit (not after submission)
-        const clickable = done && !finished;
-        const Node = clickable ? "button" : "div";
-        const nodeProps = clickable
-          ? { type: "button", onClick: () => onStepClick(num), "aria-label": `Go back to ${label}` }
-          : {};
-
+        const done = num < step;
+        const active = num === step;
         return (
           <li key={label} className="lv-steps__li" aria-current={active ? "step" : undefined}>
             <Node className={`lv-steps__item lv-steps__node${done ? " is-done" : active ? " is-active" : ""}${clickable ? " is-link" : ""}`} {...nodeProps}>
@@ -109,7 +98,7 @@ function StepIndicator({ step, onStepClick }) {
           </li>
         );
       })}
-    </ol>
+    </div>
   );
 }
 
@@ -161,38 +150,14 @@ function Step1({ docTypes, selected, onSelect, error }) {
 
 // ── Step 2: your details ──────────────────────────────────────────────────────
 function Step2({ docType, form, setForm, errors }) {
-  const { t } = useLanguage();
-  const { showAlert } = useAlert();
-  const [previewUrl, setPreviewUrl] = useState(null);
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
 
-  // Thumbnail for image uploads; revoked when the file changes or the step unmounts
-  useEffect(() => {
-    const f = form.validIdFile;
-    if (f && f.type && f.type.startsWith("image/")) {
-      const url = URL.createObjectURL(f);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setPreviewUrl(null);
-  }, [form.validIdFile]);
-
-  const handleFile = async (e) => {
-    const input = e.target;
-    const file = input.files[0];
+  const handleFile = (e) => {
+    const file = e.target.files[0];
     if (!file) return;
-
-    // Reset so choosing the same file again after removing it still fires onChange
-    input.value = "";
-
-    if (file.size > MAX_FILE_SIZE) {
-      await showAlert(t("doc_err_file_large", "File Too Large"), t("doc_err_file_size", "File must be under 5MB."));
-      return;
-    }
-
+    if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB."); return; }
     set("validId", file.name);
     set("validIdFile", file);
   };
@@ -400,7 +365,6 @@ function Step2({ docType, form, setForm, errors }) {
 
 // ── Step 3: review ────────────────────────────────────────────────────────────
 function Step3({ docType, form }) {
-  const { t } = useLanguage();
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
     ? (form.purposeOther || "Other")
@@ -417,7 +381,7 @@ function Step3({ docType, form }) {
     { label: t("doc_purpose", "Purpose"), value: effectivePurpose || "—" },
     { label: t("doc_id_uploaded", "Valid ID Uploaded"), value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
-    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? t("doc_confirmed", "✓ Confirmed") : t("doc_not_confirmed", "Not confirmed") })),
+    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
   ];
 
   return (
@@ -444,7 +408,6 @@ function Step3({ docType, form }) {
 
 // ── Step 4: done ──────────────────────────────────────────────────────────────
 function Step4({ refNum, onReset }) {
-  const { t } = useLanguage();
   return (
     <section className="bz-card">
       <div className="bf-done">
@@ -471,10 +434,7 @@ function Step4({ refNum, onReset }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function DocumentsTab({ userData, householdID, userName }) {
-  const { t } = useLanguage();
-  const residentID = userData?.residentID || getSaved("memberID", null);
-  const userUID = userData?.UID || getSaved("UID", null);
-
+  const residentID = userData?.residentID || userData?.id || getSaved("memberID", null);
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -491,35 +451,63 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   });
 
   useEffect(() => {
-    const q = query(
-      collection(db, "documents"),
-      limit(50)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
       setDocTypes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (userData) {
-      const fullAddress = [userData.houseNumber, userData.street, userData.barangay, userData.city]
+  // ─── BUG FIX (R19): Robust resident auto-fill fetch logic ───
+  const loadResidentData = useCallback(async () => {
+    let sourceData = userData;
+
+    // Fallback 1: Try Session LocalStorage
+    if (!sourceData || (!sourceData.firstName && !sourceData.lastName)) {
+      try {
+        const sessionData = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+        if (sessionData.firstName || sessionData.lastName) {
+          sourceData = sessionData;
+        }
+      } catch (err) {
+        console.error("Failed to parse session data:", err);
+      }
+    }
+
+    // Fallback 2: Direct Firestore query if props/session are insufficient
+    if ((!sourceData || !sourceData.firstName) && householdID && residentID) {
+      try {
+        const resSnap = await getDoc(doc(db, "households", householdID, "residents", residentID));
+        if (resSnap.exists()) {
+          sourceData = resSnap.data();
+        }
+      } catch (err) {
+        console.error("Failed to fetch resident from Firestore:", err);
+      }
+    }
+
+    if (sourceData) {
+      const rawRes = sourceData.residentData || sourceData;
+      const fullAddress = rawRes.address || [rawRes.houseNumber, rawRes.street, rawRes.barangay || "Malanday", rawRes.city || "Valenzuela City"]
         .filter(Boolean).join(", ");
+
       setForm(f => ({
         ...f,
-        firstName: userData.firstName || "",
-        middleName: userData.middleName || "",
-        lastName: userData.lastName || "",
-        dob: userData.birthDate || "",
-        civilStatus: userData.civilStatus || "Single",
-        address: fullAddress,
-        contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
-        email: userData.email || "",
-        residingSince: userData.residingSinceYear ? String(userData.residingSinceYear) : "",
+        firstName: rawRes.firstName || f.firstName || "",
+        middleName: rawRes.middleName || f.middleName || "",
+        lastName: rawRes.lastName || f.lastName || "",
+        dob: rawRes.birthDate || rawRes.dob || f.dob || "",
+        civilStatus: rawRes.civilStatus || f.civilStatus || "Single",
+        address: fullAddress || f.address || "",
+        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || f.contact || ""),
+        email: rawRes.email || f.email || "",
+        residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || f.residingSince || ""),
       }));
     }
-  }, [userData]);
+  }, [userData, householdID, residentID]);
+
+  useEffect(() => {
+    loadResidentData();
+  }, [loadResidentData]);
 
   // Bring the person back to the top when the step changes (not on first load)
   useEffect(() => {
@@ -528,27 +516,26 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   }, [step]);
 
   const validateStep1 = () => {
-    if (!docType) { setErrors({ docType: t("doc_err_select", "Please select a document type.") }); return false; }
+    if (!docType) { setErrors({ docType: "Please select a document type." }); return false; }
     return true;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = t("doc_err_required", "Required.");
-    if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
-    if (!form.dob) e.dob = t("doc_err_required", "Required.");
-    if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
-    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
-    else if (!isValidPHMobile(form.contact)) e.contact = t("doc_err_mobile", "Enter a valid 11-digit mobile number (e.g. 09123456789).");
-    if (!form.residingSince) e.residingSince = t("doc_err_required", "Required.");
-    if (!form.purposeOption) e.purposeOption = t("doc_err_required", "Required.");
-    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = t("doc_err_specify_purpose", "Please specify your purpose.");
-    if (!form.validId) e.validId = t("doc_err_upload_id", "Please upload a valid ID.");
+    if (!form.firstName.trim()) e.firstName = "Required.";
+    if (!form.lastName.trim()) e.lastName = "Required.";
+    if (!form.dob) e.dob = "Required.";
+    if (!form.address.trim()) e.address = "Required.";
+    if (!String(form.contact || "").trim()) e.contact = "Required.";
+    if (!form.residingSince) e.residingSince = "Required.";
+    if (!form.purposeOption) e.purposeOption = "Required.";
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
+    if (!form.validId) e.validId = "Please upload a valid ID.";
     const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = t("doc_err_confirm", "You must confirm this to proceed."); }
-      else { if (!form[f.id]?.toString().trim()) e[f.id] = t("doc_err_required", "Required."); }
+      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
+      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -583,13 +570,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         });
 
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-
-        const submissionForm = {
-          ...form,
-          purpose: effectivePurpose,
-          validIdUrl: uploadedIdUrl,
-          UID: userUID
-        };
+        const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
 
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
@@ -615,15 +596,20 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setStep(s => s + 1);
   };
 
+  // ─── BUG FIX (R19): Reset transient fields & re-populate personal info ───
   const handleReset = () => {
-    setStep(1); setDocType(null); setErrors({});
-    setForm({ firstName: "", middleName: "", lastName: "", dob: "", civilStatus: "Single", address: "", contact: "", email: "", ctc: "", residingSince: "", purposeOption: "", purposeOther: "", validId: "", validIdFile: null });
-  };
-
-  const goToStep = (n) => {
-    if (isSubmitting) return;
+    setStep(1);
+    setDocType(null);
     setErrors({});
-    setStep(n);
+    // Reset transient request inputs while maintaining personal info
+    setForm(prev => ({
+      ...prev,
+      purposeOption: "",
+      purposeOther: "",
+      validId: "",
+      validIdFile: null,
+    }));
+    loadResidentData();
   };
 
   return (

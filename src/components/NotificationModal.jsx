@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
 
 const NOTIF_ICONS = {
   document_update: { icon: "📄", bg: "rgba(232,160,32,0.12)" },
@@ -11,19 +12,19 @@ const NOTIF_ICONS = {
   transfer_approval: { icon: "🔄", bg: "rgba(45,177,123,0.15)" },
 };
 
-function formatModalTime(timestamp) {
-  if (!timestamp) return "Just now";
+function formatModalTime(timestamp, t) {
+  if (!timestamp) return t ? t('just_now') : "Just now";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const now = new Date();
   const diffMs = now - date;
   const diffMins = Math.floor(diffMs / 60000);
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return t ? t('just_now') : "Just now";
+  if (diffMins < 60) return t ? t('time_mins_ago', diffMins) : `${diffMins}m ago`;
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return t ? t('time_hours_ago', diffHours) : `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 7) return t ? t('time_days_ago', diffDays) : `${diffDays}d ago`;
 
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -42,6 +43,7 @@ export default function NotificationModal({
   onMarkAllRead,
   onDelete,
 }) {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
@@ -96,12 +98,12 @@ export default function NotificationModal({
               </svg>
             </div>
             <div>
-              <h2 style={styles.title}>Notifications</h2>
-              <p style={styles.subtitle}>Stay updated with your latest activities</p>
+              <h2 style={styles.title}>{t('notif_title')}</h2>
+              <p style={styles.subtitle}>{t('notif_subtitle')}</p>
             </div>
           </div>
 
-          <button style={styles.closeBtn} onClick={onClose} aria-label="Close">
+          <button style={styles.closeBtn} onClick={onClose} aria-label={t('close', 'Close')}>
             <svg
               width="18"
               height="18"
@@ -128,7 +130,7 @@ export default function NotificationModal({
               }}
               onClick={() => setFilter("all")}
             >
-              All ({notifications.length})
+              {t('notif_filter_all', notifications.length)}
             </button>
             <button
               style={{
@@ -137,13 +139,13 @@ export default function NotificationModal({
               }}
               onClick={() => setFilter("unread")}
             >
-              Unread {unreadCount > 0 && <span style={styles.pillBadge}>{unreadCount}</span>}
+              {t('notif_filter_unread')} {unreadCount > 0 && <span style={styles.pillBadge}>{unreadCount}</span>}
             </button>
           </div>
 
           {unreadCount > 0 && onMarkAllRead && (
             <button style={styles.markReadBtn} onClick={onMarkAllRead}>
-              Mark all as read
+              {t('notif_mark_all_read')}
             </button>
           )}
         </div>
@@ -153,11 +155,11 @@ export default function NotificationModal({
           {filteredNotifs.length === 0 ? (
             <div style={styles.emptyState}>
               <div style={styles.emptyIcon}>🔔</div>
-              <h4 style={{ margin: "0 0 4px 0", color: "#334155" }}>No notifications found</h4>
+              <h4 style={{ margin: "0 0 4px 0", color: "#334155" }}>{t('notif_no_found')}</h4>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748b" }}>
                 {filter === "unread"
-                  ? "You have caught up with all notifications!"
-                  : "You don't have any notifications right now."}
+                  ? t('notif_caught_up')
+                  : t('notif_empty_now')}
               </p>
             </div>
           ) : (
@@ -180,12 +182,12 @@ export default function NotificationModal({
 
                   <div style={styles.itemContent}>
                     <div style={styles.itemHeader}>
-                      <span style={styles.itemTitle}>{n.title || "Notification"}</span>
-                      <span style={styles.itemTime}>{formatModalTime(n.createdAt)}</span>
+                      <span style={styles.itemTitle}>{n.title || t('notif_default_title')}</span>
+                      <span style={styles.itemTime}>{formatModalTime(n.createdAt, t)}</span>
                     </div>
                     <p style={styles.itemMessage}>{n.message}</p>
                     {n.refNum && (
-                      <span style={styles.refTag}>Ref: {n.refNum}</span>
+                      <span style={styles.refTag}>{t('notif_ref_prefix')}{n.refNum}</span>
                     )}
                   </div>
 
@@ -194,7 +196,7 @@ export default function NotificationModal({
                     {onDelete && (
                       <button
                         style={styles.deleteBtn}
-                        title="Delete notification"
+                        title={t('notif_delete_title')}
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete(n.id);

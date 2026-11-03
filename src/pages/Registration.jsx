@@ -1,6 +1,7 @@
 import barangayLogo from "./barangay-logo.jpg";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { submitRegistration } from "../services/registration";
+import { useLanguage } from "../context/LanguageContext";
 import {
   RegisIconUser, RegisIconCalendar, RegisIconClock, RegisIconPin, RegisIconPhone,
   RegisIconMail, RegisIconHome, RegisIconGlobe, RegisIconBriefcase, RegisIconBook,
@@ -387,13 +388,14 @@ function UploadErrorMsg({ msg }) {
 }
 
 function CameraError({ error, fileRef }) {
+  const { t } = useLanguage();
   return (
     <div className="reg-camera-error">
       <div className="reg-camera-error-icon"><SvgAlert size={22} /></div>
       <p>{error}</p>
       <button className="reg-btn-ghost" onClick={() => { fileRef.current?.click(); }}
         style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-        <SvgUpload /> Upload Instead
+        <SvgUpload /> {t("reg_upload_instead")}
       </button>
     </div>
   );
@@ -401,6 +403,7 @@ function CameraError({ error, fileRef }) {
 
 // ─── ID Scan Step ─────────────────────────────────────────────────────────────
 function IdScanStep({ onConfirm, onSkip }) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [validationResult, setResult] = useState(null);
@@ -413,17 +416,17 @@ function IdScanStep({ onConfirm, onSkip }) {
     if (!file) return;
     setUploadError(null);
     if (!file.type.startsWith("image/")) {
-      setUploadError("Please upload a valid image file (JPG, PNG, WEBP).");
+      setUploadError(t("reg_upload_invalid"));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setUploadError("Image file is too large. Maximum size is 10MB.");
+      setUploadError(t("reg_upload_too_large"));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => { setUploadError("Failed to read the file. Please try another image."); if (fileRef.current) fileRef.current.value = ""; };
+    reader.onerror = () => { setUploadError(t("reg_upload_read_error")); if (fileRef.current) fileRef.current.value = ""; };
     reader.onload = (ev) => { setPreview(ev.target.result); setMode("preview"); setUploadError(null); };
     reader.readAsDataURL(file);
   };
@@ -458,8 +461,8 @@ function IdScanStep({ onConfirm, onSkip }) {
       <div className="reg-section-header">
         <SectionIcon><SvgIdCard size={24} /></SectionIcon>
         <div>
-          <h3>Scan Your PhilSys National ID <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>(Optional)</span></h3>
-          <p>Scan or upload your PhilSys National ID. Data will be used to autofill your form.</p>
+          <h3>{t("reg_id_scan_title")} <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 400 }}>{t("reg_id_scan_optional")}</span></h3>
+          <p>{t("reg_id_scan_desc")}</p>
         </div>
       </div>
 
@@ -468,17 +471,17 @@ function IdScanStep({ onConfirm, onSkip }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
           <div className="reg-dropzone">
             <div className="reg-dropzone-icon-square"><SvgIdCard size={36} /></div>
-            <p className="reg-dropzone-title">Position PhilSys National ID within frame</p>
-            <p className="reg-dropzone-subtitle">Accepted: PhilSys National ID card only</p>
+            <p className="reg-dropzone-title">{t("reg_id_position")}</p>
+            <p className="reg-dropzone-subtitle">{t("reg_id_accepted")}</p>
 
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0.75rem", marginTop: "1rem" }}>
               <button type="button" className="reg-btn-primary" onClick={startCamera}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgCamera /> Use Camera
+                <SvgCamera /> {t("reg_use_camera")}
               </button>
               <button type="button" className="reg-btn-ghost" onClick={() => fileRef.current?.click()}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgUpload /> Upload Image
+                <SvgUpload /> {t("reg_upload_image")}
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
@@ -504,13 +507,13 @@ function IdScanStep({ onConfirm, onSkip }) {
                 boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
               }}
             >
-              Skip ID Upload &amp; Continue <SvgArrowRight />
+              {t("reg_skip_id")} <SvgArrowRight />
             </button>
           </div>
 
           <div className="reg-info-box">
             <span style={{ color: "#317D89", flexShrink: 0 }}><SvgInfo size={17} /></span>
-            <p>Your PhilSys National ID image is used only for identity verification and will be submitted as part of your registration for Barangay review.</p>
+            <p>{t("reg_id_privacy")}</p>
           </div>
         </div>
       )}
@@ -532,7 +535,7 @@ function IdScanStep({ onConfirm, onSkip }) {
                   <div className="reg-camera-corner tr" />
                   <div className="reg-camera-corner bl" />
                   <div className="reg-camera-corner br" />
-                  <div className="reg-camera-guide-label">Align PhilSys National ID within frame</div>
+                  <div className="reg-camera-guide-label">{t("reg_align_id")}</div>
                 </div>
               </div>
             </div>
@@ -541,11 +544,11 @@ function IdScanStep({ onConfirm, onSkip }) {
             <div className="reg-camera-actions">
               <button className="reg-btn-ghost" onClick={() => { cam.stop(); setMode("idle"); }}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgArrowLeft /> Back
+                <SvgArrowLeft /> {t("reg_back")}
               </button>
               <button className="reg-btn-primary" onClick={capturePhoto}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgCamera /> Capture
+                <SvgCamera /> {t("reg_capture")}
               </button>
             </div>
           )}
@@ -559,16 +562,16 @@ function IdScanStep({ onConfirm, onSkip }) {
             <img src={preview} alt="ID preview" />
           </div>
           <div className="reg-preview-notice">
-            <SvgCheck size={15} /> Image captured — click Verify to check if this is a valid PhilSys National ID
+            <SvgCheck size={15} /> {t("reg_image_captured")}
           </div>
           <div className="reg-btn-group">
             <button className="reg-btn-ghost" onClick={retake}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-              <SvgRefresh /> Retake
+              <SvgRefresh /> {t("reg_retake")}
             </button>
             <button className="reg-btn-primary" onClick={confirm}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-              <SvgCheck /> Verify &amp; Extract
+              <SvgCheck /> {t("reg_verify_extract")}
             </button>
           </div>
         </div>
@@ -578,8 +581,8 @@ function IdScanStep({ onConfirm, onSkip }) {
       {mode === "validating" && (
         <div className="reg-status-center">
           <div className="reg-status-icon loading"><SvgLoader /></div>
-          <p className="reg-status-title">Verifying PhilSys National ID…</p>
-          <p className="reg-status-sub">Checking that this is a valid PhilSys National ID</p>
+          <p className="reg-status-title">{t("reg_verifying_id")}</p>
+          <p className="reg-status-sub">{t("reg_verifying_id_sub")}</p>
         </div>
       )}
 
@@ -597,13 +600,13 @@ function IdScanStep({ onConfirm, onSkip }) {
                   : <SvgXCircle size={28} />}
               </div>
               <p className={`reg-invalid-title ${validationResult.isValid === null ? "unavailable" : "rejected"}`}>
-                {validationResult.isValid === null ? "Verification Unavailable" : "Invalid PhilSys National ID Detected"}
+                {validationResult.isValid === null ? t("reg_verification_unavailable") : t("reg_invalid_id")}
               </p>
             </div>
-            <p className="reg-invalid-reason">{validationResult.reason || "Please upload a valid physical PhilSys National ID card."}</p>
+            <p className="reg-invalid-reason">{validationResult.reason || t("reg_invalid_id_hint")}</p>
             {validationResult.isValid === false && (
               <div className="reg-invalid-hint">
-                Please upload a <strong>physical PhilSys National ID card</strong> — not other ID types, selfies, or generic photos.
+                {t("reg_invalid_id_hint")}
               </div>
             )}
           </div>
@@ -611,16 +614,16 @@ function IdScanStep({ onConfirm, onSkip }) {
             {validationResult.isValid === null && (
               <button className="reg-btn-ghost" onClick={reverify}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgRefresh /> Re-verify Same Image
+                <SvgRefresh /> {t("reg_reverify")}
               </button>
             )}
             <button className="reg-btn-primary" onClick={retake}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-              <SvgRefresh /> Try Different Image
+              <SvgRefresh /> {t("reg_try_different")}
             </button>
             <button className="reg-btn-ghost" onClick={onSkip}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-              Skip ID Upload →
+              {t("reg_skip_id_short")}
             </button>
           </div>
         </div>
@@ -630,8 +633,8 @@ function IdScanStep({ onConfirm, onSkip }) {
       {mode === "processing" && (
         <div className="reg-status-center">
           <div className="reg-status-icon loading"><SvgLoader /></div>
-          <p className="reg-status-title">Reading PhilSys National ID…</p>
-          <p className="reg-status-sub">Running live OCR, please wait a moment</p>
+          <p className="reg-status-title">{t("reg_reading_id")}</p>
+          <p className="reg-status-sub">{t("reg_reading_id_sub")}</p>
         </div>
       )}
 
@@ -639,8 +642,8 @@ function IdScanStep({ onConfirm, onSkip }) {
       {mode === "done" && (
         <div className="reg-status-center">
           <div className="reg-status-icon success"><SvgCheckCircle size={40} color="#2db17b" /></div>
-          <p className="reg-status-title">National ID Verified — Data Extracted!</p>
-          <p className="reg-status-sub">Autofilling your information now</p>
+          <p className="reg-status-title">{t("reg_id_verified")}</p>
+          <p className="reg-status-sub">{t("reg_autofilling")}</p>
         </div>
       )}
     </div>
@@ -649,6 +652,7 @@ function IdScanStep({ onConfirm, onSkip }) {
 
 // ─── Selfie Step ──────────────────────────────────────────────────────────────
 function SelfieStep({ onConfirm }) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState("idle");
   const [preview, setPreview] = useState(null);
   const [uploadError, setUploadError] = useState(null);
@@ -659,10 +663,10 @@ function SelfieStep({ onConfirm }) {
     const file = e.target.files[0];
     if (!file) return;
     setUploadError(null);
-    if (!file.type.startsWith("image/")) { setUploadError("Please upload a valid image file (JPG, PNG, WEBP)."); if (fileRef.current) fileRef.current.value = ""; return; }
-    if (file.size > 10 * 1024 * 1024) { setUploadError("Image file is too large. Maximum size is 10MB."); if (fileRef.current) fileRef.current.value = ""; return; }
+    if (!file.type.startsWith("image/")) { setUploadError(t("reg_upload_invalid")); if (fileRef.current) fileRef.current.value = ""; return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadError(t("reg_upload_too_large")); if (fileRef.current) fileRef.current.value = ""; return; }
     const reader = new FileReader();
-    reader.onerror = () => { setUploadError("Failed to read the file. Please try another image."); if (fileRef.current) fileRef.current.value = ""; };
+    reader.onerror = () => { setUploadError(t("reg_upload_read_error")); if (fileRef.current) fileRef.current.value = ""; };
     reader.onload = (ev) => { setPreview(ev.target.result); setMode("preview"); setUploadError(null); };
     reader.readAsDataURL(file);
   };
@@ -676,8 +680,8 @@ function SelfieStep({ onConfirm }) {
       <div className="reg-section-header">
         <SectionIcon><SvgSelfie size={24} /></SectionIcon>
         <div>
-          <h3>Take a Selfie</h3>
-          <p>A clear photo of your face is required to verify your identity before registration.</p>
+          <h3>{t("reg_selfie_title")}</h3>
+          <p>{t("reg_selfie_desc")}</p>
         </div>
       </div>
 
@@ -686,12 +690,12 @@ function SelfieStep({ onConfirm }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
           <div className="reg-dropzone">
             <div className="reg-dropzone-icon-circle"><SvgPerson size={38} /></div>
-            <p className="reg-dropzone-title">Face Verification Required</p>
-            <p className="reg-dropzone-subtitle">Look directly at the camera with a neutral expression. Good lighting recommended.</p>
+            <p className="reg-dropzone-title">{t("reg_face_required")}</p>
+            <p className="reg-dropzone-subtitle">{t("reg_face_hint")}</p>
             <div className="reg-btn-group">
               <button className="reg-btn-primary" onClick={startCamera}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgCamera /> Open Camera
+                <SvgCamera /> {t("reg_open_camera")}
               </button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
             </div>
@@ -714,18 +718,18 @@ function SelfieStep({ onConfirm }) {
               <div className="reg-camera-overlay">
                 <div className="reg-camera-guide-selfie" />
               </div>
-              <div className="reg-camera-selfie-label">Position face within oval</div>
+              <div className="reg-camera-selfie-label">{t("reg_position_face")}</div>
             </div>
           )}
           {!cam.error && (
             <div className="reg-camera-actions">
               <button className="reg-btn-ghost" onClick={() => { cam.stop(); setMode("idle"); }}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                <SvgArrowLeft /> Back
+                <SvgArrowLeft /> {t("reg_back")}
               </button>
               <button className="reg-btn-primary" onClick={capturePhoto}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgCamera /> Capture Selfie
+                <SvgCamera /> {t("reg_capture_selfie")}
               </button>
             </div>
           )}
@@ -741,16 +745,16 @@ function SelfieStep({ onConfirm }) {
             </div>
           </div>
           <div className="reg-selfie-success">
-            <SvgCheckCircle size={18} color="#1e8a5e" /> Selfie captured successfully
+            <SvgCheckCircle size={18} color="#1e8a5e" /> {t("reg_selfie_captured")}
           </div>
           <div className="reg-btn-group">
             <button className="reg-btn-ghost" onClick={retake}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-              <SvgRefresh /> Retake
+              <SvgRefresh /> {t("reg_retake")}
             </button>
             <button className="reg-btn-primary" onClick={() => onConfirm(preview)}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-              <SvgCheck /> Confirm Selfie
+              <SvgCheck /> {t("reg_confirm_selfie")}
             </button>
           </div>
         </div>
@@ -759,8 +763,22 @@ function SelfieStep({ onConfirm }) {
   );
 }
 
+
 // ─── Main Registration Component ──────────────────────────────────────────────
 export default function Registration({ onBack, branchingPayload }) {
+  const { t } = useLanguage();
+
+  const STEPS = [
+    { label: t("reg_step_id_scan") },
+    { label: t("reg_step_selfie") },
+    { label: t("reg_step_personal") },
+    { label: t("reg_step_address") },
+    { label: t("reg_step_category") },
+    { label: t("reg_step_education") },
+    { label: t("reg_step_household") },
+    { label: t("reg_step_review") },
+  ];
+
   // Try to load saved state, default to step 0
   const [step, setStep] = useState(() => {
     const saved = sessionStorage.getItem("reg_step");
@@ -849,7 +867,6 @@ export default function Registration({ onBack, branchingPayload }) {
   }, []);
 
   const set = (field) => (e) => {
-    // REMOVED setErrorMsg("") to keep errors visible while typing
     manuallyEdited.current.add(field);
     setAutofilledFields((prev) => { const s = new Set(prev); s.delete(field); return s; });
     const value = e.target.type === "checkbox"
@@ -873,26 +890,26 @@ export default function Registration({ onBack, branchingPayload }) {
 
   const validateStep = () => {
     const missing = [];
-    if (step === 1 && !selfieImage) { setErrorMsg("A selfie is required before proceeding."); return false; }
+    if (step === 1 && !selfieImage) { setErrorMsg(t("reg_selfie_required")); return false; }
     if (step === 2) {
-      if (!form.firstName.trim()) missing.push("First Name");
-      if (!form.lastName.trim()) missing.push("Last Name");
-      if (!form.birthDate) missing.push("Birth Date");
-      if (!form.birthPlace.trim()) missing.push("Birth Place");
-      if (!form.sex) missing.push("Sex");
-      if (!form.civilStatus) missing.push("Civil Status");
-      if (!form.citizenship.trim()) missing.push("Citizenship");
-      if (!form.residingSinceYear) missing.push("Residing Since Year");
-      else if (!/^\d{4}$/.test(form.residingSinceYear)) missing.push("4-digit Residing Since Year");
-      if (!form.contactNumber.trim()) missing.push("Contact Number");
-      else if (!/^\d{10,15}$/.test(form.contactNumber)) missing.push("Valid Contact Number");
+      if (!form.firstName.trim()) missing.push(t("reg_first_name"));
+      if (!form.lastName.trim()) missing.push(t("reg_last_name"));
+      if (!form.birthDate) missing.push(t("reg_birth_date"));
+      if (!form.birthPlace.trim()) missing.push(t("reg_birth_place"));
+      if (!form.sex) missing.push(t("reg_sex"));
+      if (!form.civilStatus) missing.push(t("reg_civil_status"));
+      if (!form.citizenship.trim()) missing.push(t("reg_citizenship"));
+      if (!form.residingSinceYear) missing.push(t("reg_residing_since"));
+      else if (!/^\d{4}$/.test(form.residingSinceYear)) missing.push(t("reg_residing_since"));
+      if (!form.contactNumber.trim()) missing.push(t("reg_contact_number"));
+      else if (!/^\d{10,15}$/.test(form.contactNumber)) missing.push(t("reg_contact_number"));
       if (showEmail) {
-        if (!form.email.trim()) missing.push("Email Address");
-        else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push("Valid Email Address");
+        if (!form.email.trim()) missing.push(t("reg_email"));
+        else if (!/\S+@\S+\.\S+/.test(form.email)) missing.push(t("reg_email"));
       }
 
       if (missing.length > 0) {
-        setErrorMsg(`Please fill in required fields: ${missing.join(", ")}`);
+        setErrorMsg(t("reg_fill_required", missing.join(", ")));
         return false;
       }
 
@@ -902,18 +919,18 @@ export default function Registration({ onBack, branchingPayload }) {
       if (form.birthDate) {
         const dob = new Date(form.birthDate + "T00:00:00");
         if (isNaN(dob.getTime())) {
-          setErrorMsg("Please enter a valid birth date.");
+          setErrorMsg(t("reg_invalid_birth_date"));
           return false;
         }
 
         if (dob > today) {
-          setErrorMsg("Birth date cannot be beyond today's date.");
+          setErrorMsg(t("reg_birth_future"));
           return false;
         }
 
         const minYear = today.getFullYear() - 125;
         if (dob.getFullYear() < minYear) {
-          setErrorMsg(`Birth date cannot be earlier than year ${minYear}.`);
+          setErrorMsg(t("reg_birth_too_old", minYear));
           return false;
         }
       }
@@ -923,39 +940,39 @@ export default function Registration({ onBack, branchingPayload }) {
         const thisYear = today.getFullYear();
 
         if (isNaN(resYear) || resYear > thisYear) {
-          setErrorMsg(`Residing since year cannot be in the future (max: ${thisYear}).`);
+          setErrorMsg(t("reg_residing_future", thisYear));
           return false;
         }
         if (resYear < 1900) {
-          setErrorMsg("Residing since year cannot be earlier than 1900.");
+          setErrorMsg(t("reg_residing_too_old"));
           return false;
         }
       }
     }
     if (step === 3) {
-      if (!form.street.trim()) missing.push("Street");
-      if (!form.region.trim()) missing.push("Region");
-      if (!form.province.trim()) missing.push("Province");
-      if (!form.city.trim()) missing.push("City");
-      if (!form.barangay.trim()) missing.push("Barangay");
+      if (!form.street.trim()) missing.push(t("reg_street"));
+      if (!form.region.trim()) missing.push(t("reg_region"));
+      if (!form.province.trim()) missing.push(t("reg_province"));
+      if (!form.city.trim()) missing.push(t("reg_city"));
+      if (!form.barangay.trim()) missing.push(t("reg_barangay"));
     }
     if (step === 4 && isPwd) {
-      if (!form.pwdStatus) missing.push("PWD Status");
-      if (!form.disabilityType) missing.push("Disability Type");
+      if (!form.pwdStatus) missing.push(t("reg_pwd_status"));
+      if (!form.disabilityType) missing.push(t("reg_disability_type"));
     }
     if (step === 5) {
-      if (!form.educationAttainment) missing.push("Highest Educational Attainment");
-      if (!form.educationStatus) missing.push("Education Status");
-      if (!form.employmentStatus) missing.push("Employment Status");
+      if (!form.educationAttainment) missing.push(t("reg_highest_attainment"));
+      if (!form.educationStatus) missing.push(t("reg_education_status"));
+      if (!form.employmentStatus) missing.push(t("reg_employment_status"));
     }
     if (step === 6) {
-      if (!form.totalMembers) missing.push("Number of Household Members");
-      if (!form.householdClassification) missing.push("Household Classification");
+      if (!form.totalMembers) missing.push(t("reg_total_members"));
+      if (!form.householdClassification) missing.push(t("reg_household_class"));
     }
-    if (step === 7 && !privacyAgreed) { setErrorMsg("You must agree to the Privacy Policy before submitting."); return false; }
-    if (missing.length > 0) { setErrorMsg(`Please fill in required fields: ${missing.join(", ")}`); return false; }
+    if (step === 7 && !privacyAgreed) { setErrorMsg(t("reg_privacy_required")); return false; }
+    if (missing.length > 0) { setErrorMsg(t("reg_fill_required", missing.join(", "))); return false; }
     
-    setErrorMsg(""); // Clear errors only if validation completely passes
+    setErrorMsg("");
     return true;
   };
 
@@ -970,7 +987,6 @@ export default function Registration({ onBack, branchingPayload }) {
 
       await submitRegistration({ ...form, idImage, selfieImage, branchingPayload });
 
-      // Clean up storage on successful submit
       sessionStorage.removeItem("reg_step");
       sessionStorage.removeItem("reg_form");
       sessionStorage.removeItem("reg_autofilled");
@@ -978,8 +994,6 @@ export default function Registration({ onBack, branchingPayload }) {
       sessionStorage.removeItem("reg_idImage");
       sessionStorage.removeItem("reg_selfieImage");
       sessionStorage.removeItem("branchingPayload");
-      
-      // Clear parent state if registered from branch flow
       sessionStorage.removeItem("current_view"); 
 
       const ref = "REF-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 99999)).padStart(5, "0");
@@ -992,7 +1006,7 @@ export default function Registration({ onBack, branchingPayload }) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("Submission error:", err);
-      setErrorMsg("Failed to submit registration. Please check your connection and try again.");
+      setErrorMsg(t("reg_submit_error"));
       setIsSubmitting(false);
     }
   };
@@ -1002,7 +1016,7 @@ export default function Registration({ onBack, branchingPayload }) {
   };
 
   const handleCancel = () => {
-    if (window.confirm("Are you sure you want to cancel? All entered data will be lost.")) { 
+    if (window.confirm(t("reg_cancel_confirm"))) { 
       sessionStorage.removeItem("reg_step");
       sessionStorage.removeItem("reg_form");
       sessionStorage.removeItem("reg_autofilled");
@@ -1010,8 +1024,6 @@ export default function Registration({ onBack, branchingPayload }) {
       sessionStorage.removeItem("reg_idImage");
       sessionStorage.removeItem("reg_selfieImage");
       sessionStorage.removeItem("branchingPayload");
-      
-      // Clear parent state
       sessionStorage.removeItem("current_view"); 
       
       if (onBack) onBack(); 
@@ -1028,7 +1040,7 @@ export default function Registration({ onBack, branchingPayload }) {
     return (
       <div className={`reg-review-field${full ? " full" : ""}`}>
         <div className="reg-review-field-label">{label}</div>
-        <div className={`reg-review-field-value${!value ? " empty" : ""}`}>{value || "Not provided"}</div>
+        <div className={`reg-review-field-value${!value ? " empty" : ""}`}>{value || t("reg_review_not_provided")}</div>
       </div>
     );
   }
@@ -1053,15 +1065,15 @@ export default function Registration({ onBack, branchingPayload }) {
           <img src={barangayLogo} alt="Barangay Logo" style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           <div className="reg-nav-logo-text">
             Barangay 3S+ Malanday
-            <span className="reg-nav-logo-sub">Community Management System</span>
+            <span className="reg-nav-logo-sub">{t("landing_community_system")}</span>
           </div>
         </div>
       </nav>
 
       <div className="reg-page">
         <div className="reg-page-header">
-          <h1>Household Registration</h1>
-          <p>Please complete the form below. Your registration is subject to Barangay approval.</p>
+          <h1>{t("reg_title")}</h1>
+          <p>{t("reg_sub")}</p>
         </div>
 
         {/* STEPPER */}
@@ -1093,10 +1105,10 @@ export default function Registration({ onBack, branchingPayload }) {
                 </div>
                 <div className="reg-mobile-step-info">
                   <span className="reg-mobile-step-name">
-                    {submitted ? "Submitted!" : STEPS[step].label}
+                    {submitted ? t("reg_submitted_short") : STEPS[step].label}
                   </span>
                   <span className="reg-mobile-step-sub">
-                    {submitted ? "Registration complete" : step < STEPS.length - 1 ? `Next: ${STEPS[step + 1].label}` : "Last step"}
+                    {submitted ? t("reg_registration_complete") : step < STEPS.length - 1 ? t("reg_next_step", STEPS[step + 1].label) : t("reg_last_step")}
                   </span>
                 </div>
               </div>
@@ -1123,15 +1135,15 @@ export default function Registration({ onBack, branchingPayload }) {
               <div className="reg-success-icon-wrap">
                 <SvgCheckCircle size={64} color="#2db17b" />
               </div>
-              <h2>Registration Submitted!</h2>
-              <p>Your household registration request has been submitted and is now <strong>pending Barangay approval</strong>. You will receive a notification via email once reviewed.</p>
+              <h2>{t("reg_submitted_title")}</h2>
+              <p>{t("reg_submitted_desc")}</p>
               <div className="reg-ref-badge">
-                <span>Reference Number</span>
+                <span>{t("reg_ref_number")}</span>
                 <strong>{refNumber}</strong>
               </div>
               <button className="reg-btn-outline" onClick={onBack}
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgArrowLeft /> Back to Home
+                <SvgArrowLeft /> {t("reg_back_home")}
               </button>
             </div>
           ) : (
@@ -1154,33 +1166,33 @@ export default function Registration({ onBack, branchingPayload }) {
                 <div>
                   <div className="reg-section-header">
                     <SectionIcon><SvgPerson size={24} /></SectionIcon>
-                    <div><h3>Personal Information</h3><p>Household Head — enter your basic personal details.</p></div>
+                    <div><h3>{t("reg_personal_title")}</h3><p>{t("reg_personal_sub")}</p></div>
                   </div>
                   {autofilledFields.size > 0 && (
                     <div className="reg-autofill-banner">
                       <SvgInfo size={16} />
-                      <span>Some fields were autofilled from your PhilSys National ID scan. You may edit any autofilled field before submitting.</span>
+                      <span>{t("reg_autofill_notice")}</span>
                     </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-                    <Field label="PhilSys Card Number (PCN)" hint="Optional or extracted from scanned PhilSys National ID. You may type it manually or update it.">
+                    <Field label={t("reg_pcn_label")} hint={t("reg_pcn_hint")}>
                       <InputField icon={SvgHashtag} type="text" placeholder="e.g. 1234-5678-9012-0000" value={form.idNumber} onChange={set("idNumber")} autofilled={af("idNumber")} />
                     </Field>
                     <div className="reg-form-grid cols-3">
-                      <Field label="First Name" required><InputField icon={RegisIconUser} type="text" placeholder="Juan" value={form.firstName} onChange={set("firstName")} autofilled={af("firstName")} /></Field>
-                      <Field label="Middle Name"><InputField icon={RegisIconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
-                      <Field label="Last Name" required><InputField icon={RegisIconUser} type="text" placeholder="Dela Cruz" value={form.lastName} onChange={set("lastName")} autofilled={af("lastName")} /></Field>
+                      <Field label={t("reg_first_name")} required><InputField icon={RegisIconUser} type="text" placeholder="Juan" value={form.firstName} onChange={set("firstName")} autofilled={af("firstName")} /></Field>
+                      <Field label={t("reg_middle_name")}><InputField icon={RegisIconUser} type="text" placeholder="Santos" value={form.middleName} onChange={set("middleName")} autofilled={af("middleName")} /></Field>
+                      <Field label={t("reg_last_name")} required><InputField icon={RegisIconUser} type="text" placeholder="Dela Cruz" value={form.lastName} onChange={set("lastName")} autofilled={af("lastName")} /></Field>
                     </div>
                     <div className="reg-form-grid cols-3">
-                      <Field label={<>Suffix <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
+                      <Field label={<>{t("reg_suffix")} <span style={{ color: "var(--muted)", fontWeight: 400 }}>{t("reg_id_scan_optional")}</span></>}>
                         <SelectField icon={RegisIconUser} value={form.suffix} onChange={set("suffix")}>
-                          <option value="">None</option>
+                          <option value="">{t("reg_opt_none")}</option>
                           <option>Jr.</option><option>Sr.</option><option>II</option><option>III</option><option>IV</option>
                         </SelectField>
                       </Field>
-                      <Field label="Religion">
+                      <Field label={t("reg_religion")}>
                         <SelectField icon={RegisIconReligion} value={form.religion} onChange={set("religion")}>
-                          <option value="">Select religion</option>
+                          <option value="">{t("reg_select_religion")}</option>
                           <option>Roman Catholic</option>
                           <option>Islam</option>
                           <option>Iglesia ni Cristo</option>
@@ -1193,24 +1205,28 @@ export default function Registration({ onBack, branchingPayload }) {
                           <option>The Church of Jesus Christ of Latter-day Saints</option>
                           <option>Buddhist</option>
                           <option>Hindu</option>
-                          <option>None</option>
-                          <option>Others</option>
+                          <option value="None">{t("reg_opt_none")}</option>
+                          <option value="Others">{t("reg_opt_others")}</option>
                         </SelectField>
                       </Field>
-                      <Field label="Civil Status" required>
+                      <Field label={t("reg_civil_status")} required>
                         <SelectField icon={RegisIconHeart} value={form.civilStatus} onChange={set("civilStatus")}>
-                          <option value="">Select status</option>
-                          <option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Cohabitation</option>
+                          <option value="">{t("reg_select_status")}</option>
+                          <option value="Single">{t("reg_status_single")}</option>
+                          <option value="Married">{t("reg_status_married")}</option>
+                          <option value="Widowed">{t("reg_status_widowed")}</option>
+                          <option value="Separated">{t("reg_status_separated")}</option>
+                          <option value="Cohabitation">{t("reg_status_cohabitation")}</option>
                         </SelectField>
                       </Field>
                     </div>
                     {form.religion === "Others" && (
-                      <Field label="Please specify religion">
-                        <InputField type="text" placeholder="Please specify" value={form.religionOther} onChange={set("religionOther")} />
+                      <Field label={t("reg_specify_religion")}>
+                        <InputField type="text" placeholder={t("reg_please_specify")} value={form.religionOther} onChange={set("religionOther")} />
                       </Field>
                     )}
                     <div className="reg-form-grid cols-3">
-                      <Field label="Birth Date" required>
+                      <Field label={t("reg_birth_date")} required>
                         <InputField
                           icon={RegisIconCalendar}
                           type="date"
@@ -1221,47 +1237,48 @@ export default function Registration({ onBack, branchingPayload }) {
                           autofilled={af("birthDate")}
                         />
                       </Field>
-                      <Field label="Age"><InputField icon={RegisIconClock} type="number" placeholder="Auto-computed" value={form.age} readOnly /></Field>
-                      <Field label="Birth Place" required><InputField icon={RegisIconPin} type="text" placeholder="Valenzuela City" value={form.birthPlace} onChange={set("birthPlace")} /></Field>
+                      <Field label={t("reg_age")}><InputField icon={RegisIconClock} type="number" placeholder={t("reg_age_auto")} value={form.age} readOnly /></Field>
+                      <Field label={t("reg_birth_place")} required><InputField icon={RegisIconPin} type="text" placeholder="Valenzuela City" value={form.birthPlace} onChange={set("birthPlace")} /></Field>
                     </div>
                     <div className="reg-form-grid cols-2">
-                      <Field label="Sex" required>
+                      <Field label={t("reg_sex")} required>
                         <div className="reg-radio-group">
                           {["Male", "Female"].map((v) => (
                             <label key={v} className="reg-radio-option">
                               <input type="radio" name="sex" value={v} checked={form.sex === v} onChange={set("sex")} />
-                              <span className="reg-radio-label"><span className="reg-radio-dot" />{v}</span>
+                              <span className="reg-radio-label"><span className="reg-radio-dot" />{v === "Male" ? t("reg_sex_male") : t("reg_sex_female")}</span>
                             </label>
                           ))}
                         </div>
                       </Field>
-                      <Field label="Gender">
+                      <Field label={t("reg_gender")}>
                         <SelectField value={form.gender} onChange={set("gender")}>
-                          <option value="">Select gender</option>
+                          <option value="">{t("reg_select_gender")}</option>
                           <option>Man</option>
                           <option>Woman</option>
                           <option>Non-binary</option>
                           <option>Prefer not to say</option>
+                          <option value="Others">{t("reg_opt_others")}</option>
                         </SelectField>
                       </Field>
                     </div>
                     {form.gender === "Others" && (
-                      <Field label="Please specify gender">
-                        <InputField type="text" placeholder="Please specify" value={form.genderOther} onChange={set("genderOther")} />
+                      <Field label={t("reg_specify_gender")}>
+                        <InputField type="text" placeholder={t("reg_please_specify")} value={form.genderOther} onChange={set("genderOther")} />
                       </Field>
                     )}
                     <div className="reg-form-grid cols-2">
-                      <Field label="Citizenship" required>
+                      <Field label={t("reg_citizenship")} required>
                         <SelectField icon={IconFlag} value={form.citizenship} onChange={set("citizenship")}>
-                          <option value="">Select citizenship</option>
-                          <option>Filipino</option>
-                          <option>Dual Citizen</option>
-                          <option>Foreign National</option>
-                          <option>Naturalized Filipino</option>
-                          <option>Others</option>
+                          <option value="">{t("reg_select_citizenship")}</option>
+                          <option value="Filipino">{t("reg_citizenship_filipino")}</option>
+                          <option value="Dual Citizen">{t("reg_citizenship_dual")}</option>
+                          <option value="Foreign National">{t("reg_citizenship_foreign")}</option>
+                          <option value="Naturalized Filipino">{t("reg_citizenship_naturalized")}</option>
+                          <option value="Others">{t("reg_opt_others")}</option>
                         </SelectField>
                       </Field>
-                      <Field label="Residing Since (Year)" required>
+                      <Field label={t("reg_residing_since")} required>
                         <InputField
                           icon={RegisIconCalendar}
                           type="text"
@@ -1277,21 +1294,21 @@ export default function Registration({ onBack, branchingPayload }) {
                       </Field>
                     </div>
                     {form.citizenship === "Others" && (
-                      <Field label="Please specify citizenship">
-                        <InputField type="text" placeholder="Please specify" value={form.citizenshipOther} onChange={set("citizenshipOther")} />
+                      <Field label={t("reg_specify_citizenship")}>
+                        <InputField type="text" placeholder={t("reg_please_specify")} value={form.citizenshipOther} onChange={set("citizenshipOther")} />
                       </Field>
                     )}
                     <div className={`reg-form-grid ${showEmail ? "cols-2" : "cols-1"}`}>
-                      <Field label="Contact Number" required><InputField icon={RegisIconPhone} type="tel" inputMode="numeric" pattern="[0-9]*" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
+                      <Field label={t("reg_contact_number")} required><InputField icon={RegisIconPhone} type="tel" inputMode="numeric" pattern="[0-9]*" placeholder="09XX XXX XXXX" value={form.contactNumber} onChange={set("contactNumber")} /></Field>
                       {showEmail && (
-                        <Field label="Email Address" required hint="We'll send your approval notification here.">
+                        <Field label={t("reg_email")} required hint={t("reg_email_hint")}>
                           <InputField icon={RegisIconMail} type="email" placeholder="yourname@email.com" value={form.email} onChange={set("email")} />
                         </Field>
                       )}
                     </div>
                     {!showEmail && (
                       <p style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "-0.6rem" }}>
-                        Email is not required for residents under 15 years old.
+                        {t("reg_email_minor_note")}
                       </p>
                     )}
                   </div>
@@ -1303,29 +1320,29 @@ export default function Registration({ onBack, branchingPayload }) {
                 <div>
                   <div className="reg-section-header">
                     <SectionIcon><SvgMapPin size={24} /></SectionIcon>
-                    <div><h3>Address Information</h3><p>Enter your complete home address.</p></div>
+                    <div><h3>{t("reg_address_title")}</h3><p>{t("reg_address_sub")}</p></div>
                   </div>
                   {(af("houseNumber") || af("street") || af("province")) && (
                     <div className="reg-autofill-banner">
                       <SvgInfo size={16} />
-                      <span>Address fields were partially autofilled from your PhilSys National ID. Please verify and complete if needed.</span>
+                      <span>{t("reg_address_autofill")}</span>
                     </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
-                      <Field label={<>House / Unit Number <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
+                      <Field label={<>{t("reg_house_number")} <span style={{ color: "var(--muted)", fontWeight: 400 }}>{t("reg_id_scan_optional")}</span></>}>
                         <InputField icon={RegisIconHome} type="text" placeholder="123" value={form.houseNumber} onChange={set("houseNumber")} autofilled={af("houseNumber")} />
                       </Field>
-                      <Field label="Street" required><InputField icon={RegisIconHome} type="text" placeholder="Malanday Street" value={form.street} onChange={set("street")} autofilled={af("street")} /></Field>
+                      <Field label={t("reg_street")} required><InputField icon={RegisIconHome} type="text" placeholder="Malanday Street" value={form.street} onChange={set("street")} autofilled={af("street")} /></Field>
                     </div>
-                    <Field label={<>Subdivision / Village <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Optional)</span></>}>
+                    <Field label={<>{t("reg_subdivision")} <span style={{ color: "var(--muted)", fontWeight: 400 }}>{t("reg_id_scan_optional")}</span></>}>
                       <InputField icon={RegisIconHome} type="text" placeholder="e.g. Maysan Ville Subdivision" value={form.subdivision} onChange={set("subdivision")} />
                     </Field>
                     <div className="reg-form-grid cols-2">
-                      <Field label="Barangay" required><InputField icon={RegisIconPin} type="text" value={form.barangay} readOnly /></Field>
-                      <Field label="City / Municipality" required><InputField icon={RegisIconPin} type="text" value={form.city} readOnly /></Field>
-                      <Field label="Province" required><InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} autofilled={af("province")} /></Field>
-                      <Field label="Region" required><InputField icon={RegisIconGlobe} type="text" value={form.region} readOnly /></Field>
+                      <Field label={t("reg_barangay")} required><InputField icon={RegisIconPin} type="text" value={form.barangay} readOnly /></Field>
+                      <Field label={t("reg_city")} required><InputField icon={RegisIconPin} type="text" value={form.city} readOnly /></Field>
+                      <Field label={t("reg_province")} required><InputField icon={RegisIconPin} type="text" placeholder="Bulacan" value={form.province} onChange={set("province")} autofilled={af("province")} /></Field>
+                      <Field label={t("reg_region")} required><InputField icon={RegisIconGlobe} type="text" value={form.region} readOnly /></Field>
                     </div>
                   </div>
                 </div>
@@ -1336,16 +1353,24 @@ export default function Registration({ onBack, branchingPayload }) {
                 <div>
                   <div className="reg-section-header">
                     <SectionIcon><SvgTag size={24} /></SectionIcon>
-                    <div><h3>Category Classification</h3><p>Select all categories that apply to you.</p></div>
+                    <div><h3>{t("reg_category_title")}</h3><p>{t("reg_category_sub")}</p></div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                     <div className="reg-checkbox-grid">
-                      {["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"].map((cat) => (
-                        <label key={cat} className="reg-check-option">
-                          <input type="checkbox" checked={form.categories.includes(cat)} onChange={() => toggleCategory(cat)} />
+                      {[
+                        { key: "Student", label: t("reg_cat_student") },
+                        { key: "Senior Citizen", label: t("reg_cat_senior") },
+                        { key: "Solo Parent", label: t("reg_cat_solo_parent") },
+                        { key: "OFW", label: t("reg_cat_ofw") },
+                        { key: "LGBT", label: t("reg_cat_lgbt") },
+                        { key: "Indigenous People", label: t("reg_cat_ip") },
+                        { key: "PWD", label: t("reg_cat_pwd") },
+                      ].map((catItem) => (
+                        <label key={catItem.key} className="reg-check-option">
+                          <input type="checkbox" checked={form.categories.includes(catItem.key)} onChange={() => toggleCategory(catItem.key)} />
                           <span className="reg-check-label">
-                            <span className="reg-check-box">{form.categories.includes(cat) && <SvgCheck size={12} />}</span>
-                            {cat}
+                            <span className="reg-check-box">{form.categories.includes(catItem.key) && <SvgCheck size={12} />}</span>
+                            {catItem.label}
                           </span>
                         </label>
                       ))}
@@ -1353,19 +1378,19 @@ export default function Registration({ onBack, branchingPayload }) {
                     {isPwd && (
                       <div className="reg-sub-fields">
                         <div className={`reg-sub-fields-title reg-pwd-title`}>
-                          <SvgWheelchair size={16} /> PWD Additional Information
+                          <SvgWheelchair size={16} /> {t("reg_pwd_additional")}
                         </div>
                         <div className="reg-form-grid cols-2">
-                          <Field label="PWD Status" required>
+                          <Field label={t("reg_pwd_status")} required>
                             <SelectField icon={RegisIconShield} value={form.pwdStatus} onChange={set("pwdStatus")}>
-                              <option value="">Select status</option>
+                              <option value="">{t("reg_select_status")}</option>
                               <option>Children with Disabilities</option>
                               <option>Person with Disabilities</option>
                             </SelectField>
                           </Field>
-                          <Field label="Disability Type" required>
+                          <Field label={t("reg_disability_type")} required>
                             <SelectField icon={RegisIconInfo} value={form.disabilityType} onChange={set("disabilityType")}>
-                              <option value="">Select type</option>
+                              <option value="">{t("reg_select_type")}</option>
                               <option>Physical Disability</option>
                               <option>Visual Disability</option>
                               <option>Hearing Disability</option>
@@ -1376,13 +1401,13 @@ export default function Registration({ onBack, branchingPayload }) {
                               <option>Multiple Disabilities</option>
                               <option>Chronic Illness</option>
                               <option>Rare Disease</option>
-                              <option>Others</option>
+                              <option value="Others">{t("reg_opt_others")}</option>
                             </SelectField>
                           </Field>
                         </div>
                         {form.disabilityType === "Others" && (
-                          <Field label="Please specify disability type">
-                            <InputField type="text" placeholder="Please specify" value={form.disabilityTypeOther} onChange={set("disabilityTypeOther")} />
+                          <Field label={t("reg_specify_disability")}>
+                            <InputField type="text" placeholder={t("reg_please_specify")} value={form.disabilityTypeOther} onChange={set("disabilityTypeOther")} />
                           </Field>
                         )}
                       </div>
@@ -1396,36 +1421,36 @@ export default function Registration({ onBack, branchingPayload }) {
                 <div>
                   <div className="reg-section-header">
                     <SectionIcon><SvgGradCap size={24} /></SectionIcon>
-                    <div><h3>Education &amp; Employment</h3><p>Provide your educational background and employment details.</p></div>
+                    <div><h3>{t("reg_education_title")}</h3><p>{t("reg_education_sub")}</p></div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
-                      <Field label="Highest Educational Attainment" required>
+                      <Field label={t("reg_highest_attainment")} required>
                         <SelectField icon={RegisIconGradCap} value={form.educationAttainment} onChange={set("educationAttainment")}>
-                          <option value="">Select attainment</option>
+                          <option value="">{t("reg_select_attainment")}</option>
                           <option>Elementary</option><option>High School</option><option>College</option>
                           <option>Post Graduate</option><option>Vocational</option>
                         </SelectField>
                       </Field>
-                      <Field label="Education Status" required>
+                      <Field label={t("reg_education_status")} required>
                         <SelectField icon={RegisIconBook} value={form.educationStatus} onChange={set("educationStatus")}>
-                          <option value="">Select status</option>
+                          <option value="">{t("reg_select_status")}</option>
                           <option>In School</option><option>Out of School Youth (OSY)</option>
                           <option>Out of School Children (OSC)</option><option>Graduate</option>
                         </SelectField>
                       </Field>
                     </div>
                     {form.educationAttainment === "Post Graduate" && (
-                      <Field label="Post Graduate Level">
+                      <Field label={t("reg_post_grad_level")}>
                         <SelectField icon={RegisIconGradCap} value={form.postGradLevel} onChange={set("postGradLevel")}>
-                          <option value="">Select level</option>
+                          <option value="">{t("reg_select_level")}</option>
                           <option>Masters</option>
                           <option>Doctorate</option>
                         </SelectField>
                       </Field>
                     )}
                     <div className="reg-form-grid cols-2">
-                      <Field label="Occupation" hint="Select from the list or type your own.">
+                      <Field label={t("reg_occupation")} hint={t("reg_occupation_hint")}>
                         <InputField icon={RegisIconBriefcase} type="text" list="occupation-options" placeholder="e.g. Teacher, Vendor, Self-Employed" value={form.occupation} onChange={set("occupation")} />
                         <datalist id="occupation-options">
                           <option value="Teacher" />
@@ -1443,10 +1468,11 @@ export default function Registration({ onBack, branchingPayload }) {
                           <option value="Student" />
                         </datalist>
                       </Field>
-                      <Field label="Employment Status" required>
+                      <Field label={t("reg_employment_status")} required>
                         <SelectField icon={RegisIconBriefcase} value={form.employmentStatus} onChange={set("employmentStatus")}>
-                          <option value="">Select status</option>
-                          <option>Employed</option><option>Unemployed</option>
+                          <option value="">{t("reg_select_status")}</option>
+                          <option value="Employed">{t("reg_emp_employed")}</option>
+                          <option value="Unemployed">{t("reg_emp_unemployed")}</option>
                         </SelectField>
                       </Field>
                     </div>
@@ -1459,28 +1485,28 @@ export default function Registration({ onBack, branchingPayload }) {
                 <div>
                   <div className="reg-section-header">
                     <SectionIcon><SvgHome size={24} /></SectionIcon>
-                    <div><h3>Household Details</h3><p>Provide information about your household.</p></div>
+                    <div><h3>{t("reg_household_title")}</h3><p>{t("reg_household_sub")}</p></div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                     <div className="reg-form-grid cols-2">
-                      <Field label="Number of Household Members" required hint="Include yourself in the count.">
+                      <Field label={t("reg_total_members")} required hint={t("reg_total_members_hint")}>
                         <InputField icon={IconUsers} type="number" min="1" placeholder="4" value={form.totalMembers} onChange={set("totalMembers")} />
                       </Field>
-                      <Field label="Household Classification" required>
+                      <Field label={t("reg_household_class")} required>
                         <SelectField icon={RegisIconHome} value={form.householdClassification} onChange={set("householdClassification")}>
-                          <option value="">Select classification</option>
-                          <option>Owned</option>
-                          <option>Owned, Lot Rented</option>
-                          <option>Rented</option>
-                          <option>Rent-Free with Consent of Owner</option>
-                          <option>Rent-Free without Consent of Owner</option>
-                          <option>Informal Settler</option>
+                          <option value="">{t("reg_select_classification")}</option>
+                          <option value="Owned">{t("reg_class_owned")}</option>
+                          <option value="Owned, Lot Rented">{t("reg_class_owned_lot_rented")}</option>
+                          <option value="Rented">{t("reg_class_rented")}</option>
+                          <option value="Rent-Free with Consent of Owner">{t("reg_class_rent_free_owner")}</option>
+                          <option value="Rent-Free without Consent of Owner">{t("reg_class_rent_free_no_owner")}</option>
+                          <option value="Informal Settler">{t("reg_class_informal")}</option>
                         </SelectField>
                       </Field>
                     </div>
                     <div className="reg-info-box">
                       <span style={{ color: "#317D89", flexShrink: 0 }}><SvgInfo size={17} /></span>
-                      <p>After your registration is approved, you will be prompted to <strong>add individual household members</strong> using your assigned Household ID.</p>
+                      <p>{t("reg_household_info")}</p>
                     </div>
                   </div>
                 </div>
@@ -1491,93 +1517,92 @@ export default function Registration({ onBack, branchingPayload }) {
                 <div>
                   <div className="reg-section-header">
                     <SectionIcon><SvgClipboard size={24} /></SectionIcon>
-                    <div><h3>Review &amp; Submit</h3><p>Please verify all information before submitting.</p></div>
+                    <div><h3>{t("reg_review_title")}</h3><p>{t("reg_review_sub")}</p></div>
                   </div>
                   <div className="reg-review-thumbnails">
                     <div className="reg-review-thumb">
-                      <span className="reg-review-thumb-label">PhilSys National ID</span>
+                      <span className="reg-review-thumb-label">{t("reg_review_id_label")}</span>
                       {idImage ? (
                         <img src={idImage} alt="ID" className="reg-review-thumb-id" />
                       ) : (
                         <div style={{ padding: "0.8rem", fontSize: "0.75rem", color: "#6b7280", fontStyle: "italic", textAlign: "center" }}>
-                          Skipped (No ID uploaded)
+                          {t("reg_review_skipped")}
                         </div>
                       )}
                     </div>
                     {selfieImage && (
                       <div className="reg-review-thumb">
-                        <span className="reg-review-thumb-label">Selfie</span>
+                        <span className="reg-review-thumb-label">{t("reg_review_selfie_label")}</span>
                         <img src={selfieImage} alt="Selfie" className="reg-review-thumb-selfie" />
                       </div>
                     )}
                   </div>
 
-                  <ReviewSection icon={<SvgPerson size={18} />} title="Personal Information">
-                    <ReviewField label="PhilSys Card Number (PCN)" value={rv(form.idNumber)} full />
-                    <ReviewField label="Full Name" value={rv(fullName)} />
-                    <ReviewField label="Birth Date" value={formatDate(form.birthDate)} />
-                    <ReviewField label="Age" value={rv(form.age)} />
-                    <ReviewField label="Birth Place" value={rv(form.birthPlace)} />
-                    <ReviewField label="Sex" value={form.sex} />
-                    <ReviewField label="Gender" value={form.gender === "Others" ? (rv(form.genderOther) || "Others") : rv(form.gender)} />
-                    <ReviewField label="Civil Status" value={rv(form.civilStatus)} />
-                    <ReviewField label="Religion" value={form.religion === "Others" ? (rv(form.religionOther) || "Others") : rv(form.religion)} />
-                    <ReviewField label="Citizenship" value={form.citizenship === "Others" ? (rv(form.citizenshipOther) || "Others") : rv(form.citizenship)} />
-                    <ReviewField label="Residing Since" value={rv(form.residingSinceYear)} />
-                    <ReviewField label="Contact Number" value={rv(form.contactNumber)} />
-                    {showEmail && <ReviewField label="Email Address" value={rv(form.email)} full />}
+                  <ReviewSection icon={<SvgPerson size={18} />} title={t("reg_review_personal")}>
+                    <ReviewField label={t("reg_pcn_label")} value={rv(form.idNumber)} full />
+                    <ReviewField label={t("reg_first_name")} value={rv(fullName)} />
+                    <ReviewField label={t("reg_birth_date")} value={formatDate(form.birthDate)} />
+                    <ReviewField label={t("reg_age")} value={rv(form.age)} />
+                    <ReviewField label={t("reg_birth_place")} value={rv(form.birthPlace)} />
+                    <ReviewField label={t("reg_sex")} value={form.sex === "Male" ? t("reg_sex_male") : t("reg_sex_female")} />
+                    <ReviewField label={t("reg_gender")} value={form.gender === "Others" ? (rv(form.genderOther) || t("reg_opt_others")) : rv(form.gender)} />
+                    <ReviewField label={t("reg_civil_status")} value={rv(form.civilStatus)} />
+                    <ReviewField label={t("reg_religion")} value={form.religion === "Others" ? (rv(form.religionOther) || t("reg_opt_others")) : rv(form.religion)} />
+                    <ReviewField label={t("reg_citizenship")} value={form.citizenship === "Others" ? (rv(form.citizenshipOther) || t("reg_opt_others")) : rv(form.citizenship)} />
+                    <ReviewField label={t("reg_residing_since")} value={rv(form.residingSinceYear)} />
+                    <ReviewField label={t("reg_contact_number")} value={rv(form.contactNumber)} />
+                    {showEmail && <ReviewField label={t("reg_email")} value={rv(form.email)} full />}
                   </ReviewSection>
 
-                  <ReviewSection icon={<SvgMapPin size={18} />} title="Address">
-                    <ReviewField label="House / Street" value={rv(fullAddr)} />
-                    <ReviewField label="Subdivision / Village" value={rv(form.subdivision)} />
-                    <ReviewField label="Barangay" value={rv(form.barangay)} />
-                    <ReviewField label="City / Municipality" value={rv(form.city)} />
-                    <ReviewField label="Province" value={rv(form.province)} />
-                    <ReviewField label="Region" value={rv(form.region)} full />
+                  <ReviewSection icon={<SvgMapPin size={18} />} title={t("reg_review_address")}>
+                    <ReviewField label={`${t("reg_house_number")} / ${t("reg_street")}`} value={rv(fullAddr)} />
+                    <ReviewField label={t("reg_subdivision")} value={rv(form.subdivision)} />
+                    <ReviewField label={t("reg_barangay")} value={rv(form.barangay)} />
+                    <ReviewField label={t("reg_city")} value={rv(form.city)} />
+                    <ReviewField label={t("reg_province")} value={rv(form.province)} />
+                    <ReviewField label={t("reg_region")} value={rv(form.region)} full />
                   </ReviewSection>
 
-                  <ReviewSection icon={<SvgTag size={18} />} title="Category">
+                  <ReviewSection icon={<SvgTag size={18} />} title={t("reg_review_category")}>
                     {form.categories.length === 0 ? (
-                      <ReviewField label="Classifications" value={null} full />
+                      <ReviewField label={t("reg_review_classifications")} value={null} full />
                     ) : (
                       <div className="reg-review-field full">
-                        <div className="reg-review-field-label">Classifications</div>
+                        <div className="reg-review-field-label">{t("reg_review_classifications")}</div>
                         <div className="reg-review-field-value">
                           {form.categories.map((c) => <span key={c} className="reg-category-tag">{c}</span>)}
                         </div>
                       </div>
                     )}
                     {isPwd && <>
-                      <ReviewField label="PWD Status" value={rv(form.pwdStatus)} />
-                      <ReviewField label="Disability Type" value={form.disabilityType === "Others" ? (rv(form.disabilityTypeOther) || "Others") : rv(form.disabilityType)} />
+                      <ReviewField label={t("reg_pwd_status")} value={rv(form.pwdStatus)} />
+                      <ReviewField label={t("reg_disability_type")} value={form.disabilityType === "Others" ? (rv(form.disabilityTypeOther) || t("reg_opt_others")) : rv(form.disabilityType)} />
                     </>}
                   </ReviewSection>
 
-                  <ReviewSection icon={<SvgGradCap size={18} />} title="Education & Employment">
-                    <ReviewField label="Highest Attainment" value={form.educationAttainment === "Post Graduate" ? [form.educationAttainment, form.postGradLevel].filter(Boolean).join(" - ") : rv(form.educationAttainment)} />
-                    <ReviewField label="Education Status" value={rv(form.educationStatus)} />
-                    <ReviewField label="Occupation" value={rv(form.occupation)} />
-                    <ReviewField label="Employment Status" value={rv(form.employmentStatus)} />
+                  <ReviewSection icon={<SvgGradCap size={18} />} title={t("reg_review_education")}>
+                    <ReviewField label={t("reg_highest_attainment")} value={form.educationAttainment === "Post Graduate" ? [form.educationAttainment, form.postGradLevel].filter(Boolean).join(" - ") : rv(form.educationAttainment)} />
+                    <ReviewField label={t("reg_education_status")} value={rv(form.educationStatus)} />
+                    <ReviewField label={t("reg_occupation")} value={rv(form.occupation)} />
+                    <ReviewField label={t("reg_employment_status")} value={rv(form.employmentStatus)} />
                   </ReviewSection>
 
-                  <ReviewSection icon={<SvgHome size={18} />} title="Household Details">
-                    <ReviewField label="No. of Members" value={rv(form.totalMembers)} />
-                    <ReviewField label="Classification" value={rv(form.householdClassification)} />
+                  <ReviewSection icon={<SvgHome size={18} />} title={t("reg_review_household")}>
+                    <ReviewField label={t("reg_review_no_members")} value={rv(form.totalMembers)} />
+                    <ReviewField label={t("reg_review_classification")} value={rv(form.householdClassification)} />
                   </ReviewSection>
 
                   {/* Privacy */}
                   <div className="reg-privacy-section">
                     <div className="reg-privacy-header">
                       <SvgShield size={22} />
-                      <h4>Privacy Policy &amp; Consent</h4>
+                      <h4>{t("reg_privacy_title")}</h4>
                     </div>
                     <p className="reg-privacy-text">
-                      Your personal information will be collected and processed in accordance with the{" "}
-                      <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong>. The data you provide will be used strictly for system-related purposes such as account management and access to services.
+                      {t("reg_privacy_text")}
                     </p>
                     <button type="button" className="reg-privacy-link" onClick={() => setShowPrivacyModal(true)}>
-                      Read Full Privacy Policy →
+                      {t("reg_privacy_read")}
                     </button>
                     <label className="reg-privacy-check-label">
                       <input
@@ -1587,7 +1612,7 @@ export default function Registration({ onBack, branchingPayload }) {
                         style={{ marginTop: "3px", accentColor: "#317D89", width: "16px", height: "16px", flexShrink: 0 }}
                       />
                       <span className="reg-privacy-check-text">
-                        I have read and agree to the <strong>Privacy Policy</strong> and the <strong>Data Privacy Act of 2012 (RA 10173)</strong>.
+                        {t("reg_privacy_agree")}
                       </span>
                     </label>
                   </div>
@@ -1606,20 +1631,20 @@ export default function Registration({ onBack, branchingPayload }) {
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-              <button type="button" className="reg-btn-cancel" onClick={handleCancel}>Cancel</button>
+              <button type="button" className="reg-btn-cancel" onClick={handleCancel}>{t("reg_cancel")}</button>
 
               <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
                 {step > 0 && (
                   <button type="button" className="reg-btn-ghost" onClick={goBack}
                     style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                    <SvgArrowLeft /> Back
+                    <SvgArrowLeft /> {t("reg_back")}
                   </button>
                 )}
 
                 {step > 0 && step < total - 1 && (
                   <button type="button" className="reg-btn-primary" onClick={goNext}
                     style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                    Continue <SvgArrowRight />
+                    {t("reg_continue")} <SvgArrowRight />
                   </button>
                 )}
 
@@ -1632,8 +1657,8 @@ export default function Registration({ onBack, branchingPayload }) {
                       display: "inline-flex", alignItems: "center", gap: "0.5rem",
                     }}>
                     {isSubmitting
-                      ? <><SvgLoader size={16} /> Submitting…</>
-                      : <><SvgSend size={16} /> Confirm &amp; Submit</>}
+                      ? <><SvgLoader size={16} /> {t("reg_submitting")}</>
+                      : <><SvgSend size={16} /> {t("reg_confirm_submit")}</>}
                   </button>
                 )}
               </div>
@@ -1650,7 +1675,7 @@ export default function Registration({ onBack, branchingPayload }) {
             <div style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div className="reg-privacy-header" style={{ marginBottom: 0 }}>
                 <SvgShield size={22} />
-                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1e3a5f" }}>Privacy Policy</h3>
+                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1e3a5f" }}>{t("footer_privacy")}</h3>
               </div>
               <button onClick={() => setShowPrivacyModal(false)}
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.4rem", color: "#6b7280", lineHeight: 1 }}>
@@ -1658,22 +1683,22 @@ export default function Registration({ onBack, branchingPayload }) {
               </button>
             </div>
             <div style={{ overflowY: "auto", padding: "1.5rem", flex: 1, fontSize: "0.875rem", color: "#374151" }}>
-              <p style={{ marginBottom: "1rem" }}>This system complies with the <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong> and its implementing rules and regulations.</p>
-              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Information Collected</h4>
+              <p style={{ marginBottom: "1rem" }}>{t("reg_privacy_text")}</p>
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>{t("reg_privacy_info_collected")}</h4>
               <ul style={{ paddingLeft: "1.25rem", marginBottom: "1rem" }}>
                 <li>Personal details (e.g., name, contact information)</li>
                 <li>Account and profile data</li>
                 <li>ID image and selfie photo for identity verification</li>
               </ul>
-              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Purpose of Collection</h4>
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>{t("reg_privacy_purpose")}</h4>
               <ul style={{ paddingLeft: "1.25rem", marginBottom: "1rem" }}>
                 <li>To manage and verify user accounts</li>
                 <li>To provide access to system services</li>
                 <li>To send relevant notifications and updates</li>
               </ul>
-              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Data Protection</h4>
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>{t("reg_privacy_protection")}</h4>
               <p style={{ marginBottom: "1rem" }}>Appropriate organizational, physical, and technical security measures are implemented to protect personal data against unauthorized access, alteration, disclosure, or destruction.</p>
-              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>Your Rights Under RA 10173</h4>
+              <h4 style={{ color: "#1e3a5f", marginBottom: "0.5rem" }}>{t("reg_privacy_rights")}</h4>
               <ul style={{ paddingLeft: "1.25rem", marginBottom: "1rem" }}>
                 <li>Right to be informed</li><li>Right to access</li><li>Right to object</li>
                 <li>Right to correct</li><li>Right to erasure or blocking</li>
@@ -1682,7 +1707,7 @@ export default function Registration({ onBack, branchingPayload }) {
             <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
               <button onClick={() => { setPrivacyAgreed(true); setShowPrivacyModal(false); setErrorMsg(""); }}
                 style={{ background: "#317D89", color: "#fff", border: "none", borderRadius: "8px", padding: "0.6rem 1.4rem", fontWeight: 600, fontSize: "0.9rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-                <SvgCheck size={15} /> I Agree &amp; Close
+                <SvgCheck size={15} /> {t("reg_privacy_agree_close")}
               </button>
             </div>
           </div>
@@ -1690,4 +1715,4 @@ export default function Registration({ onBack, branchingPayload }) {
       )}
     </div>
   );
-}
+}

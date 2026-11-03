@@ -369,7 +369,7 @@ export default function ServiceLivelihood({ onBack }) {
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
         <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-          &larr; Back to Services Hub
+          ← Back to Services Hub
         </button>
 
         <div className="as-header-section">
@@ -677,7 +677,7 @@ export default function ServiceLivelihood({ onBack }) {
                 <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
                   {editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}
                 </h2>
-                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
+                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>×</button>
               </div>
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleAddProgram}>
@@ -768,13 +768,21 @@ export default function ServiceLivelihood({ onBack }) {
                     </div>
                     <div>
                       <label className="as-form-label">Target Demographic</label>
-                      <input
-                        type="text"
+                      <select
                         className="as-form-input"
                         value={newProgram.demographic}
                         onChange={e => setNewProgram({ ...newProgram, demographic: e.target.value })}
-                        placeholder="e.g. Students, Women, Senior"
-                      />
+                      >
+                        <option value="">Select Target Demographic</option>
+                        <option value="All Residents">All Residents</option>
+                        <option value="Student">Student</option>
+                        <option value="Senior Citizen">Senior Citizen</option>
+                        <option value="PWD">PWD</option>
+                        <option value="Solo Parent">Solo Parent</option>
+                        <option value="OFW">OFW</option>
+                        <option value="Indigenous People">Indigenous People</option>
+                        <option value="LGBT">LGBT</option>
+                      </select>
                     </div>
                   </div>
 
@@ -841,7 +849,7 @@ export default function ServiceLivelihood({ onBack }) {
               >
                 <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                   <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>Registration Details</h2>
-                  <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setSelectedParticipant(null)}>&times;</button>
+                  <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setSelectedParticipant(null)}>×</button>
                 </div>
 
                 <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
@@ -902,7 +910,7 @@ export default function ServiceLivelihood({ onBack }) {
             <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
               <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Reject Registration</h2>
-                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
+                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleConfirmReject}>

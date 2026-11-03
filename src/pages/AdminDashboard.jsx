@@ -36,10 +36,20 @@ const TABS = [
   { id: 'bswd', label: 'Social Welfare' }
 ];
 
+// ─── OPTIMIZATION: SHARED QUERY CONFIG ───
+// This stops React Query from burning reads every time the admin switches browser tabs
+const OPTIMIZED_QUERY_OPTIONS = {
+  staleTime: 1000 * 60 * 30,     // Data stays fresh for 30 minutes
+  gcTime: 1000 * 60 * 60,        // Keep in cache for 60 minutes
+  refetchOnWindowFocus: false,   // Prevents alt-tab read burns
+  refetchOnMount: false,         // Prevents refetching if navigating between internal pages
+  retry: false,
+};
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('resident');
 
-  // ─── 1. CORE SUMMARY QUERY (Always loads - Optimized with getCount) ───
+  // ─── 1. CORE SUMMARY QUERY ───
   const { data: summaryData, isLoading: isSummaryLoading, isError: isSummaryError, error: summaryError } = useQuery({
     queryKey: ['adminDashboard_summary'],
     queryFn: async () => {
@@ -49,7 +59,8 @@ export default function AdminDashboard() {
         getCountFromServer(collection(db, "pending_registrations")),
         getCountFromServer(query(collection(db, "document_requests"), where("status", "==", "Pending"))),
         getCountFromServer(query(collection(db, "facility_reservations"), where("status", "==", "Pending"))),
-        getDocs(query(collection(db, "Feedback"), orderBy("CreatedAt", "desc"), limit(300)))
+        // OPTIMIZATION: Reduced limit from 300 to 150. AI insights rarely need more than the latest 150 feedbacks.
+        getDocs(query(collection(db, "feedback"), orderBy("createdAt", "desc"), limit(150)))
       ]);
 
       return {
@@ -63,30 +74,29 @@ export default function AdminDashboard() {
         }
       };
     },
-    staleTime: 1000 * 60 * 30, // 30 minutes
-    gcTime: 1000 * 60 * 60,    // 60 minutes
-    retry: false,
+    ...OPTIMIZED_QUERY_OPTIONS
   });
 
-  // ─── 2. LAZY LOADED TAB QUERIES (Only fetches when tab is clicked) ───
+  // ─── 2. LAZY LOADED TAB QUERIES ───
 
   const { data: residentData, isLoading: isResidentLoading } = useQuery({
     queryKey: ['adminDashboard_resident'],
     queryFn: async () => {
-      const snap = await getDocs(query(collectionGroup(db, "residents"), limit(500)));
+      // OPTIMIZATION: Cap at 300 to prevent massive payload downloads on large populations
+      const snap = await getDocs(query(collectionGroup(db, "residents"), limit(300)));
       return snap.docs.map(doc => doc.data());
     },
     enabled: activeTab === 'resident',
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    ...OPTIMIZED_QUERY_OPTIONS
   });
 
   const { data: servicesData, isLoading: isServicesLoading } = useQuery({
     queryKey: ['adminDashboard_services'],
     queryFn: async () => {
       const [docSnap, facSnap, equSnap, invSnap] = await Promise.all([
-        getDocs(query(collection(db, "document_requests"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collection(db, "facility_reservations"), orderBy("submittedAt", "desc"), limit(300))),
-        getDocs(query(collection(db, "equipment_rentals"), orderBy("submittedAt", "desc"), limit(300))),
+        getDocs(query(collection(db, "document_requests"), orderBy("submittedAt", "desc"), limit(150))),
+        getDocs(query(collection(db, "facility_reservations"), orderBy("submittedAt", "desc"), limit(150))),
+        getDocs(query(collection(db, "equipment_rentals"), orderBy("submittedAt", "desc"), limit(150))),
         getDocs(collection(db, "equipment"))
       ]);
       return {
@@ -97,15 +107,15 @@ export default function AdminDashboard() {
       };
     },
     enabled: activeTab === 'services',
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    ...OPTIMIZED_QUERY_OPTIONS
   });
 
   const { data: programsData, isLoading: isProgramsLoading } = useQuery({
     queryKey: ['adminDashboard_programs'],
     queryFn: async () => {
       const [attSnap, livSnap] = await Promise.all([
-        getDocs(query(collectionGroup(db, "attendees"), limit(400))),
-        getDocs(query(collection(db, "livelihoodRegistrations"), limit(400)))
+        getDocs(query(collectionGroup(db, "attendees"), limit(200))),
+        getDocs(query(collection(db, "livelihoodRegistrations"), limit(200)))
       ]);
       const generalAttendees = attSnap.docs.map(doc => {
         const d = doc.data();
@@ -118,27 +128,27 @@ export default function AdminDashboard() {
       return [...generalAttendees, ...livelihoodAttendees];
     },
     enabled: activeTab === 'programs',
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    ...OPTIMIZED_QUERY_OPTIONS
   });
 
   const { data: peaceData, isLoading: isPeaceLoading } = useQuery({
     queryKey: ['adminDashboard_peace'],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, "incidentReports"), orderBy("submittedAt", "desc"), limit(300)));
+      const snap = await getDocs(query(collection(db, "incidentReports"), orderBy("submittedAt", "desc"), limit(150)));
       return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
     enabled: activeTab === 'peace',
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    ...OPTIMIZED_QUERY_OPTIONS
   });
 
   const { data: bswdData, isLoading: isBswdLoading } = useQuery({
     queryKey: ['adminDashboard_bswd'],
     queryFn: async () => {
-      const snap = await getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(300)));
+      const snap = await getDocs(query(collection(db, "bswdReports"), orderBy("submittedAt", "desc"), limit(150)));
       return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
     enabled: activeTab === 'bswd',
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    ...OPTIMIZED_QUERY_OPTIONS
   });
 
   // ─── RENDER LOGIC ───

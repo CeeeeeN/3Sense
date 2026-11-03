@@ -1,28 +1,5 @@
 import { UsersIcon } from "../../Icons";
-
-// ── Content ──────────────────────────────────────────────────────────────────
-const FACTS = [
-  { icon: "age",   label: "Who can join",   value: "Residents 60 years old and above" },
-  { icon: "place", label: "Where to go",    value: "Barangay Hall, Social Welfare Desk" },
-  { icon: "id",    label: "What to bring",  value: "Valid ID and proof of age" },
-];
-
-const JOIN_STEPS = [
-  { title: "Go to the Barangay Hall",    desc: "Ask for the BOSCA Membership Form." },
-  { title: "Bring your papers",          desc: "A valid ID and proof of age (birth certificate or senior citizen ID)." },
-  { title: "Hand in the filled-out form", desc: "Give it to the Barangay Social Welfare Desk." },
-  { title: "Get your cards",             desc: "You will receive your BOSCA membership card and OSCA ID." },
-];
-
-const BENEFITS = [
-  { title: "20% discount",              desc: "on medicines, medical services, and basic necessities" },
-  { title: "Free check-ups",            desc: "medical and dental consultations at public health centers" },
-  { title: "Priority lane",             desc: "in government offices and establishments" },
-  { title: "Monthly Social Pension",    desc: "for indigent senior citizens, through DSWD" },
-  { title: "Income tax exemption",      desc: "on pension income" },
-  { title: "Free transportation",       desc: "in government-owned public vehicles" },
-  { title: "Discounts on leisure",      desc: "recreation and entertainment" },
-];
+import { useLanguage } from "../../../context/LanguageContext";
 
 // ── Small icons ──────────────────────────────────────────────────────────────
 const svgProps = { width: 26, height: 26, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -46,23 +23,48 @@ const AlertIcon = () => (
 
 // ── BOSCA Tab ────────────────────────────────────────────────────────────────
 export default function BOSCATab() {
+  const { t } = useLanguage();
+
+  const facts = [
+    { icon: "age",   label: t("bosca_fact_who_label"),   value: t("bosca_fact_who_val") },
+    { icon: "place", label: t("bosca_fact_where_label"), value: t("bosca_fact_where_val") },
+    { icon: "id",    label: t("bosca_fact_bring_label"), value: t("bosca_fact_bring_val") },
+  ];
+
+  const joinSteps = [
+    { title: t("bosca_step1_title"), desc: t("bosca_step1_desc") },
+    { title: t("bosca_step2_title"), desc: t("bosca_step2_desc") },
+    { title: t("bosca_step3_title"), desc: t("bosca_step3_desc") },
+    { title: t("bosca_step4_title"), desc: t("bosca_step4_desc") },
+  ];
+
+  const benefits = [
+    { title: t("bosca_b1_title"), desc: t("bosca_b1_desc") },
+    { title: t("bosca_b2_title"), desc: t("bosca_b2_desc") },
+    { title: t("bosca_b3_title"), desc: t("bosca_b3_desc") },
+    { title: t("bosca_b4_title"), desc: t("bosca_b4_desc") },
+    { title: t("bosca_b5_title"), desc: t("bosca_b5_desc") },
+    { title: t("bosca_b6_title"), desc: t("bosca_b6_desc") },
+    { title: t("bosca_b7_title"), desc: t("bosca_b7_desc") },
+  ];
+
   return (
     <div className="bz-page">
       {/* Title */}
       <div className="svc-hero svc-hero--purple bz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><UsersIcon /></span>BOSCA</div>
-            <h2 className="svc-hero__title">Barangay Office for Senior Citizens Association</h2>
-            <p className="svc-hero__sub">Get information and assistance regarding senior citizen benefits, privileges, programs, and other services that support older persons in the community.</p>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><UsersIcon /></span>{t("bosca_eyebrow")}</div>
+            <h2 className="svc-hero__title">{t("bosca_hero_title")}</h2>
+            <p className="svc-hero__sub">{t("bosca_sub")}</p>
           </div>
         </div>
       </div>
 
       <div className="bz-wrap">
         {/* At a glance */}
-        <section className="bz-glance" aria-label="Quick facts">
-          {FACTS.map((f) => (
+        <section className="bz-glance" aria-label={t("bosca_fact_who_label")}>
+          {facts.map((f) => (
             <div className="bz-fact" key={f.label}>
               <span className="bz-fact__icon"><FactIcon type={f.icon} /></span>
               <div>
@@ -75,10 +77,10 @@ export default function BOSCATab() {
 
         {/* How to join */}
         <section className="bz-card">
-          <h3 className="bz-heading">How to join BOSCA</h3>
-          <p className="bz-text">Follow these 4 steps.</p>
+          <h3 className="bz-heading">{t("bosca_join_heading")}</h3>
+          <p className="bz-text">{t("bosca_join_sub")}</p>
           <ol className="bz-steps">
-            {JOIN_STEPS.map((s, i) => (
+            {joinSteps.map((s, i) => (
               <li className="bz-step" key={s.title}>
                 <span className="bz-step__num">{i + 1}</span>
                 <div>
@@ -92,10 +94,10 @@ export default function BOSCATab() {
 
         {/* Benefits */}
         <section className="bz-card">
-          <h3 className="bz-heading">Your benefits as a senior citizen</h3>
-          <p className="bz-text">Every registered senior citizen is entitled to these by law (RA 9994).</p>
+          <h3 className="bz-heading">{t("bosca_benefits_heading")}</h3>
+          <p className="bz-text">{t("bosca_benefits_sub")}</p>
           <ul className="bz-benefits">
-            {BENEFITS.map((b) => (
+            {benefits.map((b) => (
               <li className="bz-benefit" key={b.title}>
                 <span className="bz-benefit__check"><CheckIcon /></span>
                 <div>
@@ -109,21 +111,19 @@ export default function BOSCATab() {
           <div className="bz-note">
             <AlertIcon />
             <div>
-              <strong>Always bring your OSCA ID</strong> to get these benefits. If your ID is lost or expired, you can renew it at the Barangay Hall.
+              <strong>{t("bosca_osca_note_strong")}</strong> {t("bosca_osca_note_text")}
             </div>
           </div>
         </section>
 
         {/* About */}
         <section className="bz-card bz-card--about">
-          <h3 className="bz-heading">About BOSCA</h3>
-          <p className="bz-text">
-            BOSCA, the Barangay Office for Senior Citizens Association, is the official senior citizens organization of Barangay 3S+ Malanday. It speaks up for the rights, welfare, and active participation of older residents in barangay life.
-          </p>
+          <h3 className="bz-heading">{t("bosca_about_heading")}</h3>
+          <p className="bz-text">{t("bosca_about_p1")}</p>
           <p className="bz-text bz-text--last">
-            Anyone <strong>60 years old and above</strong> can join. BOSCA works directly with the Barangay Social Welfare and Development (BSWD) officer and the Barangay Council.
+            {t("bosca_about_p2_pre")}<strong>{t("bosca_about_p2_strong")}</strong>{t("bosca_about_p2_post")}
           </p>
-          <div className="bz-legal">Legal basis: RA 9994 (Expanded Senior Citizens Act) and RA 7876 (Senior Citizens Center Act)</div>
+          <div className="bz-legal">{t("bosca_legal")}</div>
         </section>
       </div>
     </div>
