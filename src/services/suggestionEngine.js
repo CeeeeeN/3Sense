@@ -153,6 +153,11 @@ const dictionary = {
     statement: "The resident provided a constructive idea, request for a new program, or a recommendation for barangay improvement.",
     actions: ["Acknowledge the suggestion by replying and thanking the resident for their proactive feedback.", "Forward the idea to the relevant barangay committee for initial review."],
     strategy: ["Consolidate all resident suggestions monthly to guide future barangay ordinances and budget allocations.", "Launch an official 'Community Ideas' board to publicly track and implement the best resident suggestions."]
+  },
+  "Minor / Tolerated Delay": {
+    statement: "Residents noted that the processing time was slightly slow, but were otherwise satisfied with the service outcome and facility.",
+    actions: ["Acknowledge the feedback and thank the resident for their patience.", "Commend the front desk staff for maintaining good service quality and a clean facility despite the high volume."],
+    strategy: ["Review the specific service steps to identify minor bottlenecks that could be further streamlined.", "Ensure waiting areas remain well-ventilated and comfortable to maintain resident satisfaction during peak hours."]
   }
 };
 
