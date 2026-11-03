@@ -13,6 +13,8 @@ import SummaryDashboard from '../components/Feedback/SummaryDashboard';
 import FeedbackTable from '../components/Feedback/FeedbackTable';
 import ReviewModal from '../components/Feedback/ReviewModal';
 
+import { createUserNotification } from '../services/userNotifications';
+
 const SLA_HOURS = 72;
 const SLA_MS = SLA_HOURS * 60 * 60 * 1000;
 
@@ -90,6 +92,8 @@ export default function AdminFeedback() {
         return {
           docId: doc.id,
           ...data,
+          householdID: data.householdID || data.HouseholdID || "",
+          residentID: data.residentID || data.ResidentID || "",
           userName: data.userName || data.UserName || "Resident",
           comment: data.comment || data.Comment || "",
           rating: Number(data.rating || data.Rating || 0),
@@ -203,9 +207,10 @@ export default function AdminFeedback() {
     setIsModalOpen(true);
   };
 
-  // ─── OPTIMIZED: Zero-Read Local Cache Update ───
+  // ─── OPTIMIZED: Zero-Read Local Cache Update & Push Notification ───
   const handleSaveModal = async (docId, adminNote, newStatus) => {
     try {
+      // 1. Update the Feedback Document in Firestore
       const fbRef = doc(db, "feedback", docId);
       await updateDoc(fbRef, {
         adminNotes: adminNote,
@@ -215,6 +220,35 @@ export default function AdminFeedback() {
         processedAt: new Date()
       });
 
+      // 2. Trigger Real-Time & Expo Push Notification to the Resident
+      // We only fire a notification if the status actually changed and we have the routing IDs.
+      if (selectedFeedback && selectedFeedback.status !== newStatus && selectedFeedback.householdID) {
+        
+        let notifTitle = "Feedback Status Update";
+        let notifMessage = `Your feedback (Ref: ${selectedFeedback.referenceID}) has been updated to: ${newStatus.toUpperCase()}`;
+        
+        // Customize the message based on the exact status
+        if (newStatus === "under review") {
+          notifMessage = `Your feedback (Ref: ${selectedFeedback.referenceID}) is now under review by the barangay staff.`;
+        } else if (newStatus === "responded") {
+          notifMessage = `The barangay has responded to your feedback (Ref: ${selectedFeedback.referenceID}). Please check the portal.`;
+        } else if (newStatus === "resolved") {
+          notifTitle = "Feedback Resolved";
+          notifMessage = `Your feedback (Ref: ${selectedFeedback.referenceID}) has been marked as resolved. Thank you for your input!`;
+        }
+
+        // Call your existing service utility to write to 'user_notifications' and trigger Expo Push
+        await createUserNotification(
+          selectedFeedback.householdID, 
+          selectedFeedback.residentID || "household", // Fallback to household if residentID is missing
+          notifTitle, 
+          notifMessage, 
+          "general", // You can change this to a specific type like "feedback_update" if your mobile app filters them
+          selectedFeedback.referenceID
+        );
+      }
+
+      // 3. Update the React Query Cache (Zero-Read Update)
       queryClient.setQueryData(['adminManage_feedback'], (old = []) => 
         old.map(fb => fb.docId === docId ? { 
           ...fb, 
@@ -225,7 +259,8 @@ export default function AdminFeedback() {
         } : fb)
       );
 
-      await showAlert("Success", "Feedback updated successfully!");
+      // 4. Wrap up UI and Logging
+      await showAlert("Success", "Feedback updated and resident notified!");
       setIsModalOpen(false);
       logTransaction(
         adminName,
@@ -233,6 +268,7 @@ export default function AdminFeedback() {
         "Update Feedback",
         `Updated feedback (Ref: ${selectedFeedback?.referenceID || docId}) - New Status: ${newStatus}`
       );
+
     } catch (error) {
       console.error("Error updating feedback:", error);
       await showAlert("Error", "Failed to update feedback.");
