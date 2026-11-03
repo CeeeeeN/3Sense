@@ -111,7 +111,7 @@ export default function ManageServices() {
 
   const handleGenerateQR = (serviceName, category) => {
     const today = getTodayStr();
-    const base = "https://3-sense.vercel.app/";
+    const base = "https://www.3s-sense.site/";
     const url =
       `${base}?serviceId=${encodeURIComponent(serviceName.toLowerCase())}` +
       `&serviceName=${encodeURIComponent(serviceName)}` +
