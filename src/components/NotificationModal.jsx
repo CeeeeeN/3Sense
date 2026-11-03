@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 const NOTIF_ICONS = {
   document_update: { icon: "📄", bg: "rgba(232,160,32,0.12)" },
@@ -43,6 +43,8 @@ export default function NotificationModal({
   onDelete,
 }) {
   const [filter, setFilter] = useState("all");
+
+  const bottomBoundaryRef = useRef(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -163,6 +165,11 @@ export default function NotificationModal({
           ) : (
             filteredNotifs.map((n) => {
               const iconCfg = NOTIF_ICONS[n.type] || NOTIF_ICONS.general;
+
+              const itemStyle = n.isRead 
+                ? styles.item 
+                : { ...styles.item, ...styles.itemUnread };
+
               return (
                 <div
                   key={n.id}
@@ -220,6 +227,10 @@ export default function NotificationModal({
               );
             })
           )}
+          <div 
+            ref={bottomBoundaryRef} 
+            style={{ height: '20px', visibility: 'hidden' }}
+          />
         </div>
       </div>
     </div>
