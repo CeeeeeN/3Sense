@@ -1204,12 +1204,14 @@ export default function HouseholdManagement() {
         </div>
       )}
 
-      <AdminAddHouseholdPanel 
-        isOpen={showAddPanel} 
-        onClose={() => setShowAddPanel(false)} 
-        adminName={adminName} 
-        adminRole={adminRole} 
-      />
+      {showAddPanel && (
+        <AdminAddHouseholdPanel 
+          isOpen={showAddPanel} 
+          onClose={() => setShowAddPanel(false)} 
+          adminName={adminName} 
+          adminRole={adminRole} 
+        />
+      )}
       
     </AdminLayout>
   );

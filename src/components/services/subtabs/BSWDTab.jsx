@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { HeartIcon, ServiceMapPinIcon, SendIcon } from "../../Icons";
 import { submitBSWDReport, submitBSWDTip } from "../../../services/services";
 import { createNotification } from "../../../services/notifications";
+import { useLanguage } from "../../../context/LanguageContext";
 
 // ── SESSION HELPER ────────────────────────────────────────────────────────────
 const getSaved = (key, fallback) => {
@@ -9,21 +10,46 @@ const getSaved = (key, fallback) => {
   catch { return fallback; }
 };
 
+// ── Small icons ──────────────────────────────────────────────────────────────
+const sv = { width: 26, height: 26, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
+
+const ArrowRight = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+);
+const ArrowLeft = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+);
+const LockIcon = () => (
+  <svg {...sv}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+);
+const ClockIcon = () => (
+  <svg {...sv}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+);
+const PeopleIcon = () => (
+  <svg {...sv}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+);
+const CameraIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+);
+const BigCheck = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+);
+
+const BLANK_REPORT = { name: "", location: "", landmark: "", lastSeen: "", description: "", photo: "" };
+const BLANK_TIP = { about: "", tip: "", contact: "" };
+
 export default function BSWDTab({ userData, householdID }) {
-  const [reportForm, setReportForm] = useState({
-    name: "",
-    location: "",
-    landmark: "",
-    lastSeen: "",
-    description: "",
-    photo: ""
-  });
+  const { t } = useLanguage();
+  const [view, setView] = useState(null); // null | "report" | "tip"
+  const topRef = useRef(null);
+
+  const [reportForm, setReportForm] = useState(BLANK_REPORT);
   const [reportErrors, setReportErrors] = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [reportFile, setReportFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [tipForm, setTipForm] = useState({ about: "", tip: "", contact: "" });
+  const [tipForm, setTipForm] = useState(BLANK_TIP);
   const [tipSubmitted, setTipSubmitted] = useState(false);
   const [tipErrors, setTipErrors] = useState({});
   const [isTipSubmitting, setIsTipSubmitting] = useState(false);
@@ -37,13 +63,24 @@ export default function BSWDTab({ userData, householdID }) {
     }
   }, [userData]);
 
+  // Bring the person back to the top whenever the screen changes
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [view, reportSubmitted, tipSubmitted]);
+
   const setR = (k, v) => setReportForm(f => ({ ...f, [k]: v }));
   const setT = (k, v) => setTipForm(f => ({ ...f, [k]: v }));
 
+  const facts = [
+    { icon: <PeopleIcon />, label: t("bswd_fact_who_label"), value: t("bswd_fact_who_val") },
+    { icon: <LockIcon />,   label: t("bswd_fact_privacy_label"), value: t("bswd_fact_privacy_val") },
+    { icon: <ClockIcon />,  label: t("bswd_fact_next_label"), value: t("bswd_fact_next_val") },
+  ];
+
   const submitReport = async () => {
     const e = {};
-    if (!reportForm.location.trim()) e.location = "Location is required.";
-    if (!reportForm.description.trim()) e.description = "Please describe what you observed.";
+    if (!reportForm.location.trim()) e.location = t("bswd_rep_err_location");
+    if (!reportForm.description.trim()) e.description = t("bswd_rep_err_desc");
     if (Object.keys(e).length) { setReportErrors(e); return; }
 
     setIsSubmitting(true);
@@ -67,7 +104,7 @@ export default function BSWDTab({ userData, householdID }) {
         }
       }
 
-      // <-- EXTRACT & INJECT PERMANENT UID HERE
+      // Permanent UID
       const userUID = userData?.UID || getSaved("UID", null);
       const finalReportData = { ...reportForm, photo: finalPhotoUrl, UID: userUID };
 
@@ -87,7 +124,7 @@ export default function BSWDTab({ userData, householdID }) {
       setReportFile(null);
     } catch (err) {
       console.error("BSWD Report failed:", err);
-      setReportErrors({ submit: "Failed to submit report. Please try again." });
+      setReportErrors({ submit: t("bswd_rep_err_submit") });
     } finally {
       setIsSubmitting(false);
     }
@@ -95,14 +132,14 @@ export default function BSWDTab({ userData, householdID }) {
 
   const submitTip = async () => {
     const e = {};
-    if (!tipForm.about.trim()) e.about = "Please describe who this is about.";
-    if (!tipForm.tip.trim()) e.tip = "Please share what you know.";
+    if (!tipForm.about.trim()) e.about = t("bswd_tip_err_about");
+    if (!tipForm.tip.trim()) e.tip = t("bswd_tip_err_tip");
     if (Object.keys(e).length) { setTipErrors(e); return; }
 
     setIsTipSubmitting(true);
 
     try {
-      // <-- EXTRACT & INJECT PERMANENT UID HERE
+      // Permanent UID
       const userUID = userData?.UID || getSaved("UID", null);
       const finalTipData = { ...tipForm, UID: userUID };
 
@@ -120,188 +157,229 @@ export default function BSWDTab({ userData, householdID }) {
       setTipSubmitted(true);
     } catch (err) {
       console.error("BSWD Tip failed:", err);
-      setTipErrors({ submit: "Failed to send tip. Please try again." });
+      setTipErrors({ submit: t("bswd_tip_err_submit") });
     } finally {
       setIsTipSubmitting(false);
     }
   };
 
-  return (
-    <div className="bswd-page">
+  const BackButton = () => (
+    <button type="button" className="vz-back" onClick={() => setView(null)}>
+      <ArrowLeft /> {t("bswd_back_start")}
+    </button>
+  );
 
-      {/* ── HERO BANNER ── */}
-      <div className="svc-hero svc-hero--teal">
+  return (
+    <div className="bz-page">
+      {/* Title */}
+      <div className="svc-hero svc-hero--teal bz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>Social Welfare & Development</div>
-            <h2 className="svc-hero__title">Barangay Social Welfare and Development</h2>
-            <p className="svc-hero__abbr">BSWD</p>
-            <p className="svc-hero__sub">Providing social protection, welfare programs, and community development services to all residents of Barangay 3S+ Malanday.</p>
-            <div className="svc-hero__law">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              Coordinating with <strong>DSWD</strong> — Department of Social Welfare and Development
-            </div>
-          </div>
-          <div className="svc-hero__right">
-            <div className="svc-hero__hotline-pill">
-              <div className="svc-hero__hotline-item">
-                <span className="svc-hero__hotline-label">BSWD Hotline</span>
-                <a href="tel:044000000" className="svc-hero__hotline-num">(044) 000-0000</a>
-              </div>
-              <div className="svc-hero__hotline-sep" />
-              <div className="svc-hero__hotline-item">
-                <span className="svc-hero__hotline-label">DSWD National</span>
-                <a href="tel:8888" className="svc-hero__hotline-num">8-888</a>
-              </div>
-            </div>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><HeartIcon /></span>{t("bswd_eyebrow")}</div>
+            <h2 className="svc-hero__title">{t("bswd_hero_title")}</h2>
+            <p className="svc-hero__sub">{t("bswd_sub")}</p>
           </div>
         </div>
       </div>
 
-      {/* ── REPORT SECTION ── */}
-      <div className="bswd-section">
-        <div className="bswd-section__title"><ServiceMapPinIcon /> Report a Homeless or Displaced Person</div>
-        <p className="bswd-section__sub">If you see a homeless or displaced individual who may need assistance, please let us know.</p>
+      <div className="bz-wrap" ref={topRef}>
 
-        {reportSubmitted ? (
-          <div className="bswd-submitted">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-            <div>
-              <div className="bswd-submitted-title">Report Submitted</div>
-              <div className="bswd-submitted-sub">Thank you. Our BSWD officer will follow up within 24–48 hours.</div>
-            </div>
-            <button className="sv-btn-outline" style={{ fontSize: "0.75rem", padding: "0.4rem 0.9rem" }}
-              onClick={() => { setReportForm({ name: "", location: "", landmark: "", lastSeen: "", description: "", photo: "" }); setReportSubmitted(false); setReportFile(null); }}>
-              Submit Another
-            </button>
-          </div>
-        ) : (
-          <div className="bswd-form-card">
-
-            {/* 🆕 Reporting Tips Box */}
-            <div style={{ marginBottom: "1.25rem", padding: "1rem", background: "#f0f9ff", borderRadius: "8px", borderLeft: "4px solid #3b82f6", fontSize: "0.85rem", color: "#1e40af" }}>
-              <strong>💡 Pro-tip:</strong> Being specific helps our team find people faster. Mention nearby stores, street corners, and describe clothing colors or unique physical features.
-            </div>
-
-            <div className="dr-field-row dr-field-row--wrap">
-              <div className="dr-field">
-                <label className="sv-label">Your Name <span className="sv-optional">(Optional)</span></label>
-                <input className="sv-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder="Leave blank to stay anonymous" disabled={isSubmitting} />
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Main Location / Street <span className="sv-required">*</span></label>
-                <input className={`sv-input${reportErrors.location ? " sv-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder="e.g. McArthur Highway" disabled={isSubmitting} />
-                {reportErrors.location && <span className="sv-error-msg">{reportErrors.location}</span>}
-              </div>
-            </div>
-
-            {/* 🆕 Landmark and Last Seen fields */}
-            <div className="dr-field-row dr-field-row--wrap" style={{ marginTop: "0.75rem" }}>
-              <div className="dr-field">
-                <label className="sv-label">Nearby Landmark <span className="sv-optional">(Optional)</span></label>
-                <input className="sv-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder="e.g. Near 7-Eleven or Petron" disabled={isSubmitting} />
-              </div>
-              <div className="dr-field">
-                <label className="sv-label">Last Seen / Time <span className="sv-optional">(Optional)</span></label>
-                <input className="sv-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder="e.g. Corner of 5th St, 2:30 PM" disabled={isSubmitting} />
-              </div>
-            </div>
-
-            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">Description of Person & Concern <span className="sv-required">*</span></label>
-              <textarea className={`sv-textarea${reportErrors.description ? " sv-input--error" : ""}`} rows={3} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder="Describe clothing, age, and any immediate needs..." disabled={isSubmitting} />
-              {reportErrors.description && <span className="sv-error-msg">{reportErrors.description}</span>}
-            </div>
-
-            {reportErrors.submit && (
-              <div className="sv-error-msg" style={{ marginTop: "1rem", padding: "0.75rem", background: "#fef2f2", borderRadius: "8px" }}>
-                {reportErrors.submit}
-              </div>
-            )}
-
-            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">Photo <span className="sv-optional">(Optional)</span></label>
-              <label className="dr-upload-box" style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? "not-allowed" : "pointer" }}>
-                <input
-                  type="file" accept="image/*" style={{ display: "none" }} disabled={isSubmitting}
-                  onChange={e => {
-                    const file = e.target.files[0];
-                    if (file) { setReportFile(file); setR("photo", file.name); }
-                  }}
-                />
-                {reportForm.photo ? (
-                  <div className="dr-upload-done">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                    {reportForm.photo}
+        {/* ═════════ START SCREEN ═════════ */}
+        {view === null && (
+          <>
+            <section className="bz-glance" aria-label={t("bswd_fact_who_label")}>
+              {facts.map((f, i) => (
+                <div className="bz-fact" key={i}>
+                  <span className="bz-fact__icon bz-fact__icon--teal">{f.icon}</span>
+                  <div>
+                    <div className="bz-fact__label">{f.label}</div>
+                    <div className="bz-fact__value">{f.value}</div>
                   </div>
-                ) : (
-                  <div className="dr-upload-placeholder">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
-                    <span>Upload a photo</span>
-                    <span className="dr-upload-hint">Include surroundings to help identify the spot</span>
-                  </div>
-                )}
-              </label>
-            </div>
+                </div>
+              ))}
+            </section>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-              <button className="sv-btn-primary" onClick={submitReport} disabled={isSubmitting} style={{ opacity: isSubmitting ? 0.7 : 1 }}>
-                <SendIcon /> {isSubmitting ? "Uploading Report..." : "Submit Report"}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+            <section className="bz-card">
+              <h3 className="bz-heading">{t("bswd_choice_heading")}</h3>
+              <p className="bz-text">{t("bswd_choice_sub")}</p>
 
-      {/* ── TIP SECTION ── */}
-      <div className="bswd-section bswd-section--last">
-        <div className="bswd-section__title"><SendIcon /> Send a Tip or Additional Information</div>
-        <p className="bswd-section__sub">Do you have information about a homeless individual that could help us assist them?</p>
+              <div className="vz-choices">
+                <button type="button" className="vz-choice" onClick={() => setView("report")}>
+                  <span className="vz-choice__icon vz-choice__icon--teal"><ServiceMapPinIcon /></span>
+                  <span className="vz-choice__body">
+                    <span className="vz-choice__title">{t("bswd_choice_report_title")}</span>
+                    <span className="vz-choice__desc">{t("bswd_choice_report_desc")}</span>
+                  </span>
+                  <span className="vz-choice__arrow"><ArrowRight /></span>
+                </button>
 
-        {tipSubmitted ? (
-          <div className="bswd-submitted">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2DB17B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-            <div>
-              <div className="bswd-submitted-title">Tip Received</div>
-              <div className="bswd-submitted-sub">Your information has been forwarded to the BSWD officer. Thank you for caring.</div>
-            </div>
-            <button className="sv-btn-outline" style={{ fontSize: "0.75rem", padding: "0.4rem 0.9rem" }}
-              onClick={() => { setTipForm({ about: "", tip: "", contact: "" }); setTipSubmitted(false); }}>
-              Send Another
-            </button>
-          </div>
-        ) : (
-          <div className="bswd-form-card">
-            <div className="dr-field">
-              <label className="sv-label">Who is this about? <span className="sv-required">*</span></label>
-              <input className={`sv-input${tipErrors.about ? " sv-input--error" : ""}`} value={tipForm.about} onChange={e => setT("about", e.target.value)} placeholder="Name (if known), description, or case reference" disabled={isTipSubmitting} />
-              {tipErrors.about && <span className="sv-error-msg">{tipErrors.about}</span>}
-            </div>
-            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">What do you know? <span className="sv-required">*</span></label>
-              <textarea className={`sv-textarea${tipErrors.tip ? " sv-input--error" : ""}`} rows={3} value={tipForm.tip} onChange={e => setT("tip", e.target.value)} placeholder="Share any information that may help..." disabled={isTipSubmitting} />
-              {tipErrors.tip && <span className="sv-error-msg">{tipErrors.tip}</span>}
-            </div>
-            <div className="dr-field" style={{ marginTop: "0.75rem" }}>
-              <label className="sv-label">Your Contact <span className="sv-optional">(Optional)</span></label>
-              <input className="sv-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder="Phone or email — only if you wish to be contacted" disabled={isTipSubmitting} />
-            </div>
-
-            {tipErrors.submit && (
-              <div className="sv-error-msg" style={{ marginTop: "1rem", padding: "0.75rem", background: "#fef2f2", borderRadius: "8px" }}>
-                {tipErrors.submit}
+                <button type="button" className="vz-choice" onClick={() => setView("tip")}>
+                  <span className="vz-choice__icon vz-choice__icon--green"><SendIcon /></span>
+                  <span className="vz-choice__body">
+                    <span className="vz-choice__title">{t("bswd_choice_tip_title")}</span>
+                    <span className="vz-choice__desc">{t("bswd_choice_tip_desc")}</span>
+                  </span>
+                  <span className="vz-choice__arrow"><ArrowRight /></span>
+                </button>
               </div>
-            )}
+            </section>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-              <button className="sv-btn-primary" onClick={submitTip} disabled={isTipSubmitting} style={{ opacity: isTipSubmitting ? 0.7 : 1 }}>
-                <SendIcon /> {isTipSubmitting ? "Sending Tip..." : "Send Tip"}
-              </button>
-            </div>
-          </div>
+            <section className="bz-card bz-card--about">
+              <h3 className="bz-heading">{t("bswd_about_heading")}</h3>
+              <p className="bz-text">{t("bswd_about_desc")}</p>
+              <div className="bz-legal">{t("bswd_legal")}</div>
+            </section>
+          </>
         )}
-      </div>
 
+        {/* ═════════ REPORT ═════════ */}
+        {view === "report" && (
+          <section className="bz-card">
+            <BackButton />
+
+            {reportSubmitted ? (
+              <div className="bf-done">
+                <span className="bf-done__icon"><BigCheck /></span>
+                <h3 className="bz-heading">{t("bswd_rep_done_heading")}</h3>
+                <p className="bz-text">{t("bswd_rep_done_sub")}</p>
+                <div className="bf-done__btns">
+                  <button type="button" className="bf-secondary" onClick={() => { setReportForm(BLANK_REPORT); setReportSubmitted(false); setReportFile(null); }}>
+                    {t("bswd_rep_btn_another")}
+                  </button>
+                  <button type="button" className="bf-secondary" onClick={() => { setReportForm(BLANK_REPORT); setReportSubmitted(false); setReportFile(null); setView(null); }}>
+                    {t("bswd_rep_btn_done")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="bz-heading">{t("bswd_rep_form_heading")}</h3>
+                <p className="bz-text">{t("bswd_rep_form_sub")}</p>
+
+                <div className="bz-note bf-tip">
+                  <strong>{t("bswd_rep_tip_strong")}</strong> {t("bswd_rep_tip_text")}
+                </div>
+
+                <div className="bf-form">
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-location">{t("bswd_rep_lbl_location")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <input id="bf-location" className={`bf-input${reportErrors.location ? " bf-input--error" : ""}`} value={reportForm.location} onChange={e => setR("location", e.target.value)} placeholder={t("bswd_rep_ph_location")} disabled={isSubmitting} />
+                    {reportErrors.location && <div className="bf-error">{reportErrors.location}</div>}
+                  </div>
+
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-landmark">{t("bswd_rep_lbl_landmark")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-landmark" className="bf-input" value={reportForm.landmark} onChange={e => setR("landmark", e.target.value)} placeholder={t("bswd_rep_ph_landmark")} disabled={isSubmitting} />
+                  </div>
+
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-lastseen">{t("bswd_rep_lbl_lastseen")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-lastseen" className="bf-input" value={reportForm.lastSeen} onChange={e => setR("lastSeen", e.target.value)} placeholder={t("bswd_rep_ph_lastseen")} disabled={isSubmitting} />
+                  </div>
+
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-desc">{t("bswd_rep_lbl_desc")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <textarea id="bf-desc" className={`bf-textarea${reportErrors.description ? " bf-input--error" : ""}`} rows={4} value={reportForm.description} onChange={e => setR("description", e.target.value)} placeholder={t("bswd_rep_ph_desc")} disabled={isSubmitting} />
+                    {reportErrors.description && <div className="bf-error">{reportErrors.description}</div>}
+                  </div>
+
+                  <div className="bf-field">
+                    <div className="bf-label">{t("bswd_rep_lbl_photo")} <span className="bf-pill">{t("bswd_pill_optional")}</span></div>
+                    <label className={`bf-photo${reportForm.photo ? " is-filled" : ""}`} style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? "not-allowed" : "pointer" }}>
+                      <input
+                        type="file" accept="image/*" style={{ display: "none" }} disabled={isSubmitting}
+                        onChange={e => {
+                          const file = e.target.files[0];
+                          if (file) { setReportFile(file); setR("photo", file.name); }
+                        }}
+                      />
+                      <CameraIcon />
+                      <span className="bf-photo__text">
+                        {reportForm.photo ? (
+                          <>
+                            <strong>{t("bswd_rep_photo_added")}</strong>
+                            <small>{reportForm.photo} · {t("bswd_rep_photo_change")}</small>
+                          </>
+                        ) : (
+                          <>
+                            <strong>{t("bswd_rep_photo_add")}</strong>
+                            <small>{t("bswd_rep_photo_hint")}</small>
+                          </>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-name">{t("bswd_rep_lbl_name")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-name" className="bf-input" value={reportForm.name} onChange={e => setR("name", e.target.value)} placeholder={t("bswd_rep_ph_name")} disabled={isSubmitting} />
+                  </div>
+
+                  {reportErrors.submit && <div className="bf-alert">{reportErrors.submit}</div>}
+
+                  <button type="button" className="bf-submit" onClick={submitReport} disabled={isSubmitting}>
+                    <SendIcon /> {isSubmitting ? t("bswd_rep_btn_submitting") : t("bswd_rep_btn_submit")}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ═════════ TIP ═════════ */}
+        {view === "tip" && (
+          <section className="bz-card">
+            <BackButton />
+
+            {tipSubmitted ? (
+              <div className="bf-done">
+                <span className="bf-done__icon"><BigCheck /></span>
+                <h3 className="bz-heading">{t("bswd_tip_done_heading")}</h3>
+                <p className="bz-text">{t("bswd_tip_done_sub")}</p>
+                <div className="bf-done__btns">
+                  <button type="button" className="bf-secondary" onClick={() => { setTipForm(BLANK_TIP); setTipSubmitted(false); }}>
+                    {t("bswd_tip_btn_more")}
+                  </button>
+                  <button type="button" className="bf-secondary" onClick={() => { setTipForm(BLANK_TIP); setTipSubmitted(false); setView(null); }}>
+                    {t("bswd_tip_btn_done")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="bz-heading">{t("bswd_tip_form_heading")}</h3>
+                <p className="bz-text">{t("bswd_tip_form_sub")}</p>
+
+                <div className="bf-form">
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-about">{t("bswd_tip_lbl_about")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <input id="bf-about" className={`bf-input${tipErrors.about ? " bf-input--error" : ""}`} value={tipForm.about} onChange={e => setT("about", e.target.value)} placeholder={t("bswd_tip_ph_about")} disabled={isTipSubmitting} />
+                    {tipErrors.about && <div className="bf-error">{tipErrors.about}</div>}
+                  </div>
+
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-tip">{t("bswd_tip_lbl_tip")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                    <textarea id="bf-tip" className={`bf-textarea${tipErrors.tip ? " bf-input--error" : ""}`} rows={4} value={tipForm.tip} onChange={e => setT("tip", e.target.value)} placeholder={t("bswd_tip_ph_tip")} disabled={isTipSubmitting} />
+                    {tipErrors.tip && <div className="bf-error">{tipErrors.tip}</div>}
+                  </div>
+
+                  <div className="bf-field">
+                    <label className="bf-label" htmlFor="bf-contact">{t("bswd_tip_lbl_contact")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                    <input id="bf-contact" className="bf-input" value={tipForm.contact} onChange={e => setT("contact", e.target.value)} placeholder={t("bswd_tip_ph_contact")} disabled={isTipSubmitting} />
+                  </div>
+
+                  {tipErrors.submit && <div className="bf-alert">{tipErrors.submit}</div>}
+
+                  <button type="button" className="bf-submit" onClick={submitTip} disabled={isTipSubmitting}>
+                    <SendIcon /> {isTipSubmitting ? t("bswd_tip_btn_submitting") : t("bswd_tip_btn_submit")}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+      </div>
     </div>
   );
 }

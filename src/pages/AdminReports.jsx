@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, collectionGroup } from "firebase/fir
 import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../services/logger";
-import { useQuery } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery } from '@tanstack/react-query';
 
 import barangayLogo from "./barangay-logo.jpg";
 
@@ -28,7 +28,6 @@ const getImageFormat = (src) => {
 };
 
 export default function Reports() {
-  // ── State ────────────────────────────────────────────────────────────────────
   const [reportType, setReportType] = useState("demographics");
   
   const [exportLoading, setExportLoading] = useState(false);
@@ -50,7 +49,6 @@ export default function Reports() {
     setRbiAPage(1);
   }, [sortRbiA, rbiARowsPerPage]);
 
-  // ─── OPTIMIZED: Fetch Admin Profile from Session Cache (0 Reads) ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -65,7 +63,7 @@ export default function Reports() {
     return () => unsubscribe();
   }, []);
 
-  // ─── 1. LAZY LOADED: Residents Data (Shared by Demographics & RBI) ───
+  // 1. Residents Data
   const { data: residentData = [], isLoading: loadingResidents } = useQuery({
     queryKey: ['adminManage_reportResidents'],
     queryFn: async () => {
@@ -102,16 +100,16 @@ export default function Reports() {
           educationStatus: d.educationStatus || "",
           employmentStatus: d.employmentStatus || "",
           role: d.role || "",
+          isHead: d.isHead || d.isHouseholdHead || false,
           categories: d.categories || {},
         };
       });
     },
-    // Only load if the admin is looking at a tab that requires residents
     enabled: reportType === 'demographics' || reportType === 'rbi-a' || reportType === 'rbi-c',
-    staleTime: 1000 * 60 * 30, // 30 mins
+    staleTime: 1000 * 60 * 30,
   });
 
-  // ─── 2. LAZY LOADED: Households Data (For RBI Form A & C) ───
+  // 2. Households Data
   const { data: householdData = [], isLoading: loadingHouseholds } = useQuery({
     queryKey: ['adminManage_reportHouseholds'],
     queryFn: async () => {
@@ -124,6 +122,7 @@ export default function Reports() {
           householdAddress: [d.houseNumber, d.street, d.barangay].filter(Boolean).join(", "),
           totalMembers: d.totalMembers || 0,
           householdClassification: d.householdClassification || "",
+          headName: d.headName || d.householdHead || d.headOfHousehold || "",
           barangay: d.barangay || "Malanday",
           city: d.city || "Valenzuela City",
         };
@@ -133,7 +132,7 @@ export default function Reports() {
     staleTime: 1000 * 60 * 30,
   });
 
-  // ─── 3. LAZY LOADED: VAWC Data ───
+  // 3. VAWC Data
   const { data: vawcData = [] } = useQuery({
     queryKey: ['adminManage_reportVawc'],
     queryFn: async () => {
@@ -147,7 +146,6 @@ export default function Reports() {
   const loading = reportType === 'demographics' ? loadingResidents :
                   reportType === 'rbi-a' || reportType === 'rbi-c' ? (loadingResidents || loadingHouseholds) : false;
 
-  // ── Demographics Calculations ───────────────────────────────────────────────
   const filteredResidents = useMemo(() => {
     let result = residentData;
     if (sexFilter !== "all") {
@@ -182,7 +180,6 @@ export default function Reports() {
     return counts;
   }, [residentData]);
 
-  // ── RBI Form C age brackets ─────────────────────────────────────────────────
   const AGE_BRACKETS = [
     { label: "0–1 yrs old (Infant)", min: 0, max: 1 },
     { label: "2–5 yrs old (Toddler)", min: 2, max: 5 },
@@ -277,16 +274,31 @@ export default function Reports() {
     return { ageBrackets, sectors, civilStatuses, citizenshipRows };
   }, [residentData]);
 
-  // ── RBI Form A Data ──────────────────────────────────────────────────────────
+  // ── FIX FOR BUG A19: Robust Head of Household Identification ────────────────
   const rbiFormAData = useMemo(() => {
     return householdData
       .map((hh) => {
         const members = residentData.filter((r) => r.householdID === hh.householdID);
-        const head = members.find((m) => m.role === "head");
+        
+        // Multi-check strategy for Household Head
+        let head = members.find((m) => 
+          (m.role && m.role.toLowerCase() === "head") || 
+          m.isHead === true ||
+          m.isHouseholdHead === true
+        );
+
+        // Fallback: Check if household document itself stores head name
+        let headFullName = head ? head.fullName : (hh.headName || "");
+
+        // Ultimate Fallback: Default to first member if no head is tagged
+        if (!headFullName && members.length > 0) {
+          headFullName = members[0].fullName;
+        }
+
         return {
           ...hh,
           members,
-          headName: head ? head.fullName : "",
+          headName: headFullName || "—",
         };
       })
       .sort((a, b) => {
@@ -340,7 +352,6 @@ export default function Reports() {
     return { total, gender, age, violence, perpetrator, actions };
   }, [vawcData]);
 
-  // ── VAWC CSV Export ──
   const handleExportVawcCSV = () => {
     const headers = [
       "Total VAC Victims", "Male", "Female",
@@ -375,7 +386,6 @@ export default function Reports() {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "landscape" });
       const pageW = doc.internal.pageSize.width;
-      const pageH = doc.internal.pageSize.height;
       let y = 14;
 
       const logoImg = await loadImage(barangayLogo);
@@ -395,13 +405,11 @@ export default function Reports() {
       doc.setFont("helvetica", "normal"); doc.setFontSize(8);
       doc.text(`Covered Period: As of ${new Date().toLocaleDateString("en-PH")} | National Capital Region`, pageW / 2, y, { align: "center" }); y += 8;
 
-      // Render Table Structure
       const s = vawcStats;
       doc.setFontSize(6.5); doc.setFont("helvetica", "bold");
       doc.setFillColor(240, 244, 248);
       doc.rect(14, y, pageW - 28, 14, "F");
 
-      // Super Headers
       doc.rect(14, y, 22, 14); doc.text("BARANGAY", 16, y + 9);
       doc.rect(36, y, 16, 14); doc.text("VAC VICTIMS (1)", 37, y + 9);
       doc.rect(52, y, 16, 7);  doc.text("GENDER (2)", 54, y + 5);
@@ -410,7 +418,6 @@ export default function Reports() {
       doc.rect(148, y, 56, 7); doc.text("PERPETRATORS (5)", 166, y + 5);
       doc.rect(204, y, pageW - 204 - 14, 7); doc.text("ACTIONS TAKEN BY THE BARANGAY / BCPC (6)", 218, y + 5);
 
-      // Sub Headers
       const subY = y + 7;
       doc.setFontSize(5);
       doc.rect(52, subY, 8, 7); doc.text("M", 55, subY + 5);
@@ -444,7 +451,6 @@ export default function Reports() {
 
       y += 14;
 
-      // Data Row
       doc.setFont("helvetica", "normal"); doc.setFontSize(7);
       const rowH = 8;
       doc.rect(14, y, 22, rowH); doc.text("MALANDAY", 16, y + 5.5);
@@ -693,7 +699,12 @@ export default function Reports() {
         if (m.categories?.isOFW) cats.push("OFW");
         if (m.categories?.isSoloParent) cats.push("Solo Parent");
         if (m.categories?.isIP) cats.push("IP");
-        if (m.employmentStatus === "Unemployed") cats.push("Unemployed");
+
+        // Fix Bug A20: Include Employed alongside Unemployed and other employment statuses
+        if (m.employmentStatus) {
+          cats.push(m.employmentStatus);
+        }
+
         if (m.educationStatus === "Out of School" && m.age >= 6 && m.age <= 14) cats.push("OSC");
         if (m.educationStatus === "Out of School" && m.age >= 15 && m.age <= 24) cats.push("OSY");
         const catStr = cats.join(", ") || "—";
@@ -1151,23 +1162,22 @@ export default function Reports() {
                         <tr>{["Household ID", "Household Address", "No. of Members", "Head of Household", "Members Preview"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                       </thead>
                       <tbody>
-                        {paginatedRbiA.map((hh) => {
-                          const head = hh.members.find((m) => m.role === "head");
-                          return (
-                            <tr key={hh.id}>
-                              <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace" }}><strong>{hh.householdID}</strong></td>
-                              <td style={tdStyle}>{hh.householdAddress || "—"}</td>
-                              <td style={{ ...tdStyle, textAlign: "center", fontWeight: 600 }}>{hh.members.length}</td>
-                              <td style={{ ...tdStyle, fontWeight: 500 }}>{head ? head.fullName : "—"}</td>
-                              <td style={tdStyle}>
-                                <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                                  {hh.members.slice(0, 3).map((m) => m.fullName).join(", ")}
-                                  {hh.members.length > 3 && ` +${hh.members.length - 3} more`}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {paginatedRbiA.map((hh) => (
+                          <tr key={hh.id}>
+                            <td style={{ ...tdStyle, fontFamily: "'JetBrains Mono', monospace" }}><strong>{hh.householdID}</strong></td>
+                            <td style={tdStyle}>{hh.householdAddress || "—"}</td>
+                            <td style={{ ...tdStyle, textAlign: "center", fontWeight: 600 }}>{hh.members.length}</td>
+                            <td style={{ ...tdStyle, fontWeight: 600, color: hh.headName !== "—" ? "#111827" : "#9ca3af" }}>
+                              {hh.headName}
+                            </td>
+                            <td style={tdStyle}>
+                              <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                                {hh.members.slice(0, 3).map((m) => m.fullName).join(", ")}
+                                {hh.members.length > 3 && ` +${hh.members.length - 3} more`}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -1391,7 +1401,6 @@ export default function Reports() {
                 </div>
               </div>
 
-              {/* Official Document Matrix */}
               <div className="req-table-wrapper" style={{ overflowX: "auto", border: "1px solid #cbd5e1", borderRadius: "8px" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "center" }}>
                   <thead>
@@ -1405,21 +1414,17 @@ export default function Reports() {
                       <th colSpan="6" style={{ ...thStyle, textAlign: "center" }}>ACTIONS TAKEN BY THE BARANGAY / BCPC<br />(6)</th>
                     </tr>
                     <tr style={{ background: "#f8fafc", fontSize: "10px", borderBottom: "2px solid #cbd5e1" }}>
-                      {/* Gender */}
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>M</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>F</th>
-                      {/* Age */}
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>0-4 (3a)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>5-9 (3b)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>10-14 (3c)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>15-17 (3d)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>18+ Dis</th>
-                      {/* Types */}
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Phys (4a)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Sex (4b)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Psych (4c)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Negl (4d)</th>
-                      {/* Perpetrators */}
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Imm (5a)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Close (5b)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Acq (5c)</th>
@@ -1427,7 +1432,6 @@ export default function Reports() {
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Offc (5e)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Law (5f)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Othr (5g)</th>
-                      {/* Actions */}
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>LSWDO (6a)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>PNP (6b)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>NBI (6c)</th>

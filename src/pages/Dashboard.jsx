@@ -51,8 +51,8 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
         <div className="db-popup-scroll">
           <div className="db-popup-header">
             <div className="db-popup-tags">
-              <span className={`ann-row__cat-tag ${ann.catClass || "db-cat-service"}`}>{ann.announcementCategory || "General"}</span>
-              <span className="db-popup-badge" style={{ background: `${annColor}1A`, color: annColor, marginLeft: '8px' }}>Target: {ann.category}</span>
+              <span className={`ann-row__cat-tag ${ann.catClass || "db-cat-service"}`}>{ann.announcementCategory || t('dashboard_general', 'General')}</span>
+              <span className="db-popup-badge" style={{ background: `${annColor}1A`, color: annColor, marginLeft: '8px' }}>{t('dashboard_target_prefix', 'Target: ')}{ann.category}</span>
             </div>
             <h2 className="db-popup-title">{ann.title}</h2>
             <p className="db-popup-desc" style={{ whiteSpace: 'pre-wrap' }}>{ann.description}</p>
@@ -112,7 +112,7 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
           <div className="db-popup-header">
             <div className="db-popup-tags">
               <span className="db-popup-badge" style={{ background: "rgba(49,125,137,0.1)", color: "#317D89" }}>
-                {announcements.length} Announcements
+                {t('dashboard_ann_count', announcements.length)}
               </span>
             </div>
             <h2 className="db-popup-title">{t('dashboard_all_ann')}</h2>
@@ -123,7 +123,7 @@ function AllAnnouncementsPopup({ announcements, onClose, onSelectAnn }) {
               <button key={ann.id} className="db-popup-ann-row" onClick={() => onSelectAnn(ann)}>
                 <div className="db-popup-ann-body">
                   <div className="db-popup-ann-top">
-                    {ann.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48", marginRight: '8px' }}>ALERT</span>}
+                    {ann.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48", marginRight: '8px' }}>{t('dashboard_alert_badge', 'ALERT')}</span>}
                     <span className={`ann-row__cat-tag ${ann.catClass || "db-cat-service"}`}>{ann.announcementCategory}</span>
                     <span className="db-popup-ann-date">{ann.date}</span>
                   </div>
@@ -170,10 +170,10 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
   const accentColor  = isUnreturned ? '#c2410c' : '#dc2626';
   const accentLight  = isUnreturned ? '#fff7ed' : '#fef2f2';
   const accentBorder = isUnreturned ? '#fed7aa' : '#fecaca';
-  const badgeLabel   = isUnreturned ? 'Unreturned' : 'Overdue';
+  const badgeLabel   = isUnreturned ? t('status_unreturned') : t('status_overdue');
   const warningText  = isUnreturned
-    ? 'The Barangay has formally reported this equipment as unreturned. Please visit the Barangay Hall immediately to resolve this matter.'
-    : 'Return date has passed. Please return the equipment to the Barangay Hall as soon as possible to avoid further penalties.';
+    ? t('dashboard_unreturned_msg')
+    : t('dashboard_overdue_msg');
 
   return (
     <div
@@ -361,6 +361,7 @@ function SubLabel({ icon, label }) {
 const ITEMS_PER_PAGE = 4;
 
 function PaginationBar({ current, total, onChange }) {
+  const { t } = useLanguage();
   if (total <= 1) return null;
   return (
     <div className="db-pagination">
@@ -368,7 +369,7 @@ function PaginationBar({ current, total, onChange }) {
         className="db-pagination__btn"
         disabled={current === 1}
         onClick={() => onChange(current - 1)}
-        aria-label="Previous page"
+        aria-label={t('aria_prev_page', 'Previous page')}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
       </button>
@@ -378,7 +379,7 @@ function PaginationBar({ current, total, onChange }) {
             key={p}
             className={`db-pagination__dot${p === current ? ' db-pagination__dot--active' : ''}`}
             onClick={() => onChange(p)}
-            aria-label={`Page ${p}`}
+            aria-label={t('aria_page_num', p)}
           >
             {p}
           </button>
@@ -388,7 +389,7 @@ function PaginationBar({ current, total, onChange }) {
         className="db-pagination__btn"
         disabled={current === total}
         onClick={() => onChange(current + 1)}
-        aria-label="Next page"
+        aria-label={t('aria_next_page', 'Next page')}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
       </button>
@@ -399,16 +400,16 @@ function PaginationBar({ current, total, onChange }) {
 // ── Helpers for Alerts & Announcements ──
 const getPostedAt = (a) => a.createdAt?.toDate?.() || a.time || null; // adjust to your field name
 
-const timeAgo = (value) => {
+const timeAgo = (value, translate) => {
   const t = new Date(value).getTime();
   if (!value || isNaN(t)) return "";
   const m = Math.floor((Date.now() - t) / 60000);
-  if (m < 1) return "Just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return translate ? translate('just_now') : "Just now";
+  if (m < 60) return translate ? translate('time_mins_ago', m) : `${m}m ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return translate ? translate('time_hours_ago', h) : `${h}h ago`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
+  if (d < 7) return translate ? translate('time_days_ago', d) : `${d}d ago`;
   return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
@@ -836,8 +837,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                         </div>
                         <div className="alert-card__body">
                           <div className="alert-card__meta">
-                            {isRecent(posted) && <span className="alert-card__new">New</span>}
-                            <span>{timeAgo(posted)}</span>
+                            {isRecent(posted) && <span className="alert-card__new">{t('dashboard_new_badge', 'New')}</span>}
+                            <span>{timeAgo(posted, t)}</span>
                           </div>
                           <div className="alert-card__title">{a.title}</div>
                           <div className="alert-card__desc" style={{
@@ -883,7 +884,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                     className={`ann-chip${annFilter === opt ? " ann-chip--active" : ""}`}
                     onClick={() => { setAnnFilter(opt); setAnnPage(1); }}
                   >
-                    {opt}
+                    {opt === "All" ? t('filter_all', 'All') : opt}
                   </button>
                 ))}
               </div>
@@ -900,7 +901,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
             ) : (
               <>
                 <div className="ann-table-header">
-                  {["TITLE", "DATE", "CATEGORY", ""].map((h, i) => (
+                  {[t('dashboard_th_title', 'TITLE'), t('dashboard_th_date', 'DATE'), t('dashboard_th_category', 'CATEGORY'), ""].map((h, i) => (
                     <div key={i} className="ann-table-header__cell">{h}</div>
                   ))}
                 </div>
@@ -914,7 +915,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                     <div className="ann-row__body">
                       <div className="ann-row__title-line">
                         <span className="ann-row__title">{a.title}</span>
-                        {a.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48" }}>ALERT</span>}
+                        {a.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48" }}>{t('dashboard_alert_badge', 'ALERT')}</span>}
                       </div>
                       <div className="ann-row__desc" style={{
                         display: '-webkit-box',
@@ -926,7 +927,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                     </div>
                     <div className="ann-row__date">
                       {isRecent(getPostedAt(a)) && <span className="ann-row__fresh" />}
-                      {timeAgo(getPostedAt(a)) || a.date}
+                      {timeAgo(getPostedAt(a), t) || a.date}
                     </div>
                     <div className="ann-row__cat">
                       <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
