@@ -58,7 +58,9 @@ export default function VAWCTab() {
   const topRef = useRef(null);
 
   // Bring the person back to the top of the content whenever the screen changes
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [view]);
 

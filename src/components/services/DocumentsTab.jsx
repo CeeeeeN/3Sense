@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
@@ -7,7 +7,6 @@ import { useAlert } from "../../context/AlertContext";
 import { useLanguage } from "../../context/LanguageContext";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
-const STEP_LABELS = ["Select Document", "Personal Details", "Review", "Done"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const getSaved = (key, fallback) => {
@@ -31,55 +30,49 @@ const formatSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const Ico = ({ size = 22, children }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+);
+const ICONS = {
+  doc:     <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
+  warning: <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
+  upload:  <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>,
+  check:   <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>,
+  phone:   <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></>,
+  clock:   <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+  close:   <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
+};
+const ArrowRight = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+);
+const ArrowLeft = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+);
+const BigCheck = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+);
+
+// ── Validity reminder (big yellow notice, can be dismissed) ───────────────────
 function ValidityReminderBanner() {
   const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "flex-start",
-      gap: "12px",
-      background: "#fffbeb",
-      border: "1px solid #fcd34d",
-      borderRadius: "10px",
-      padding: "10px 14px",
-      marginBottom: "0.75rem",
-      fontSize: "14px",
-      color: "#92400e",
-    }}>
-      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <line x1="12" y1="9" x2="12" y2="13" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-      <div style={{ flex: 1 }}>
-        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
-          {t("doc_validity_title", "Document Validity Reminder")}
-        </strong>
+    <div className="bz-note dz-banner">
+      <span className="dz-banner__icon"><Ico size={26}>{ICONS.warning}</Ico></span>
+      <div className="dz-banner__text">
+        <strong>{t("doc_validity_title", "Document Validity Reminder")}</strong>
         {t("doc_validity_desc", "Barangay documents issued through this system are valid for 6 months from the date of issuance. Please ensure you use your document within this period. After expiry, a new request will be required.")}
       </div>
-      <button
-        onClick={() => setDismissed(true)}
-        aria-label={t("close", "Dismiss reminder")}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "#92400e",
-          padding: "0",
-          flexShrink: 0,
-          lineHeight: 1,
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
+      <button type="button" className="dz-banner__x" onClick={() => setDismissed(true)} aria-label={t("close", "Dismiss reminder")}>
+        <Ico size={22}>{ICONS.close}</Ico>
       </button>
     </div>
   );
 }
 
+// ── Steps ─────────────────────────────────────────────────────────────────────
 function StepIndicator({ step, onStepClick }) {
   const { t } = useLanguage();
   const stepLabels = [
@@ -90,7 +83,7 @@ function StepIndicator({ step, onStepClick }) {
   ];
 
   return (
-    <ol className="dr-steps" aria-label={t("doc_request_progress", "Request progress")}>
+    <ol className="lv-steps lv-steps--4" aria-label={t("doc_request_progress", "Request progress")}>
       {stepLabels.map((label, i) => {
         const num = i + 1;
         const finished = step === 4;
@@ -104,18 +97,15 @@ function StepIndicator({ step, onStepClick }) {
           : {};
 
         return (
-          <li key={label} className="dr-step-item" aria-current={active ? "step" : undefined}>
-            <Node className={`dr-step-node${clickable ? " dr-step-node--link" : ""}`} {...nodeProps}>
-              <span className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
+          <li key={label} className="lv-steps__li" aria-current={active ? "step" : undefined}>
+            <Node className={`lv-steps__item lv-steps__node${done ? " is-done" : active ? " is-active" : ""}${clickable ? " is-link" : ""}`} {...nodeProps}>
+              <span className="lv-steps__dot">
                 {done
-                  ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   : num}
               </span>
-              <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
+              <span className="lv-steps__label">{label}</span>
             </Node>
-            {i < stepLabels.length - 1 && (
-              <span className={`dr-step-line${done ? " dr-step-line--done" : ""}`} aria-hidden="true" />
-            )}
           </li>
         );
       })}
@@ -123,40 +113,53 @@ function StepIndicator({ step, onStepClick }) {
   );
 }
 
-function Step1({ docTypes, selected, onSelect }) {
+// ── Step 1: choose a document ─────────────────────────────────────────────────
+function Step1({ docTypes, selected, onSelect, error }) {
   const { t } = useLanguage();
   return (
-    <div className="dr-step1">
-      <p className="dr-step-hint">{t("doc_step1_hint", "Select the document you need. You must choose one to proceed.")}</p>
-      <div className="dr-doc-list">
-        {docTypes.map(d => (
-          <button
-            key={d.id}
-            className={`dr-doc-row${selected?.id === d.id ? " dr-doc-row--selected" : ""}`}
-            onClick={() => onSelect(d)}
-          >
-            <div className="dr-doc-row__icon">{d.icon || <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}</div>
-            <div className="dr-doc-row__body">
-              <div className="dr-doc-row__name">{d.documentName || d.title || d.name}</div>
-              <div className="dr-doc-row__desc">{d.description || d.desc}</div>
-            </div>
-            <div className="dr-doc-row__meta">
-              <span className="dr-doc-row__fee">{d.fee}</span>
-              <span className="dr-doc-row__days">{d.processingTime || d.days}</span>
-            </div>
-            <div className="dr-doc-row__check">
-              {selected?.id === d.id
-                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-              }
-            </div>
-          </button>
-        ))}
+    <section className="bz-card">
+      <h3 className="bz-heading">Choose the document you need</h3>
+      <p className="bz-text">{t("doc_step1_hint", "Select the document you need. You must choose one to proceed.")}</p>
+
+      <div className="dz-docs" role="radiogroup" aria-label="Documents">
+        {docTypes.map(d => {
+          const isSel = selected?.id === d.id;
+          const fee = d.fee;
+          const days = d.processingTime || d.days;
+          return (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={isSel}
+              key={d.id}
+              className={`dz-doc${isSel ? " is-active" : ""}`}
+              onClick={() => onSelect(d)}
+            >
+              <span className="dz-doc__icon">{d.icon || <Ico size={26}>{ICONS.doc}</Ico>}</span>
+              <span className="dz-doc__body">
+                <span className="dz-doc__name">{d.documentName || d.title || d.name}</span>
+                <span className="dz-doc__desc">{d.description || d.desc}</span>
+                {(fee || days) && (
+                  <span className="dz-doc__pills">
+                    {fee ? <span className="dz-pill dz-pill--fee">{fee}</span> : null}
+                    {days ? <span className="dz-pill">{days}</span> : null}
+                  </span>
+                )}
+              </span>
+              <span className="dz-doc__check">
+                {isSel && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+              </span>
+            </button>
+          );
+        })}
       </div>
-    </div>
+
+      {error && <div className="bf-error" style={{ marginTop: "0.8rem" }}>{error}</div>}
+    </section>
   );
 }
 
+// ── Step 2: your details ──────────────────────────────────────────────────────
 function Step2({ docType, form, setForm, errors }) {
   const { t } = useLanguage();
   const { showAlert } = useAlert();
@@ -204,185 +207,198 @@ function Step2({ docType, form, setForm, errors }) {
   const isPdf = form.validIdFile?.type === "application/pdf" || /\.pdf$/i.test(form.validId || "");
   const isOther = form.purposeOption === "Other";
 
+  const Req = () => <span className="bf-pill bf-pill--req">Required</span>;
+  const Opt = () => <span className="bf-pill">Optional</span>;
+
   return (
-    <div className="dr-step2">
+    <section className="bz-card">
+      <h3 className="bz-heading">Your details</h3>
+      <p className="bz-text">Check that your information is correct. Fill in anything that is empty.</p>
+
       {docType && (
-        <div className="dr-doc-selected-banner">
-          <span className="dr-doc-selected-icon">{docType.icon}</span>
-          <div>
-            <div className="dr-doc-selected-name">{docType.documentName || docType.title || docType.name}</div>
-            {(docType.reminder || docType.note) && <div className="dr-doc-selected-note">{docType.reminder || docType.note}</div>}
+        <div className="lv-chosen">
+          <div className="lv-chosen__label">You are requesting</div>
+          <div className="lv-chosen__title">
+            {docType.icon ? <span className="dz-chosen-icon">{docType.icon}</span> : null}
+            {docType.documentName || docType.title || docType.name}
           </div>
+          {(docType.reminder || docType.note) && <div className="dz-chosen-note">{docType.reminder || docType.note}</div>}
         </div>
       )}
 
-      {/* ── Personal information ── */}
-      <section className="dr-card">
-        <div className="dr-card__title">Personal Information</div>
-        <div className="dr-grid">
-          <div className="dr-field">
-            <label className="sv-label">First Name <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.firstName ? " sv-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
-            {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Middle Name</label>
-            <input className="sv-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Last Name <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.lastName ? " sv-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
-            {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Date of Birth <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.dob ? " sv-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
-            {errors.dob && <span className="sv-error-msg">{errors.dob}</span>}
-          </div>
+      <div className="bf-form">
+        {/* ── Personal information ── */}
+        <div className="bf-group">
+          <div className="bf-group__title">Personal information</div>
 
-          <div className="dr-field">
-            <label className="sv-label">Civil Status</label>
-            <select className="sv-input sv-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
-              {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Residing Since <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.residingSince ? " sv-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="Year, e.g. 2010" />
-            {errors.residingSince && <span className="sv-error-msg">{errors.residingSince}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Contact Number <span className="sv-required">*</span></label>
-            <input
-              className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
-              type="tel"
-              inputMode="numeric"
-              maxLength={11}
-              value={form.contact}
-              onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
-              onBlur={e => set("contact", normalizePHMobile(e.target.value))}
-              placeholder="09123456789"
-            />
-            {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
-          </div>
-          <div className="dr-field">
-            <label className="sv-label">Email Address</label>
-            <input className="sv-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
-          </div>
-
-          <div className="dr-field dr-span-4">
-            <label className="sv-label">Complete Address <span className="sv-required">*</span></label>
-            <input className={`sv-input${errors.address ? " sv-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
-            {errors.address && <span className="sv-error-msg">{errors.address}</span>}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Request details: purpose + valid ID ── */}
-      <section className="dr-card">
-        <div className="dr-card__title">Request Details</div>
-        <div className="dr-grid">
-          <div className="dr-field dr-span-2">
-            <label className="sv-label">Purpose of Request <span className="sv-required">*</span></label>
-            <select
-              className={`sv-input sv-select${errors.purposeOption ? " sv-input--error" : ""}`}
-              value={form.purposeOption}
-              onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
-            >
-              <option value="">— Select purpose —</option>
-              {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              <option value="Other">Other</option>
-            </select>
-            {errors.purposeOption && <span className="sv-error-msg">{errors.purposeOption}</span>}
-          </div>
-
-          {isOther && (
-            <div className="dr-field dr-span-2">
-              <label className="sv-label">Please specify <span className="sv-required">*</span></label>
-              <input
-                className={`sv-input${errors.purposeOther ? " sv-input--error" : ""}`}
-                value={form.purposeOther}
-                onChange={e => set("purposeOther", e.target.value)}
-                placeholder="Describe your purpose..."
-              />
-              {errors.purposeOther && <span className="sv-error-msg">{errors.purposeOther}</span>}
+          <div className="bf-form bf-form--tight">
+            <div className="bf-row">
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-first">First name <Req /></label>
+                <input id="dz-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
+                {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
+              </div>
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-last">Last name <Req /></label>
+                <input id="dz-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+                {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
+              </div>
             </div>
-          )}
 
-          <div className={`dr-field ${isOther ? "dr-span-4" : "dr-span-2"}`}>
-            <label className="sv-label">Upload Valid ID <span className="sv-required">*</span></label>
-            <label className={`dr-upload-box dr-upload-box--compact${form.validId ? " dr-upload-box--filled" : ""}${errors.validId ? " dr-upload-box--error" : ""}`}>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
-              {form.validId ? (
-                <div className="dr-upload-file">
-                  {previewUrl ? (
-                    <img className="dr-upload-thumb" src={previewUrl} alt="Uploaded ID preview" />
-                  ) : (
-                    <div className="dr-upload-file-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                    </div>
-                  )}
-                  <div className="dr-upload-file-meta">
-                    <span className="dr-upload-file-name" title={form.validId}>{form.validId}</span>
-                    <span className="dr-upload-file-sub">
-                      {[isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Click to replace
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="dr-upload-remove"
-                    onClick={removeFile}
-                    aria-label="Remove uploaded ID"
-                    title="Remove"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                  </button>
-                </div>
-              ) : (
-                <div className="dr-upload-placeholder">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                  <span>Click to upload</span>
-                  <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
-                </div>
-              )}
-            </label>
-            {errors.validId && <span className="sv-error-msg">{errors.validId}</span>}
+            <div className="bf-row">
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-middle">Middle name <Opt /></label>
+                <input id="dz-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
+              </div>
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-dob">Date of birth <Req /></label>
+                <input id="dz-dob" className={`bf-input${errors.dob ? " bf-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+                {errors.dob && <div className="bf-error">{errors.dob}</div>}
+              </div>
+            </div>
+
+            <div className="bf-row">
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-civil">Civil status</label>
+                <select id="dz-civil" className="bf-input bf-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
+                  {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-since">Living here since (year) <Req /></label>
+                <input id="dz-since" className={`bf-input${errors.residingSince ? " bf-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="For example: 2010" />
+                {errors.residingSince && <div className="bf-error">{errors.residingSince}</div>}
+              </div>
+            </div>
+
+            <div className="bf-row">
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-contact">Phone number <Req /></label>
+                <input
+                  id="dz-contact"
+                  className={`bf-input${errors.contact ? " bf-input--error" : ""}`}
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={11}
+                  value={form.contact}
+                  onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
+                  onBlur={e => set("contact", normalizePHMobile(e.target.value))}
+                  placeholder="09123456789"
+                />
+                {errors.contact && <div className="bf-error">{errors.contact}</div>}
+              </div>
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-email">Email <Opt /></label>
+                <input id="dz-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
+              </div>
+            </div>
+
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-address">Home address <Req /></label>
+              <input id="dz-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
+              {errors.address && <div className="bf-error">{errors.address}</div>}
+            </div>
           </div>
         </div>
-      </section>
 
-      {/* ── Document-specific fields ── */}
-      {extraFields.length > 0 && (
-        <section className="dr-card">
-          <div className="dr-card__title">Additional Information</div>
-          <div className="dr-grid">
-            {extraFields.map(f => {
-              if (f.type === "checkbox") {
+        {/* ── Your request ── */}
+        <div className="bf-group">
+          <div className="bf-group__title">Your request</div>
+
+          <div className="bf-form bf-form--tight">
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-purpose">Why do you need this document? <Req /></label>
+              <select
+                id="dz-purpose"
+                className={`bf-input bf-select${errors.purposeOption ? " bf-input--error" : ""}`}
+                value={form.purposeOption}
+                onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
+              >
+                <option value="">Choose from the list...</option>
+                {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                <option value="Other">Other</option>
+              </select>
+              {errors.purposeOption && <div className="bf-error">{errors.purposeOption}</div>}
+            </div>
+
+            {isOther && (
+              <div className="bf-field">
+                <label className="bf-label" htmlFor="dz-other">Please tell us the reason <Req /></label>
+                <input
+                  id="dz-other"
+                  className={`bf-input${errors.purposeOther ? " bf-input--error" : ""}`}
+                  value={form.purposeOther}
+                  onChange={e => set("purposeOther", e.target.value)}
+                  placeholder="Write your reason here"
+                />
+                {errors.purposeOther && <div className="bf-error">{errors.purposeOther}</div>}
+              </div>
+            )}
+
+            <div className="bf-field">
+              <div className="bf-label">Valid ID <Req /></div>
+              <label className={`bf-photo${form.validId ? " is-filled" : ""}${errors.validId ? " is-error" : ""}`}>
+                <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
+                {previewUrl
+                  ? <img className="dz-thumb" src={previewUrl} alt="Uploaded ID preview" />
+                  : <Ico size={28}>{form.validId ? ICONS.check : ICONS.upload}</Ico>}
+                <span className="bf-photo__text">
+                  {form.validId ? (
+                    <>
+                      <strong>ID added</strong>
+                      <small>{[form.validId, isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Tap to change</small>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Tap here to add your ID</strong>
+                      <small>A photo or scan. JPG, PNG or PDF, up to 5MB</small>
+                    </>
+                  )}
+                </span>
+              </label>
+              {form.validId && (
+                <button type="button" className="bf-secondary dz-remove" onClick={removeFile}>Remove this file</button>
+              )}
+              {errors.validId && <div className="bf-error">{errors.validId}</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Document-specific fields ── */}
+        {extraFields.length > 0 && (
+          <div className="bf-group">
+            <div className="bf-group__title">More information needed</div>
+
+            <div className="bf-form bf-form--tight">
+              {extraFields.map(f => {
+                if (f.type === "checkbox") {
+                  return (
+                    <div className="bf-field" key={f.id}>
+                      <label className={`bf-check${form[f.id] ? " is-on" : ""}${errors[f.id] ? " is-error" : ""}`}>
+                        <input type="checkbox" className="bf-check__box" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} />
+                        <span>{f.label} {f.required && <span className="bf-pill bf-pill--req">Required</span>}</span>
+                      </label>
+                      {errors[f.id] && <div className="bf-error">{errors[f.id]}</div>}
+                    </div>
+                  );
+                }
                 return (
-                  <div className="dr-field dr-span-4" key={f.id}>
-                    <label className={`dr-checkbox-label${errors[f.id] ? " dr-checkbox-label--error" : ""}`}>
-                      <input type="checkbox" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} className="dr-checkbox" />
-                      <span>{f.label} {f.required && <span className="sv-required">*</span>}</span>
-                    </label>
-                    {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
+                  <div className="bf-field" key={f.id}>
+                    <label className="bf-label" htmlFor={`dz-x-${f.id}`}>{f.label} {f.required && <span className="bf-pill bf-pill--req">Required</span>}</label>
+                    <input id={`dz-x-${f.id}`} className={`bf-input${errors[f.id] ? " bf-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
+                    {errors[f.id] && <div className="bf-error">{errors[f.id]}</div>}
                   </div>
                 );
-              }
-              return (
-                <div className="dr-field dr-span-2" key={f.id}>
-                  <label className="sv-label">{f.label} {f.required && <span className="sv-required">*</span>}</label>
-                  <input className={`sv-input${errors[f.id] ? " sv-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
-                  {errors[f.id] && <span className="sv-error-msg">{errors[f.id]}</span>}
-                </div>
-              );
-            })}
+              })}
+            </div>
           </div>
-        </section>
-      )}
-    </div>
+        )}
+      </div>
+    </section>
   );
 }
 
+// ── Step 3: review ────────────────────────────────────────────────────────────
 function Step3({ docType, form }) {
   const { t } = useLanguage();
   const extraFields = docType?.customFields || [];
@@ -390,92 +406,70 @@ function Step3({ docType, form }) {
     ? (form.purposeOther || "Other")
     : form.purposeOption;
   const rows = [
-    { label: t("doc_type", "Document Type"), value: docType?.documentName || docType?.title || docType?.name, full: true },
+    { label: t("doc_type", "Document Type"), value: docType?.documentName || docType?.title || docType?.name },
     { label: t("doc_full_name", "Full Name"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
     { label: t("profile_birthdate", "Date of Birth"), value: form.dob },
     { label: t("profile_civil_status", "Civil Status"), value: form.civilStatus },
     { label: t("profile_residing_since", "Residing Since"), value: form.residingSince ? (typeof t("doc_residing_present") === "function" ? t("doc_residing_present", form.residingSince) : `${form.residingSince} up to present`) : "—" },
-    { label: t("doc_address", "Address"), value: form.address, full: true },
+    { label: t("doc_address", "Address"), value: form.address },
     { label: t("profile_contact", "Contact Number"), value: form.contact },
     { label: t("profile_email", "Email"), value: form.email || "—" },
-    { label: t("doc_purpose", "Purpose"), value: effectivePurpose || "—", full: true },
+    { label: t("doc_purpose", "Purpose"), value: effectivePurpose || "—" },
     { label: t("doc_id_uploaded", "Valid ID Uploaded"), value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
     ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? t("doc_confirmed", "✓ Confirmed") : t("doc_not_confirmed", "Not confirmed") })),
   ];
 
   return (
-    <div className="dr-step3">
-      <p className="dr-step-hint">{t("doc_review_hint")}</p>
+    <section className="bz-card">
+      <h3 className="bz-heading">Check your request</h3>
+      <p className="bz-text">{t("doc_review_hint")}</p>
 
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        background: "#fffbeb",
-        border: "1px solid #fcd34d",
-        borderRadius: "8px",
-        padding: "10px 14px",
-        marginBottom: "0.75rem",
-        fontSize: "13px",
-        color: "#92400e",
-      }}>
-        <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <span>{t("doc_review_validity")}</span>
+      <div className="bz-note dz-review-note">
+        <span className="dz-banner__icon"><Ico size={24}>{ICONS.warning}</Ico></span>
+        <div>{t("doc_review_validity")}</div>
       </div>
 
-      <div className="dr-review-grid">
+      <dl className="lv-review">
         {rows.map((r, i) => (
-          <div key={i} className={`dr-review-row${r.full ? " dr-review-row--full" : ""}`}>
-            <span className="dr-review-label">{r.label}</span>
-            <span className="dr-review-value">{r.value}</span>
+          <div key={i} className="lv-review__row">
+            <dt>{r.label}</dt>
+            <dd>{r.value}</dd>
           </div>
         ))}
-      </div>
-    </div>
+      </dl>
+    </section>
   );
 }
 
+// ── Step 4: done ──────────────────────────────────────────────────────────────
 function Step4({ refNum, onReset }) {
   const { t } = useLanguage();
   return (
-    <div className="sv-success-wrap">
-      <div className="sv-success-icon" style={{ width: 64, height: 64 }}>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-      </div>
-      <h3 className="sv-success-title">{t("doc_submitted_title", "Request Submitted!")}</h3>
-      <p className="sv-success-sub">{t("doc_submitted_sub", "Your document request has been received by the barangay.")}</p>
-      <div className="dr-ref-box">
-        <span className="dr-ref-label">{t("reference_number", "Reference Number")}</span>
-        <span className="dr-ref-num">{refNum}</span>
-      </div>
-      <div className="dr-success-info">
-        <div className="dr-success-info-item">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.81-.81a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" /></svg>
-          <span>{t("doc_sms_notif", "You will receive an SMS notification once your request is processed.")}</span>
+    <section className="bz-card">
+      <div className="bf-done">
+        <span className="bf-done__icon"><BigCheck /></span>
+        <h3 className="bz-heading">{t("doc_submitted_title", "Request Submitted!")}</h3>
+        <p className="bz-text">{t("doc_submitted_sub", "Your document request has been received by the barangay.")}</p>
+
+        <div className="bt-ref">
+          <div className="bt-ref__label">{t("reference_number", "Reference Number")}</div>
+          <div className="bt-ref__num">{refNum}</div>
         </div>
-        <div className="dr-success-info-item">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          <span>{t("doc_processing_time", "Processing time: 2–3 business days.")}</span>
-        </div>
-        <div className="dr-success-info-item" style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "8px 10px", marginTop: "4px" }}>
-          <svg style={{ flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <span>{t("doc_validity_note", "Your document will be valid for 6 months from the date of issuance.")}</span>
-        </div>
+
+        <ul className="dz-info">
+          <li><span className="dz-info__icon"><Ico size={22}>{ICONS.phone}</Ico></span><span>{t("doc_sms_notif", "You will receive an SMS notification once your request is processed.")}</span></li>
+          <li><span className="dz-info__icon"><Ico size={22}>{ICONS.clock}</Ico></span><span>{t("doc_processing_time", "Processing time: 2–3 business days.")}</span></li>
+          <li className="is-warn"><span className="dz-info__icon"><Ico size={22}>{ICONS.warning}</Ico></span><span>{t("doc_validity_note", "Your document will be valid for 6 months from the date of issuance.")}</span></li>
+        </ul>
+
+        <button type="button" className="bf-submit dz-again" onClick={onReset}>{t("doc_submit_another", "Submit Another Request")}</button>
       </div>
-      <button className="sv-btn-primary" onClick={onReset}>{t("doc_submit_another", "Submit Another Request")}</button>
-    </div>
+    </section>
   );
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function DocumentsTab({ userData, householdID, userName }) {
   const { t } = useLanguage();
   const residentID = userData?.residentID || getSaved("memberID", null);
@@ -487,6 +481,8 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   const [errors, setErrors] = useState({});
   const [refNum, setRefNum] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const topRef = useRef(null);
+  const mounted = useRef(false);
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
@@ -524,6 +520,12 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       }));
     }
   }, [userData]);
+
+  // Bring the person back to the top when the step changes (not on first load)
+  useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [step]);
 
   const validateStep1 = () => {
     if (!docType) { setErrors({ docType: t("doc_err_select", "Please select a document type.") }); return false; }
@@ -625,28 +627,39 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   };
 
   return (
-    <div className="dr-wizard">
-      <div className="dr-wizard-header"><StepIndicator step={step} onStepClick={goToStep} /></div>
-
-      <div className="dr-wizard-body">
-        {(step === 1 || step === 2) && <ValidityReminderBanner />}
-
-        {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} />}
-        {errors.docType && <p className="sv-error-msg" style={{ padding: "0 1.5rem" }}>{errors.docType}</p>}
-        {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
-        {step === 3 && <Step3 docType={docType} form={form} />}
-        {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
-        {errors.submit && <p className="sv-error-msg" style={{ padding: "1rem 1.5rem", textAlign: "center" }}>{errors.submit}</p>}
+    <div className="dr-wizard dz-wizard">
+      <div className="dr-wizard-header">
+        <div className="dz-stepswrap"><StepIndicator step={step} onStepClick={goToStep} /></div>
       </div>
 
-      {step < 4 && (
-        <div className="dr-wizard-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-          {step > 1 && <button className="sv-btn-ghost" onClick={() => goToStep(step - 1)} disabled={isSubmitting}>{t("back", "Previous")}</button>}
-          <button className="sv-btn-primary" onClick={handleNext} disabled={isSubmitting}>
-            {isSubmitting ? t("doc_uploading", "Uploading ID...") : (step === 3 ? t("doc_submit_btn", "Submit Request") : t("doc_next", "Next"))}
-          </button>
+      <div className="dr-wizard-body">
+        <div className="dz-wrap" ref={topRef}>
+          {(step === 1 || step === 2) && <ValidityReminderBanner />}
+
+          {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} error={errors.docType} />}
+          {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
+          {step === 3 && <Step3 docType={docType} form={form} />}
+          {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
+
+          {errors.submit && <div className="bf-alert">{errors.submit}</div>}
+
+          {step < 4 && (
+            <div className="dz-actions">
+              <button type="button" className="bf-submit" onClick={handleNext} disabled={isSubmitting}>
+                {isSubmitting
+                  ? t("doc_uploading", "Uploading ID...")
+                  : (step === 3 ? t("doc_submit_btn", "Submit Request") : t("doc_next", "Next"))}
+                {!isSubmitting && step < 3 && <ArrowRight />}
+              </button>
+              {step > 1 && (
+                <button type="button" className="bf-secondary" onClick={() => goToStep(step - 1)} disabled={isSubmitting}>
+                  <ArrowLeft /> {t("back", "Previous")}
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
