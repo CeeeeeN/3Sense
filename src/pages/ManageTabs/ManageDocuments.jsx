@@ -227,7 +227,7 @@ export default function ManageDocuments() {
   };
 
   const handleGenerateGlobalQR = () => {
-    const residentAppUrl = "https://3-sense.vercel.app/";
+    const residentAppUrl = "https://www.3s-sense.site/";
     const encodedUrl = `${residentAppUrl}?serviceId=documents_global&serviceName=${encodeURIComponent("All Documents")}&category=Documents`;
     setSelectedQR({ name: "Document Request Portal", qrValue: encodedUrl });
   };

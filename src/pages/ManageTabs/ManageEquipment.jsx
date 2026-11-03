@@ -209,7 +209,7 @@ export default function ManageEquipment() {
   };
 
   const handleGenerateGlobalQR = () => {
-    const residentAppUrl = "https://3-sense.vercel.app/";
+    const residentAppUrl = "https://www.3s-sense.site/";
     const encodedUrl = `${residentAppUrl}?serviceId=equipment_global&serviceName=${encodeURIComponent("Equipment Rental")}&category=Equipment`;
     setSelectedQR({ name: "Equipment Rental Portal", qrValue: encodedUrl });
   };

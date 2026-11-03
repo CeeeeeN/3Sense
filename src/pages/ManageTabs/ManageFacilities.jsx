@@ -217,7 +217,7 @@ export default function ManageFacilities() {
   };
 
   const handleGenerateGlobalQR = () => {
-    const residentAppUrl = "https://3-sense.vercel.app/";
+    const residentAppUrl = "https://www.3s-sense.site/";
     const encodedUrl = `${residentAppUrl}?serviceId=facilities_global&serviceName=${encodeURIComponent("All Facilities")}&category=Facilities`;
     setSelectedQR({ name: "Facility Reservation Portal", qrValue: encodedUrl });
   };
