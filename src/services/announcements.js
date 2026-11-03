@@ -10,77 +10,111 @@ import {
     query, 
     orderBy, 
     getDocs, 
-    limit, 
-    where 
+    limit
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
-import { createUserNotification } from "./userNotifications";
+import { createAnnouncementNotification } from "./userNotifications";
 
 /**
- * Fan out an in-app notification to every HOUSEHOLD that has at least one
- * resident whose categories array contains the announcement's target category.
+ * Fan out an in-app notification to every resident whose category matches
+ * the announcement's target category.
+ * Only residents belonging to the targeted category receive the notification.
+ * Duplicate notifications for the same resident and announcement are prevented.
  */
 const fanOutAnnouncementNotification = async ({ title, description, category, announcementID }) => {
-  if (!category || category.trim().toLowerCase() === "all residents") return;
+  if (!category || category.trim().toLowerCase() === "all residents" || !announcementID) return;
 
   const baseCategory = category.trim();
-  console.log(`[fanOut] Starting fan-out for category: "${baseCategory}"`);
+  const targetLower = baseCategory.toLowerCase();
+  console.log(`[fanOut] Starting targeted fan-out for category: "${baseCategory}" (announcement: ${announcementID})`);
 
   try {
-    // ─── OPTIMIZED: Targeted Server-Side Query ───
-    // Instead of downloading 5,000 residents to find 50, we ask Firestore to only 
-    // send us the residents who match. We use variations to catch capitalization differences.
-    const variations = [...new Set([
-        baseCategory,
-        baseCategory.toLowerCase(),
-        baseCategory.toUpperCase(),
-        baseCategory.charAt(0).toUpperCase() + baseCategory.slice(1).toLowerCase()
-    ])];
+    let residentDocs = [];
 
-    const q = query(
-        collectionGroup(db, "residents"),
-        where("categories", "array-contains-any", variations)
-    );
+    // Attempt 1: Fetch via collectionGroup("residents") without 'where' (no composite index needed)
+    try {
+      const cgSnap = await getDocs(collectionGroup(db, "residents"));
+      if (!cgSnap.empty) {
+        residentDocs = cgSnap.docs;
+      }
+    } catch (cgErr) {
+      console.warn("[fanOut] collectionGroup query failed or blocked, falling back to household traversal:", cgErr);
+    }
 
-    const snap = await getDocs(q);
+    // Attempt 2: If collectionGroup failed or returned nothing, traverse households
+    if (residentDocs.length === 0) {
+      try {
+        const hhSnap = await getDocs(collection(db, "households"));
+        const subPromises = hhSnap.docs.map(hDoc =>
+          getDocs(collection(db, "households", hDoc.id, "residents"))
+        );
+        const subSnaps = await Promise.allSettled(subPromises);
+        subSnaps.forEach(res => {
+          if (res.status === "fulfilled" && !res.value.empty) {
+            res.value.docs.forEach(d => residentDocs.push(d));
+          }
+        });
+      } catch (hhErr) {
+        console.error("[fanOut] Error traversing households for residents:", hhErr);
+      }
+    }
 
-    if (snap.empty) {
-      console.warn(`[fanOut] No residents found matching category: ${baseCategory}`);
+    if (residentDocs.length === 0) {
+      console.warn("[fanOut] No resident records found in database.");
       return;
     }
 
-    // Collect unique householdIDs
-    const matchedHouseholdIDs = new Set();
-    snap.docs.forEach((d) => {
-      const householdID = d.ref.parent.parent?.id;
-      if (householdID) matchedHouseholdIDs.add(householdID);
+    const matchedResidents = [];
+    const seenResidentKeys = new Set();
+
+    residentDocs.forEach(d => {
+      const data = d.data();
+      const residentID = d.id || data.residentID;
+      const householdID = d.ref.parent.parent?.id || data.householdID;
+      if (!householdID || !residentID) return;
+
+      const rawCat = data.categories || data.category;
+      let cats = [];
+      if (Array.isArray(rawCat)) {
+        cats = rawCat;
+      } else if (typeof rawCat === "string") {
+        cats = rawCat.split(",");
+      }
+
+      const isMatch = cats.some(c => String(c).trim().toLowerCase() === targetLower);
+      if (isMatch) {
+        const uniqueKey = `${householdID}_${residentID}`;
+        if (!seenResidentKeys.has(uniqueKey)) {
+          seenResidentKeys.add(uniqueKey);
+          matchedResidents.push({ householdID, residentID });
+        }
+      }
     });
 
-    console.log(`[fanOut] Matched ${matchedHouseholdIDs.size} household(s) for category "${baseCategory}"`);
+    if (matchedResidents.length === 0) {
+      console.warn(`[fanOut] No residents found matching category: "${baseCategory}"`);
+      return;
+    }
 
-    if (matchedHouseholdIDs.size === 0) return;
+    console.log(`[fanOut] Matched ${matchedResidents.length} targeted resident(s) for category "${baseCategory}"`);
 
-    // Fire network requests in parallel
-    // (Note: We will optimize createUserNotification's internal writes when we review userNotifications.js)
+    const notifMessage = description ? `${title} — ${description}`.slice(0, 200) : title;
+
     const results = await Promise.allSettled(
-      [...matchedHouseholdIDs].map((householdID) =>
-        createUserNotification(
-          householdID,                           // householdID field
-          "household",                           // residentID = "household" for household-wide
-          `New Announcement`,
-          `${title} — ${description}`.slice(0, 200),
-          "announcement",
-          announcementID                         // refNum
-        )
+      matchedResidents.map(({ householdID, residentID }) =>
+        createAnnouncementNotification({
+          householdID,
+          residentID,
+          announcementID,
+          title: "New Announcement",
+          message: notifMessage,
+          category: baseCategory,
+        })
       )
     );
 
-    const failed = results.filter((r) => r.status === "rejected");
-    if (failed.length > 0) {
-      console.warn(`[fanOut] ${failed.length} notification(s) failed:`, failed);
-    } else {
-      console.log(`[fanOut] ✅ Sent to ${matchedHouseholdIDs.size} household(s) successfully.`);
-    }
+    const sentCount = results.filter(r => r.status === "fulfilled" && r.value === true).length;
+    console.log(`[fanOut] ✅ Sent ${sentCount} new notification(s) to targeted resident(s) of category "${baseCategory}".`);
   } catch (err) {
     console.error("[fanOut] Announcement notification error:", err);
   }
@@ -108,7 +142,7 @@ export const createAnnouncement = async (data, adminID) => {
     updatedAt: serverTimestamp(),
   });
 
-  // Fire-and-forget: notify matching residents
+  // Fire-and-forget: notify matching residents belonging to targeted category
   fanOutAnnouncementNotification({
     title: data.title || "",
     description: data.description || "",
@@ -133,6 +167,16 @@ export const updateAnnouncement = async (id, data) => {
   };
 
   await updateDoc(annRef, updates);
+
+  // If targeted to a specific category, ensure matching residents are notified (duplicate-safe)
+  if (data.category && data.category.trim().toLowerCase() !== "all residents") {
+    fanOutAnnouncementNotification({
+      title: data.title || "",
+      description: data.description || "",
+      category: data.category,
+      announcementID: id,
+    });
+  }
 };
 
 export const deleteAnnouncement = async (id) => {

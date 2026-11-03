@@ -355,7 +355,6 @@ export default function ManageAnnouncements() {
               {ann.time && <li><strong>Time:</strong> {new Date(ann.time).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</li>}
               <li><strong>Target Audience:</strong> {ann.category}</li>
               <li><strong>Date Posted:</strong> {ann.date}</li>
-              <li><strong>Posted By:</strong> {ann.postedBy}</li>
             </ul>
             <div className="as-card-footer" style={{ gap: '8px', display: 'flex' }}>
               <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1 }} onClick={() => handleEdit(ann)}>Edit</button>

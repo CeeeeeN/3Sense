@@ -4,6 +4,7 @@ import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, getCountFromServer, orderBy, limit } from "firebase/firestore";
 import { subscribeToAnnouncements } from "../services/announcements";
+import { createAnnouncementNotification } from "../services/userNotifications";
 import FeedbackAlerts from "../components/Feedback/FeedbackAlerts";
 import {
   ScholarshipIcon, HealthIcon, AssistanceIcon,
@@ -86,10 +87,6 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
               </ul>
             </div>
           )}
-          <div className="db-popup-section">
-            <div className="db-popup-section-title">{t('dashboard_posted_by')}</div>
-            <div className="db-popup-posted-by">{ann.postedBy || t('dashboard_barangay_admin')}</div>
-          </div>
         </div>
       </div>
     </div>
@@ -167,11 +164,11 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
     } catch { return dateStr; }
   };
 
-  const accentColor  = isUnreturned ? '#c2410c' : '#dc2626';
-  const accentLight  = isUnreturned ? '#fff7ed' : '#fef2f2';
+  const accentColor = isUnreturned ? '#c2410c' : '#dc2626';
+  const accentLight = isUnreturned ? '#fff7ed' : '#fef2f2';
   const accentBorder = isUnreturned ? '#fed7aa' : '#fecaca';
-  const badgeLabel   = isUnreturned ? t('status_unreturned') : t('status_overdue');
-  const warningText  = isUnreturned
+  const badgeLabel = isUnreturned ? t('status_unreturned') : t('status_overdue');
+  const warningText = isUnreturned
     ? t('dashboard_unreturned_msg')
     : t('dashboard_overdue_msg');
 
@@ -193,9 +190,9 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
         fontFamily: "'Poppins', sans-serif",
       }}>
 
-      <div style={{ height: '5px', background: `linear-gradient(90deg, ${accentColor}, ${isUnreturned ? '#f97316' : '#f87171'})` }} />
+        <div style={{ height: '5px', background: `linear-gradient(90deg, ${accentColor}, ${isUnreturned ? '#f97316' : '#f87171'})` }} />
 
-      <div style={{
+        <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '18px 20px 0',
         }}>
@@ -205,8 +202,8 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
               background: accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             </div>
             <div>
@@ -226,7 +223,7 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
             onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -272,8 +269,8 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
             borderRadius: '10px', padding: '12px 14px', fontSize: '0.82rem', color: accentColor,
           }}>
             <svg style={{ flexShrink: 0, marginTop: '1px' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
             <span style={{ lineHeight: 1.6 }}>{warningText}</span>
           </div>
@@ -296,7 +293,7 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
                 }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6"/>
+                  <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
               <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{currentIdx + 1} / {total}</span>
@@ -311,7 +308,7 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
                 }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 18 15 12 9 6"/>
+                  <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
             </div>
@@ -398,6 +395,21 @@ function PaginationBar({ current, total, onChange }) {
 }
 
 // ── Helpers for Alerts & Announcements ──
+const extractCategories = (d) => {
+  if (!d) return [];
+  const rawCats = d.categories || d.category;
+  let normalizedCategories = [];
+  if (Array.isArray(rawCats)) {
+    normalizedCategories = rawCats;
+  } else if (typeof rawCats === "string") {
+    normalizedCategories = rawCats.split(",").map(c => c.trim());
+  }
+  return normalizedCategories
+    .map(c => (typeof c === "string" ? c.trim() : String(c).trim()))
+    .filter(Boolean);
+};
+
+
 const getPostedAt = (a) => a.createdAt?.toDate?.() || a.time || null; // adjust to your field name
 
 const timeAgo = (value, translate) => {
@@ -437,7 +449,7 @@ function SkeletonCards({ count = 2 }) {
   );
 }
 
-export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, userRole, pendingAnnID, onAnnConsumed }) {
+export default function Dashboard({ userName = "", onNavigate, householdID: propsHouseholdID, memberID, pendingAnnID, onAnnConsumed }) {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [showAllAnns, setShowAllAnns] = useState(false);
   const [alertPage, setAlertPage] = useState(1);
@@ -448,7 +460,21 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   const [realUserName, setRealUserName] = useState(userName);
   const [dataLoading, setDataLoading] = useState(true);
   const [announcementsData, setAnnouncementsData] = useState([]);
-  const [userCategories, setUserCategories] = useState([]);
+  const [userCategories, setUserCategories] = useState(() => {
+    try {
+      const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+      const cleanHH = propsHouseholdID || session.householdID;
+      const cleanMem = memberID || session.memberID;
+      if (cleanHH && cleanMem) {
+        const cached = JSON.parse(localStorage.getItem(`hh_residents_${cleanHH}`) || "[]");
+        const res = cached.find(r => r.id === cleanMem || r.residentID === cleanMem || (cleanMem === "head" && (r.role === "Household Head" || r.role === "head")));
+        if (res) {
+          return extractCategories(res);
+        }
+      }
+    } catch (e) { void e; }
+    return [];
+  });
 
   const [overdueRentals, setOverdueRentals] = useState([]);
   const [eqAlertIdx, setEqAlertIdx] = useState(0);
@@ -523,15 +549,42 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
   // Deep-link: open a specific announcement popup when arriving from a notification
   useEffect(() => {
-    if (!pendingAnnID || announcementsData.length === 0) return;
-    const raw = announcementsData.find((a) => a.id === pendingAnnID);
-    if (raw) {
-      const processed = mapAnnouncements([raw])[0];
-      setSelectedAnn(processed);
-      if (onAnnConsumed) onAnnConsumed();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAnnID, announcementsData]);
+    if (!pendingAnnID) return;
+    let cancelled = false;
+
+    const findAndShow = async () => {
+      let raw = announcementsData.find((a) => a.id === pendingAnnID || a.announcementID === pendingAnnID);
+      if (!raw) {
+        try {
+          const snap = await getDoc(doc(db, "announcements", pendingAnnID));
+          if (snap.exists() && !cancelled) {
+            const data = snap.data();
+            let displayDate = "";
+            if (data.createdAt) {
+              displayDate = data.createdAt.toDate
+                ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" })
+                : new Date(data.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
+            } else {
+              displayDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
+            }
+            raw = { id: snap.id, ...data, date: displayDate };
+          }
+        } catch (e) {
+          console.warn("[Dashboard] Could not fetch announcement by ID:", e);
+        }
+      }
+
+      if (raw && !cancelled) {
+        const processed = mapAnnouncements([raw])[0];
+        setSelectedAnn(processed);
+        if (onAnnConsumed) onAnnConsumed();
+      }
+    };
+
+    findAndShow();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAnnID, announcementsData, userCategories]);
 
   useEffect(() => {
     let unsubResident = null;
@@ -539,23 +592,29 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) { setDataLoading(false); return; }
       try {
-        const hhQ = query(collection(db, "households"), where("userID", "==", user.uid));
-        const hhSnap = await getDocs(hhQ);
-        if (hhSnap.empty) { setDataLoading(false); return; }
+        let householdID = propsHouseholdID;
+        if (!householdID) {
+          const hhQ = query(collection(db, "households"), where("userID", "==", user.uid));
+          const hhSnap = await getDocs(hhQ);
+          if (!hhSnap.empty) {
+            householdID = hhSnap.docs[0].id;
+          }
+        }
+        if (!householdID) {
+          const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+          householdID = session.householdID;
+        }
 
-        const hhDoc = hhSnap.docs[0];
-        const householdID = hhDoc.id;
-
-        const residentIdToFetch = memberID;
-        if (!residentIdToFetch) {
-          console.warn("[Dashboard] No memberID provided, skipping category fetch.");
+        const residentIdToFetch = memberID || JSON.parse(localStorage.getItem("brgy_session") || "{}").memberID || "head";
+        if (!householdID || !residentIdToFetch) {
+          console.warn("[Dashboard] Missing householdID or memberID, skipping category fetch.");
           setDataLoading(false);
           return;
         }
 
         const headRef = doc(db, "households", householdID, "residents", residentIdToFetch);
         if (unsubResident) unsubResident();
-        unsubResident = onSnapshot(headRef, (headSnap) => {
+        unsubResident = onSnapshot(headRef, async (headSnap) => {
           let firstName = userName;
           let adminStatus = "Clear";
           let uCats = [];
@@ -564,20 +623,41 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
             const d = headSnap.data();
             firstName = d.firstName || userName;
             adminStatus = d.adminStatus || "Clear";
-            let rawCats = d.categories || d.category;
-            let normalizedCategories = [];
-            if (Array.isArray(rawCats)) {
-              normalizedCategories = rawCats;
-            } else if (typeof rawCats === "string") {
-              normalizedCategories = rawCats.split(",").map(c => c.trim());
+            uCats = extractCategories(d);
+          } else {
+            try {
+              const allResSnap = await getDocs(collection(db, "households", householdID, "residents"));
+              const matchedDoc = allResSnap.docs.find(d =>
+                d.id === residentIdToFetch ||
+                d.data().residentID === residentIdToFetch ||
+                d.data().UID === residentIdToFetch ||
+                (residentIdToFetch === "head" && (d.data().role === "Household Head" || d.data().role === "head"))
+              );
+              if (matchedDoc) {
+                const d = matchedDoc.data();
+                firstName = d.firstName || userName;
+                adminStatus = d.adminStatus || "Clear";
+                uCats = extractCategories(d);
+              }
+            } catch (err) {
+              console.warn("[Dashboard] Error looking up resident in subcollection:", err);
             }
-            uCats = normalizedCategories
-              .map(c => (typeof c === "string" ? c.trim() : String(c).trim()))
-              .filter(Boolean);
+          }
+
+          if (uCats.length === 0) {
+            try {
+              const cached = JSON.parse(localStorage.getItem(`hh_residents_${householdID}`) || "[]");
+              const res = cached.find(r => r.id === residentIdToFetch || r.residentID === residentIdToFetch || (residentIdToFetch === "head" && (r.role === "Household Head" || r.role === "head")));
+              if (res) {
+                uCats = extractCategories(res);
+              }
+            } catch (e) { void e; }
           }
 
           setRealUserName(firstName);
-          setUserCategories(uCats);
+          if (uCats.length > 0) {
+            setUserCategories(uCats);
+          }
 
           setWidgets([
             { icon: <VerifiedVisitIcon />, color: "teal", value: "...", labelKey: "widget_verified_visits", subKey: "widget_verified_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
@@ -610,7 +690,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       unsubscribe();
       if (unsubResident) unsubResident();
     };
-  }, [memberID]);
+  }, [memberID, propsHouseholdID, userName]);
 
   const { t } = useLanguage();
 
@@ -637,31 +717,78 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
         default: break;
       }
 
-      const annCatClean = (ann.category || "").trim().toLowerCase();
-      const annAudienceClean = (ann.targetAudience || "").trim().toLowerCase();
+      const annRawCat = ann.category || "";
+      const annRawAudience = ann.targetAudience || "";
 
-      // "All Residents" → general announcements only, NOT alerts
-      const targetsEveryone = annCatClean === "all residents" || annAudienceClean === "all residents";
+      const annCategories = (
+        Array.isArray(annRawCat) ? annRawCat :
+          typeof annRawCat === "string" ? annRawCat.split(",") : []
+      ).map(c => String(c).trim().toLowerCase()).filter(Boolean);
 
-      // Exact match: announcement category must equal one of the user's profile categories
+      if (typeof annRawAudience === "string" && annRawAudience.trim()) {
+        annRawAudience.split(",").forEach(c => {
+          const clean = c.trim().toLowerCase();
+          if (clean && !annCategories.includes(clean)) annCategories.push(clean);
+        });
+      }
+
+      // "All Residents" or empty → general announcement, NOT a category-targeted alert
+      const targetsEveryone = annCategories.length === 0 || annCategories.includes("all residents");
+
+      // Targeted alert: announcement category must equal one of the resident's profile categories
       const isAlert = !targetsEveryone && userCategories.some(uc => {
-        const u = uc.trim().toLowerCase();
+        const u = String(uc).trim().toLowerCase();
         if (!u) return false;
-        return annCatClean === u || annAudienceClean === u;
+        return annCategories.includes(u);
       });
 
       return { ...ann, dotColor: dc, catClass: cc, icon, isSmartAlert: isAlert };
     });
   };
 
+  const getTimestamp = (a) => {
+    if (a.createdAt?.toDate) return a.createdAt.toDate().getTime();
+    if (a.createdAt?.seconds) return a.createdAt.seconds * 1000;
+    if (a.createdAt) return new Date(a.createdAt).getTime();
+    if (a.time) return new Date(a.time).getTime();
+    return 0;
+  };
+
   const processedAnns = mapAnnouncements(announcementsData);
-  // Already ordered newest-first by Firestore (orderBy createdAt desc)
-  const smartAlertsList = processedAnns.filter(a => a.isSmartAlert);
-  const generalAnnsList = processedAnns.filter(a => {
-    const cat = (a.category || "").trim().toLowerCase();
-    return cat === "all residents" || cat === "";
-  });
+
+  // Alert Announcements: category-specific announcements that match the logged-in resident's category
+  const smartAlertsList = processedAnns
+    .filter(a => a.isSmartAlert)
+    .sort((a, b) => getTimestamp(b) - getTimestamp(a));
+
+  // General Announcements
+  const generalAnnsList = processedAnns
+    .filter(a => !a.isSmartAlert)
+    .sort((a, b) => getTimestamp(b) - getTimestamp(a));
+
+  // View All: ALL published announcements, prioritizing category-targeted announcements for the resident at top
   const combinedAnns = [...smartAlertsList, ...generalAnnsList];
+
+  // Self-heal: ensure in-app notification exists for matching alert announcements
+  useEffect(() => {
+    const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
+    const hhID = propsHouseholdID || session.householdID;
+    const memID = memberID || session.memberID;
+    if (!hhID || !memID || smartAlertsList.length === 0) return;
+
+    smartAlertsList.forEach(a => {
+      if (a.id && a.isSmartAlert) {
+        createAnnouncementNotification({
+          householdID: hhID,
+          residentID: memID,
+          announcementID: a.id,
+          title: "New Announcement",
+          message: a.description ? `${a.title} — ${a.description}`.slice(0, 200) : a.title,
+          category: a.category || "",
+        }).catch(e => { void e; });
+      }
+    });
+  }, [propsHouseholdID, memberID, smartAlertsList]);
 
   // Pagination + filter derived values
   const alertTotalPages = Math.max(1, Math.ceil(smartAlertsList.length / ITEMS_PER_PAGE));
@@ -764,7 +891,7 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
                   margin: isMobile480 ? "10px auto 0 auto" : "0"
                 }}
               >
-              {t('dashboard_review_now')}
+                {t('dashboard_review_now')}
               </button>
             </div>
           </div>
