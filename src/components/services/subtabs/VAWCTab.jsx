@@ -104,6 +104,7 @@ export default function VAWCTab() {
             </a>
           </div>
         </section>
+      </div>
 
         {/* ── Choices ── */}
         {view === null && (
