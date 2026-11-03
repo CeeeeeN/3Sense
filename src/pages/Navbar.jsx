@@ -10,7 +10,6 @@ import {
   markAllNotificationsAsRead,
   deleteUserNotification,
 } from "../services/userNotifications";
-import { requestPushPermission } from "../services/fcm";
 
 const NAV_ITEMS_KEYS = [
   { key: "home",      labelKey: "nav_home",      icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg> },
@@ -20,7 +19,7 @@ const NAV_ITEMS_KEYS = [
   { key: "emergency", labelKey: "nav_emergency", icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>, emergency: true },
 ];
 
-export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "", userID = "" }) {
+export default function Navbar({ activePage = "home", onNavigate, householdID = "", userName = "", userRole = "member", memberID = "" }) {
   const { t } = useLanguage();
   const NAV_ITEMS = NAV_ITEMS_KEYS.map(item => ({ ...item, label: t(item.labelKey) }));
   const [notifOpen, setNotifOpen] = useState(false);
@@ -46,13 +45,17 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
 
   useEffect(() => {
     if (!householdID || !memberID) return;
-    const unsub = subscribeToUserNotifications(householdID, memberID, setMemberNotifs);
+    const unsub = subscribeToUserNotifications(householdID, memberID, (notifs) => {
+      setMemberNotifs(Array.isArray(notifs) ? notifs : []);
+    });
     return () => unsub();
   }, [householdID, memberID]);
 
   useEffect(() => {
     if (!householdID) return;
-    const unsub = subscribeToUserNotifications(householdID, "household", setHouseholdNotifs);
+    const unsub = subscribeToUserNotifications(householdID, "household", (notifs) => {
+      setHouseholdNotifs(Array.isArray(notifs) ? notifs : []);
+    });
     return () => unsub();
   }, [householdID]);
 
@@ -281,7 +284,7 @@ export default function Navbar({ activePage = "home", onNavigate, householdID = 
             householdID={householdID}
             currentHeadID={memberID}
             onClose={() => setActiveTransferConsentID(null)}
-            onHandled={(decision) => {
+            onHandled={() => {
               // The action is recorded in DB. We just close the modal.
               setActiveTransferConsentID(null);
             }}
