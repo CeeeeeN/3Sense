@@ -14,11 +14,14 @@ import FeedbackTable from '../components/Feedback/FeedbackTable';
 import ReviewModal from '../components/Feedback/ReviewModal';
 
 import { createUserNotification } from '../services/userNotifications';
+import { useLanguage } from '../context/LanguageContext';
 
 const SLA_HOURS = 72;
 const SLA_MS = SLA_HOURS * 60 * 60 * 1000;
 
 export default function AdminFeedback() {
+  const { t } = useLanguage();
+
   const queryClient = useQueryClient(); 
   const { showAlert } = useAlert();
   
@@ -281,9 +284,9 @@ export default function AdminFeedback() {
 
         <div className="requests-header">
           <h1 className="requests-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <BarChart2 size={28} color="#317D89" /> Feedback & Sentiment Analytics
+            <BarChart2 size={28} color="#317D89" /> {t('admin_title')}
           </h1>
-          <p className="requests-subtitle">Analyze AI insights, resolve negative complaints, and view historical feedback data.</p>
+          <p className="requests-subtitle">{t('admin_subtitle')}</p>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
@@ -303,7 +306,7 @@ export default function AdminFeedback() {
               gap: '8px'
             }}
           >
-            <BarChart2 size={18} /> Dashboard Summary
+            <BarChart2 size={18} /> {t('admin_tab_summary')}
           </button>
           <button
             onClick={() => setActiveTab('action')}
@@ -321,7 +324,7 @@ export default function AdminFeedback() {
               gap: '8px'
             }}
           >
-            <AlertTriangle size={18} /> Action Required
+            <AlertTriangle size={18} /> {t('admin_tab_action')}
             {actionRequiredFeedbacks.length > 0 && (
               <span style={{ background: '#e11d48', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
                 {actionRequiredFeedbacks.length}
@@ -344,7 +347,7 @@ export default function AdminFeedback() {
               gap: '8px'
             }}
           >
-            <List size={18} /> All Feedback
+            <List size={18} /> {t('admin_tab_all')}
           </button>
         </div>
 
