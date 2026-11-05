@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { db } from "../firebase/firebase";
 import { collection, query, where, orderBy, onSnapshot, limit, or, and } from "firebase/firestore";
 import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 import { useLanguage } from "../context/LanguageContext";
+import {
+  localizePurpose,
+} from "../utils/serviceTranslations";
 
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
@@ -32,6 +35,7 @@ const STATUS = {
   returned: { label: "Returned", color: "#4f46e5", bg: "rgba(79,70,229,0.1)" },
   ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
   new: { label: "New", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
+  cancelled: { label: "Cancelled", color: "#64748b", bg: "rgba(100,116,139,0.1)" },
 };
 
 // ── Reusable Components ──
@@ -58,8 +62,8 @@ function EmptyState({ message }) {
 }
 
 // ── MAIN ACTIVITY PAGE ──
-export default function ActivityPage({ onNavigate, memberID: propMemberID, householdID: propHouseholdID, UID: propUID }) {
-  const { t } = useLanguage();
+export default function ActivityPage({ memberID: propMemberID, householdID: propHouseholdID, UID: propUID }) {
+  const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState("programs");
   const [loading, setLoading] = useState(true);
 
@@ -85,7 +89,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   const householdID = propHouseholdID || getSaved("householdID", null);
 
   // Helper to build the hybrid query conditions safely
-  const buildIdentityQuery = () => {
+  const buildIdentityQuery = useCallback(() => {
     const strictResidentMatch = and(
       where("householdID", "==", householdID),
       where("residentID", "==", residentID)
@@ -98,14 +102,20 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     }
     
     return or(...conditions);
-  };
+  }, [householdID, residentID, userUID]);
 
   // --- FIREBASE REAL-TIME LISTENERS ---
 
   // Initial Loading Check
   useEffect(() => {
-    if (!residentID) { setLoading(true); return; }
-    setLoading(false);
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) {
+        if (!residentID) setLoading(true);
+        else setLoading(false);
+      }
+    });
+    return () => { active = false; };
   }, [residentID]);
 
   // A. Fetch Programs
@@ -123,7 +133,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       })));
     });
     return () => unsubPrograms();
-  }, [userUID, residentID, progLimit]);
+  }, [residentID, progLimit, buildIdentityQuery]);
 
   // B. Fetch Documents
   useEffect(() => {
@@ -138,7 +148,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubDocs();
-  }, [userUID, residentID, docLimit]);
+  }, [residentID, docLimit, buildIdentityQuery]);
 
   // C. Fetch Reservations
   useEffect(() => {
@@ -153,7 +163,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubReservations();
-  }, [userUID, residentID, resLimit]);
+  }, [residentID, resLimit, buildIdentityQuery]);
 
   // D. Fetch Equipment Rentals
   useEffect(() => {
@@ -168,7 +178,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setEquipment(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubEquipment();
-  }, [userUID, residentID, eqLimit]);
+  }, [residentID, eqLimit, buildIdentityQuery]);
 
   // E. Fetch Services (Combined: Peace & Order and BSWD)
   useEffect(() => {
@@ -223,7 +233,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     });
 
     return () => { unsubInc(); unsubBswd(); };
-  }, [userUID, residentID, servicesLimit]);
+  }, [residentID, servicesLimit, buildIdentityQuery]);
 
   // F. Fetch Feedback
   useEffect(() => {
@@ -238,19 +248,19 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
       setFeedback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubFeedback();
-  }, [userUID, residentID, feedbackLimit]);
+  }, [residentID, feedbackLimit, buildIdentityQuery]);
 
   // Helper to format Firestore Timestamps safely
   const formatDate = (timestamp) => {
     if (!timestamp) return t('unknown_date');
     if (typeof timestamp === 'string') return timestamp;
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString(language === "fil" ? "fil-PH" : "en-US", { month: "long", day: "numeric", year: "numeric" });
   };
 
 
   // ── 6.1 Programs Tab ──
-  const ProgramsFacilitiesTab = () => {
+  const renderProgramsTab = () => {
     if (programs.length === 0) return <EmptyState message={t('activity_no_programs')} />;
     return (
       <div className="act2-list">
@@ -279,7 +289,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   };
 
   // ── 6.2 Documents Tab ──
-  const DocumentsTab = () => {
+  const renderDocumentsTab = () => {
     if (documents.length === 0) return <EmptyState message={t('activity_no_documents')} />;
     return (
       <div className="act2-list">
@@ -293,7 +303,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>{t('activity_processed_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`}</span>
+                    <span>{t('activity_processed_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- ${t('reason', 'Reason')}: ${item.rejectionReason}`}</span>
                   </div>
                 )}
               </div>
@@ -313,7 +323,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   };
 
   // ── 6.3 Reservations Tab ──
-  const ReservationsTab = () => {
+  const renderReservationsTab = () => {
     if (reservations.length === 0) return <EmptyState message={t('activity_no_reservations')} />;
     return (
       <div className="act2-list">
@@ -321,13 +331,13 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{item.purpose || item.eventName}</div>
+                <div className="act2-card__title">{localizePurpose(item.purpose || item.eventName, language)}</div>
                 <div className="act2-card__subtitle">{item.facilityName || item.facility}</div>
-                <div className="act2-card__meta">Ref: {item.reservationID || item.refNum || item.id} · {formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || "TBA"}</div>
+                <div className="act2-card__meta">Ref: {item.reservationID || item.refNum || item.id} · {formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || t('tba', 'TBA')}</div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
+                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- ${t('reason', 'Reason')}: ${item.rejectionReason}`} </span>
                   </div>
                 )}
               </div>
@@ -355,7 +365,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   };
 
   // ── 6.4 Equipment Tab ──
-  const EquipmentTab = () => {
+  const renderEquipmentTab = () => {
     if (equipment.length === 0) return <EmptyState message={t('activity_no_equipment')} />;
     return (
       <div className="act2-list">
@@ -363,15 +373,15 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{item.equipmentName || "Equipment Rental"}</div>
-                <div className="act2-card__subtitle">{t('activity_quantity')}: {item.quantity} {item.quantity > 1 ? t('qty_units') : t('qty_unit')} · {item.purpose}</div>
+                <div className="act2-card__title">{item.equipmentName || t('eq_rental_header_default', 'Equipment Rental')}</div>
+                <div className="act2-card__subtitle">{t('activity_quantity')}: {item.quantity} {item.quantity > 1 ? t('qty_units') : t('qty_unit')} · {localizePurpose(item.purpose, language)}</div>
                 <div className="act2-card__meta">
                   Ref: {item.rentalID || item.id} · {t('activity_pickup')}: {formatDate(item.pickUpDate)} · {t('activity_return')}: {formatDate(item.returnDate)}
                 </div>
                 {item.processedBy && (
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
+                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- ${t('reason', 'Reason')}: ${item.rejectionReason}`} </span>
                   </div>
                 )}
               </div>
@@ -399,7 +409,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   };
 
   // ── 6.5 Services Tab
-  const ServicesTab = () => {
+  const renderServicesTab = () => {
     if (services.length === 0) return <EmptyState message={t('activity_no_services')} />;
     return (
       <div className="act2-list">
@@ -435,7 +445,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   };
 
   // ── 6.6 Feedback Tab
-  const FeedbackTab = () => {
+  const renderFeedbackTab = () => {
     if (feedback.length === 0) return <EmptyState message={t('activity_no_feedback')} />;
     return (
       <div className="act2-list">
@@ -473,12 +483,12 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
   // ── TABS CONFIG ──
   const TABS = [
-    { key: "programs", label: t('activity_tab_programs'), icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
-    { key: "documents", label: t('activity_tab_documents'), icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
-    { key: "reservations", label: t('activity_tab_reservations'), icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
-    { key: "equipment", label: t('activity_tab_equipment'), icon: <EquipmentIcon />, count: equipment.length, component: <EquipmentTab /> },
-    { key: "services", label: t('activity_tab_services'), icon: <AlertCircleIcon />, count: services.length, component: <ServicesTab /> },
-    { key: "feedback", label: t('activity_tab_feedback'), icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
+    { key: "programs", label: t('activity_tab_programs'), icon: <ProgramIcon />, count: programs.length, render: renderProgramsTab },
+    { key: "documents", label: t('activity_tab_documents'), icon: <DocumentIcon />, count: documents.length, render: renderDocumentsTab },
+    { key: "reservations", label: t('activity_tab_reservations'), icon: <ReservationIcon />, count: reservations.length, render: renderReservationsTab },
+    { key: "equipment", label: t('activity_tab_equipment'), icon: <EquipmentIcon />, count: equipment.length, render: renderEquipmentTab },
+    { key: "services", label: t('activity_tab_services'), icon: <AlertCircleIcon />, count: services.length, render: renderServicesTab },
+    { key: "feedback", label: t('activity_tab_feedback'), icon: <ActivityIcon />, count: feedback.length, render: renderFeedbackTab },
   ];
 
   const current = TABS.find((tab) => tab.key === activeTab);
@@ -494,7 +504,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
   if (!residentID) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
-        Please select a profile to view activity history.
+        {t('activity_select_profile', 'Please select a profile to view activity history.')}
       </div>
     );
   }
@@ -540,7 +550,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
 
           {/* Tab Content */}
           <div className="act2-tab-body">
-            {current?.component}
+            {current?.render ? current.render() : null}
           </div>
 
         </div>
