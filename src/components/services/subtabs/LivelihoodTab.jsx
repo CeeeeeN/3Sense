@@ -155,6 +155,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           title: r.title || r.name || "Untitled Program",
           description: r.description || "",
           date: r.date || "",
+          endDate: r.endDate || "",
           startTime: r.startTime || "",
           endTime: r.endTime || "",
           location: r.location || "",
@@ -419,7 +420,15 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                     />
 
                     <ul className="lv-meta">
-                      {p.date && <li><Ico>{ICONS.calendar}</Ico><span>{formatDate(p.date)}</span></li>}
+                      {(p.date || p.endDate) && (
+                        <li>
+                          <Ico>{ICONS.calendar}</Ico>
+                          <span>
+                            {p.date ? formatDate(p.date) : ""}
+                            {p.endDate && p.endDate !== p.date ? ` – ${formatDate(p.endDate)}` : ""}
+                          </span>
+                        </li>
+                      )}
                       {timeLabel && <li><Ico>{ICONS.clock}</Ico><span>{timeLabel}</span></li>}
                       {p.location && <li><Ico>{ICONS.pin}</Ico><span>{p.location}</span></li>}
                     </ul>
