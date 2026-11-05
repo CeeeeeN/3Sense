@@ -73,13 +73,6 @@ h4 {
 .left-content p {
   @apply text-[0.9rem] text-[rgba(255,255,255,0.65)] leading-[1.7] max-w-[360px] mb-8;
 }
-.feature-box {
-  @apply flex items-center gap-3 border text-[0.82rem] mb-[0.7rem] p-4 rounded-[10px] border-solid border-[rgba(255,255,255,0.12)] self-center my-auto flex items-center justify-center;
-  background: rgba(255, 255, 255, 0.06);
-}
-.feature-icon {
-  @apply w-[18px] h-[18px] shrink-0 self-center my-auto flex items-center justify-center;
-}
 .footer {
   @apply text-xs text-[rgba(255,255,255,0.3)];
 }
@@ -159,6 +152,40 @@ label {
 .bottom-link a {
   @apply text-[#317D89] font-semibold no-underline hover:underline;
 }
+
+.admin-features-list {
+  @apply list-none mt-7 p-0 flex flex-col gap-[1.1rem] max-w-none w-full;
+}
+
+.admin-feature-item {
+  @apply flex items-start gap-[0.9rem] cursor-default;
+}
+
+.admin-feature-icon {
+  @apply shrink-0 w-[38px] h-[38px] rounded-[10px] flex items-center justify-center text-[#f5c04a] bg-[#f5c04a]/[0.12];
+}
+
+.admin-feature-text h4 {
+  @apply m-0 mb-[0.15rem] text-[0.92rem] font-semibold text-white leading-[1.3];
+  font-family: "Poppins", sans-serif;
+}
+
+.admin-feature-text p {
+  @apply m-0 text-[0.8rem] leading-[1.5] text-white/65 max-w-none whitespace-nowrap;
+}
+
+.login-alert-error {
+  @apply bg-red-50 border border-red-200 text-red-600 text-[0.84rem] px-4 py-3 rounded-lg mb-4;
+}
+
+.login-alert-success {
+  @apply bg-green-50 border border-green-200 text-green-600 text-[0.84rem] px-4 py-3 rounded-lg mb-4;
+}
+
+.left-logo-text span {
+  @apply block text-[0.67rem] font-normal text-white/[0.55] tracking-[0.02em] mt-px;
+}
+
 
 /* ===================================================== */
 /* SIGNUP PAGE */
@@ -1511,12 +1538,6 @@ nav {
   @apply border border-[color:var(--border)] mt-4 p-6 rounded-xl border-solid;
   background: white;
 }
-.profile-header {
-  @apply flex items-center gap-4 mb-6;
-}
-.admin-profile-grid {
-  @apply grid grid-cols-[repeat(2,1fr)] gap-4;
-}
 .profile-grid .full-width {
   @apply col-[span_2];
 }
@@ -1542,13 +1563,6 @@ nav {
   @apply absolute -translate-y-2/4 cursor-pointer text-[color:var(--muted)] border-[none] right-[0.8rem] top-2/4 hover:text-[color:var(--primary)];
   background: none;
 }
-.no-scroll-page {
-  @apply h-full overflow-hidden flex flex-col;
-}
-.no-scroll-page .section {
-  @apply mt-4 first:mt-0;
-}
-
 
 /* ===================================================== */
 /* REDESIGNED REQUESTS PAGE */
@@ -1992,9 +2006,6 @@ nav {
   .profile-grid .full-width {
     @apply col-[span_1];
   }
-  .no-scroll-page {
-    @apply overflow-visible h-auto;
-  }
 
   /* ── Modals general ── */
   .modal.large {
@@ -2293,9 +2304,6 @@ nav {
   }
   .profile-header {
     @apply flex-col items-start gap-2 mb-4;
-  }
-  .no-scroll-page {
-    @apply overflow-visible h-auto;
   }
   .section-header {
     @apply flex-col items-start gap-2;
