@@ -2,9 +2,14 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitEquipmentRental } from "../../services/services";
-import { ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
+import { ChevronRightIcon, ChevronLeftIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
 import { useAlert } from "../../context/AlertContext";
 import { useLanguage } from "../../context/LanguageContext";
+import {
+  CALENDAR_DAYS,
+  CALENDAR_MONTHS,
+  localizePurpose,
+} from "../../utils/serviceTranslations";
 
 const EquipmentIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -13,9 +18,6 @@ const EquipmentIcon = () => (
     <line x1="12" y1="22.08" x2="12" y2="12"></line>
   </svg>
 );
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
@@ -102,10 +104,7 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
 
         <div className="sv-facilities-list">
           {equipmentList.map(eq => {
-            // Dynamically check if the item is out of stock (quantity <= 0)
             const isOutOfStock = eq.quantity !== undefined && eq.quantity !== "" && Number(eq.quantity) <= 0;
-
-            // It is only available if the admin switch is ON and it has stock
             const isAvailable = eq.available !== false && !isOutOfStock;
 
             return (
@@ -113,11 +112,15 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
                 <div className="sv-facility-card__left">
                   <div className="sv-facility-card__icon-wrap"><EquipmentIcon /></div>
                   <div>
-                    <div className="sv-facility-card__title">{eq.equipmentName || eq.name}</div>
-                    <div className="sv-facility-card__meta">
-                      <span>{eq.quantity !== undefined && eq.quantity !== "" ? t("eq_inventory_count", `Total Inventory: ${eq.quantity} units`) : t("eq_qty_unlisted", "Quantity unlisted")}</span>
+                    <div className="sv-facility-card__title">
+                      {eq.equipmentName || eq.name}
                     </div>
-                    <div className="sv-facility-card__desc">{eq.description || eq.fullDescription}</div>
+                    <div className="sv-facility-card__meta">
+                      <span>{eq.quantity !== undefined && eq.quantity !== "" ? t("eq_inventory_count", eq.quantity) : t("eq_qty_unlisted", "Quantity unlisted")}</span>
+                    </div>
+                    <div className="sv-facility-card__desc">
+                      {eq.description || eq.fullDescription}
+                    </div>
                   </div>
                 </div>
                 <div className="sv-facility-card__right">
@@ -126,7 +129,9 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
                     {isAvailable ? t("eq_available", "Available") : (isOutOfStock ? t("eq_out_of_stock", "Out of Stock") : t("eq_unavailable", "Unavailable"))}
                   </span>
                   {isAvailable && (
-                    <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>{t("eq_rent", "Rent")} <ChevronRightIcon /></button>
+                    <button className="sv-btn-primary sv-btn-sm" onClick={() => setRentalEquipment(eq)}>
+                      {t("eq_rent", "Rent")} <ChevronRightIcon />
+                    </button>
                   )}
                 </div>
               </div>
@@ -138,7 +143,7 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
       {rentalEquipment && (
         <div className="rsv-overlay" onClick={e => e.target === e.currentTarget && setRentalEquipment(null)}>
           <div className="rsv-modal">
-            <button className="rsv-modal__close" onClick={() => setRentalEquipment(null)} aria-label="Close">
+            <button className="rsv-modal__close" onClick={() => setRentalEquipment(null)} aria-label={t("close", "Close")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
             <RentalForm
@@ -157,10 +162,13 @@ export default function EquipmentTab({ userData, householdID, userName, userID }
 }
 
 function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const daysList = CALENDAR_DAYS[language] || CALENDAR_DAYS.en;
+  const monthsList = CALENDAR_MONTHS[language] || CALENDAR_MONTHS.en;
 
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -186,7 +194,7 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
 
     if (date < todayMidnight) return "past";
     if (str < MIN_RENTAL_DATE) return "past";
-    if (blockedDates.includes(str)) return "past"; // Blocked by admin
+    if (blockedDates.includes(str)) return "past";
     return "available";
   };
 
@@ -199,11 +207,11 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
     <div className="sv-calendar">
       <div className="sv-cal-nav">
         <button className="sv-cal-arrow" onClick={prevMonth}><ChevronLeftIcon /></button>
-        <span className="sv-cal-title">{MONTHS[viewMonth]} {viewYear}</span>
+        <span className="sv-cal-title">{monthsList[viewMonth]} {viewYear}</span>
         <button className="sv-cal-arrow" onClick={nextMonth}><ChevronRightIcon /></button>
       </div>
       <div className="sv-cal-grid">
-        {DAYS.map(d => <div key={d} className="sv-cal-day-label">{d}</div>)}
+        {daysList.map(d => <div key={d} className="sv-cal-day-label">{d}</div>)}
         {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const d = i + 1;
@@ -224,8 +232,8 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
         })}
       </div>
       <div className="sv-cal-legend">
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
-        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Blocked</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />{t("eq_available", "Available")}</span>
+        <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />{t("eq_blocked", "Blocked")}</span>
       </div>
       <div style={{
         display: "flex", alignItems: "flex-start", gap: "6px", marginTop: "10px",
@@ -245,9 +253,10 @@ function Calendar({ selectedDate, onSelectDate, blockedDates = [] }) {
 
 function RentalForm({ onBack, equipment, userData, householdID, userName, userID }) {
   const { showAlert } = useAlert();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
-  const equipmentName = equipment?.equipmentName || equipment?.name || "Equipment";
+  const rawEquipmentName = equipment?.equipmentName || equipment?.name || "Equipment";
+  const equipmentName = rawEquipmentName;
   const maxQty = equipment?.quantity ? parseInt(equipment.quantity, 10) : 0;
 
   const [form, setForm] = useState({
@@ -260,31 +269,37 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    if (userData) {
-      const name = [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ");
-      setForm(f => ({
-        ...f,
-        fullName: name,
-        email: userData.email || "",
-        contactNumber: userData.contactNumber != null ? String(userData.contactNumber) : ""
-      }));
-    }
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active && userData) {
+        const name = [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ");
+        setForm(f => ({
+          ...f,
+          fullName: name,
+          email: userData.email || "",
+          contactNumber: userData.contactNumber != null ? String(userData.contactNumber) : ""
+        }));
+      }
+    });
+    return () => { active = false; };
   }, [userData]);
 
   const validate = () => {
     const e = {};
-    if (!form.email?.trim()) e.email = "Email is required.";
+    if (!form.email?.trim()) e.email = t("eq_err_email", "Email is required.");
 
-    if (!form.purpose) e.purpose = "Please select a purpose.";
-    if (form.purpose === "Other" && !form.customPurpose.trim()) e.customPurpose = "Please specify your purpose.";
+    if (!form.purpose) e.purpose = t("eq_err_purpose", "Please select a purpose.");
+    if (form.purpose === "Other" && !form.customPurpose.trim()) {
+      e.customPurpose = t("eq_err_specify_purpose", "Please specify your purpose.");
+    }
 
-    if (!form.quantity || form.quantity <= 0) e.quantity = "Please enter a valid quantity.";
-    if (maxQty > 0 && form.quantity > maxQty) e.quantity = `Requested quantity exceeds available inventory (Max: ${maxQty}).`;
+    if (!form.quantity || form.quantity <= 0) e.quantity = t("eq_err_quantity_invalid", "Please enter a valid quantity.");
+    if (maxQty > 0 && form.quantity > maxQty) e.quantity = t("eq_err_quantity_exceed", maxQty);
 
-    if (!form.pickUpDate) e.pickUpDate = "Please select a pick-up date.";
-    if (!form.returnDate) e.returnDate = "Please select a return date.";
+    if (!form.pickUpDate) e.pickUpDate = t("eq_err_pickup_date", "Please select a pick-up date.");
+    if (!form.returnDate) e.returnDate = t("eq_err_return_date", "Please select a return date.");
     if (form.returnDate && form.pickUpDate && form.returnDate < form.pickUpDate) {
-      e.returnDate = "Return date cannot be before the pick-up date.";
+      e.returnDate = t("eq_err_return_before_pickup", "Return date cannot be before the pick-up date.");
     }
 
     return e;
@@ -296,7 +311,6 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
 
     try {
       const finalPurpose = form.purpose === "Other" ? form.customPurpose : form.purpose;
-
       const userUID = userData?.UID || getSaved("UID", null);
 
       const submissionForm = {
@@ -317,21 +331,21 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit rental:", error);
-      await showAlert("Submission Failed", error.message || "Failed to submit request. Please try again.");
+      await showAlert(t("eq_submission_failed", "Submission Failed"), error.message || t("eq_failed_msg", "Failed to submit request. Please try again."));
     }
   };
 
   if (submitted) return (
     <div className="sv-success-wrap">
       <div className="sv-success-icon"><ServiceCheckCircleIcon /></div>
-      <h3 className="sv-success-title">Request Submitted</h3>
-      <p className="sv-success-sub">Your equipment rental request has been submitted and is awaiting barangay approval.</p>
+      <h3 className="sv-success-title">{t("eq_submitted_header", "Request Submitted")}</h3>
+      <p className="sv-success-sub">{t("eq_submitted_desc", "Your equipment rental request has been submitted and is awaiting barangay approval.")}</p>
       <div className="dr-ref-box" style={{ margin: '1rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-        <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
+        <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>{t("reference_number", "Reference Number")}</span>
         <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
       </div>
-      <div className="sv-status-badge"><ServiceClockIcon /> Pending Approval</div>
-      <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>Close</button>
+      <div className="sv-status-badge"><ServiceClockIcon /> {t("status_pending", "Pending Approval")}</div>
+      <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>{t("close", "Close")}</button>
     </div>
   );
 
@@ -388,7 +402,7 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
             >
               <option value="" disabled>{t("eq_select_purpose_ph", "Select a purpose...")}</option>
               {(equipment?.purposeOptions || []).map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
+                <option key={i} value={opt}>{localizePurpose(opt, language)}</option>
               ))}
               <option value="Other">{t("eq_other_specify", "Other (Please specify)")}</option>
             </select>
@@ -398,14 +412,14 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
           {form.purpose === "Other" && (
             <div className="sv-field">
               <label className="sv-label">{t("eq_specify_purpose", "Specify Purpose")} <span className="sv-required">*</span></label>
-              <input className={`sv-input${errors.customPurpose ? " sv-input--error" : ""}`} placeholder="e.g. Community Cleanup, Sportsfest" value={form.customPurpose} onChange={e => { set("customPurpose", e.target.value); setErrors(p => ({ ...p, customPurpose: "" })); }} />
+              <input className={`sv-input${errors.customPurpose ? " sv-input--error" : ""}`} placeholder={t("eq_specify_purpose_ph", "e.g. Community Cleanup, Sportsfest")} value={form.customPurpose} onChange={e => { set("customPurpose", e.target.value); setErrors(p => ({ ...p, customPurpose: "" })); }} />
               {errors.customPurpose && <span className="sv-error-msg">{errors.customPurpose}</span>}
             </div>
           )}
 
           <div className="sv-field">
             <label className="sv-label">{t("eq_qty_requested", "Quantity Requested")} <span className="sv-required">*</span> {maxQty > 0 && <span style={{ fontWeight: 400, fontSize: '0.8rem', color: '#64748b' }}>{t("eq_max_inventory", maxQty)}</span>}</label>
-            <input className={`sv-input${errors.quantity ? " sv-input--error" : ""}`} type="number" min="1" max={maxQty || undefined} placeholder="e.g. 50" value={form.quantity} onChange={e => { set("quantity", e.target.value); setErrors(p => ({ ...p, quantity: "" })); }} />
+            <input className={`sv-input${errors.quantity ? " sv-input--error" : ""}`} type="number" min="1" max={maxQty || undefined} placeholder={t("eq_qty_ph", "e.g. 50")} value={form.quantity} onChange={e => { set("quantity", e.target.value); setErrors(p => ({ ...p, quantity: "" })); }} />
             {errors.quantity && <span className="sv-error-msg">{errors.quantity}</span>}
           </div>
 

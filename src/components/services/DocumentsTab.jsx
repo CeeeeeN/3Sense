@@ -1,12 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { collection, onSnapshot, getDoc, doc, query, limit } from "firebase/firestore";
+import { collection, onSnapshot, getDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
 import { useLanguage } from "../../context/LanguageContext";
+import {
+  localizePurpose,
+  localizeFee,
+  localizeDays,
+  localizeReminder,
+} from "../../utils/serviceTranslations";
 
-const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const CIVIL_STATUS_OPTIONS = [
+  { value: "Single", labelKey: "status_single" },
+  { value: "Married", labelKey: "status_married" },
+  { value: "Widowed", labelKey: "status_widowed" },
+  { value: "Separated", labelKey: "status_separated" },
+];
 
 const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
@@ -20,8 +30,6 @@ const normalizePHMobile = (value) => {
   else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
   return d.slice(0, 11);
 };
-
-const isValidPHMobile = (value) => /^09\d{9}$/.test(value);
 
 const formatSize = (bytes) => {
   if (!bytes && bytes !== 0) return "";
@@ -111,13 +119,13 @@ function StepIndicator({ step, onStepClick }) {
 
 // ── Step 1: choose a document ─────────────────────────────────────────────────
 function Step1({ docTypes, selected, onSelect, error }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   return (
     <section className="bz-card">
-      <h3 className="bz-heading">Choose the document you need</h3>
+      <h3 className="bz-heading">{t("doc_choose_title", "Choose the document you need")}</h3>
       <p className="bz-text">{t("doc_step1_hint", "Select the document you need. You must choose one to proceed.")}</p>
 
-      <div className="dz-docs" role="radiogroup" aria-label="Documents">
+      <div className="dz-docs" role="radiogroup" aria-label={t("doc_documents", "Documents")}>
         {docTypes.map(d => {
           const isSel = selected?.id === d.id;
           const fee = d.fee;
@@ -137,8 +145,8 @@ function Step1({ docTypes, selected, onSelect, error }) {
                 <span className="dz-doc__desc">{d.description || d.desc}</span>
                 {(fee || days) && (
                   <span className="dz-doc__pills">
-                    {fee ? <span className="dz-pill dz-pill--fee">{fee}</span> : null}
-                    {days ? <span className="dz-pill">{days}</span> : null}
+                    {fee ? <span className="dz-pill dz-pill--fee">{localizeFee(fee, language)}</span> : null}
+                    {days ? <span className="dz-pill">{localizeDays(days, language)}</span> : null}
                   </span>
                 )}
               </span>
@@ -157,6 +165,7 @@ function Step1({ docTypes, selected, onSelect, error }) {
 
 // ── Step 2: your details ──────────────────────────────────────────────────────
 function Step2({ docType, form, setForm, errors }) {
+  const { t, language } = useLanguage();
   const [previewUrl, setPreviewUrl] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
@@ -165,7 +174,10 @@ function Step2({ docType, form, setForm, errors }) {
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB."); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      alert(t("doc_err_file_size", "File must be under 5MB."));
+      return;
+    }
     set("validId", file.name);
     set("validIdFile", file);
 
@@ -193,39 +205,43 @@ function Step2({ docType, form, setForm, errors }) {
   const isPdf = form.validIdFile?.type === "application/pdf" || /\.pdf$/i.test(form.validId || "");
   const isOther = form.purposeOption === "Other";
 
-  const Req = () => <span className="bf-pill bf-pill--req">Required</span>;
-  const Opt = () => <span className="bf-pill">Optional</span>;
+  const reqPill = <span className="bf-pill bf-pill--req">{t("required", "Required")}</span>;
+  const optPill = <span className="bf-pill">{t("optional", "Optional")}</span>;
 
   return (
     <section className="bz-card">
-      <h3 className="bz-heading">Your details</h3>
-      <p className="bz-text">Check that your information is correct. Fill in anything that is empty.</p>
+      <h3 className="bz-heading">{t("doc_your_details", "Your details")}</h3>
+      <p className="bz-text">{t("doc_details_hint", "Check that your information is correct. Fill in anything that is empty.")}</p>
 
       {docType && (
         <div className="lv-chosen">
-          <div className="lv-chosen__label">You are requesting</div>
+          <div className="lv-chosen__label">{t("doc_requesting_label", "You are requesting")}</div>
           <div className="lv-chosen__title">
             {docType.icon ? <span className="dz-chosen-icon">{docType.icon}</span> : null}
             {docType.documentName || docType.title || docType.name}
           </div>
-          {(docType.reminder || docType.note) && <div className="dz-chosen-note">{docType.reminder || docType.note}</div>}
+          {(docType.reminder || docType.note) && (
+            <div className="dz-chosen-note">
+              {localizeReminder(docType.reminder || docType.note, language)}
+            </div>
+          )}
         </div>
       )}
 
       <div className="bf-form">
         {/* ── Personal information ── */}
         <div className="bf-group">
-          <div className="bf-group__title">Personal information</div>
+          <div className="bf-group__title">{t("doc_personal_info", "Personal information")}</div>
 
           <div className="bf-form bf-form--tight">
             <div className="bf-row">
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-first">First name <Req /></label>
+                <label className="bf-label" htmlFor="dz-first">{t("doc_first_name", "First name")} {reqPill}</label>
                 <input id="dz-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
                 {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
               </div>
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-last">Last name <Req /></label>
+                <label className="bf-label" htmlFor="dz-last">{t("doc_last_name", "Last name")} {reqPill}</label>
                 <input id="dz-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
                 {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
               </div>
@@ -233,11 +249,11 @@ function Step2({ docType, form, setForm, errors }) {
 
             <div className="bf-row">
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-middle">Middle name <Opt /></label>
+                <label className="bf-label" htmlFor="dz-middle">{t("doc_middle_name", "Middle name")} {optPill}</label>
                 <input id="dz-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
               </div>
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-dob">Date of birth <Req /></label>
+                <label className="bf-label" htmlFor="dz-dob">{t("profile_birthdate", "Date of birth")} {reqPill}</label>
                 <input id="dz-dob" className={`bf-input${errors.dob ? " bf-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
                 {errors.dob && <div className="bf-error">{errors.dob}</div>}
               </div>
@@ -245,21 +261,21 @@ function Step2({ docType, form, setForm, errors }) {
 
             <div className="bf-row">
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-civil">Civil status</label>
+                <label className="bf-label" htmlFor="dz-civil">{t("profile_civil_status", "Civil status")}</label>
                 <select id="dz-civil" className="bf-input bf-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
-                  {CIVIL_STATUS.map(s => <option key={s}>{s}</option>)}
+                  {CIVIL_STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{t(s.labelKey, s.value)}</option>)}
                 </select>
               </div>
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-since">Living here since (year) <Req /></label>
-                <input id="dz-since" className={`bf-input${errors.residingSince ? " bf-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder="For example: 2010" />
+                <label className="bf-label" htmlFor="dz-since">{t("doc_residing_since_year", "Living here since (year)")} {reqPill}</label>
+                <input id="dz-since" className={`bf-input${errors.residingSince ? " bf-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder={t("doc_residing_year_ph", "For example: 2010")} />
                 {errors.residingSince && <div className="bf-error">{errors.residingSince}</div>}
               </div>
             </div>
 
             <div className="bf-row">
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-contact">Phone number <Req /></label>
+                <label className="bf-label" htmlFor="dz-contact">{t("doc_phone_number", "Phone number")} {reqPill}</label>
                 <input
                   id="dz-contact"
                   className={`bf-input${errors.contact ? " bf-input--error" : ""}`}
@@ -274,14 +290,14 @@ function Step2({ docType, form, setForm, errors }) {
                 {errors.contact && <div className="bf-error">{errors.contact}</div>}
               </div>
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-email">Email <Opt /></label>
+                <label className="bf-label" htmlFor="dz-email">{t("profile_email", "Email")} {optPill}</label>
                 <input id="dz-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
               </div>
             </div>
 
             <div className="bf-field">
-              <label className="bf-label" htmlFor="dz-address">Home address <Req /></label>
-              <input id="dz-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
+              <label className="bf-label" htmlFor="dz-address">{t("doc_home_address", "Home address")} {reqPill}</label>
+              <input id="dz-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder={t("doc_address_ph", "House No., Street, Barangay Malanday, Valenzuela City")} />
               {errors.address && <div className="bf-error">{errors.address}</div>}
             </div>
           </div>
@@ -289,40 +305,40 @@ function Step2({ docType, form, setForm, errors }) {
 
         {/* ── Your request ── */}
         <div className="bf-group">
-          <div className="bf-group__title">Your request</div>
+          <div className="bf-group__title">{t("doc_your_request", "Your request")}</div>
 
           <div className="bf-form bf-form--tight">
             <div className="bf-field">
-              <label className="bf-label" htmlFor="dz-purpose">Why do you need this document? <Req /></label>
+              <label className="bf-label" htmlFor="dz-purpose">{t("doc_why_need", "Why do you need this document?")} {reqPill}</label>
               <select
                 id="dz-purpose"
                 className={`bf-input bf-select${errors.purposeOption ? " bf-input--error" : ""}`}
                 value={form.purposeOption}
                 onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
               >
-                <option value="">Choose from the list...</option>
-                {purposeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                <option value="Other">Other</option>
+                <option value="">{t("doc_choose_list", "Choose from the list...")}</option>
+                {purposeOptions.map(opt => <option key={opt} value={opt}>{localizePurpose(opt, language)}</option>)}
+                <option value="Other">{t("doc_other", "Other")}</option>
               </select>
               {errors.purposeOption && <div className="bf-error">{errors.purposeOption}</div>}
             </div>
 
             {isOther && (
               <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-other">Please tell us the reason <Req /></label>
+                <label className="bf-label" htmlFor="dz-other">{t("doc_specify_reason", "Please tell us the reason")} {reqPill}</label>
                 <input
                   id="dz-other"
                   className={`bf-input${errors.purposeOther ? " bf-input--error" : ""}`}
                   value={form.purposeOther}
                   onChange={e => set("purposeOther", e.target.value)}
-                  placeholder="Write your reason here"
+                  placeholder={t("doc_reason_ph", "Write your reason here")}
                 />
                 {errors.purposeOther && <div className="bf-error">{errors.purposeOther}</div>}
               </div>
             )}
 
             <div className="bf-field">
-              <div className="bf-label">Valid ID <Req /></div>
+              <div className="bf-label">{t("doc_valid_id", "Valid ID")} {reqPill}</div>
               <label className={`bf-photo${form.validId ? " is-filled" : ""}${errors.validId ? " is-error" : ""}`}>
                 <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
                 {previewUrl
@@ -331,19 +347,19 @@ function Step2({ docType, form, setForm, errors }) {
                 <span className="bf-photo__text">
                   {form.validId ? (
                     <>
-                      <strong>ID added</strong>
-                      <small>{[form.validId, isPdf ? "PDF" : "Image", formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · Tap to change</small>
+                      <strong>{t("doc_id_added", "ID added")}</strong>
+                      <small>{[form.validId, isPdf ? "PDF" : t("doc_image", "Image"), formatSize(form.validIdFile?.size)].filter(Boolean).join(" · ")} · {t("doc_tap_change", "Tap to change")}</small>
                     </>
                   ) : (
                     <>
-                      <strong>Tap here to add your ID</strong>
-                      <small>A photo or scan. JPG, PNG or PDF, up to 5MB</small>
+                      <strong>{t("doc_tap_add_id", "Tap here to add your ID")}</strong>
+                      <small>{t("doc_id_guideline", "A photo or scan. JPG, PNG or PDF, up to 5MB")}</small>
                     </>
                   )}
                 </span>
               </label>
               {form.validId && (
-                <button type="button" className="bf-secondary dz-remove" onClick={removeFile}>Remove this file</button>
+                <button type="button" className="bf-secondary dz-remove" onClick={removeFile}>{t("doc_remove_file", "Remove this file")}</button>
               )}
               {errors.validId && <div className="bf-error">{errors.validId}</div>}
             </div>
@@ -353,7 +369,7 @@ function Step2({ docType, form, setForm, errors }) {
         {/* ── Document-specific fields ── */}
         {extraFields.length > 0 && (
           <div className="bf-group">
-            <div className="bf-group__title">More information needed</div>
+            <div className="bf-group__title">{t("doc_more_info_needed", "More information needed")}</div>
 
             <div className="bf-form bf-form--tight">
               {extraFields.map(f => {
@@ -362,7 +378,7 @@ function Step2({ docType, form, setForm, errors }) {
                     <div className="bf-field" key={f.id}>
                       <label className={`bf-check${form[f.id] ? " is-on" : ""}${errors[f.id] ? " is-error" : ""}`}>
                         <input type="checkbox" className="bf-check__box" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} />
-                        <span>{f.label} {f.required && <span className="bf-pill bf-pill--req">Required</span>}</span>
+                        <span>{f.label} {f.required && <span className="bf-pill bf-pill--req">{t("required", "Required")}</span>}</span>
                       </label>
                       {errors[f.id] && <div className="bf-error">{errors[f.id]}</div>}
                     </div>
@@ -370,7 +386,7 @@ function Step2({ docType, form, setForm, errors }) {
                 }
                 return (
                   <div className="bf-field" key={f.id}>
-                    <label className="bf-label" htmlFor={`dz-x-${f.id}`}>{f.label} {f.required && <span className="bf-pill bf-pill--req">Required</span>}</label>
+                    <label className="bf-label" htmlFor={`dz-x-${f.id}`}>{f.label} {f.required && <span className="bf-pill bf-pill--req">{t("required", "Required")}</span>}</label>
                     <input id={`dz-x-${f.id}`} className={`bf-input${errors[f.id] ? " bf-input--error" : ""}`} type={f.type || "text"} value={form[f.id] || ""} placeholder={f.placeholder || ""} onChange={e => set(f.id, e.target.value)} />
                     {errors[f.id] && <div className="bf-error">{errors[f.id]}</div>}
                   </div>
@@ -386,16 +402,19 @@ function Step2({ docType, form, setForm, errors }) {
 
 // ── Step 3: review ────────────────────────────────────────────────────────────
 function Step3({ docType, form }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
-    ? (form.purposeOther || "Other")
-    : form.purposeOption;
+    ? (form.purposeOther || t("doc_other", "Other"))
+    : localizePurpose(form.purposeOption, language);
+
+  const civilStatusLabel = form.civilStatus ? t("status_" + form.civilStatus.toLowerCase(), form.civilStatus) : form.civilStatus;
+
   const rows = [
     { label: t("doc_type", "Document Type"), value: docType?.documentName || docType?.title || docType?.name },
     { label: t("doc_full_name", "Full Name"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
     { label: t("profile_birthdate", "Date of Birth"), value: form.dob },
-    { label: t("profile_civil_status", "Civil Status"), value: form.civilStatus },
+    { label: t("profile_civil_status", "Civil Status"), value: civilStatusLabel },
     { label: t("profile_residing_since", "Residing Since"), value: form.residingSince ? (typeof t("doc_residing_present") === "function" ? t("doc_residing_present", form.residingSince) : `${form.residingSince} up to present`) : "—" },
     { label: t("doc_address", "Address"), value: form.address },
     { label: t("profile_contact", "Contact Number"), value: form.contact },
@@ -403,16 +422,16 @@ function Step3({ docType, form }) {
     { label: t("doc_purpose", "Purpose"), value: effectivePurpose || "—" },
     { label: t("doc_id_uploaded", "Valid ID Uploaded"), value: form.validId || "—" },
     ...extraFields.filter(f => f.type !== "checkbox").map(f => ({ label: f.label, value: form[f.id] || "—" })),
-    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? "✓ Confirmed" : "Not confirmed" })),
+    ...extraFields.filter(f => f.type === "checkbox").map(f => ({ label: f.label, value: form[f.id] ? t("doc_confirmed", "✓ Confirmed") : t("doc_not_confirmed", "Not confirmed") })),
   ];
 
   return (
     <section className="bz-card">
-      <h3 className="bz-heading">Check your request</h3>
+      <h3 className="bz-heading">{t("doc_check_request", "Check your request")}</h3>
       <p className="bz-text">{t("doc_review_hint")}</p>
 
       <div className="bz-note dz-review-note">
-        <span className="dz-banner__icon"><Ico size={24}>{ICONS.warning}</Ico></span>
+        <span className="dz-banner__icon"><Ico size={26}>{ICONS.warning}</Ico></span>
         <div>{t("doc_review_validity")}</div>
       </div>
 
@@ -481,11 +500,9 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     return () => unsubscribe();
   }, []);
 
-  // ─── BUG FIX (R19): Robust resident auto-fill fetch logic ───
   const loadResidentData = useCallback(async () => {
     let sourceData = userData;
 
-    // Fallback 1: Try Session LocalStorage
     if (!sourceData || (!sourceData.firstName && !sourceData.lastName)) {
       try {
         const sessionData = JSON.parse(localStorage.getItem("brgy_session") || "{}");
@@ -497,7 +514,6 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       }
     }
 
-    // Fallback 2: Direct Firestore query if props/session are insufficient
     if ((!sourceData || !sourceData.firstName) && householdID && residentID) {
       try {
         const resSnap = await getDoc(doc(db, "households", householdID, "residents", residentID));
@@ -533,33 +549,40 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     loadResidentData();
   }, [loadResidentData]);
 
-  // Bring the person back to the top when the step changes (not on first load)
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return; }
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
   const validateStep1 = () => {
-    if (!docType) { setErrors({ docType: "Please select a document type." }); return false; }
+    if (!docType) {
+      setErrors({ docType: t("doc_err_select", "Please select a document type.") });
+      return false;
+    }
     return true;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = "Required.";
-    if (!form.lastName.trim()) e.lastName = "Required.";
-    if (!form.dob) e.dob = "Required.";
-    if (!form.address.trim()) e.address = "Required.";
-    if (!String(form.contact || "").trim()) e.contact = "Required.";
-    if (!form.residingSince) e.residingSince = "Required.";
-    if (!form.purposeOption) e.purposeOption = "Required.";
-    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
-    if (!form.validId) e.validId = "Please upload a valid ID.";
+    if (!form.firstName.trim()) e.firstName = t("doc_err_required", "Required.");
+    if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
+    if (!form.dob) e.dob = t("doc_err_required", "Required.");
+    if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
+    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
+    if (!form.residingSince) e.residingSince = t("doc_err_required", "Required.");
+    if (!form.purposeOption) e.purposeOption = t("doc_err_required", "Required.");
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) {
+      e.purposeOther = t("doc_err_specify_purpose", "Please specify your purpose.");
+    }
+    if (!form.validId) e.validId = t("doc_err_upload_id", "Please upload a valid ID.");
     const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
-      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
+      if (f.type === "checkbox") {
+        if (!form[f.id]) e[f.id] = t("doc_err_confirm", "You must confirm this to proceed.");
+      } else {
+        if (!form[f.id]?.toString().trim()) e[f.id] = t("doc_err_required", "Required.");
+      }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -610,7 +633,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         setStep(4);
       } catch (error) {
         console.error("Failed to submit document request:", error);
-        setErrors({ submit: "Failed to submit. Please try again." });
+        setErrors({ submit: t("doc_err_failed_submit", "Failed to submit. Please try again.") });
       } finally {
         setIsSubmitting(false);
       }
@@ -620,12 +643,10 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setStep(s => s + 1);
   };
 
-  // ─── BUG FIX (R19): Reset transient fields & re-populate personal info ───
   const handleReset = () => {
     setStep(1);
     setDocType(null);
     setErrors({});
-    // Reset transient request inputs while maintaining personal info
     setForm(prev => ({
       ...prev,
       purposeOption: "",
