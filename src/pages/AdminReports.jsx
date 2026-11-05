@@ -7,6 +7,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../services/logger";
 import { useQuery } from '@tanstack/react-query';
 
+// NEW: Import Language Hook
+import { useLanguage } from '../context/LanguageContext';
+
 import barangayLogo from "./barangay-logo.jpg";
 
 const loadImage = (src) =>
@@ -28,6 +31,8 @@ const getImageFormat = (src) => {
 };
 
 export default function Reports() {
+  const { t } = useLanguage(); // NEW: Destructure hook
+
   const [reportType, setReportType] = useState("demographics");
   
   const [exportLoading, setExportLoading] = useState(false);
@@ -514,7 +519,7 @@ export default function Reports() {
       logTransaction(adminName, adminRole, "Exported VAWC PDF", `Total cases: ${vawcData.length}`);
     } catch (err) {
       console.error("VAWC PDF export failed:", err);
-      alert("PDF export failed. Check browser console.");
+      alert(t('admin_rep_pdf_err'));
     }
     setExportLoading(false);
   };
@@ -597,7 +602,7 @@ export default function Reports() {
       logTransaction(adminName, adminRole, "Exported Demographics PDF", `Filter: ${sexFilter}. Total: ${filteredResidents.length}.`);
     } catch (err) {
       console.error("Demographics PDF export failed:", err);
-      alert("PDF export failed.");
+      alert(t('admin_rep_pdf_err'));
     }
     setExportLoading(false);
   };
@@ -700,7 +705,6 @@ export default function Reports() {
         if (m.categories?.isSoloParent) cats.push("Solo Parent");
         if (m.categories?.isIP) cats.push("IP");
 
-        // Fix Bug A20: Include Employed alongside Unemployed and other employment statuses
         if (m.employmentStatus) {
           cats.push(m.employmentStatus);
         }
@@ -949,8 +953,8 @@ export default function Reports() {
     <AdminLayout>
       <div className="requests-container">
         <div className="requests-header">
-          <h1 className="requests-title">Reports & RBI</h1>
-          <p className="requests-subtitle">Generate official barangay demographic reports, RBI Form A, RBI Form C, and VAW-C Desk returns.</p>
+          <h1 className="requests-title">{t('admin_reports_title')}</h1>
+          <p className="requests-subtitle">{t('admin_reports_subtitle')}</p>
         </div>
 
         {/* ── TABS ── */}
@@ -959,25 +963,25 @@ export default function Reports() {
             className={`req-tab ${reportType === "demographics" ? "active" : ""}`}
             onClick={() => setReportType("demographics")}
           >
-            Demographics
+            {t('admin_rep_tab_demo')}
           </button>
           <button
             className={`req-tab ${reportType === "rbi-a" ? "active" : ""}`}
             onClick={() => setReportType("rbi-a")}
           >
-            RBI Form A
+            {t('admin_rep_tab_rbiA')}
           </button>
           <button
             className={`req-tab ${reportType === "rbi-c" ? "active" : ""}`}
             onClick={() => setReportType("rbi-c")}
           >
-            RBI Form C
+            {t('admin_rep_tab_rbiC')}
           </button>
           <button
             className={`req-tab ${reportType === "vawc" ? "active" : ""}`}
             onClick={() => setReportType("vawc")}
           >
-            VAWC Cases
+            {t('admin_rep_tab_vawc')}
           </button>
         </div>
 
@@ -985,13 +989,13 @@ export default function Reports() {
         {reportType === "demographics" && (
           <>
             <div className="card-grid">
-              <div className="card">Total Residents<br /><strong>{loading ? "..." : filteredStats.total}</strong></div>
-              <div className="card">Male<br /><strong>{loading ? "..." : filteredStats.Male}</strong></div>
-              <div className="card">Female<br /><strong>{loading ? "..." : filteredStats.Female}</strong></div>
+              <div className="card">{t('admin_rep_demo_total')}<br /><strong>{loading ? "..." : filteredStats.total}</strong></div>
+              <div className="card">{t('admin_rep_demo_male')}<br /><strong>{loading ? "..." : filteredStats.Male}</strong></div>
+              <div className="card">{t('admin_rep_demo_female')}<br /><strong>{loading ? "..." : filteredStats.Female}</strong></div>
             </div>
             <div className="section">
               <div className="report-header">
-                <h2>Resident Demographics</h2>
+                <h2>{t('admin_rep_demo_header')}</h2>
                 <div className="report-controls" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="filter-group" style={{ display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", flexWrap: "nowrap" }}>
                     <select
@@ -999,7 +1003,7 @@ export default function Reports() {
                       value={sexFilter}
                       onChange={(e) => setSexFilter(e.target.value)}
                     >
-                      <option value="all">All Sexes</option>
+                      <option value="all">{t('admin_rep_demo_filter_all')}</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                     </select>
@@ -1009,31 +1013,31 @@ export default function Reports() {
                       value={sortDemographics}
                       onChange={(e) => setSortDemographics(e.target.value)}
                     >
-                      <option value="name_asc">Name: A to Z</option>
-                      <option value="name_desc">Name: Z to A</option>
-                      <option value="age_asc">Age: Lowest First</option>
-                      <option value="age_desc">Age: Highest First</option>
-                      <option value="hhid_asc">Household ID: Ascending</option>
-                      <option value="hhid_desc">Household ID: Descending</option>
+                      <option value="name_asc">{t('admin_rep_demo_sort_name_asc')}</option>
+                      <option value="name_desc">{t('admin_rep_demo_sort_name_desc')}</option>
+                      <option value="age_asc">{t('admin_rep_demo_sort_age_asc')}</option>
+                      <option value="age_desc">{t('admin_rep_demo_sort_age_desc')}</option>
+                      <option value="hhid_asc">{t('admin_rep_demo_sort_hhid_asc')}</option>
+                      <option value="hhid_desc">{t('admin_rep_demo_sort_hhid_desc')}</option>
                     </select>
                   </div>
-                  <button className="export-btn" onClick={handleExportDemographicsCSV} disabled={filteredResidents.length === 0 || exportLoading}>Export CSV</button>
+                  <button className="export-btn" onClick={handleExportDemographicsCSV} disabled={filteredResidents.length === 0 || exportLoading}>{t('admin_rep_btn_export_csv')}</button>
                   <button className="export-btn" onClick={handleExportDemographicsPDF} disabled={filteredResidents.length === 0 || exportLoading}>
-                    {exportLoading ? "Generating…" : "Export PDF"}
+                    {exportLoading ? t('admin_rep_btn_generating') : t('admin_rep_btn_export_pdf')}
                   </button>
                 </div>
               </div>
 
               {loading ? (
-                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>Loading resident data…</div>
+                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>{t('admin_rep_demo_loading')}</div>
               ) : filteredResidents.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No residents found.</div>
+                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>{t('admin_rep_demo_empty')}</div>
               ) : (
                 <>
                   <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                     <table className="req-table" style={{ minWidth: "850px", width: "100%", borderCollapse: "collapse" }}>
                       <thead>
-                        <tr>{["Full Name", "Sex", "Age", "Civil Status", "Citizenship", "Occupation", "Household ID"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                        <tr>{[t('admin_rep_demo_th_name'), t('admin_rep_demo_th_sex'), t('admin_rep_demo_th_age'), t('admin_rep_demo_th_civil'), t('admin_rep_demo_th_citizen'), t('admin_rep_demo_th_occ'), t('admin_rep_demo_th_hhid')].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                       </thead>
                       <tbody>
                         {paginatedResidents.map((r, index) => (
@@ -1062,7 +1066,7 @@ export default function Reports() {
                     gap: "16px",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                      <span>Rows per page:</span>
+                      <span>{t('admin_rep_page_rows')}</span>
                       <select
                         value={demoRowsPerPage}
                         onChange={(e) => setDemoRowsPerPage(Number(e.target.value))}
@@ -1089,7 +1093,7 @@ export default function Reports() {
                           onClick={() => setDemoPage((prev) => Math.max(prev - 1, 1))}
                           disabled={demoPage === 1}
                         >
-                          Previous
+                          {t('admin_rep_page_prev')}
                         </button>
                         {renderPageNumbers(demoPage, totalDemoPages, setDemoPage)}
                         <button
@@ -1097,14 +1101,14 @@ export default function Reports() {
                           onClick={() => setDemoPage((prev) => Math.min(prev + 1, totalDemoPages))}
                           disabled={demoPage === totalDemoPages}
                         >
-                          Next
+                          {t('admin_rep_page_next')}
                         </button>
                       </div>
                     )}
 
                     <div style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                      Showing {filteredResidents.length > 0 ? demoStartIndex + 1 : 0} to{" "}
-                      {Math.min(demoStartIndex + demoRowsPerPage, filteredResidents.length)} of{" "}
+                      {t('admin_rep_page_showing')} {filteredResidents.length > 0 ? demoStartIndex + 1 : 0} {t('admin_rep_page_to')}{" "}
+                      {Math.min(demoStartIndex + demoRowsPerPage, filteredResidents.length)} {t('admin_rep_page_of')}{" "}
                       {filteredResidents.length}
                     </div>
                   </div>
@@ -1118,14 +1122,14 @@ export default function Reports() {
         {reportType === "rbi-a" && (
           <>
             <div className="card-grid">
-              <div className="card">Total Households<br /><strong>{householdData.length}</strong></div>
-              <div className="card">Total Residents<br /><strong>{residentData.length}</strong></div>
-              <div className="card">Male<br /><strong>{maleFemaleCount.Male}</strong></div>
-              <div className="card">Female<br /><strong>{maleFemaleCount.Female}</strong></div>
+              <div className="card">{t('admin_rep_rbiA_total_hh')}<br /><strong>{householdData.length}</strong></div>
+              <div className="card">{t('admin_rep_demo_total')}<br /><strong>{residentData.length}</strong></div>
+              <div className="card">{t('admin_rep_demo_male')}<br /><strong>{maleFemaleCount.Male}</strong></div>
+              <div className="card">{t('admin_rep_demo_female')}<br /><strong>{maleFemaleCount.Female}</strong></div>
             </div>
             <div className="section">
               <div className="report-header">
-                <h2>RBI Form A — Records of Barangay Inhabitants Masterlist</h2>
+                <h2>{t('admin_rep_rbiA_header')}</h2>
                 <div className="report-controls" style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                   <div className="filter-group" style={{ display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", flexWrap: "nowrap" }}>
                     <select
@@ -1133,33 +1137,33 @@ export default function Reports() {
                       value={sortRbiA}
                       onChange={(e) => setSortRbiA(e.target.value)}
                     >
-                      <option value="hhid_asc">Household ID: Ascending</option>
-                      <option value="hhid_desc">Household ID: Descending</option>
-                      <option value="members_desc">Members: Highest First</option>
-                      <option value="members_asc">Members: Lowest First</option>
-                      <option value="head_asc">Head Name: A to Z</option>
-                      <option value="head_desc">Head Name: Z to A</option>
+                      <option value="hhid_asc">{t('admin_rep_demo_sort_hhid_asc')}</option>
+                      <option value="hhid_desc">{t('admin_rep_demo_sort_hhid_desc')}</option>
+                      <option value="members_desc">{t('admin_rep_rbiA_sort_mem_desc')}</option>
+                      <option value="members_asc">{t('admin_rep_rbiA_sort_mem_asc')}</option>
+                      <option value="head_asc">{t('admin_rep_rbiA_sort_head_asc')}</option>
+                      <option value="head_desc">{t('admin_rep_rbiA_sort_head_desc')}</option>
                     </select>
                   </div>
                   <button className="export-btn" onClick={handleExportRBIFormA}
                     disabled={rbiFormAData.length === 0 || exportLoading}>
-                    {exportLoading ? "Generating…" : "Export PDF"}
+                    {exportLoading ? t('admin_rep_btn_generating') : t('admin_rep_btn_export_pdf')}
                   </button>
                 </div>
               </div>
 
               <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", fontSize: "13px", color: "#1e40af" }}>
-                <strong>Note:</strong> Exports 1 Masterlist PDF file containing all households matching RBI Form A (Revised 2024) in a single continuous table structure.
+                <strong>Note:</strong> {t('admin_rep_rbiA_note')}
               </div>
 
               {rbiFormAData.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>No household data found.</div>
+                <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>{t('admin_rep_rbiA_empty')}</div>
               ) : (
                 <>
                   <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                     <table className="req-table" style={{ minWidth: "850px", width: "100%", borderCollapse: "collapse" }}>
                       <thead>
-                        <tr>{["Household ID", "Household Address", "No. of Members", "Head of Household", "Members Preview"].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                        <tr>{[t('admin_rep_demo_th_hhid'), t('admin_rep_rbiA_th_hh_addr'), t('admin_rep_rbiA_th_no_mem'), t('admin_rep_rbiA_th_head'), t('admin_rep_rbiA_th_mem_prev')].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
                       </thead>
                       <tbody>
                         {paginatedRbiA.map((hh) => (
@@ -1173,7 +1177,7 @@ export default function Reports() {
                             <td style={tdStyle}>
                               <div style={{ fontSize: "12px", color: "#6b7280" }}>
                                 {hh.members.slice(0, 3).map((m) => m.fullName).join(", ")}
-                                {hh.members.length > 3 && ` +${hh.members.length - 3} more`}
+                                {hh.members.length > 3 && ` +${hh.members.length - 3} ${t('admin_rep_rbiA_more')}`}
                               </div>
                             </td>
                           </tr>
@@ -1193,7 +1197,7 @@ export default function Reports() {
                     gap: "16px",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem" }}>
-                      <span>Rows per page:</span>
+                      <span>{t('admin_rep_page_rows')}</span>
                       <select
                         value={rbiARowsPerPage}
                         onChange={(e) => setRbiARowsPerPage(Number(e.target.value))}
@@ -1220,7 +1224,7 @@ export default function Reports() {
                           onClick={() => setRbiAPage((prev) => Math.max(prev - 1, 1))}
                           disabled={rbiAPage === 1}
                         >
-                          Previous
+                          {t('admin_rep_page_prev')}
                         </button>
                         {renderPageNumbers(rbiAPage, totalRbiAPages, setRbiAPage)}
                         <button
@@ -1228,14 +1232,14 @@ export default function Reports() {
                           onClick={() => setRbiAPage((prev) => Math.min(prev + 1, totalRbiAPages))}
                           disabled={rbiAPage === totalRbiAPages}
                         >
-                          Next
+                          {t('admin_rep_page_next')}
                         </button>
                       </div>
                     )}
 
                     <div style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                      Showing {rbiFormAData.length > 0 ? rbiAStartIndex + 1 : 0} to{" "}
-                      {Math.min(rbiAStartIndex + rbiARowsPerPage, rbiFormAData.length)} of{" "}
+                      {t('admin_rep_page_showing')} {rbiFormAData.length > 0 ? rbiAStartIndex + 1 : 0} {t('admin_rep_page_to')}{" "}
+                      {Math.min(rbiAStartIndex + rbiARowsPerPage, rbiFormAData.length)} {t('admin_rep_page_of')}{" "}
                       {rbiFormAData.length}
                     </div>
                   </div>
@@ -1249,33 +1253,33 @@ export default function Reports() {
         {reportType === "rbi-c" && (
           <>
             <div className="card-grid">
-              <div className="card">Total Population<br /><strong>{residentData.length}</strong></div>
-              <div className="card">Total Households<br /><strong>{householdData.length}</strong></div>
-              <div className="card">Male<br /><strong>{maleFemaleCount.Male}</strong></div>
-              <div className="card">Female<br /><strong>{maleFemaleCount.Female}</strong></div>
+              <div className="card">{t('admin_rep_rbiC_total_pop')}<br /><strong>{residentData.length}</strong></div>
+              <div className="card">{t('admin_rep_rbiA_total_hh')}<br /><strong>{householdData.length}</strong></div>
+              <div className="card">{t('admin_rep_demo_male')}<br /><strong>{maleFemaleCount.Male}</strong></div>
+              <div className="card">{t('admin_rep_demo_female')}<br /><strong>{maleFemaleCount.Female}</strong></div>
             </div>
             <div className="section">
               <div className="report-header">
-                <h2>RBI Form C — Barangay Monitoring Report</h2>
+                <h2>{t('admin_rep_rbiC_header')}</h2>
                 <div className="report-controls">
                   <button className="export-btn" onClick={handleExportRBIFormC}
                     disabled={residentData.length === 0 || exportLoading}>
-                    {exportLoading ? "Generating…" : "Export PDF"}
+                    {exportLoading ? t('admin_rep_btn_generating') : t('admin_rep_btn_export_pdf')}
                   </button>
                 </div>
               </div>
 
               {/* A. Age Brackets */}
               <div className="report-card" style={{ marginBottom: "20px" }}>
-                <h3 style={{ marginBottom: "12px" }}>A. Population by Age Bracket</h3>
+                <h3 style={{ marginBottom: "12px" }}>{t('admin_rep_rbiC_secA')}</h3>
                 <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                   <table className="req-table" style={{ minWidth: "600px", width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>Age Bracket</th>
-                        <th style={thNum}>Male</th>
-                        <th style={thNum}>Female</th>
-                        <th style={thNum}>Total</th>
+                        <th style={thStyle}>{t('admin_rep_rbiC_th_age_bracket')}</th>
+                        <th style={thNum}>{t('admin_rep_demo_male')}</th>
+                        <th style={thNum}>{t('admin_rep_demo_female')}</th>
+                        <th style={thNum}>{t('admin_rep_rbiC_th_total')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1288,7 +1292,7 @@ export default function Reports() {
                         </tr>
                       ))}
                       <tr style={{ background: "#eff6ff" }}>
-                        <td style={{ ...tdStyle, fontWeight: "700", color: "#1e40af" }}>TOTAL</td>
+                        <td style={{ ...tdStyle, fontWeight: "700", color: "#1e40af" }}>{t('admin_rep_rbiC_total_caps')}</td>
                         <td style={{ ...tdNum, fontWeight: "700", color: "#1e40af" }}>{maleFemaleCount.Male}</td>
                         <td style={{ ...tdNum, fontWeight: "700", color: "#1e40af" }}>{maleFemaleCount.Female}</td>
                         <td style={{ ...tdNum, fontWeight: "700", color: "#1e40af" }}>{residentData.length}</td>
@@ -1300,15 +1304,15 @@ export default function Reports() {
 
               {/* B. Population by Sector */}
               <div className="report-card" style={{ marginBottom: "20px" }}>
-                <h3 style={{ marginBottom: "12px" }}>B. Population by Sector</h3>
+                <h3 style={{ marginBottom: "12px" }}>{t('admin_rep_rbiC_secB')}</h3>
                 <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                   <table className="req-table" style={{ minWidth: "600px", width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>Sector</th>
-                        <th style={thNum}>Male</th>
-                        <th style={thNum}>Female</th>
-                        <th style={thNum}>Total</th>
+                        <th style={thStyle}>{t('admin_rep_rbiC_th_sector')}</th>
+                        <th style={thNum}>{t('admin_rep_demo_male')}</th>
+                        <th style={thNum}>{t('admin_rep_demo_female')}</th>
+                        <th style={thNum}>{t('admin_rep_rbiC_th_total')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1328,11 +1332,11 @@ export default function Reports() {
               {/* C & D side by side */}
               <div className="rbi-bottom-grid">
                 <div className="report-card">
-                  <h3 style={{ marginBottom: "12px" }}>Civil Status</h3>
+                  <h3 style={{ marginBottom: "12px" }}>{t('admin_rep_rbiC_secC')}</h3>
                   <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                     <table className="req-table" style={{ minWidth: "400px", width: "100%", borderCollapse: "collapse" }}>
                       <thead>
-                        <tr><th style={thStyle}>Status</th><th style={thNum}>Male</th><th style={thNum}>Female</th><th style={thNum}>Total</th></tr>
+                        <tr><th style={thStyle}>{t('admin_rep_rbiC_th_status')}</th><th style={thNum}>{t('admin_rep_demo_male')}</th><th style={thNum}>{t('admin_rep_demo_female')}</th><th style={thNum}>{t('admin_rep_rbiC_th_total')}</th></tr>
                       </thead>
                       <tbody>
                         {rbiFormCData.civilStatuses.map((s) => (
@@ -1348,11 +1352,11 @@ export default function Reports() {
                   </div>
                 </div>
                 <div className="report-card">
-                  <h3 style={{ marginBottom: "12px" }}>Citizenship</h3>
+                  <h3 style={{ marginBottom: "12px" }}>{t('admin_rep_rbiC_secD')}</h3>
                   <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                     <table className="req-table" style={{ minWidth: "400px", width: "100%", borderCollapse: "collapse" }}>
                       <thead>
-                        <tr><th style={thStyle}>Type</th><th style={thNum}>Male</th><th style={thNum}>Female</th><th style={thNum}>Total</th></tr>
+                        <tr><th style={thStyle}>{t('admin_rep_rbiC_th_type')}</th><th style={thNum}>{t('admin_rep_demo_male')}</th><th style={thNum}>{t('admin_rep_demo_female')}</th><th style={thNum}>{t('admin_rep_rbiC_th_total')}</th></tr>
                       </thead>
                       <tbody>
                         {rbiFormCData.citizenshipRows.map((s) => (
@@ -1377,26 +1381,26 @@ export default function Reports() {
         {reportType === "vawc" && (
           <>
             <div className="card-grid">
-              <div className="card">Total VAC Victims<br /><strong>{vawcStats.total}</strong></div>
-              <div className="card">Gender: Male<br /><strong>{vawcStats.gender.M}</strong></div>
-              <div className="card">Gender: Female<br /><strong>{vawcStats.gender.F}</strong></div>
-              <div className="card">Cases Acted Upon<br /><strong style={{ color: "#166534" }}>{vawcData.filter(c => c.status === "Acted Upon").length}</strong></div>
+              <div className="card">{t('admin_rep_vawc_total_vac')}<br /><strong>{vawcStats.total}</strong></div>
+              <div className="card">{t('admin_rep_vawc_gen_male')}<br /><strong>{vawcStats.gender.M}</strong></div>
+              <div className="card">{t('admin_rep_vawc_gen_female')}<br /><strong>{vawcStats.gender.F}</strong></div>
+              <div className="card">{t('admin_rep_vawc_acted')}<br /><strong style={{ color: "#166534" }}>{vawcData.filter(c => c.status === "Acted Upon").length}</strong></div>
             </div>
 
             <div className="section">
               <div className="report-header">
                 <div>
-                  <h2>Monitoring of Incidence on Violence Against Children (VAC)</h2>
+                  <h2>{t('admin_rep_vawc_header')}</h2>
                   <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "4px 0 0 0" }}>
-                    Barangay: MALANDAY | City: VALENZUELA | Region: NATIONAL CAPITAL REGION
+                    {t('admin_rep_vawc_location')}
                   </p>
                 </div>
                 <div className="report-controls" style={{ display: "flex", gap: "10px" }}>
                   <button className="export-btn" onClick={handleExportVawcCSV} disabled={vawcData.length === 0 || exportLoading}>
-                    Export CSV
+                    {t('admin_rep_btn_export_csv')}
                   </button>
                   <button className="export-btn" onClick={handleExportVawcPDF} disabled={vawcData.length === 0 || exportLoading}>
-                    {exportLoading ? "Generating…" : "Export PDF"}
+                    {exportLoading ? t('admin_rep_btn_generating') : t('admin_rep_btn_export_pdf')}
                   </button>
                 </div>
               </div>
@@ -1405,13 +1409,13 @@ export default function Reports() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "center" }}>
                   <thead>
                     <tr style={{ background: "#f1f5f9", borderBottom: "1px solid #cbd5e1" }}>
-                      <th rowSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>BARANGAY</th>
-                      <th rowSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>VAC VICTIMS<br />(1)</th>
-                      <th colSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>GENDER<br />(2)</th>
-                      <th colSpan="5" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>AGE<br />(3)</th>
-                      <th colSpan="4" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>TYPES OF VIOLENCE<br />(4)</th>
-                      <th colSpan="7" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>PERPETRATORS<br />(5)</th>
-                      <th colSpan="6" style={{ ...thStyle, textAlign: "center" }}>ACTIONS TAKEN BY THE BARANGAY / BCPC<br />(6)</th>
+                      <th rowSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_th_brgy')}</th>
+                      <th rowSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_th_vac_vic')}</th>
+                      <th colSpan="2" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_th_gender')}</th>
+                      <th colSpan="5" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_th_age')}</th>
+                      <th colSpan="4" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_th_types')}</th>
+                      <th colSpan="7" style={{ ...thStyle, textAlign: "center", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_th_perp')}</th>
+                      <th colSpan="6" style={{ ...thStyle, textAlign: "center" }}>{t('admin_rep_vawc_th_action')}</th>
                     </tr>
                     <tr style={{ background: "#f8fafc", fontSize: "10px", borderBottom: "2px solid #cbd5e1" }}>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>M</th>
@@ -1421,23 +1425,23 @@ export default function Reports() {
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>10-14 (3c)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>15-17 (3d)</th>
                       <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>18+ Dis</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Phys (4a)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Sex (4b)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Psych (4c)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Negl (4d)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Imm (5a)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Close (5b)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Acq (5c)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Strg (5d)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Offc (5e)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Law (5f)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Othr (5g)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>LSWDO (6a)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>PNP (6b)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>NBI (6c)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Medical (6d)</th>
-                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>Legal (6e)</th>
-                      <th style={{ padding: "6px" }}>NGO (6f)</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_phys')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_sex')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_psych')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_negl')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_imm')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_close')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_acq')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_strg')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_offc')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_law')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_othr')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_lswdo')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_pnp')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_nbi')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_medical')}</th>
+                      <th style={{ padding: "6px", borderRight: "1px solid #cbd5e1" }}>{t('admin_rep_vawc_legal')}</th>
+                      <th style={{ padding: "6px" }}>{t('admin_rep_vawc_ngo')}</th>
                     </tr>
                   </thead>
                   <tbody>

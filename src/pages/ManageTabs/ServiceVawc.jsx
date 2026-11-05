@@ -15,9 +15,11 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
 
 export default function ServiceVawc({ onBack, userRole }) {
   const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Destructure hook
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -106,7 +108,6 @@ export default function ServiceVawc({ onBack, userRole }) {
     "Others (Referred to NGO/FBO) (6f)",
   ];
 
-  // ─── 1. OPTIMIZED: React Query for Table Cases (Bounded to 200) ───
   const { data: cases = [], isLoading: loading } = useQuery({
     queryKey: ["adminManage_vawcCases"],
     queryFn: async () => {
@@ -122,7 +123,6 @@ export default function ServiceVawc({ onBack, userRole }) {
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
 
-  // ─── 2. OPTIMIZED: Server-Side Counts for Summary Cards ───
   const {
     data: stats = {
       totalVictims: 0,
@@ -159,7 +159,6 @@ export default function ServiceVawc({ onBack, userRole }) {
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
 
-  // Reset pagination on filter or search change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, genderFilter, violenceFilter, rowsPerPage]);
@@ -174,7 +173,6 @@ export default function ServiceVawc({ onBack, userRole }) {
     setEditFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ── Create New Case (Zero-Read Local Cache Update) ──
   const handleSaveNewCase = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -207,14 +205,12 @@ export default function ServiceVawc({ onBack, userRole }) {
 
       const docRef = await addDoc(collection(db, "vawcCases"), payload);
 
-      // Surgically prepend the new case to local memory (Saves 200 reads)
       const newCaseWithId = { id: docRef.id, ...payload, createdAt: new Date() };
       queryClient.setQueryData(["adminManage_vawcCases"], (old = []) => [
         newCaseWithId,
         ...old,
       ]);
 
-      // Refresh lightweight server-side counts
       queryClient.invalidateQueries({ queryKey: ["adminManage_vawcStats"] });
       queryClient.invalidateQueries({ queryKey: ["adminManage_servicesStats"] });
 
@@ -235,13 +231,12 @@ export default function ServiceVawc({ onBack, userRole }) {
       });
     } catch (err) {
       console.error("Error saving VAWC case:", err);
-      alert("Failed to save VAWC Case. Please check database connection.");
+      alert(t('admin_srv_vawc_err_save'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Open Complete Edit Modal ──
   const openEditModal = (item) => {
     setEditingCase(item);
 
@@ -267,7 +262,6 @@ export default function ServiceVawc({ onBack, userRole }) {
     });
   };
 
-  // ── Save Full Case Edits (Zero-Read Local Cache Update) ──
   const handleSaveCaseEdits = async (e) => {
     e.preventDefault();
     if (!editingCase) return;
@@ -298,25 +292,22 @@ export default function ServiceVawc({ onBack, userRole }) {
 
       await updateDoc(caseRef, updatedPayload);
 
-      // Surgically update the edited case in local memory (Saves 200 reads)
       queryClient.setQueryData(["adminManage_vawcCases"], (old = []) =>
         old.map((c) => (c.id === editingCase.id ? { ...c, ...updatedPayload } : c))
       );
 
-      // Refresh lightweight server-side counts
       queryClient.invalidateQueries({ queryKey: ["adminManage_vawcStats"] });
       queryClient.invalidateQueries({ queryKey: ["adminManage_servicesStats"] });
 
       setEditingCase(null);
     } catch (err) {
       console.error("Failed to update case details:", err);
-      alert("Error saving updated case information.");
+      alert(t('admin_srv_vawc_err_update'));
     } finally {
       setUpdating(false);
     }
   };
 
-  // ── Delete Case (Zero-Read Local Cache Update) ──
   const handleDeleteCase = async () => {
     if (!caseToDelete) return;
     setDeleting(true);
@@ -324,25 +315,22 @@ export default function ServiceVawc({ onBack, userRole }) {
     try {
       await deleteDoc(doc(db, "vawcCases", caseToDelete.id));
 
-      // Surgically remove the deleted case from local memory (Saves 200 reads)
       queryClient.setQueryData(["adminManage_vawcCases"], (old = []) =>
         old.filter((c) => c.id !== caseToDelete.id)
       );
 
-      // Refresh lightweight server-side counts
       queryClient.invalidateQueries({ queryKey: ["adminManage_vawcStats"] });
       queryClient.invalidateQueries({ queryKey: ["adminManage_servicesStats"] });
 
       setCaseToDelete(null);
     } catch (err) {
       console.error("Error deleting VAWC case:", err);
-      alert("Failed to delete case record.");
+      alert(t('admin_srv_vawc_err_delete'));
     } finally {
       setDeleting(false);
     }
   };
 
-  // Filtered & Searched Data
   const filteredCases = useMemo(() => {
     return cases.filter((c) => {
       if (statusFilter !== "all" && (c.status || "").toLowerCase() !== statusFilter.toLowerCase()) {
@@ -375,18 +363,17 @@ export default function ServiceVawc({ onBack, userRole }) {
   if (!isAuthorized) {
     return (
       <div className="as-container" style={{ textAlign: "center", padding: "60px 20px" }}>
-        <h2>Access Denied</h2>
+        <h2>{t('admin_srv_vawc_denied_title')}</h2>
         <p style={{ color: "#6b7280" }}>
-          You do not have administrative privileges to view the VAWC workspace.
+          {t('admin_srv_vawc_denied_desc')}
         </p>
         <button className="as-btn-aqua" style={{ marginTop: "16px" }} onClick={onBack}>
-          &larr; Return to Services Hub
+          {t('admin_srv_vawc_back')}
         </button>
       </div>
     );
   }
 
-  // Pagination Math
   const totalPages = Math.ceil(filteredCases.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedCases = filteredCases.slice(startIndex, startIndex + rowsPerPage);
@@ -431,7 +418,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       {/* Top Header */}
       <div style={{ marginBottom: "20px" }}>
         <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-          &larr; Back to Services Hub
+          {t('admin_srv_vawc_back')}
         </button>
         <div
           style={{
@@ -444,10 +431,10 @@ export default function ServiceVawc({ onBack, userRole }) {
         >
           <div>
             <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "#111827", margin: 0 }}>
-              VAWC Case Management
+              {t('admin_srv_vawc_title')}
             </h1>
             <p style={{ fontSize: "0.85rem", color: "#6b7280", margin: "4px 0 0 0" }}>
-              Violence Against Women &amp; Children monitoring workspace and case intake.
+              {t('admin_srv_vawc_subtitle')}
             </p>
           </div>
           <button
@@ -461,7 +448,7 @@ export default function ServiceVawc({ onBack, userRole }) {
               gap: "6px",
             }}
           >
-            + Add New VAWC Case
+            {t('admin_srv_vawc_btn_add')}
           </button>
         </div>
       </div>
@@ -477,42 +464,42 @@ export default function ServiceVawc({ onBack, userRole }) {
       >
         <div className="card" style={{ padding: "16px 20px" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
-            VAC Victims (Total)
+            {t('admin_srv_vawc_stat_total')}
           </span>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#111827", marginTop: "4px" }}>
             {totalVictims}
           </div>
-          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Running count of all logged cases</span>
+          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{t('admin_srv_vawc_stat_total_desc')}</span>
         </div>
 
         <div className="card" style={{ padding: "16px 20px" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#be185d", textTransform: "uppercase" }}>
-            Gender Distribution
+            {t('admin_srv_vawc_stat_gender')}
           </span>
           <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#be185d", marginTop: "4px" }}>
             F: {femaleCount} | M: {maleCount}
           </div>
-          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Female vs Male Intake</span>
+          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{t('admin_srv_vawc_stat_gender_desc')}</span>
         </div>
 
         <div className="card" style={{ padding: "16px 20px" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#15803d", textTransform: "uppercase" }}>
-            Acted Upon
+            {t('admin_srv_vawc_stat_acted')}
           </span>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#15803d", marginTop: "4px" }}>
             {actedUponCount}
           </div>
-          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Referred or Intervened</span>
+          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{t('admin_srv_vawc_stat_acted_desc')}</span>
         </div>
 
         <div className="card" style={{ padding: "16px 20px" }}>
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#b45309", textTransform: "uppercase" }}>
-            Pending
+            {t('admin_srv_vawc_stat_pending')}
           </span>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#b45309", marginTop: "4px" }}>
             {pendingCount}
           </div>
-          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Awaiting triage or review</span>
+          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{t('admin_srv_vawc_stat_pending_desc')}</span>
         </div>
       </div>
 
@@ -539,10 +526,10 @@ export default function ServiceVawc({ onBack, userRole }) {
         >
           <div>
             <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1f2937", margin: 0 }}>
-              VAWC Incident Logs
+              {t('admin_srv_vawc_table_title')}
             </h2>
             <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "2px 0 0 0" }}>
-              Filter, search, edit full case details, or delete records.
+              {t('admin_srv_vawc_table_desc')}
             </p>
           </div>
 
@@ -557,7 +544,7 @@ export default function ServiceVawc({ onBack, userRole }) {
             {/* Search Input */}
             <input
               type="text"
-              placeholder="Search ref #, violence, perpetrator..."
+              placeholder={t('admin_srv_vawc_search_ph')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -576,10 +563,10 @@ export default function ServiceVawc({ onBack, userRole }) {
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ padding: "6px 10px", fontSize: "0.82rem" }}
             >
-              <option value="all">All Status</option>
-              <option value="Acted Upon">Acted Upon</option>
-              <option value="Pending">Pending</option>
-              <option value="Closed / Resolved">Closed / Resolved</option>
+              <option value="all">{t('admin_srv_vawc_filter_status')}</option>
+              <option value="Acted Upon">{t('admin_srv_vawc_modal_status_acted')}</option>
+              <option value="Pending">{t('admin_srv_vawc_modal_status_pending')}</option>
+              <option value="Closed / Resolved">{t('admin_srv_vawc_modal_status_closed')}</option>
             </select>
 
             {/* Filter by Gender */}
@@ -589,9 +576,9 @@ export default function ServiceVawc({ onBack, userRole }) {
               onChange={(e) => setGenderFilter(e.target.value)}
               style={{ padding: "6px 10px", fontSize: "0.82rem" }}
             >
-              <option value="all">All Genders</option>
-              <option value="F">Female (F)</option>
-              <option value="M">Male (M)</option>
+              <option value="all">{t('admin_srv_vawc_filter_gender')}</option>
+              <option value="F">{t('admin_srv_vawc_modal_gender_f')}</option>
+              <option value="M">{t('admin_srv_vawc_modal_gender_m')}</option>
             </select>
 
             {/* Filter by Violence Type */}
@@ -601,7 +588,7 @@ export default function ServiceVawc({ onBack, userRole }) {
               onChange={(e) => setViolenceFilter(e.target.value)}
               style={{ padding: "6px 10px", fontSize: "0.82rem" }}
             >
-              <option value="all">All Types of Violence</option>
+              <option value="all">{t('admin_srv_vawc_filter_violence')}</option>
               <option value="Physical">Physical Abuse</option>
               <option value="Sexual">Sexual Abuse</option>
               <option value="Psychological">Psychological / Emotional</option>
@@ -612,11 +599,11 @@ export default function ServiceVawc({ onBack, userRole }) {
 
         {loading ? (
           <div style={{ textAlign: "center", padding: "50px", color: "#9ca3af" }}>
-            Loading VAWC records...
+            {t('admin_srv_vawc_loading')}
           </div>
         ) : filteredCases.length === 0 ? (
           <div style={{ textAlign: "center", padding: "50px", color: "#9ca3af" }}>
-            No matching VAWC records found.
+            {t('admin_srv_vawc_empty')}
           </div>
         ) : (
           <>
@@ -627,15 +614,15 @@ export default function ServiceVawc({ onBack, userRole }) {
               >
                 <thead>
                   <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", textAlign: "center" }}>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>REF #</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>DATE LOGGED</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>GENDER</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>AGE</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>NATURE OF VIOLENCE</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>PERPETRATOR</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTIONS TAKEN</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>STATUS</th>
-                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>ACTION</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_ref')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_date')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_gender')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_age')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_nature')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_perpetrator')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_action_taken')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_status')}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "0.78rem", fontWeight: 700, color: "#475569" }}>{t('admin_srv_vawc_th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -668,7 +655,14 @@ export default function ServiceVawc({ onBack, userRole }) {
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         <span className={`status-badge ${(c.status || "pending").toLowerCase().replace(/\s+/g, '-')}`}>
-                          {c.status || "Pending"}
+                          {(() => {
+                            let statusRaw = (c.status || "Pending");
+                            let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
+                            if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_vawc_modal_status_pending');
+                            if (statusRaw.toLowerCase() === 'acted upon') displayStatus = t('admin_srv_vawc_modal_status_acted');
+                            if (statusRaw.toLowerCase() === 'closed / resolved') displayStatus = t('admin_srv_vawc_modal_status_closed');
+                            return displayStatus;
+                          })()}
                         </span>
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
@@ -681,7 +675,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                             openEditModal(c);
                           }}
                         >
-                          More Details
+                          {t('admin_srv_vawc_btn_details')}
                         </button>
                       </td>
                     </tr>
@@ -731,7 +725,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
                   >
-                    Previous
+                    {t('admin_srv_po_page_prev')}
                   </button>
                   {renderPageNumbers()}
                   <button
@@ -739,7 +733,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
                   >
-                    Next
+                    {t('admin_srv_po_page_next')}
                   </button>
                 </div>
               )}
@@ -763,9 +757,9 @@ export default function ServiceVawc({ onBack, userRole }) {
           >
             <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
               <div>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Case Details</h2>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_modal_edit_title')}</h2>
                 <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
-                  Ref: {editingCase.referenceNumber || editingCase.id}
+                  {t('admin_srv_vawc_modal_ref')} {editingCase.referenceNumber || editingCase.id}
                 </p>
               </div>
               <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setEditingCase(null)}>
@@ -794,18 +788,18 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Edit Gender */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    GENDER (2) *
+                    {t('admin_srv_vawc_modal_gender_label')}
                   </label>
                   <select name="gender" value={editFormData.gender} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="F">Female (F)</option>
-                    <option value="M">Male (M)</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="F">{t('admin_srv_vawc_modal_gender_f')}</option>
+                    <option value="M">{t('admin_srv_vawc_modal_gender_m')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {editFormData.gender === "Others" && (
                     <input
                       type="text"
                       name="genderOther"
-                      placeholder="Specify gender"
+                      placeholder={t('admin_srv_vawc_modal_other_ph')}
                       required
                       value={editFormData.genderOther}
                       onChange={handleEditFormChange}
@@ -817,21 +811,21 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Edit Age Bracket */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    AGE (3) *
+                    {t('admin_srv_vawc_modal_age_label')}
                   </label>
                   <select name="ageBracket" value={editFormData.ageBracket} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
-                    <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
-                    <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
-                    <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
-                    <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="0-4 (3a)">{t('admin_srv_vawc_modal_age_0_4')}</option>
+                    <option value="5-9 (3b)">{t('admin_srv_vawc_modal_age_5_9')}</option>
+                    <option value="10-14 (3c)">{t('admin_srv_vawc_modal_age_10_14')}</option>
+                    <option value="15-17 (3d)">{t('admin_srv_vawc_modal_age_15_17')}</option>
+                    <option value="18 & above w/ disability">{t('admin_srv_vawc_modal_age_18_pwd')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {editFormData.ageBracket === "Others" && (
                     <input
                       type="text"
                       name="ageBracketOther"
-                      placeholder="Specify age bracket"
+                      placeholder={t('admin_srv_vawc_modal_age_other_ph')}
                       required
                       value={editFormData.ageBracketOther}
                       onChange={handleEditFormChange}
@@ -843,20 +837,20 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Edit Types of Violence */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    TYPES OF VIOLENCE (4) *
+                    {t('admin_srv_vawc_modal_violence_label')}
                   </label>
                   <select name="typeOfViolence" value={editFormData.typeOfViolence} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
-                    <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
-                    <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
-                    <option value="Neglect (4d)">Neglect (4d)</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="Physical Abuse (4a)">{t('admin_srv_vawc_modal_vio_physical')}</option>
+                    <option value="Sexual Abuse (4b)">{t('admin_srv_vawc_modal_vio_sexual')}</option>
+                    <option value="Psychological/Emotional Abuse (4c)">{t('admin_srv_vawc_modal_vio_psych')}</option>
+                    <option value="Neglect (4d)">{t('admin_srv_vawc_modal_vio_neglect')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {editFormData.typeOfViolence === "Others" && (
                     <input
                       type="text"
                       name="typeOfViolenceOther"
-                      placeholder="Specify type of violence"
+                      placeholder={t('admin_srv_vawc_modal_vio_other_ph')}
                       required
                       value={editFormData.typeOfViolenceOther}
                       onChange={handleEditFormChange}
@@ -868,22 +862,22 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Edit Perpetrator */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    PERPETRATORS (5) *
+                    {t('admin_srv_vawc_modal_perp_label')}
                   </label>
                   <select name="perpetrator" value={editFormData.perpetrator} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
-                    <option value="Close Relative (5b)">Close Relative (5b)</option>
-                    <option value="Acquaintance (5c)">Acquaintance (5c)</option>
-                    <option value="Stranger (5d)">Stranger (5d)</option>
-                    <option value="Local Office (5e)">Local Office (5e)</option>
-                    <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
-                    <option value="Others">Others (ex: Guardian) (5g)</option>
+                    <option value="Immediate Family Member (5a)">{t('admin_srv_vawc_modal_perp_family')}</option>
+                    <option value="Close Relative (5b)">{t('admin_srv_vawc_modal_perp_relative')}</option>
+                    <option value="Acquaintance (5c)">{t('admin_srv_vawc_modal_perp_acq')}</option>
+                    <option value="Stranger (5d)">{t('admin_srv_vawc_modal_perp_stranger')}</option>
+                    <option value="Local Office (5e)">{t('admin_srv_vawc_modal_perp_local')}</option>
+                    <option value="Law Enforcer (5f)">{t('admin_srv_vawc_modal_perp_law')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_perp_other_opt')}</option>
                   </select>
                   {editFormData.perpetrator === "Others" && (
                     <input
                       type="text"
                       name="perpetratorOther"
-                      placeholder="Specify perpetrator"
+                      placeholder={t('admin_srv_vawc_modal_perp_other_ph')}
                       required
                       value={editFormData.perpetratorOther}
                       onChange={handleEditFormChange}
@@ -895,22 +889,22 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Edit Actions Taken */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
+                    {t('admin_srv_vawc_modal_action_label')}
                   </label>
                   <select name="actionTaken" value={editFormData.actionTaken} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
-                    <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
-                    <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
-                    <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
-                    <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
-                    <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="Referred to LSWDO (6a)">{t('admin_srv_vawc_modal_act_lswdo')}</option>
+                    <option value="Referred to PNP (6b)">{t('admin_srv_vawc_modal_act_pnp')}</option>
+                    <option value="Referred to NBI (6c)">{t('admin_srv_vawc_modal_act_nbi')}</option>
+                    <option value="Referred for Medical Treatment (6d)">{t('admin_srv_vawc_modal_act_medical')}</option>
+                    <option value="Referred to Legal Assistance (6e)">{t('admin_srv_vawc_modal_act_legal')}</option>
+                    <option value="Others (Referred to NGO/FBO) (6f)">{t('admin_srv_vawc_modal_act_ngo')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {editFormData.actionTaken === "Others" && (
                     <input
                       type="text"
                       name="actionTakenOther"
-                      placeholder="Specify action taken"
+                      placeholder={t('admin_srv_vawc_modal_act_other_ph')}
                       required
                       value={editFormData.actionTakenOther}
                       onChange={handleEditFormChange}
@@ -923,22 +917,22 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                      STATUS
+                      {t('admin_srv_vawc_modal_status_label')}
                     </label>
                     <select name="status" value={editFormData.status} onChange={handleEditFormChange} className="filter-select" style={{ width: "100%" }}>
-                      <option value="Acted Upon">Acted Upon</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Closed / Resolved">Closed / Resolved</option>
+                      <option value="Acted Upon">{t('admin_srv_vawc_modal_status_acted')}</option>
+                      <option value="Pending">{t('admin_srv_vawc_modal_status_pending')}</option>
+                      <option value="Closed / Resolved">{t('admin_srv_vawc_modal_status_closed')}</option>
                     </select>
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                      REMARKS
+                      {t('admin_srv_vawc_modal_remarks_label')}
                     </label>
                     <input
                       type="text"
                       name="remarks"
-                      placeholder="Optional case remarks"
+                      placeholder={t('admin_srv_vawc_modal_remarks_ph')}
                       value={editFormData.remarks}
                       onChange={handleEditFormChange}
                       style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
@@ -967,10 +961,10 @@ export default function ServiceVawc({ onBack, userRole }) {
                   }}
                   disabled={updating}
                 >
-                  Delete Case
+                  {t('admin_srv_vawc_btn_delete')}
                 </button>
                 <button type="submit" className="as-btn-aqua" disabled={updating}>
-                  {updating ? "Saving..." : "Save Case Changes"}
+                  {updating ? t('admin_srv_vawc_btn_saving') : t('admin_srv_vawc_btn_save_edits')}
                 </button>
               </div>
             </form>
@@ -987,18 +981,18 @@ export default function ServiceVawc({ onBack, userRole }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "14px 18px" }}>
-              <h3 style={{ color: "#dc2626", margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Confirm Deletion</h3>
+              <h3 style={{ color: "#dc2626", margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{t('admin_srv_vawc_del_title')}</h3>
               <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setCaseToDelete(null)}>
                 &times;
               </button>
             </div>
             <div style={{ padding: "20px" }}>
               <p style={{ fontSize: "0.9rem", color: "#374151", margin: "0 0 12px 0" }}>
-                Are you sure you want to permanently delete case{" "}
+                {t('admin_srv_vawc_del_desc1')}{" "}
                 <strong>{caseToDelete.referenceNumber || caseToDelete.id}</strong>?
               </p>
               <p style={{ fontSize: "0.78rem", color: "#6b7280", margin: 0 }}>
-                This record will be removed permanently from the database and will no longer appear in official reports.
+                {t('admin_srv_vawc_del_desc2')}
               </p>
               <div
                 style={{
@@ -1025,7 +1019,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                     cursor: "pointer",
                   }}
                 >
-                  {deleting ? "Deleting..." : "Delete Permanently"}
+                  {deleting ? t('admin_srv_vawc_del_processing') : t('admin_srv_vawc_del_confirm')}
                 </button>
               </div>
             </div>
@@ -1043,9 +1037,9 @@ export default function ServiceVawc({ onBack, userRole }) {
           >
             <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
               <div>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Add New VAWC Case</h2>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_modal_add_title')}</h2>
                 <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
-                  Recording Incident Form for Violence Against Children/Women
+                  {t('admin_srv_vawc_modal_subtitle')}
                 </p>
               </div>
               <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setIsAddModalOpen(false)}>
@@ -1074,18 +1068,18 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Gender */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    GENDER (2) *
+                    {t('admin_srv_vawc_modal_gender_label')}
                   </label>
                   <select name="gender" value={formData.gender} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="F">Female (F)</option>
-                    <option value="M">Male (M)</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="F">{t('admin_srv_vawc_modal_gender_f')}</option>
+                    <option value="M">{t('admin_srv_vawc_modal_gender_m')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {formData.gender === "Others" && (
                     <input
                       type="text"
                       name="genderOther"
-                      placeholder="Specify gender"
+                      placeholder={t('admin_srv_vawc_modal_other_ph')}
                       required
                       value={formData.genderOther}
                       onChange={handleFormChange}
@@ -1097,21 +1091,21 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Age Bracket */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    AGE (3) *
+                    {t('admin_srv_vawc_modal_age_label')}
                   </label>
                   <select name="ageBracket" value={formData.ageBracket} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="0-4 (3a)">0-4 Y.O. (3a)</option>
-                    <option value="5-9 (3b)">5-9 Y.O. (3b)</option>
-                    <option value="10-14 (3c)">10-14 Y.O. (3c)</option>
-                    <option value="15-17 (3d)">15-17 Y.O. (3d)</option>
-                    <option value="18 & above w/ disability">18 Y.O. and above with physical/mental disability</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="0-4 (3a)">{t('admin_srv_vawc_modal_age_0_4')}</option>
+                    <option value="5-9 (3b)">{t('admin_srv_vawc_modal_age_5_9')}</option>
+                    <option value="10-14 (3c)">{t('admin_srv_vawc_modal_age_10_14')}</option>
+                    <option value="15-17 (3d)">{t('admin_srv_vawc_modal_age_15_17')}</option>
+                    <option value="18 & above w/ disability">{t('admin_srv_vawc_modal_age_18_pwd')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {formData.ageBracket === "Others" && (
                     <input
                       type="text"
                       name="ageBracketOther"
-                      placeholder="Specify age bracket"
+                      placeholder={t('admin_srv_vawc_modal_age_other_ph')}
                       required
                       value={formData.ageBracketOther}
                       onChange={handleFormChange}
@@ -1123,20 +1117,20 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Types of Violence */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    TYPES OF VIOLENCE (4) *
+                    {t('admin_srv_vawc_modal_violence_label')}
                   </label>
                   <select name="typeOfViolence" value={formData.typeOfViolence} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Physical Abuse (4a)">Physical Abuse (4a)</option>
-                    <option value="Sexual Abuse (4b)">Sexual Abuse (4b)</option>
-                    <option value="Psychological/Emotional Abuse (4c)">Psychological / Emotional Abuse (4c)</option>
-                    <option value="Neglect (4d)">Neglect (4d)</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="Physical Abuse (4a)">{t('admin_srv_vawc_modal_vio_physical')}</option>
+                    <option value="Sexual Abuse (4b)">{t('admin_srv_vawc_modal_vio_sexual')}</option>
+                    <option value="Psychological/Emotional Abuse (4c)">{t('admin_srv_vawc_modal_vio_psych')}</option>
+                    <option value="Neglect (4d)">{t('admin_srv_vawc_modal_vio_neglect')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {formData.typeOfViolence === "Others" && (
                     <input
                       type="text"
                       name="typeOfViolenceOther"
-                      placeholder="Specify type of violence"
+                      placeholder={t('admin_srv_vawc_modal_vio_other_ph')}
                       required
                       value={formData.typeOfViolenceOther}
                       onChange={handleFormChange}
@@ -1148,22 +1142,22 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Perpetrators */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    PERPETRATORS (5) *
+                    {t('admin_srv_vawc_modal_perp_label')}
                   </label>
                   <select name="perpetrator" value={formData.perpetrator} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Immediate Family Member (5a)">Immediate Family Member (5a)</option>
-                    <option value="Close Relative (5b)">Close Relative (5b)</option>
-                    <option value="Acquaintance (5c)">Acquaintance (5c)</option>
-                    <option value="Stranger (5d)">Stranger (5d)</option>
-                    <option value="Local Office (5e)">Local Office (5e)</option>
-                    <option value="Law Enforcer (5f)">Law Enforcer (5f)</option>
-                    <option value="Others">Others (ex: Guardian) (5g)</option>
+                    <option value="Immediate Family Member (5a)">{t('admin_srv_vawc_modal_perp_family')}</option>
+                    <option value="Close Relative (5b)">{t('admin_srv_vawc_modal_perp_relative')}</option>
+                    <option value="Acquaintance (5c)">{t('admin_srv_vawc_modal_perp_acq')}</option>
+                    <option value="Stranger (5d)">{t('admin_srv_vawc_modal_perp_stranger')}</option>
+                    <option value="Local Office (5e)">{t('admin_srv_vawc_modal_perp_local')}</option>
+                    <option value="Law Enforcer (5f)">{t('admin_srv_vawc_modal_perp_law')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_perp_other_opt')}</option>
                   </select>
                   {formData.perpetrator === "Others" && (
                     <input
                       type="text"
                       name="perpetratorOther"
-                      placeholder="Specify perpetrator"
+                      placeholder={t('admin_srv_vawc_modal_perp_other_ph')}
                       required
                       value={formData.perpetratorOther}
                       onChange={handleFormChange}
@@ -1175,22 +1169,22 @@ export default function ServiceVawc({ onBack, userRole }) {
                 {/* Actions Taken */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                    ACTIONS TAKEN BY THE BARANGAY / BCPC (6) *
+                    {t('admin_srv_vawc_modal_action_label')}
                   </label>
                   <select name="actionTaken" value={formData.actionTaken} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                    <option value="Referred to LSWDO (6a)">Referred to LSWDO (6a)</option>
-                    <option value="Referred to PNP (6b)">Referred to PNP (6b)</option>
-                    <option value="Referred to NBI (6c)">Referred to NBI (6c)</option>
-                    <option value="Referred for Medical Treatment (6d)">Referred for Medical Treatment (6d)</option>
-                    <option value="Referred to Legal Assistance (6e)">Referred to Legal Assistance (6e)</option>
-                    <option value="Others (Referred to NGO/FBO) (6f)">Others (Referred to NGO's, FBO's) (6f)</option>
-                    <option value="Others">Others (Please specify)</option>
+                    <option value="Referred to LSWDO (6a)">{t('admin_srv_vawc_modal_act_lswdo')}</option>
+                    <option value="Referred to PNP (6b)">{t('admin_srv_vawc_modal_act_pnp')}</option>
+                    <option value="Referred to NBI (6c)">{t('admin_srv_vawc_modal_act_nbi')}</option>
+                    <option value="Referred for Medical Treatment (6d)">{t('admin_srv_vawc_modal_act_medical')}</option>
+                    <option value="Referred to Legal Assistance (6e)">{t('admin_srv_vawc_modal_act_legal')}</option>
+                    <option value="Others (Referred to NGO/FBO) (6f)">{t('admin_srv_vawc_modal_act_ngo')}</option>
+                    <option value="Others">{t('admin_srv_vawc_modal_other_specify')}</option>
                   </select>
                   {formData.actionTaken === "Others" && (
                     <input
                       type="text"
                       name="actionTakenOther"
-                      placeholder="Specify action taken"
+                      placeholder={t('admin_srv_vawc_modal_act_other_ph')}
                       required
                       value={formData.actionTakenOther}
                       onChange={handleFormChange}
@@ -1203,22 +1197,22 @@ export default function ServiceVawc({ onBack, userRole }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                      STATUS
+                      {t('admin_srv_vawc_modal_status_label')}
                     </label>
                     <select name="status" value={formData.status} onChange={handleFormChange} className="filter-select" style={{ width: "100%" }}>
-                      <option value="Acted Upon">Acted Upon</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Closed / Resolved">Closed / Resolved</option>
+                      <option value="Acted Upon">{t('admin_srv_vawc_modal_status_acted')}</option>
+                      <option value="Pending">{t('admin_srv_vawc_modal_status_pending')}</option>
+                      <option value="Closed / Resolved">{t('admin_srv_vawc_modal_status_closed')}</option>
                     </select>
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>
-                      REMARKS
+                      {t('admin_srv_vawc_modal_remarks_label')}
                     </label>
                     <input
                       type="text"
                       name="remarks"
-                      placeholder="Optional case remarks"
+                      placeholder={t('admin_srv_vawc_modal_remarks_ph')}
                       value={formData.remarks}
                       onChange={handleFormChange}
                       style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.85rem" }}
@@ -1238,7 +1232,7 @@ export default function ServiceVawc({ onBack, userRole }) {
                 }}
               >
                 <button type="submit" className="as-btn-aqua" disabled={submitting}>
-                  {submitting ? "Saving..." : "Save VAWC Case"}
+                  {submitting ? t('admin_srv_vawc_btn_saving') : t('admin_srv_vawc_btn_save_new')}
                 </button>
               </div>
             </form>

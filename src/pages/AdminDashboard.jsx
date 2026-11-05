@@ -27,17 +27,9 @@ import {
   limit
 } from "firebase/firestore";
 
-const TABS = [
-  { id: 'resident', label: 'Resident Analytics' },
-  { id: 'services', label: 'Services & Facilities' },
-  { id: 'programs', label: 'Programs & Livelihood' },
-  { id: 'sentiment', label: 'Sentiment & Satisfaction' },
-  { id: 'peace', label: 'Peace & Order' },
-  { id: 'bswd', label: 'Social Welfare' }
-];
+// NEW: Import the custom language hook
+import { useLanguage } from '../context/LanguageContext';
 
-// ─── OPTIMIZATION: SHARED QUERY CONFIG ───
-// This stops React Query from burning reads every time the admin switches browser tabs
 const OPTIMIZED_QUERY_OPTIONS = {
   staleTime: 1000 * 60 * 30,     // Data stays fresh for 30 minutes
   gcTime: 1000 * 60 * 60,        // Keep in cache for 60 minutes
@@ -48,6 +40,19 @@ const OPTIMIZED_QUERY_OPTIONS = {
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('resident');
+  
+  // NEW: Destructure the translation hook
+  const { t } = useLanguage();
+
+  // Dynamic TABS array inside the component so it re-translates instantly on toggle
+  const TABS = [
+    { id: 'resident', label: t('admin_tab_resident') },
+    { id: 'services', label: t('admin_tab_services') },
+    { id: 'programs', label: t('admin_tab_programs') },
+    { id: 'sentiment', label: t('admin_tab_sentiment') },
+    { id: 'peace', label: t('admin_tab_peace') },
+    { id: 'bswd', label: t('admin_tab_bswd') }
+  ];
 
   // ─── 1. CORE SUMMARY QUERY ───
   const { data: summaryData, isLoading: isSummaryLoading, isError: isSummaryError, error: summaryError } = useQuery({
@@ -59,7 +64,6 @@ export default function AdminDashboard() {
         getCountFromServer(collection(db, "pending_registrations")),
         getCountFromServer(query(collection(db, "document_requests"), where("status", "==", "Pending"))),
         getCountFromServer(query(collection(db, "facility_reservations"), where("status", "==", "Pending"))),
-        // OPTIMIZATION: Reduced limit from 300 to 150. AI insights rarely need more than the latest 150 feedbacks.
         getDocs(query(collection(db, "feedback"), orderBy("createdAt", "desc"), limit(150)))
       ]);
 
@@ -78,11 +82,9 @@ export default function AdminDashboard() {
   });
 
   // ─── 2. LAZY LOADED TAB QUERIES ───
-
   const { data: residentData, isLoading: isResidentLoading } = useQuery({
     queryKey: ['adminDashboard_resident'],
     queryFn: async () => {
-      // OPTIMIZATION: Cap at 300 to prevent massive payload downloads on large populations
       const snap = await getDocs(query(collectionGroup(db, "residents"), limit(300)));
       return snap.docs.map(doc => doc.data());
     },
@@ -157,9 +159,9 @@ export default function AdminDashboard() {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center", color: "#b91c1c" }}>
-          <h2>Analytics failed to load.</h2>
+          <h2>{t('admin_dash_error_core')}</h2>
           <p style={{ background: "#fee2e2", padding: "16px", borderRadius: "8px", display: "inline-block" }}>
-            {summaryError?.message || "Unknown error occurred"}
+            {summaryError?.message || t('admin_dash_error_unknown')}
           </p>
         </div>
       </AdminLayout>
@@ -170,7 +172,7 @@ export default function AdminDashboard() {
     return (
       <AdminLayout>
         <div className="main-content" style={{ padding: "40px", textAlign: "center" }}>
-          <h2>Loading Dashboard... (This may take a moment)</h2>
+          <h2>{t('admin_dash_loading_core')}</h2>
         </div>
       </AdminLayout>
     );
@@ -183,10 +185,10 @@ export default function AdminDashboard() {
         {/* TOP HEADER */}
         <div style={{ marginBottom: "1.5rem" }}>
           <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "#1e293b" }}>
-            Dashboard
+            {t('admin_dash_title')}
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "#64748b" }}>
-            Welcome back — here's what's happening in your barangay.
+            {t('admin_dash_subtitle')}
           </p>
         </div>
 
@@ -214,25 +216,25 @@ export default function AdminDashboard() {
           
           {/* TAB: RESIDENT ANALYTICS */}
           {activeTab === 'resident' && (
-            isResidentLoading ? <p>Loading resident data...</p> :
+            isResidentLoading ? <p>{t('admin_dash_loading_res')}</p> :
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
               <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', gridColumn: '1 / -1' }}>
-                <h1 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Resident Analytics</h1>
+                <h1 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{t('admin_dash_res_header')}</h1>
                 <div className="resident-analytics-grid">
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Resident Demographic</h2>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>{t('admin_dash_res_demographic')}</h2>
                     <ResidentDemographics data={residentData} />
                   </div>
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Age Distribution</h2>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>{t('admin_dash_res_age')}</h2>
                     <AgeAnalytics data={residentData} />
                   </div>
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Sex Assigned at Birth</h2>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>{t('admin_dash_res_sex')}</h2>
                     <SexAnalytics data={residentData} />
                   </div>
                   <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>Gender Orientation</h2>
+                    <h2 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', color: '#1e293b' }}>{t('admin_dash_res_gender')}</h2>
                     <GenderOrientationAnalytics data={residentData} />
                   </div>
                 </div>
@@ -242,7 +244,7 @@ export default function AdminDashboard() {
 
           {/* TAB: SERVICES & FACILITIES */}
           {activeTab === 'services' && (
-            isServicesLoading ? <p>Loading services data...</p> :
+            isServicesLoading ? <p>{t('admin_dash_loading_srv')}</p> :
             <ServiceFacilityAnalytics 
               docRequestsData={servicesData.docRequestsData} 
               facilityRequestsData={servicesData.facilityRequestsData}
@@ -253,10 +255,10 @@ export default function AdminDashboard() {
 
           {/* TAB: PROGRAMS & LIVELIHOOD */}
           {activeTab === 'programs' && (
-            isProgramsLoading ? <p>Loading programs data...</p> :
+            isProgramsLoading ? <p>{t('admin_dash_loading_prog')}</p> :
             <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Program & Livelihood Attendance</h1>
-              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Total registered residents across all programs</p>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{t('admin_dash_prog_header')}</h1>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>{t('admin_dash_prog_sub')}</p>
               <ProgramAnalytics data={programsData} />
             </div>
           )}
@@ -273,20 +275,20 @@ export default function AdminDashboard() {
 
           {/* TAB: PEACE & ORDER */}
           {activeTab === 'peace' && (
-            isPeaceLoading ? <p>Loading incident data...</p> :
+            isPeaceLoading ? <p>{t('admin_dash_loading_peace')}</p> :
             <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Peace & Order Overview</h1>
-              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for incident reports, urgency levels, and location hotspots</p>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{t('admin_dash_peace_header')}</h1>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>{t('admin_dash_peace_sub')}</p>
               <PeaceAndOrderAnalytics data={peaceData} />
             </div>
           )}
 
           {/* TAB: SOCIAL WELFARE (BSWD) */}
           {activeTab === 'bswd' && (
-            isBswdLoading ? <p>Loading welfare data...</p> :
+            isBswdLoading ? <p>{t('admin_dash_loading_bswd')}</p> :
             <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>Social Welfare (BSWD) Overview</h1>
-              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>Analytics for displaced persons reports, tips, and sighting locations</p>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e293b' }}>{t('admin_dash_bswd_header')}</h1>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: '#64748b' }}>{t('admin_dash_bswd_sub')}</p>
               <BSWDAnalytics data={bswdData} />
             </div>
           )}

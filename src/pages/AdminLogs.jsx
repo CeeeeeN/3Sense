@@ -4,9 +4,14 @@ import AdminLayout from "../components/AdminLayout";
 import { Search, Clock, ShieldAlert, Activity, FilterX } from 'lucide-react';
 import { db } from '../firebase/firebase';
 import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore';
-import { useQuery } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery } from '@tanstack/react-query'; 
+
+// NEW: Import Language Hook
+import { useLanguage } from '../context/LanguageContext';
 
 export default function AdminLogs() {
+  const { t } = useLanguage(); // NEW: Destructure hook
+
   // --- FILTER & SORT STATES ---
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -17,7 +22,6 @@ export default function AdminLogs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(15);
 
-  // ─── OPTIMIZED: React Query bounded to 300 logs ───
   const { data: logs = [], isLoading: loading } = useQuery({
     queryKey: ['adminManage_auditLogs'],
     queryFn: async () => {
@@ -34,10 +38,10 @@ export default function AdminLogs() {
         const rawTime = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : (data.timestamp ? new Date(data.timestamp).getTime() : 0);
         return {
           id: doc.id,
-          adminName: data.adminName || 'Unknown',
-          adminRole: data.adminRole || 'Unknown',
-          actionType: data.actionType || 'SYSTEM_ACTION',
-          details: data.details || 'No details provided',
+          adminName: data.adminName || t('admin_logs_unknown'),
+          adminRole: data.adminRole || t('admin_logs_unknown'),
+          actionType: data.actionType || t('admin_logs_sys_action'),
+          details: data.details || t('admin_logs_no_details'),
           timestamp: data.timestamp,
           rawTime: rawTime
         };
@@ -47,7 +51,7 @@ export default function AdminLogs() {
   });
 
   const formatDateTime = (timestamp) => {
-    if (!timestamp) return 'Just now';
+    if (!timestamp) return t('admin_logs_just_now');
     if (typeof timestamp.toDate === 'function') {
       return timestamp.toDate().toLocaleString('en-US', { 
         month: 'short', day: 'numeric', year: 'numeric', 
@@ -174,9 +178,9 @@ export default function AdminLogs() {
         {/* HEADER */}
         <div className="requests-header">
           <h1 className="requests-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldAlert size={28} color="#e11d48" /> System Audit Logs
+            <ShieldAlert size={28} color="#e11d48" /> {t('admin_logs_title')}
           </h1>
-          <p className="requests-subtitle">Monitor and track all administrative actions performed within the system. Only visible to Super Admins.</p>
+          <p className="requests-subtitle">{t('admin_logs_subtitle')}</p>
         </div>
 
         {/* CONTROLS & FILTERS */}
@@ -186,7 +190,7 @@ export default function AdminLogs() {
             <Search className="search-icon" size={20} />
             <input
               type="text"
-              placeholder="Search by Admin Name, Role, or Action..."
+              placeholder={t('admin_logs_search_ph')}
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -195,7 +199,7 @@ export default function AdminLogs() {
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Start Date</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>{t('admin_logs_lbl_start_date')}</label>
               <input 
                 type="date" 
                 className="filter-select" 
@@ -206,7 +210,7 @@ export default function AdminLogs() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>End Date</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>{t('admin_logs_lbl_end_date')}</label>
               <input 
                 type="date" 
                 className="filter-select" 
@@ -217,19 +221,19 @@ export default function AdminLogs() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Sort By</label>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>{t('admin_logs_lbl_sort')}</label>
               <select
                 className="filter-select"
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
                 style={{ padding: '8px 12px' }}
               >
-                <option value="date_desc">Date: Newest First</option>
-                <option value="date_asc">Date: Oldest First</option>
-                <option value="name_asc">Admin Name: A to Z</option>
-                <option value="name_desc">Admin Name: Z to A</option>
-                <option value="action_asc">Action: A to Z</option>
-                <option value="action_desc">Action: Z to A</option>
+                <option value="date_desc">{t('admin_logs_sort_date_new')}</option>
+                <option value="date_asc">{t('admin_logs_sort_date_old')}</option>
+                <option value="name_asc">{t('admin_logs_sort_name_asc')}</option>
+                <option value="name_desc">{t('admin_logs_sort_name_desc')}</option>
+                <option value="action_asc">{t('admin_logs_sort_action_asc')}</option>
+                <option value="action_desc">{t('admin_logs_sort_action_desc')}</option>
               </select>
             </div>
 
@@ -243,7 +247,7 @@ export default function AdminLogs() {
                   borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600
                 }}
               >
-                <FilterX size={16} /> Clear Dates
+                <FilterX size={16} /> {t('admin_logs_btn_clear_dates')}
               </button>
             )}
           </div>
@@ -255,22 +259,22 @@ export default function AdminLogs() {
           {loading ? (
             <div className="empty-state">
               <Clock className="animate-spin mb-2" size={32} />
-              <h3>Loading logs...</h3>
+              <h3>{t('admin_logs_loading')}</h3>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div className="empty-state">
               <Activity className="empty-state-icon" size={48} />
-              <h3>No logs found</h3>
-              <p>No system actions match your current search and date filters.</p>
+              <h3>{t('admin_logs_empty_title')}</h3>
+              <p>{t('admin_logs_empty_desc')}</p>
             </div>
           ) : (
             <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
                 <tr style={{ textAlign: 'center' }}>
-                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Date & Time</th>
-                  <th style={{ width: '20%', whiteSpace: 'nowrap' }}>Admin</th>
-                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>Action Type</th>
-                  <th style={{ width: '50%', minWidth: '250px' }}>Details</th>
+                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>{t('admin_logs_th_datetime')}</th>
+                  <th style={{ width: '20%', whiteSpace: 'nowrap' }}>{t('admin_logs_th_admin')}</th>
+                  <th style={{ width: '15%', whiteSpace: 'nowrap' }}>{t('admin_logs_th_action')}</th>
+                  <th style={{ width: '50%', minWidth: '250px' }}>{t('admin_logs_th_details')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -332,7 +336,7 @@ export default function AdminLogs() {
           }}>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b' }}>
-              <span>Rows per page:</span>
+              <span>{t('admin_logs_page_rows')}</span>
               <select 
                 value={itemsPerPage} 
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
@@ -360,7 +364,7 @@ export default function AdminLogs() {
                   disabled={currentPage === 1}
                   style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
                 >
-                  Previous
+                  {t('admin_logs_page_prev')}
                 </button>
                 
                 {renderPageNumbers()}
@@ -371,7 +375,7 @@ export default function AdminLogs() {
                   disabled={currentPage === totalPages}
                   style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
                 >
-                  Next
+                  {t('admin_logs_page_next')}
                 </button>
               </div>
             )}

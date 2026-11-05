@@ -9,7 +9,8 @@ import { createUserNotification } from "../../services/userNotifications";
 import { runStatusMaintenance } from "../../services/statusUpdater";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildLivelihoodEmail } from "../../utils/emailTemplates";
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
@@ -19,10 +20,15 @@ const formatTs = (ts) => {
   return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 };
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, t }) => {
   const rawStatus = status || "Pending";
   const statusClass = String(rawStatus).toLowerCase().replace(/\s+/g, '-');
-  const formattedText = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
+  
+  // Translate the common status words, fallback to capitalized string
+  let formattedText = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
+  if (statusClass === 'pending') formattedText = t('admin_srv_lh_stat_pending');
+  if (statusClass === 'approved') formattedText = t('admin_srv_lh_stat_approved');
+  if (statusClass === 'rejected') formattedText = t('admin_srv_lh_stat_rejected');
 
   return (
     <span className={`status-badge ${statusClass}`}>
@@ -37,7 +43,8 @@ const BLANK = {
 };
 
 export default function ServiceLivelihood({ onBack }) {
-  const queryClient = useQueryClient(); // <-- For cache invalidation
+  const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Destructure hook
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -47,9 +54,7 @@ export default function ServiceLivelihood({ onBack }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
-  const [removeTarget, setRemoveTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -61,7 +66,6 @@ export default function ServiceLivelihood({ onBack }) {
     runStatusMaintenance();
   }, []);
 
-  // ─── 1. OPTIMIZED: React Query for Programs ───
   const { data: programs = [], isLoading: loadingPrograms } = useQuery({
     queryKey: ['adminManage_livelihoodPrograms'],
     queryFn: async () => {
@@ -92,7 +96,6 @@ export default function ServiceLivelihood({ onBack }) {
     staleTime: 1000 * 60 * 30, // 30 mins
   });
 
-  // ─── 2. OPTIMIZED: React Query for Participants ───
   const { data: participants = [], isLoading: loadingParts } = useQuery({
     queryKey: ['adminManage_livelihoodRegistrations'],
     queryFn: async () => {
@@ -115,7 +118,6 @@ export default function ServiceLivelihood({ onBack }) {
     staleTime: 1000 * 60 * 30, // 30 mins
   });
 
-  // ─── 3. OPTIMIZED: Server-side Counts for Stats ───
   const { data: stats = { total: 0, approved: 0, pending: 0, rejected: 0 } } = useQuery({
     queryKey: ['adminManage_livelihoodStats'],
     queryFn: async () => {
@@ -172,13 +174,13 @@ export default function ServiceLivelihood({ onBack }) {
   };
 
   const handleDelete = async (id, progTitle) => {
-    if (!window.confirm(`Are you sure you want to delete "${progTitle}"?`)) return;
+    if (!window.confirm(`${t('admin_srv_lh_confirm_delete')} "${progTitle}"?`)) return;
     try {
       await deleteDoc(doc(db, "Programs", id));
       queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodPrograms'] });
     } catch (error) {
       console.error("Error deleting program:", error);
-      alert("Failed to delete program. Please try again.");
+      alert(t('admin_srv_lh_err_delete'));
     }
   };
 
@@ -226,7 +228,7 @@ export default function ServiceLivelihood({ onBack }) {
       setShowAddModal(false);
     } catch (err) {
       console.error("Error saving program:", err);
-      alert("Failed to save program. Please try again.");
+      alert(t('admin_srv_lh_err_save'));
     }
     setSaving(false);
   };
@@ -369,31 +371,31 @@ export default function ServiceLivelihood({ onBack }) {
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
         <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-          ← Back to Services Hub
+          {t('admin_srv_lh_back')}
         </button>
 
         <div className="as-header-section">
           <div className="as-title-wrap">
-            <h1>Livelihood Skills Training</h1>
-            <p className="as-subtitle">Manage livelihood programs, skills training, and registrations</p>
+            <h1>{t('admin_srv_lh_title')}</h1>
+            <p className="as-subtitle">{t('admin_srv_lh_subtitle')}</p>
           </div>
           <button className="as-btn-aqua" onClick={openAddModal} style={{ padding: "8px 16px", fontSize: "0.9rem" }}>
-            + Add New Program
+            {t('admin_srv_lh_btn_add')}
           </button>
         </div>
 
         {/* ── Active Programs Grid ── */}
         <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: "20px", paddingBottom: "20px" }}>
           <h3 style={{ marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-            Active Programs
+            {t('admin_srv_lh_active_programs')}
             <span style={{ fontSize: "0.85rem", fontWeight: 500, color: "#6b7280" }}>
               ({programs.length})
             </span>
           </h3>
           {loadingPrograms ? (
-            <p style={{ color: "#9ca3af" }}>Loading…</p>
+            <p style={{ color: "#9ca3af" }}>{t('admin_srv_lh_loading')}</p>
           ) : programs.length === 0 ? (
-            <p style={{ color: "#9ca3af" }}>No programs yet.</p>
+            <p style={{ color: "#9ca3af" }}>{t('admin_srv_lh_empty_programs')}</p>
           ) : (
             <div
               style={{
@@ -444,16 +446,16 @@ export default function ServiceLivelihood({ onBack }) {
                       )}
                       {prog.demographic && (
                         <div style={{ fontSize: "0.82rem", color: "#6b7280" }}>
-                          <strong>Target:</strong> {prog.demographic}
+                          <strong>{t('admin_srv_lh_target')}</strong> {prog.demographic}
                         </div>
                       )}
                       <div style={{ marginTop: "4px", fontSize: "0.82rem" }}>
-                        <span style={{ fontWeight: 600, color: "#166534" }}>{approved} approved</span>
+                        <span style={{ fontWeight: 600, color: "#166534" }}>{approved} {t('admin_srv_lh_approved')}</span>
                         {prog.slots > 0 && (
                           <span style={{ color: "#6b7280" }}>
-                            {" / "}{prog.slots} slots ·{" "}
+                            {" / "}{prog.slots} {t('admin_srv_lh_slots')} ·{" "}
                             <span style={{ fontWeight: 600, color: full ? "#991b1b" : "#15803d" }}>
-                              {full ? "Full" : `${left} left`}
+                              {full ? t('admin_srv_lh_slots_full') : `${left} ${t('admin_srv_lh_slots_left')}`}
                             </span>
                           </span>
                         )}
@@ -476,22 +478,22 @@ export default function ServiceLivelihood({ onBack }) {
                           style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", background: "#fff" }}
                           onClick={() => handleEdit(prog)}
                         >
-                          Edit
+                          {t('admin_srv_lh_btn_edit')}
                         </button>
                         <button
                           className="as-btn-ghost"
                           style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", color: "#0369a1", borderColor: "#bae6fd", background: "#fff" }}
                           onClick={() => setEmailBlastTarget(prog)}
-                          title="Send email to approved registrants"
+                          title={t('admin_srv_lh_btn_email_title')}
                         >
-                          Email
+                          {t('admin_srv_lh_btn_email')}
                         </button>
                         <button
                           className="as-btn-ghost"
                           style={{ flex: 1, padding: "6px 10px", fontSize: "0.8rem", color: "#dc2626", borderColor: "#fca5a5", background: "#fff" }}
                           onClick={() => handleDelete(prog.id, prog.title)}
                         >
-                          Delete
+                          {t('admin_srv_lh_btn_delete')}
                         </button>
                       </div>
                     </div>
@@ -504,7 +506,7 @@ export default function ServiceLivelihood({ onBack }) {
 
         {/* ── Stats row ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
-          <h3 style={{ margin: 0 }}>Participant Registrations</h3>
+          <h3 style={{ margin: 0 }}>{t('admin_srv_lh_reg_title')}</h3>
 
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <select
@@ -513,10 +515,10 @@ export default function ServiceLivelihood({ onBack }) {
               onChange={(e) => setFilterStatus(e.target.value)}
               style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
             >
-              <option value="All">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="All">{t('admin_srv_lh_filter_all')}</option>
+              <option value="pending">{t('admin_srv_lh_stat_pending')}</option>
+              <option value="approved">{t('admin_srv_lh_stat_approved')}</option>
+              <option value="rejected">{t('admin_srv_lh_stat_rejected')}</option>
             </select>
 
             <select
@@ -525,21 +527,21 @@ export default function ServiceLivelihood({ onBack }) {
               onChange={(e) => setSortOrder(e.target.value)}
               style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
             >
-              <option value="date_desc">Date: Newest First</option>
-              <option value="date_asc">Date: Oldest First</option>
-              <option value="name_asc">Participant: A to Z</option>
-              <option value="name_desc">Participant: Z to A</option>
-              <option value="prog_asc">Program: A to Z</option>
+              <option value="date_desc">{t('admin_srv_lh_sort_date_new')}</option>
+              <option value="date_asc">{t('admin_srv_lh_sort_date_old')}</option>
+              <option value="name_asc">{t('admin_srv_lh_sort_name_asc')}</option>
+              <option value="name_desc">{t('admin_srv_lh_sort_name_desc')}</option>
+              <option value="prog_asc">{t('admin_srv_lh_sort_prog_asc')}</option>
             </select>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
           {[
-            { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
-            { label: "Approved", value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-            { label: "Pending", value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-            { label: "Rejected", value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
+            { label: t('admin_srv_lh_stat_total'), value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
+            { label: t('admin_srv_lh_stat_approved'), value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: t('admin_srv_lh_stat_pending'), value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: t('admin_srv_lh_stat_rejected'), value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, padding: "18px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
               <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
@@ -550,13 +552,13 @@ export default function ServiceLivelihood({ onBack }) {
 
         {/* ── Table ── */}
         {loadingParts ? (
-          <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
+          <p style={{ color: "#9ca3af" }}>{t('admin_srv_lh_loading')}</p>
         ) : (
           <div className="req-table-wrapper" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table className="req-table" style={{ width: "100%", minWidth: "850px" }}>
               <thead>
                 <tr style={{ textAlign: "center" }}>
-                  {["Ref #", "Full Name", "Program", "Slots Left", "Applied", "Status", "Action"].map(h => (
+                  {[t('admin_srv_lh_th_ref'), t('admin_srv_lh_th_name'), t('admin_srv_lh_th_prog'), t('admin_srv_lh_th_slots'), t('admin_srv_lh_th_applied'), t('admin_srv_lh_th_status'), t('admin_srv_lh_th_action')].map(h => (
                     <th key={h} style={{ textAlign: "center" }}>
                       {h}
                     </th>
@@ -567,7 +569,7 @@ export default function ServiceLivelihood({ onBack }) {
                 {filteredParticipants.length === 0 && (
                   <tr>
                     <td colSpan={7} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>
-                      No registrations match your criteria.
+                      {t('admin_srv_lh_table_empty')}
                     </td>
                   </tr>
                 )}
@@ -598,7 +600,7 @@ export default function ServiceLivelihood({ onBack }) {
                       <td>
                         {left !== null ? (
                           <span style={{ fontSize: "0.82rem", fontWeight: 600, color: left <= 0 ? "#991b1b" : left <= 5 ? "#a16207" : "#166534" }}>
-                            {left <= 0 ? "Full" : `${left} left`}
+                            {left <= 0 ? t('admin_srv_lh_td_full') : `${left} ${t('admin_srv_lh_slots_left')}`}
                           </span>
                         ) : (
                           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>—</span>
@@ -608,7 +610,7 @@ export default function ServiceLivelihood({ onBack }) {
                         {formatTs(p.submittedAt)}
                       </td>
                       <td>
-                        <StatusBadge status={p.status} />
+                        <StatusBadge status={p.status} t={t} />
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <button
@@ -619,7 +621,7 @@ export default function ServiceLivelihood({ onBack }) {
                             setSelectedParticipant(p);
                           }}
                         >
-                          More Details
+                          {t('admin_srv_lh_btn_details')}
                         </button>
                       </td>
                     </tr>
@@ -675,27 +677,27 @@ export default function ServiceLivelihood({ onBack }) {
             <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }} onClick={e => e.stopPropagation()}>
               <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
-                  {editingProgramId ? "Edit Livelihood Program" : "Add Livelihood Program"}
+                  {editingProgramId ? t('admin_srv_lh_modal_edit_title') : t('admin_srv_lh_modal_add_title')}
                 </h2>
                 <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>×</button>
               </div>
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleAddProgram}>
                   <div style={{ marginBottom: "15px" }}>
-                    <label className="as-form-label">Program Title <span style={{ color: "red" }}>*</span></label>
+                    <label className="as-form-label">{t('admin_srv_lh_modal_prog_title')} <span style={{ color: "red" }}>*</span></label>
                     <input
                       type="text"
                       className="as-form-input"
                       required
                       value={newProgram.title}
                       onChange={e => setNewProgram({ ...newProgram, title: e.target.value })}
-                      placeholder="e.g. Food Processing & Packaging"
+                      placeholder={t('admin_srv_lh_modal_prog_title_ph')}
                     />
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
                     <div>
-                      <label className="as-form-label">Start Date <span style={{ color: "red" }}>*</span></label>
+                      <label className="as-form-label">{t('admin_srv_lh_modal_start_date')} <span style={{ color: "red" }}>*</span></label>
                       <input
                         type="date"
                         className="as-form-input"
@@ -714,8 +716,8 @@ export default function ServiceLivelihood({ onBack }) {
                     </div>
                     <div>
                       <label className="as-form-label">
-                        End Date
-                        <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
+                        {t('admin_srv_lh_modal_end_date')}
+                        <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>{t('admin_srv_lh_modal_end_date_hint')}</span>
                       </label>
                       <input
                         type="date"
@@ -726,7 +728,7 @@ export default function ServiceLivelihood({ onBack }) {
                       />
                     </div>
                     <div>
-                      <label className="as-form-label">Start Time <span style={{ color: "red" }}>*</span></label>
+                      <label className="as-form-label">{t('admin_srv_lh_modal_start_time')} <span style={{ color: "red" }}>*</span></label>
                       <input
                         type="time"
                         className="as-form-input"
@@ -736,7 +738,7 @@ export default function ServiceLivelihood({ onBack }) {
                       />
                     </div>
                     <div>
-                      <label className="as-form-label">End Time <span style={{ color: "red" }}>*</span></label>
+                      <label className="as-form-label">{t('admin_srv_lh_modal_end_time')} <span style={{ color: "red" }}>*</span></label>
                       <input
                         type="time"
                         className="as-form-input"
@@ -746,35 +748,35 @@ export default function ServiceLivelihood({ onBack }) {
                       />
                     </div>
                     <div>
-                      <label className="as-form-label">Location</label>
+                      <label className="as-form-label">{t('admin_srv_lh_modal_location')}</label>
                       <input
                         type="text"
                         className="as-form-input"
                         value={newProgram.location}
                         onChange={e => setNewProgram({ ...newProgram, location: e.target.value })}
-                        placeholder="e.g. Barangay Multi-Purpose Hall"
+                        placeholder={t('admin_srv_lh_modal_location_ph')}
                       />
                     </div>
                     <div>
-                      <label className="as-form-label">Total Slots</label>
+                      <label className="as-form-label">{t('admin_srv_lh_modal_total_slots')}</label>
                       <input
                         type="number"
                         min="1"
                         className="as-form-input"
                         value={newProgram.slots}
                         onChange={e => setNewProgram({ ...newProgram, slots: e.target.value })}
-                        placeholder="e.g. 30"
+                        placeholder={t('admin_srv_lh_modal_total_slots_ph')}
                       />
                     </div>
                     <div>
-                      <label className="as-form-label">Target Demographic</label>
+                      <label className="as-form-label">{t('admin_srv_lh_modal_target')}</label>
                       <select
                         className="as-form-input"
                         value={newProgram.demographic}
                         onChange={e => setNewProgram({ ...newProgram, demographic: e.target.value })}
                       >
-                        <option value="">Select Target Demographic</option>
-                        <option value="All Residents">All Residents</option>
+                        <option value="">{t('admin_srv_lh_modal_target_select')}</option>
+                        <option value="All Residents">{t('admin_srv_lh_modal_target_all')}</option>
                         <option value="Student">Student</option>
                         <option value="Senior Citizen">Senior Citizen</option>
                         <option value="PWD">PWD</option>
@@ -787,21 +789,21 @@ export default function ServiceLivelihood({ onBack }) {
                   </div>
 
                   <div style={{ marginBottom: "15px" }}>
-                    <label className="as-form-label">Description <span style={{ color: "red" }}>*</span></label>
+                    <label className="as-form-label">{t('admin_srv_lh_modal_desc')} <span style={{ color: "red" }}>*</span></label>
                     <textarea
                       className="as-form-textarea"
                       required
                       rows="3"
                       value={newProgram.description}
                       onChange={e => setNewProgram({ ...newProgram, description: e.target.value })}
-                      placeholder="Describe the program objectives…"
+                      placeholder={t('admin_srv_lh_modal_desc_ph')}
                     />
                   </div>
 
                   <div style={{ marginTop: "16px", background: "#f9fafb", padding: "14px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
-                    <h4 style={{ margin: "0 0 8px 0", fontSize: "0.9rem", color: "#374151" }}>Default Collected Fields</h4>
+                    <h4 style={{ margin: "0 0 8px 0", fontSize: "0.9rem", color: "#374151" }}>{t('admin_srv_lh_modal_default_fields')}</h4>
                     <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "0 0 8px 0" }}>
-                      These are automatically collected. Do not recreate them.
+                      {t('admin_srv_lh_modal_default_desc')}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                       {["Full Name", "Complete Address", "Contact Number", "Email", "Valid ID / Clearance"].map(f => (
@@ -817,14 +819,15 @@ export default function ServiceLivelihood({ onBack }) {
                     onChange={fields => setNewProgram({ ...newProgram, customFields: fields })}
                   />
 
-                  <div style={{ padding: "14px 0 0 0", marginTop: "20px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
+                  <div style={{ padding: "14px 0 0 0", marginTop: "20px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: '8px' }}>
+                    <button type="button" className="as-btn-ghost" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>{t('admin_srv_lh_modal_btn_cancel')}</button>
                     <button
                       type="submit"
                       className="as-btn-aqua"
                       style={{ padding: "8px 20px" }}
                       disabled={saving}
                     >
-                      {saving ? "Saving…" : editingProgramId ? "Update Program" : "Save Program"}
+                      {saving ? t('admin_srv_lh_modal_btn_saving') : editingProgramId ? t('admin_srv_lh_modal_btn_update') : t('admin_srv_lh_modal_btn_save')}
                     </button>
                   </div>
                 </form>
@@ -848,7 +851,7 @@ export default function ServiceLivelihood({ onBack }) {
                 onClick={e => e.stopPropagation()}
               >
                 <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                  <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>Registration Details</h2>
+                  <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>{t('admin_srv_lh_det_title')}</h2>
                   <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setSelectedParticipant(null)}>×</button>
                 </div>
 
@@ -856,19 +859,19 @@ export default function ServiceLivelihood({ onBack }) {
                   <div className="admin-details" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
                       <div>
-                        <strong>Ref #:</strong> <span style={{ fontFamily: "monospace" }}>{selectedParticipant.regNum || selectedParticipant.id}</span>
+                        <strong>{t('admin_srv_lh_det_ref')}</strong> <span style={{ fontFamily: "monospace" }}>{selectedParticipant.regNum || selectedParticipant.id}</span>
                       </div>
-                      <StatusBadge status={selectedParticipant.status} />
+                      <StatusBadge status={selectedParticipant.status} t={t} />
                     </div>
 
-                    <p><strong>Full Name:</strong> <span>{selectedParticipant.fullName || `${selectedParticipant.firstName || ""} ${selectedParticipant.lastName || ""}`.trim() || "—"}</span></p>
-                    <p><strong>Program:</strong> <span>{selectedParticipant.programName || prog?.title || "—"}</span></p>
-                    <p><strong>Schedule:</strong> <span>{selectedParticipant.programDate || prog?.date || "—"}</span></p>
-                    <p><strong>Date Applied:</strong> <span>{formatTs(selectedParticipant.submittedAt)}</span></p>
+                    <p><strong>{t('admin_srv_lh_det_name')}</strong> <span>{selectedParticipant.fullName || `${selectedParticipant.firstName || ""} ${selectedParticipant.lastName || ""}`.trim() || "—"}</span></p>
+                    <p><strong>{t('admin_srv_lh_det_prog')}</strong> <span>{selectedParticipant.programName || prog?.title || "—"}</span></p>
+                    <p><strong>{t('admin_srv_lh_det_schedule')}</strong> <span>{selectedParticipant.programDate || prog?.date || "—"}</span></p>
+                    <p><strong>{t('admin_srv_lh_det_applied')}</strong> <span>{formatTs(selectedParticipant.submittedAt)}</span></p>
 
                     {selectedParticipant.rejectReason && (
                       <div style={{ marginTop: "8px", background: "#fef2f2", padding: "10px", borderRadius: "6px", border: "1px solid #fecaca" }}>
-                        <strong style={{ color: "#991b1b" }}>Rejection Reason:</strong>
+                        <strong style={{ color: "#991b1b" }}>{t('admin_srv_lh_det_reject_reason')}</strong>
                         <p style={{ margin: "4px 0 0 0", color: "#b91c1c" }}>{selectedParticipant.rejectReason}</p>
                       </div>
                     )}
@@ -887,7 +890,7 @@ export default function ServiceLivelihood({ onBack }) {
                         setShowRejectModal(true);
                       }}
                     >
-                      Reject
+                      {t('admin_srv_lh_det_btn_reject')}
                     </button>
                     <button
                       className="btn-approve"
@@ -895,7 +898,7 @@ export default function ServiceLivelihood({ onBack }) {
                       disabled={slotsFull}
                       style={{ opacity: slotsFull ? 0.6 : 1, cursor: slotsFull ? "not-allowed" : "pointer" }}
                     >
-                      {slotsFull ? "Slots Full" : "Approve"}
+                      {slotsFull ? t('admin_srv_lh_det_btn_full') : t('admin_srv_lh_det_btn_approve')}
                     </button>
                   </div>
                 )}
@@ -909,27 +912,28 @@ export default function ServiceLivelihood({ onBack }) {
           <div className="as-modal-overlay" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
             <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
               <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Reject Registration</h2>
+                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_lh_rej_title')}</h2>
                 <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleConfirmReject}>
-                  <label className="as-form-label">Reason for Rejection <span style={{ color: "red" }}>*</span></label>
+                  <label className="as-form-label">{t('admin_srv_lh_rej_reason')} <span style={{ color: "red" }}>*</span></label>
                   <textarea
                     className="as-form-textarea"
                     rows="3"
                     required
-                    placeholder="Provide a brief explanation…"
+                    placeholder={t('admin_srv_lh_rej_ph')}
                     value={rejectReason}
                     onChange={e => setRejectReason(e.target.value)}
                   />
-                  <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end" }}>
+                  <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end", gap: '8px' }}>
+                    <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>{t('admin_srv_lh_modal_btn_cancel')}</button>
                     <button
                       type="submit"
                       style={{ padding: "8px 18px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
                       disabled={saving}
                     >
-                      {saving ? "Processing…" : "Confirm Rejection"}
+                      {saving ? t('admin_srv_lh_rej_btn_processing') : t('admin_srv_lh_rej_btn_confirm')}
                     </button>
                   </div>
                 </form>
