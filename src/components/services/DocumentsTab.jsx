@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { collection, onSnapshot, query, limit } from "firebase/firestore";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { collection, onSnapshot, getDoc, doc, query, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitDocumentRequest } from "../../services/services";
 import { createNotification } from "../../services/notifications";
+import { useLanguage } from "../../context/LanguageContext";
 
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -54,6 +55,7 @@ const BigCheck = () => (
 // ── Validity reminder (big yellow notice, can be dismissed) ───────────────────
 function ValidityReminderBanner() {
   const [dismissed, setDismissed] = useState(false);
+  const { t } = useLanguage();
   if (dismissed) return null;
   return (
     <div className="bz-note dz-banner">
@@ -85,6 +87,11 @@ function StepIndicator({ step, onStepClick }) {
         const num = i + 1;
         const done = num < step;
         const active = num === step;
+        
+        const clickable = done;
+        const Node = clickable ? "button" : "div";
+        const nodeProps = clickable ? { onClick: () => onStepClick(num), type: "button" } : {};
+
         return (
           <li key={label} className="lv-steps__li" aria-current={active ? "step" : undefined}>
             <Node className={`lv-steps__item lv-steps__node${done ? " is-done" : active ? " is-active" : ""}${clickable ? " is-link" : ""}`} {...nodeProps}>
@@ -150,6 +157,7 @@ function Step1({ docTypes, selected, onSelect, error }) {
 
 // ── Step 2: your details ──────────────────────────────────────────────────────
 function Step2({ docType, form, setForm, errors }) {
+  const [previewUrl, setPreviewUrl] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
@@ -160,6 +168,12 @@ function Step2({ docType, form, setForm, errors }) {
     if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB."); return; }
     set("validId", file.name);
     set("validIdFile", file);
+
+    if (file.type.startsWith("image/")) {
+      setPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setPreviewUrl(null);
+    }
   };
 
   const removeFile = (e) => {
@@ -167,7 +181,14 @@ function Step2({ docType, form, setForm, errors }) {
     e.stopPropagation();
     set("validId", "");
     set("validIdFile", null);
+    setPreviewUrl(null);
   };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const isPdf = form.validIdFile?.type === "application/pdf" || /\.pdf$/i.test(form.validId || "");
   const isOther = form.purposeOption === "Other";
@@ -365,6 +386,7 @@ function Step2({ docType, form, setForm, errors }) {
 
 // ── Step 3: review ────────────────────────────────────────────────────────────
 function Step3({ docType, form }) {
+  const { t } = useLanguage();
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
     ? (form.purposeOther || "Other")
@@ -408,6 +430,7 @@ function Step3({ docType, form }) {
 
 // ── Step 4: done ──────────────────────────────────────────────────────────────
 function Step4({ refNum, onReset }) {
+  const { t } = useLanguage();
   return (
     <section className="bz-card">
       <div className="bf-done">
@@ -443,6 +466,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const topRef = useRef(null);
   const mounted = useRef(false);
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     firstName: "", middleName: "", lastName: "",
     dob: "", civilStatus: "Single", address: "",
@@ -610,6 +634,10 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       validIdFile: null,
     }));
     loadResidentData();
+  };
+
+  const goToStep = (newStep) => {
+    setStep(newStep);
   };
 
   return (
