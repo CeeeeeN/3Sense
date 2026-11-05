@@ -29,7 +29,7 @@ export async function processQRScan({ qrUrl, residentID, householdID, userID }) 
   let parsedUrl;
   try {
     parsedUrl = new URL(qrUrl);
-  } catch (error) {
+  } catch {
     throw new Error("Invalid QR code format. Not a recognizable URL.");
   }
 
@@ -91,6 +91,19 @@ export async function processQRScan({ qrUrl, residentID, householdID, userID }) 
             validationCache.set(cacheKey, validationName);
           }
         }
+      } else if (category === "Equipment") {
+        if (serviceId === "equipment_global") {
+          isValid = true;
+          validationCache.set(cacheKey, validationName);
+        } else {
+          const docRef = doc(db, "equipment", serviceId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            isValid = true;
+            validationName = docSnap.data().equipmentName || docSnap.data().name || docSnap.data().title || validationName;
+            validationCache.set(cacheKey, validationName);
+          }
+        }
       }
 
       if (!isValid) {
@@ -98,7 +111,7 @@ export async function processQRScan({ qrUrl, residentID, householdID, userID }) 
       }
     } catch (error) {
       console.error("QR Validation Error:", error);
-      throw new Error("Validation failed. Please try again or assure internet connection.");
+      throw new Error(error.message || "Validation failed. Please try again or assure internet connection.");
     }
   }
 
@@ -121,6 +134,9 @@ export async function processQRScan({ qrUrl, residentID, householdID, userID }) 
     scanData.facilityID = serviceId;
   } else if (category === "Documents") {
     scanData.documentID = serviceId;
+  } else if (category === "Equipment") {
+    scanData.equipmentID = serviceId;
+    scanData.serviceID = serviceId;
   } else {
     scanData.serviceID = serviceId;
   }

@@ -378,10 +378,6 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
       });
 
       // Update the original document so the Alert disappears
-      const urlParams = new URLSearchParams(window.location.search);
-      const alertType = urlParams.get("type"); // e.g., "DOCUMENT", "FACILITY"
-      const alertRefId = urlParams.get("refId"); // The ID of the original transaction
-
       try {
         if (alertTxId && alertTxType) {
         let collectionName = "";
@@ -389,6 +385,7 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
         // Map the alert type to the exact Firestore collection
         if (alertTxType === "DOCUMENT") collectionName = "document_requests";
         else if (alertTxType === "FACILITY") collectionName = "facility_reservations";
+        else if (alertTxType === "EQUIPMENT") collectionName = "equipment_rentals";
         else if (alertTxType === "LIVELIHOOD") collectionName = "livelihoodRegistrations";
         else if (alertTxType === "PEACE_AND_ORDER") collectionName = "incidentReports";
         else if (alertTxType === "BSWD_REPORT") collectionName = "bswdReports";
@@ -408,8 +405,8 @@ export default function FeedbackForm({ onNavigate, service, userName = "Resident
           });
         }
       }
-      } catch (error) {
-        
+      } catch (err) {
+        console.warn("Could not update original alert doc:", err);
       }
 
       setRefId(ref);

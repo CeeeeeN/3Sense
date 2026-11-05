@@ -76,7 +76,6 @@ export function buildAnnouncementEmail(announcement) {
     location = '',
     time = '',
     requirements = [],
-    postedBy = 'Barangay Admin',
   } = announcement;
 
   const isGeneral = !category || category.trim().toLowerCase() === 'all residents';
@@ -99,7 +98,6 @@ export function buildAnnouncementEmail(announcement) {
       ${infoRow('Location', location || 'TBA')}
       ${formattedTime ? infoRow('Date &amp; Time', formattedTime) : ''}
       ${infoRow('Target Audience', category)}
-      ${infoRow('Posted By', postedBy)}
     </table>
     ${reqList.length > 0 ? `
     <div style="background:#f9fafb;border:1px solid ${BORDER};border-radius:8px;padding:16px 20px;margin-bottom:20px;">

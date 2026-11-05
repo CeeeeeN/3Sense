@@ -114,6 +114,60 @@ export async function createUserNotification(householdID, residentID, title, mes
 }
 
 /**
+ * Create a category-targeted announcement notification for a specific resident,
+ * preventing duplicate notifications for the same resident and announcement.
+ */
+export async function createAnnouncementNotification({
+  householdID,
+  residentID,
+  announcementID,
+  title,
+  message,
+  category = "",
+}) {
+  if (!householdID || !residentID || !announcementID) return false;
+
+  try {
+    const cleanHH = householdID.trim();
+    const cleanRes = residentID.trim();
+    const cleanAnn = announcementID.trim();
+
+    // Deterministic document ID to prevent duplicate notifications for the same resident and announcement
+    const notifDocID = `ann_${cleanAnn}_${cleanRes}`;
+    const notifRef = doc(db, "user_notifications", notifDocID);
+
+    const existingSnap = await getDoc(notifRef);
+    if (existingSnap.exists()) {
+      // Notification already exists for this resident and announcement - skip duplicate!
+      return false;
+    }
+
+    await setDoc(notifRef, {
+      userNotificationID: notifDocID,
+      householdID: cleanHH,
+      residentID: cleanRes,
+      title: title || "New Announcement",
+      message: message || "",
+      type: "announcement",
+      refNum: cleanAnn,
+      category: category || "",
+      isRead: false,
+      createdAt: serverTimestamp(),
+    });
+
+    // Dispatch Live Mobile Push Notification (Non-blocking)
+    sendPushToResidentOrHousehold(cleanHH, cleanRes, title || "New Announcement", message || "", cleanAnn).catch(e =>
+      console.warn("Silent push notification error:", e)
+    );
+
+    return true;
+  } catch (err) {
+    console.error("Failed to create announcement notification:", err);
+    return false;
+  }
+}
+
+/**
  * Top-level admin notification utility
  */
 export async function createNotification(type, message, triggeredBy, refNum = "") {
@@ -144,14 +198,17 @@ export function subscribeToUserNotifications(householdID, residentID, callback) 
   const q = query(
     collection(db, "user_notifications"),
     where("householdID", "==", householdID.trim()),
-    where("residentID", "in", [residentID.trim(), "household", "all"]),
-    orderBy("createdAt", "desc"),
-    limit(20) // Only charge for 20 reads on mount!
+    where("residentID", "in", [residentID.trim(), "household", "all"])
   );
 
   return onSnapshot(q, (snapshot) => {
     const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-    const lastVisible = snapshot.docs[snapshot.docs.length - 1]; // Save cursor for infinite scroll
+    notifs.sort((a, b) => {
+      const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+      const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
     callback(notifs, lastVisible); 
   }, (err) => {
     console.error("Notification listener error:", err);
