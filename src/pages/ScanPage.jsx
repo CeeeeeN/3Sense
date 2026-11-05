@@ -125,7 +125,6 @@ function DesktopBlock() {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ScanPage({
   onNavigate,
-  userName = "",
   householdID = "",
   residentID = "",
   userID = "",
@@ -231,7 +230,7 @@ export default function ScanPage({
           setCamState("idle");
           // Re-map the generic info to work with the VerifiedPopup and later Feedback Form
           setVerifiedService({
-            id: result.data.serviceID || result.data.programID || result.data.facilityID || result.data.documentID,
+            id: result.data.equipmentID || result.data.serviceID || result.data.programID || result.data.facilityID || result.data.documentID,
             name: result.data.serviceName,
             category: result.data.category,
             fullName: result.data.serviceName,

@@ -63,9 +63,12 @@ export default function UserApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const scannedServiceId = urlParams.get("serviceId");
   const scannedServiceName = urlParams.get('serviceName');
+  const scannedCategory = urlParams.get('category');
 
   // State
   const [page, setPage] = useState(() => {
+    const branchingData = sessionStorage.getItem("branchingPayload");
+    if (branchingData) return "register";
     const hasSession = localStorage.getItem("brgy_session");
     if (scannedServiceId) {
       return hasSession ? "feedback" : "login";
@@ -88,10 +91,9 @@ export default function UserApp() {
     getSaved("userRole", "member"),
   );
   const [hhAddress, setHhAddress] = useState(null);
-  const [hhHeadName, setHhHeadName] = useState("");
   const [pendingAnnID, setPendingAnnID] = useState(null);
   const [feedbackService, setFeedbackService] = useState(
-    scannedServiceId ? { id: scannedServiceId, name: scannedServiceName } : null,
+    scannedServiceId ? { id: scannedServiceId, name: scannedServiceName, category: scannedCategory || "General" } : null,
   );
 
   // <-- ADDED: Persist the current view to sessionStorage whenever the page changes
@@ -101,15 +103,6 @@ export default function UserApp() {
     }
   }, [page]);
 
-  // ── DETECT BRANCHING REQUEST ──
-  useEffect(() => {
-    // If the user has a branching payload waiting, instantly open the registration page
-    const branchingData = sessionStorage.getItem("branchingPayload");
-    if (branchingData && page !== "register") {
-      setPage("register");
-    }
-  }, []);
-  // ──────────────────────────────
 
   // Sync URL when page changes
   useEffect(() => {
@@ -151,7 +144,7 @@ export default function UserApp() {
       } else {
         localStorage.removeItem("brgy_session");
       }
-    } catch (e) { }
+    } catch (err) { void err; }
   }, [page, householdID, userID, userName, memberID, userRole]);
 
   // Scroll to top on page change
