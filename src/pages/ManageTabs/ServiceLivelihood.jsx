@@ -70,7 +70,8 @@ export default function ServiceLivelihood({ onBack }) {
     queryKey: ['adminManage_livelihoodPrograms'],
     queryFn: async () => {
       const q = query(
-        collection(db, "Programs"), 
+        collection(db, "Programs"),
+        where("programType", "==", "livelihood"), 
         orderBy("updatedAt", "desc"),
         limit(100)
       );
@@ -188,6 +189,29 @@ export default function ServiceLivelihood({ onBack }) {
     e.preventDefault();
     setSaving(true);
 
+    // --- CALCULATE CORRECT STATUS ON SAVE ---
+    const now = new Date();
+    const localNow = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+    const todayStr = localNow.toISOString().split('T')[0];
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeStr = `${hours}:${minutes}`;
+
+    const sDate = newProgram.date;
+    const eDate = newProgram.endDate || newProgram.date;
+    const sTime = newProgram.startTime || "00:00";
+    const eTime = newProgram.endTime || "23:59";
+
+    let calculatedStatus = "Upcoming";
+    const isPastEnd = (todayStr > eDate) || (todayStr === eDate && currentTimeStr >= eTime);
+    const isPastStart = (todayStr > sDate) || (todayStr === sDate && currentTimeStr >= sTime);
+
+    if (isPastEnd) {
+      calculatedStatus = "Completed";
+    } else if (isPastStart) {
+      calculatedStatus = "Ongoing";
+    }
+
     const programData = {
       title: newProgram.title,
       description: newProgram.description,
@@ -202,6 +226,7 @@ export default function ServiceLivelihood({ onBack }) {
       slots: newProgram.slots,
       demographic: newProgram.demographic,
       customFields: newProgram.customFields || [],
+      status: calculatedStatus, // Force the status update here
     };
 
     try {
@@ -214,7 +239,6 @@ export default function ServiceLivelihood({ onBack }) {
         await addDoc(collection(db, "Programs"), {
           ...programData,
           programType: "livelihood",
-          status: "Upcoming",
           attendees: [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
