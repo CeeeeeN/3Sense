@@ -361,11 +361,21 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     return () => unsub();
   }, []);
 
-  const [form, setForm] = useState({
-    fullName: "", email: "", contactNumber: "",
-    purpose: "", date: "", startTime: "", endTime: "",
-    attendees: "", notes: ""
+  const [form, setForm] = useState(() => {
+    const name = userData ? [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ") : "";
+    return {
+      fullName: name, 
+      email: userData?.email || "", 
+      contactNumber: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      purpose: "", 
+      date: "", 
+      startTime: "", 
+      endTime: "",
+      attendees: "", 
+      notes: ""
+    };
   });
+  
   const [refNum, setRefNum] = useState("");
   const [_dateStatus, setDateStatus] = useState(null);
   const [submitted, setSubmitted] = useState(false);

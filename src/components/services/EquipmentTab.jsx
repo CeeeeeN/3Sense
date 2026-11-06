@@ -259,10 +259,21 @@ function RentalForm({ onBack, equipment, userData, householdID, userName, userID
   const equipmentName = rawEquipmentName;
   const maxQty = equipment?.quantity ? parseInt(equipment.quantity, 10) : 0;
 
-  const [form, setForm] = useState({
-    fullName: "", email: "", contactNumber: "",
-    purpose: "", customPurpose: "", quantity: "", pickUpDate: "", returnDate: "", notes: ""
+  const [form, setForm] = useState(() => {
+    const name = userData ? [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ") : "";
+    return {
+      fullName: name, 
+      email: userData?.email || "", 
+      contactNumber: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      purpose: "", 
+      customPurpose: "", 
+      quantity: "", 
+      pickUpDate: "", 
+      returnDate: "", 
+      notes: ""
+    };
   });
+  
   const [refNum, setRefNum] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState({});

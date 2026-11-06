@@ -370,8 +370,31 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   };
 
   const resetForm = () => {
-    setStep(1); setErrors({});
-    setForm(BLANK_FORM);
+    setStep(1); 
+    setErrors({});
+    
+    // Re-populate the auto-fill data instead of wiping it completely blank
+    let fullAddress = "";
+    if (userData) {
+      fullAddress = [
+        userData.houseNumber, 
+        userData.street, 
+        userData.barangay, 
+        userData.city
+      ].filter(Boolean).join(", ");
+    }
+    
+    setForm({
+      firstName: userData?.firstName || "",
+      middleName: userData?.middleName || "",
+      lastName: userData?.lastName || "",
+      address: fullAddress,
+      contact: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      email: userData?.email || "",
+      idFile: "", // Keep the uploaded file blank
+      programId: "", // Keep the selected program blank
+    });
+    
     setView("main");
   };
 
