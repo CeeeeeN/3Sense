@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const AlertContext = createContext();
 
@@ -14,6 +14,18 @@ export const AlertProvider = ({ children }) => {
     onCancel: null,
   });
 
+  // 1. Lock the scroll of the page when modal is active
+  useEffect(() => {
+    if (alertState.isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [alertState.isOpen]);
+
   const showAlert = (title, message) => {
     return new Promise((resolve) => {
       setAlertState({
@@ -23,7 +35,7 @@ export const AlertProvider = ({ children }) => {
         message,
         onConfirm: () => {
           setAlertState((prev) => ({ ...prev, isOpen: false }));
-          resolve(true); // Resolves the promise when OK is clicked
+          resolve(true);
         },
         onCancel: null,
       });
@@ -39,14 +51,22 @@ export const AlertProvider = ({ children }) => {
         message,
         onConfirm: () => {
           setAlertState((prev) => ({ ...prev, isOpen: false }));
-          resolve(true); // Resolves true if confirmed
+          resolve(true);
         },
         onCancel: () => {
           setAlertState((prev) => ({ ...prev, isOpen: false }));
-          resolve(false); // Resolves false if canceled
+          resolve(false);
         },
       });
     });
+  };
+
+  const handleBackdropClick = () => {
+    if (alertState.type === 'confirm') {
+      alertState.onCancel?.();
+    } else {
+      alertState.onConfirm?.();
+    }
   };
 
   return (
@@ -55,11 +75,24 @@ export const AlertProvider = ({ children }) => {
 
       {/* Global Alert Modal UI */}
       {alertState.isOpen && (
-        <div className="as-modal-overlay" style={{ zIndex: 9999 }}>
-          <div className="as-modal-content" style={{ maxWidth: '400px', padding: 0, overflow: 'hidden' }}>
+        /* 2. Backdrop click handler closes the modal */
+        <div 
+          className="as-modal-overlay" 
+          style={{ zIndex: 9999 }}
+          onClick={handleBackdropClick}
+        >
+          {/* stopPropagation prevents clicks inside the card from closing it */}
+          <div 
+            className="as-modal-content" 
+            style={{ maxWidth: '400px', padding: 0, overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             
-            <div className="as-modal-header" style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#111827' }}>{alertState.title}</h2>
+            {/* 3. Header title changed to color: '#ffffff' */}
+            <div className="as-modal-header" style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#ffffff' }}>
+                {alertState.title}
+              </h2>
             </div>
             
             <div className="as-modal-body" style={{ padding: '24px', fontSize: '0.95rem', color: '#374151', lineHeight: '1.5' }}>
@@ -69,6 +102,7 @@ export const AlertProvider = ({ children }) => {
             <div style={{ padding: '16px 24px', background: '#f9fafb', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               {alertState.type === 'confirm' && (
                 <button 
+                  type="button"
                   className="as-btn-ghost" 
                   onClick={alertState.onCancel}
                   style={{ padding: '8px 16px' }}
@@ -77,6 +111,7 @@ export const AlertProvider = ({ children }) => {
                 </button>
               )}
               <button 
+                type="button"
                 className="approve-btn" 
                 onClick={alertState.onConfirm}
                 style={{ 

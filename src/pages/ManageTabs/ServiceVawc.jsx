@@ -16,10 +16,12 @@ import {
 import { db } from "../../firebase/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 export default function ServiceVawc({ onBack, userRole }) {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showAlert } = useAlert();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -231,7 +233,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       });
     } catch (err) {
       console.error("Error saving VAWC case:", err);
-      alert(t('admin_srv_vawc_err_save'));
+      await showAlert("Error", t('admin_srv_vawc_err_save'));
     } finally {
       setSubmitting(false);
     }
@@ -302,7 +304,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       setEditingCase(null);
     } catch (err) {
       console.error("Failed to update case details:", err);
-      alert(t('admin_srv_vawc_err_update'));
+      await showAlert("Error", t('admin_srv_vawc_err_update'));
     } finally {
       setUpdating(false);
     }
@@ -325,7 +327,7 @@ export default function ServiceVawc({ onBack, userRole }) {
       setCaseToDelete(null);
     } catch (err) {
       console.error("Error deleting VAWC case:", err);
-      alert(t('admin_srv_vawc_err_delete'));
+      await showAlert("Error", t('admin_srv_vawc_err_delete'));
     } finally {
       setDeleting(false);
     }
@@ -373,6 +375,14 @@ export default function ServiceVawc({ onBack, userRole }) {
       </div>
     );
   }
+
+  const getStatusBadgeClass = (status) => {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("closed") || s.includes("resolved")) return "closed-resolved";
+  if (s.includes("acted")) return "acted-upon";
+  if (s.includes("pending")) return "pending";
+  return s.replace(/[^a-z0-9]/g, "-");
+  };
 
   const totalPages = Math.ceil(filteredCases.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -654,17 +664,19 @@ export default function ServiceVawc({ onBack, userRole }) {
                         {c.actionTaken}
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                        <span className={`status-badge ${(c.status || "pending").toLowerCase().replace(/\s+/g, '-')}`}>
-                          {(() => {
-                            let statusRaw = (c.status || "Pending");
-                            let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
-                            if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_vawc_modal_status_pending');
-                            if (statusRaw.toLowerCase() === 'acted upon') displayStatus = t('admin_srv_vawc_modal_status_acted');
-                            if (statusRaw.toLowerCase() === 'closed / resolved') displayStatus = t('admin_srv_vawc_modal_status_closed');
-                            return displayStatus;
-                          })()}
-                        </span>
-                      </td>
+  <span className={`status-badge ${getStatusBadgeClass(c.status)}`}>
+    {(() => {
+      let statusRaw = (c.status || "Pending");
+      let displayStatus = statusRaw;
+      if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_vawc_modal_status_pending');
+      if (statusRaw.toLowerCase() === 'acted upon') displayStatus = t('admin_srv_vawc_modal_status_acted');
+      if (statusRaw.toLowerCase().includes('closed') || statusRaw.toLowerCase().includes('resolved')) {
+        displayStatus = t('admin_srv_vawc_modal_status_closed');
+      }
+      return displayStatus;
+    })()}
+  </span>
+</td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         <button
                           type="button"
@@ -755,14 +767,14 @@ export default function ServiceVawc({ onBack, userRole }) {
             style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
+            <div className="as-modal-header">
               <div>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_modal_edit_title')}</h2>
-                <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
+                <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_modal_edit_title')}</h2>
+                <p style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
                   {t('admin_srv_vawc_modal_ref')} {editingCase.referenceNumber || editingCase.id}
                 </p>
               </div>
-              <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setEditingCase(null)}>
+              <button className="as-modal-close" onClick={() => setEditingCase(null)}>
                 &times;
               </button>
             </div>
@@ -980,9 +992,9 @@ export default function ServiceVawc({ onBack, userRole }) {
             style={{ maxWidth: "420px", padding: 0, overflow: "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "14px 18px" }}>
-              <h3 style={{ color: "#dc2626", margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{t('admin_srv_vawc_del_title')}</h3>
-              <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setCaseToDelete(null)}>
+            <div className="as-modal-header">
+              <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_del_title')}</h2>
+              <button className="as-modal-close" onClick={() => setCaseToDelete(null)}>
                 &times;
               </button>
             </div>
@@ -1035,14 +1047,14 @@ export default function ServiceVawc({ onBack, userRole }) {
             style={{ maxWidth: "580px", padding: 0, overflow: "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
+            <div className="as-modal-header">
               <div>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_modal_add_title')}</h2>
-                <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
+                <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_vawc_modal_add_title')}</h2>
+                <p style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.75rem", margin: "2px 0 0 0" }}>
                   {t('admin_srv_vawc_modal_subtitle')}
                 </p>
               </div>
-              <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setIsAddModalOpen(false)}>
+              <button className="as-modal-close" onClick={() => setIsAddModalOpen(false)}>
                 &times;
               </button>
             </div>

@@ -260,7 +260,7 @@ const LoginPage = () => {
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="e.g. admin@malanday.gov.ph"
+                  placeholder="Enter email or username"
                   required
                 />
               </div>

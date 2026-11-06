@@ -32,6 +32,7 @@ import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildProgramEmail } from "../../utils/emailTemplates";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 const getTodayStr = () => new Date().toISOString().split("T")[0];
@@ -159,6 +160,7 @@ function StatBar({ stats, t }) {
 // ─── PROGRAM WORKSPACE COMPONENT ───
 function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
   const queryClient = useQueryClient();
+  const { showAlert } = useAlert();
   const [filterStatus, setFilterStatus] = useState("All");
   const [sortOrder, setSortOrder] = useState("date_desc");
 
@@ -209,7 +211,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
     if (totalSlots > 0) {
       const left = getSlotsLeft();
       if (left !== null && left <= 0) {
-        alert(`No slots left for "${program.title}". Cannot approve.`);
+        await showAlert("Slots Full", `No slots left for "${program.title}". Cannot approve.`);
         return;
       }
     }
@@ -519,10 +521,10 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
 
         {/* ── Reject Modal ── */}
         {showRejectModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
+          <div className="as-modal-overlay" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "400px" }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>{t('admin_prog_reject_title')}</h2>
+                <h2 style={{ color: "#ffffff", margin: 0 }}>{t('admin_prog_reject_title')}</h2>
                 <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body">
@@ -543,10 +545,10 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
 
         {/* ── Remove Modal ── */}
         {showRemoveModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
+          <div className="as-modal-overlay" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "400px" }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>{t('admin_prog_remove_title')}</h2>
+                <h2 style={{ color: "#ffffff", margin: 0 }}>{t('admin_prog_remove_title')}</h2>
                 <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body">
@@ -593,6 +595,7 @@ const EMPTY_PROGRAM = {
 export default function ManagePrograms() {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Hook implementation
+  const { showAlert, showConfirm } = useAlert();
   
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -743,14 +746,20 @@ export default function ManagePrograms() {
   };
 
   const handleDelete = async (id, progTitle) => {
-    if (!window.confirm("Are you sure you want to delete this program?")) return;
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `Are you sure you want to delete "${progTitle}"?`
+    );
+    if (!isConfirmed) return;
+
     try {
       await deleteDoc(doc(db, "Programs", id));
       logTransaction(adminName, adminRole, "DELETED_PROGRAM", `Deleted program "${progTitle}" ID: ${id}`);
       queryClient.invalidateQueries({ queryKey: ['adminManage_programs'] });
+      await showAlert("Success", "Program deleted successfully.");
     } catch (error) {
       console.error("Error deleting program:", error);
-      alert("Failed to delete program. Please try again.");
+      await showAlert("Error", "Failed to delete program. Please try again.");
     }
   };
 
@@ -793,7 +802,7 @@ export default function ManagePrograms() {
       setShowAddModal(false);
     } catch (error) {
       console.error("Error saving program:", error);
-      alert("Failed to save program. Please try again.");
+      await showAlert("Error", "Failed to save program. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -976,9 +985,13 @@ export default function ManagePrograms() {
         </>
       )}
 
-      {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
+{showAddModal && (
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div 
+            className="as-modal-content" 
+            style={{ maxWidth: "700px", width: "100%" }} 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="as-modal-header">
               <h2>{editingProgramId ? t('admin_prog_modal_edit_title') : t('admin_prog_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>×</button>
@@ -1025,6 +1038,7 @@ export default function ManagePrograms() {
                   </div>
                 </div>
 
+                {/* Row 1: Start Date & End Date */}
                 <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_prog_modal_start_date')}</label>
@@ -1047,7 +1061,9 @@ export default function ManagePrograms() {
                   <div className="as-form-group">
                     <label className="as-form-label">
                       {t('admin_prog_modal_end_date')}
-                      <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>{t('admin_prog_modal_end_date_hint')}</span>
+                      <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>
+                        {t('admin_prog_modal_end_date_hint')}
+                      </span>
                     </label>
                     <input
                       type="date"
@@ -1057,21 +1073,43 @@ export default function ManagePrograms() {
                       onChange={(e) => setNewProgram({ ...newProgram, endDate: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* Row 2: Start Time & End Time */}
+                <div className="as-form-row">
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_prog_modal_start_time')}</label>
-                    <input type="time" className="as-form-input" required value={newProgram.startTime}
-                      onChange={(e) => setNewProgram({ ...newProgram, startTime: e.target.value })} />
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.startTime}
+                      onChange={(e) => setNewProgram({ ...newProgram, startTime: e.target.value })}
+                    />
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_prog_modal_end_time')}</label>
-                    <input type="time" className="as-form-input" required value={newProgram.endTime}
-                      onChange={(e) => setNewProgram({ ...newProgram, endTime: e.target.value })} />
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.endTime}
+                      onChange={(e) => setNewProgram({ ...newProgram, endTime: e.target.value })}
+                    />
                   </div>
-                  <div className="as-form-group">
-                    <label className="as-form-label">{t('admin_prog_modal_slots')}</label>
-                    <input type="number" className="as-form-input" placeholder={t('admin_prog_modal_slots_ph')} value={newProgram.slots}
-                      onChange={(e) => setNewProgram({ ...newProgram, slots: e.target.value })} />
-                  </div>
+                </div>
+
+                {/* Row 3: Available Slots */}
+                <div className="as-form-group">
+                  <label className="as-form-label">{t('admin_prog_modal_slots')}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="as-form-input"
+                    placeholder={t('admin_prog_modal_slots_ph')}
+                    value={newProgram.slots}
+                    onChange={(e) => setNewProgram({ ...newProgram, slots: e.target.value })}
+                  />
                 </div>
 
                 <div className="as-form-group">
@@ -1130,8 +1168,8 @@ export default function ManagePrograms() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "450px" }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: "450px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{t('admin_prog_qr_title')}</h2>
               <button className="as-modal-close" onClick={() => setSelectedQR(null)}>×</button>
