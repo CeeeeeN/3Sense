@@ -87,10 +87,23 @@ const BigCheck = () => (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
 );
 
-const BLANK_FORM = {
-  reporterName: "", isAnonymous: false, contact: "", reporterAddress: "",
-  incidentType: "", location: "", date: "", time: "", description: "", urgency: "",
-  photo: "", photoFile: null,
+const getInitialFormState = (userData) => {
+  const name = userData ? [userData.firstName, userData.lastName].filter(Boolean).join(" ") : "";
+  const fullAddress = userData ? [userData.houseNumber, userData.street, userData.barangay].filter(Boolean).join(", ") : "";
+  return {
+    reporterName: name, 
+    isAnonymous: false, 
+    contact: userData?.contactNumber || "", 
+    reporterAddress: fullAddress,
+    incidentType: "", 
+    location: "", 
+    date: "", 
+    time: "", 
+    description: "", 
+    urgency: "",
+    photo: "", 
+    photoFile: null,
+  };
 };
 
 export default function PeaceOrderTab({ userData, householdID }) {
@@ -104,7 +117,12 @@ export default function PeaceOrderTab({ userData, householdID }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const topRef = useRef(null);
 
-  const [form, setForm] = useState(BLANK_FORM);
+  const [form, setForm] = useState(() => getInitialFormState(userData));
+
+  const handleResetForm = () => {
+    setForm(getInitialFormState(userData));
+    goHome();
+  };
 
   useEffect(() => {
     if (userData && !form.isAnonymous) {
@@ -527,7 +545,7 @@ export default function PeaceOrderTab({ userData, householdID }) {
                 <button type="button" className="bf-secondary" onClick={() => { setTrackInput(refNum); setView("track"); }}>
                   {t("po_sub_btn_check")}
                 </button>
-                <button type="button" className="bf-secondary" onClick={() => { setForm(BLANK_FORM); goHome(); }}>
+                <button type="button" className="bf-secondary" onClick={handleResetForm}>
                   {t("po_sub_btn_done")}
                 </button>
               </div>

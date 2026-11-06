@@ -532,15 +532,15 @@ export default function DocumentsTab({ userData, householdID, userName }) {
 
       setForm(f => ({
         ...f,
-        firstName: rawRes.firstName || f.firstName || "",
-        middleName: rawRes.middleName || f.middleName || "",
-        lastName: rawRes.lastName || f.lastName || "",
-        dob: rawRes.birthDate || rawRes.dob || f.dob || "",
-        civilStatus: rawRes.civilStatus || f.civilStatus || "Single",
-        address: fullAddress || f.address || "",
-        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || f.contact || ""),
-        email: rawRes.email || f.email || "",
-        residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || f.residingSince || ""),
+        firstName: rawRes.firstName || "",
+        middleName: rawRes.middleName || "",
+        lastName: rawRes.lastName || "",
+        dob: rawRes.birthDate || rawRes.dob || "",
+        civilStatus: rawRes.civilStatus || "Single",
+        address: fullAddress || "",
+        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || ""),
+        email: rawRes.email || "",
+        residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || ""),
       }));
     }
   }, [userData, householdID, residentID]);
@@ -647,13 +647,17 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setStep(1);
     setDocType(null);
     setErrors({});
-    setForm(prev => ({
-      ...prev,
-      purposeOption: "",
-      purposeOther: "",
-      validId: "",
-      validIdFile: null,
-    }));
+    
+    // Explicitly wipe the form clean BEFORE we load the resident data again
+    setForm({
+      firstName: "", middleName: "", lastName: "",
+      dob: "", civilStatus: "Single", address: "",
+      contact: "", email: "", residingSince: "",
+      purposeOption: "", purposeOther: "", 
+      validId: "", validIdFile: null,
+    });
+    
+    // Now trigger the auto-fill pulling strictly from the resident context
     loadResidentData();
   };
 
