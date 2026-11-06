@@ -61,8 +61,13 @@ export default function PeaceAndOrderAIInsights() {
         
         setTrendData(formattedTrendData);
 
+        const typeCounts = {};
+        safeData.forEach(inc => {
+          typeCounts[inc.type] = (typeCounts[inc.type] || 0) + 1;
+        });
+
         // 4. Cache Management
-        const cacheKey = `po_insight_count_${safeData.length}`;
+        const cacheKey = `po_insight_v2_${safeData.length}`;
         const localCache = sessionStorage.getItem(cacheKey);
         if (localCache) {
           setInsight(localCache);
@@ -80,42 +85,46 @@ export default function PeaceAndOrderAIInsights() {
           return;
         }
 
-        // 5. Call Hugging Face API with strict statistical requirements
-        const response = await fetch(MODEL_URL, {
+        // 6. Call Gemini API with aggregated data and bypassed safety filters
+        const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
+        
+        const prompt = `You are an expert crime and incident analyst for a local Barangay. Based ONLY on the provided aggregated statistics, provide a concise summary identifying trends.
+        
+Monthly Incident Volume: ${JSON.stringify(formattedTrendData)}
+Incident Type Breakdown: ${JSON.stringify(typeCounts)}
+
+You MUST format your output exactly like this (do not use markdown asterisks):
+Increasing Trend: [Your observation. You MUST include a calculated percentage or specific number of cases to prove the trend.]
+Peak Period: [Your observation.]
+Notable Pattern: [Your observation. You MUST include the specific number of incidents that fit this pattern.]`;
+
+        const response = await fetch(GEMINI_URL, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${HF_ACCESS_TOKEN}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "deepseek-ai/DeepSeek-V3-0324", 
-            messages: [
-              {
-                role: "system",
-                content: `You are an expert crime and incident analyst for a local Barangay. Based ONLY on the provided JSON data, provide a concise summary identifying trends. IMPORTANT: Ignore locations like 'Unspecified Zone'. 
-                
-                You MUST format your output exactly like this (do not use markdown asterisks):
-                Increasing Trend: [Your observation. You MUST include a calculated percentage or specific number of cases to prove the trend.]
-                Peak Period: [Your observation.]
-                Notable Pattern: [Your observation. You MUST include the specific number of incidents that fit this pattern.]`
-              },
-              {
-                role: "user",
-                content: `Analyze this timeline and incident data: ${JSON.stringify(safeData)}`
-              }
+            contents: [{ parts: [{ text: prompt }] }],
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
             ],
-            max_tokens: 250,
-            temperature: 0.2
+            generationConfig: {
+                maxOutputTokens: 400,
+                temperature: 0.2
+            }
           })
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.error?.message || "Failed to fetch from Hugging Face API");
+          throw new Error(result.error?.message || "Failed to fetch from Gemini API");
         }
 
-        const generatedText = result.choices[0].message.content.trim();
+        const generatedText = result.candidates[0].content.parts[0].text.trim();
 
         await setDoc(insightRef, { text: generatedText, createdAt: serverTimestamp() });
         sessionStorage.setItem(cacheKey, generatedText);
@@ -156,7 +165,7 @@ export default function PeaceAndOrderAIInsights() {
       {loading ? (
         <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#64748b", fontSize: "0.9rem" }}>
           <span style={{ width: "16px", height: "16px", border: "2px solid #cbd5e1", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite" }}></span>
-          Analyzing spatial and temporal incident patterns...
+          Analyzing incident patterns...
         </div>
       ) : error ? (
         <p style={{ color: "#ef4444", fontSize: "0.9rem", margin: 0 }}>{error}</p>
