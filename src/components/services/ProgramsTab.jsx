@@ -398,7 +398,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
 
         // 2️⃣ Attendee sub-doc → ManagePrograms workspace
         if (activeUserId && prog?.id) {
-          await setDoc(
+          await addDoc(
             doc(db, "Programs", prog.id, "attendees", activeUserId),
             {
               UID: userUID,
