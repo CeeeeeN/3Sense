@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { db } from "../firebase/firebase";
-import { collection, query, where, orderBy, onSnapshot, limit, or, and } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, or, and, collectionGroup, getDoc } from "firebase/firestore";
 import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 import { useLanguage } from "../context/LanguageContext";
 import {
@@ -118,22 +118,86 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
     return () => { active = false; };
   }, [residentID]);
 
-  // A. Fetch Programs
+  // A. Fetch Programs (Combined: Livelihood and General Programs)
   useEffect(() => {
     if (!residentID) return;
-    const qPrograms = query(
+
+    // 1. Query Livelihood Programs
+    const qLivelihood = query(
       collection(db, "livelihoodRegistrations"),
       buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(progLimit)
     );
-    const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
-      setPrograms(snapshot.docs.map(doc => ({
-        id: doc.id, name: doc.data().programName, date: doc.data().programDate, ...doc.data()
-      })));
+
+    // 2. Query General Programs from 'attendees' to get the REAL admin status.
+    // NOTE: We explicitly omit orderBy() here to bypass the strict Firebase composite index error.
+    // The results will be sorted chronologically on the client side below.
+    const qGeneral = query(
+      collectionGroup(db, "attendees"),
+      where("residentID", "==", residentID)
+    );
+
+    let livelihoodData = [];
+    let generalData = [];
+
+    const updateCombinedPrograms = () => {
+      const combined = [...livelihoodData, ...generalData];
+      
+      // Client-side sorting (Newest first)
+      combined.sort((a, b) => {
+        const timeA = (a.createdAt || a.submittedAt)?.toMillis ? (a.createdAt || a.submittedAt).toMillis() : 0;
+        const timeB = (b.createdAt || b.submittedAt)?.toMillis ? (b.createdAt || b.submittedAt).toMillis() : 0;
+        return timeB - timeA;
+      });
+      
+      // Apply the limit after sorting
+      setPrograms(combined.slice(0, progLimit));
+    };
+
+    const unsubLivelihood = onSnapshot(qLivelihood, (snap) => {
+      livelihoodData = snap.docs.map(doc => ({
+        id: doc.id, 
+        name: doc.data().programName, 
+        date: doc.data().programDate,
+        category: "Livelihood",
+        ...doc.data()
+      }));
+      updateCombinedPrograms();
     });
-    return () => unsubPrograms();
-  }, [residentID, progLimit, buildIdentityQuery]);
+
+    const unsubGeneral = onSnapshot(qGeneral, async (snap) => {
+      // Fetch the parent Program document to get the title and date
+      const resolvedDocs = await Promise.all(snap.docs.map(async (attendeeDoc) => {
+        const programRef = attendeeDoc.ref.parent.parent; 
+        let programData = {};
+        
+        if (programRef) {
+          const programSnap = await getDoc(programRef);
+          if (programSnap.exists()) {
+            programData = programSnap.data();
+          }
+        }
+        
+        return {
+          id: attendeeDoc.id, 
+          programId: programRef?.id,
+          name: programData.programName || programData.title || "General Program", 
+          date: programData.programDate || programData.date,
+          category: "General Program",
+          ...attendeeDoc.data() // This pulls in the REAL status (Approved/Rejected/Pending)
+        };
+      }));
+      
+      generalData = resolvedDocs;
+      updateCombinedPrograms();
+    });
+
+    return () => { 
+      unsubLivelihood(); 
+      unsubGeneral(); 
+    };
+  }, [userUID, residentID, progLimit]);
 
   // B. Fetch Documents
   useEffect(() => {
