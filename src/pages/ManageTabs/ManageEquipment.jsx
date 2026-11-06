@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
@@ -36,6 +37,7 @@ function DescriptionPreview({ text, t }) {
 export default function ManageEquipment() {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert(); // <-- ADD HERE
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("All");
@@ -143,16 +145,22 @@ export default function ManageEquipment() {
     setShowAddModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm(t('admin_eq_confirm_delete'))) {
-      try {
-        await deleteDoc(doc(db, "equipment", id));
-        logTransaction(adminName, adminRole, "DELETED_EQUIPMENT", `Deleted equipment with ID: ${id}`);
-        queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
-      } catch(error) {
-        console.error("Error deleting equipment: ", error);
-        logTransaction(adminName, adminRole, "ERROR_DELETING_EQUIPMENT", `Error deleting equipment with ID: ${id}\n${error.message}`);
-      }
+  const handleDelete = async (id, eqName) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_eq_confirm_delete')}\n\n"${eqName}"`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "equipment", id));
+      logTransaction(adminName, adminRole, "DELETED_EQUIPMENT", `Deleted equipment with ID: ${id}`);
+      queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
+      await showAlert("Success", "Equipment deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting equipment: ", error);
+      await showAlert("Error", "Failed to delete equipment. Please try again.");
+      logTransaction(adminName, adminRole, "ERROR_DELETING_EQUIPMENT", `Error deleting equipment with ID: ${id}\n${error.message}`);
     }
   };
 
@@ -368,7 +376,7 @@ export default function ManageEquipment() {
             <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(eq)}>{t('admin_eq_btn_block_dates')}</button>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(eq)}>{t('admin_eq_btn_edit')}</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(eq.id)}>{t('admin_eq_btn_delete')}</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(eq.id, eq.equipmentName || eq.name)}>{t('admin_eq_btn_delete')}</button>
             </div>
           </div>
         ))}
@@ -383,8 +391,8 @@ export default function ManageEquipment() {
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{editingEquipmentId ? t('admin_eq_modal_edit_title') : t('admin_eq_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
@@ -533,8 +541,8 @@ export default function ManageEquipment() {
       )}
 
       {showCalendarModal && selectedEquipment && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '600px' }}>
+        <div className="as-modal-overlay" onClick={() => setShowCalendarModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{t('admin_eq_cal_title')} {selectedEquipment.equipmentName || selectedEquipment.name}</h2>
               <button className="as-modal-close" onClick={() => setShowCalendarModal(false)}>&times;</button>
@@ -583,8 +591,8 @@ export default function ManageEquipment() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '450px' }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: '450px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{t('admin_eq_qr_title')}</h2>
               <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>

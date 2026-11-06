@@ -25,6 +25,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Import hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
@@ -54,6 +55,7 @@ function DescriptionPreview({ text }) {
 export default function ManageDocuments() {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortCatalog, setSortCatalog] = useState("date_desc");
@@ -136,26 +138,32 @@ export default function ManageDocuments() {
     setShowAddModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm(t('admin_doc_confirm_delete'))) {
-      try {
-        await deleteDoc(doc(db, "documents", id));
-        logTransaction(
-          adminName,
-          adminRole,
-          "DELETED_DOCUMENT_TYPE",
-          `Deleted document type with ID: ${id}`,
-        );
-        queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
-      } catch (error) {
-        console.error("Error deleting document type: ", error);
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_DELETING_DOCUMENT_TYPE",
-          `Error deleting document type with ID: ${id}\n${error.message}`,
-        );
-      }
+  const handleDelete = async (id, docName) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_doc_confirm_delete')}\n\n"${docName}"`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "documents", id));
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_DOCUMENT_TYPE",
+        `Deleted document type with ID: ${id}`
+      );
+      queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
+      await showAlert("Success", "Document type deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting document type: ", error);
+      await showAlert("Error", "Failed to delete document type. Please try again.");
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_DELETING_DOCUMENT_TYPE",
+        `Error deleting document type with ID: ${id}\n${error.message}`
+      );
     }
   };
 
@@ -407,7 +415,7 @@ export default function ManageDocuments() {
                   color: "red",
                   borderColor: "#fca5a5",
                 }}
-                onClick={() => handleDelete(doc.id)}
+                onClick={() => handleDelete(doc.id, doc.documentName || doc.title)}
               >
                 {t('admin_doc_btn_delete')}
               </button>
@@ -439,8 +447,8 @@ export default function ManageDocuments() {
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "600px" }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: "600px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>
                 {editingDocId ? t('admin_doc_modal_edit_title') : t('admin_doc_modal_add_title')}
@@ -758,8 +766,8 @@ export default function ManageDocuments() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "450px" }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: "450px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{t('admin_doc_qr_title')}</h2>
               <button

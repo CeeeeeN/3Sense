@@ -179,7 +179,7 @@ export default function ServiceLivelihood({ onBack }) {
   const handleDelete = async (id, progTitle) => {
       const isConfirmed = await showConfirm(
         "Confirm Deletion",
-        `${t('admin_srv_lh_confirm_delete')} "${progTitle}"?`
+        `${t('admin_srv_lh_confirm_delete')}\n\n"${progTitle}"`
       );
       if (!isConfirmed) return;
 

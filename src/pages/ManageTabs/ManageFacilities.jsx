@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
@@ -36,6 +37,7 @@ function DescriptionPreview({ text, t }) {
 export default function ManageFacilities() {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("All");
@@ -146,26 +148,32 @@ export default function ManageFacilities() {
     setShowAddModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm(t('admin_fac_confirm_delete'))) {
-      try {
-        await deleteDoc(doc(db, "facilities", id));
-        logTransaction(
-          adminName,
-          adminRole,
-          "DELETED_FACILITY",
-          `Deleted facility with ID: ${id}`,
-        );
-        queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
-      } catch(error) {
-        console.error("Error deleting facility: ", error);
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_DELETING_FACILITY",
-          `Error deleting facility with ID: ${id}\n${error.message}`,
-        );
-      }
+  const handleDelete = async (id, facName) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_fac_confirm_delete')}\n\n"${facName}"`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "facilities", id));
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_FACILITY",
+        `Deleted facility with ID: ${id}`
+      );
+      queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
+      await showAlert("Success", "Facility deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting facility: ", error);
+      await showAlert("Error", "Failed to delete facility. Please try again.");
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_DELETING_FACILITY",
+        `Error deleting facility with ID: ${id}\n${error.message}`
+      );
     }
   };
 
@@ -380,7 +388,7 @@ export default function ManageFacilities() {
             <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>{t('admin_fac_btn_calendar')}</button>
               <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>{t('admin_fac_btn_edit')}</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id)}>{t('admin_fac_btn_delete')}</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id, fac.facilityName || fac.name)}>{t('admin_fac_btn_delete')}</button>
             </div>
           </div>
         ))}
@@ -409,8 +417,8 @@ export default function ManageFacilities() {
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{editingFacilityId ? t('admin_fac_modal_edit_title') : t('admin_fac_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
@@ -592,8 +600,8 @@ export default function ManageFacilities() {
       )}
 
       {showCalendarModal && selectedFacility && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '600px' }}>
+        <div className="as-modal-overlay" onClick={() => setShowCalendarModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{t('admin_fac_cal_title')} {selectedFacility.name || selectedFacility.facilityName}</h2>
               <button className="as-modal-close" onClick={() => setShowCalendarModal(false)}>&times;</button>
@@ -642,8 +650,8 @@ export default function ManageFacilities() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '450px' }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: '450px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{t('admin_fac_qr_title')}</h2>
               <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>

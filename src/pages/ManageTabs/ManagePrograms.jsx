@@ -748,7 +748,7 @@ export default function ManagePrograms() {
   const handleDelete = async (id, progTitle) => {
     const isConfirmed = await showConfirm(
       "Confirm Deletion",
-      `Are you sure you want to delete "${progTitle}"?`
+      `Are you sure you want to delete this program?\n\n"${progTitle}"`
     );
     if (!isConfirmed) return;
 

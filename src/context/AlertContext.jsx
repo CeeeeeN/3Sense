@@ -10,11 +10,13 @@ export const AlertProvider = ({ children }) => {
     type: 'alert', // 'alert' or 'confirm'
     title: '',
     message: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    isDestructive: false,
     onConfirm: null,
     onCancel: null,
   });
 
-  // 1. Lock the scroll of the page when modal is active
   useEffect(() => {
     if (alertState.isOpen) {
       document.body.style.overflow = 'hidden';
@@ -33,6 +35,8 @@ export const AlertProvider = ({ children }) => {
         type: 'alert',
         title,
         message,
+        confirmText: 'OK',
+        isDestructive: false,
         onConfirm: () => {
           setAlertState((prev) => ({ ...prev, isOpen: false }));
           resolve(true);
@@ -42,13 +46,22 @@ export const AlertProvider = ({ children }) => {
     });
   };
 
-  const showConfirm = (title, message) => {
+  const showConfirm = (title, message, options = {}) => {
+    // Automatically detect if it's a delete/destructive action if not explicitly specified
+    const isDelete =
+      options.isDestructive ??
+      (String(title).toLowerCase().includes('delete') ||
+       String(message).toLowerCase().includes('delete'));
+
     return new Promise((resolve) => {
       setAlertState({
         isOpen: true,
         type: 'confirm',
         title,
         message,
+        confirmText: options.confirmText || (isDelete ? 'Delete' : 'Confirm'),
+        cancelText: options.cancelText || 'Cancel',
+        isDestructive: isDelete,
         onConfirm: () => {
           setAlertState((prev) => ({ ...prev, isOpen: false }));
           resolve(true);
@@ -75,30 +88,36 @@ export const AlertProvider = ({ children }) => {
 
       {/* Global Alert Modal UI */}
       {alertState.isOpen && (
-        /* 2. Backdrop click handler closes the modal */
         <div 
           className="as-modal-overlay" 
           style={{ zIndex: 9999 }}
           onClick={handleBackdropClick}
         >
-          {/* stopPropagation prevents clicks inside the card from closing it */}
           <div 
             className="as-modal-content" 
             style={{ maxWidth: '400px', padding: 0, overflow: 'hidden' }}
             onClick={(e) => e.stopPropagation()}
           >
-            
-            {/* 3. Header title changed to color: '#ffffff' */}
-            <div className="as-modal-header" style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}>
+            {/* Header */}
+            <div 
+              className="as-modal-header" 
+              style={{ 
+                padding: '16px 24px', 
+                borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+                background: alertState.isDestructive ? '#dc2626' : '#128FA6'
+              }}
+            >
               <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#ffffff' }}>
                 {alertState.title}
               </h2>
             </div>
             
-            <div className="as-modal-body" style={{ padding: '24px', fontSize: '0.95rem', color: '#374151', lineHeight: '1.5' }}>
+            {/* Body */}
+            <div className="as-modal-body" style={{ padding: '24px', fontSize: '0.95rem', color: '#374151', lineHeight: '1.5', textAlign: 'center', whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
               {alertState.message}
             </div>
             
+            {/* Footer Buttons */}
             <div style={{ padding: '16px 24px', background: '#f9fafb', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               {alertState.type === 'confirm' && (
                 <button 
@@ -107,24 +126,27 @@ export const AlertProvider = ({ children }) => {
                   onClick={alertState.onCancel}
                   style={{ padding: '8px 16px' }}
                 >
-                  Cancel
+                  {alertState.cancelText}
                 </button>
               )}
               <button 
                 type="button"
-                className="approve-btn" 
                 onClick={alertState.onConfirm}
                 style={{ 
                   padding: '8px 16px', 
-                  background: alertState.type === 'confirm' ? '#0d7a55' : '#2563eb', 
+                  background: alertState.isDestructive 
+                    ? '#dc2626' 
+                    : alertState.type === 'confirm' 
+                      ? '#0d7a55' 
+                      : '#2563eb', 
                   color: '#fff', 
                   border: 'none', 
                   borderRadius: '6px', 
-                  fontWeight: 500,
+                  fontWeight: 600,
                   cursor: 'pointer'
                 }}
               >
-                {alertState.type === 'confirm' ? 'Confirm' : 'OK'}
+                {alertState.confirmText}
               </button>
             </div>
 
