@@ -13,6 +13,7 @@ import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildAnnouncementEmail } from "../../utils/emailTemplates";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
@@ -42,6 +43,7 @@ function DescriptionPreview({ text, t }) {
 export default function ManageAnnouncements() {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
@@ -137,27 +139,32 @@ export default function ManageAnnouncements() {
     setShowEmailBlast(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm(t('admin_ann_confirm_delete'))) {
-      try {
-        await deleteAnnouncement(id);
-        logTransaction(
-          adminName,
-          adminRole,
-          "DELETED_ANNOUNCEMENT",
-          `Deleted announcement with ID: ${id}`,
-        );
-        queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
-      } catch (error) {
-        console.error("Error deleting announcement:", error);
-        alert(t('admin_ann_delete_failed'));
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_DELETING_ANNOUNCEMENT",
-          `Error deleting announcement with ID: ${id}\n${error.message}`,
-        );
-      }
+const handleDelete = async (id, annTitle) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_ann_confirm_delete')}\n\n"${annTitle}"`    
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteAnnouncement(id);
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_ANNOUNCEMENT",
+        `Deleted announcement with ID: ${id}`
+      );
+      queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
+      await showAlert("Success", "Announcement deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting announcement:", error);
+      await showAlert("Error", t('admin_ann_delete_failed'));
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_DELETING_ANNOUNCEMENT",
+        `Error deleting announcement with ID: ${id}\n${error.message}`
+      );
     }
   };
 
@@ -365,7 +372,7 @@ export default function ManageAnnouncements() {
               >
                 {t('admin_ann_btn_email')}
               </button>
-              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(ann.id)}>{t('admin_ann_btn_delete')}</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(ann.id, ann.title)}>{t('admin_ann_btn_delete')}</button>            
             </div>
           </div>
         ))}
@@ -394,8 +401,8 @@ export default function ManageAnnouncements() {
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '600px' }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>{editingAnnId ? t('admin_ann_modal_edit_title') : t('admin_ann_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
