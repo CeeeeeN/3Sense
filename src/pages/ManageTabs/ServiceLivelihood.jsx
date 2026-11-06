@@ -11,6 +11,7 @@ import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildLivelihoodEmail } from "../../utils/emailTemplates";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
@@ -45,6 +46,7 @@ const BLANK = {
 export default function ServiceLivelihood({ onBack }) {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showAlert, showConfirm } = useAlert();
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -175,15 +177,21 @@ export default function ServiceLivelihood({ onBack }) {
   };
 
   const handleDelete = async (id, progTitle) => {
-    if (!window.confirm(`${t('admin_srv_lh_confirm_delete')} "${progTitle}"?`)) return;
-    try {
-      await deleteDoc(doc(db, "Programs", id));
-      queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodPrograms'] });
-    } catch (error) {
-      console.error("Error deleting program:", error);
-      alert(t('admin_srv_lh_err_delete'));
-    }
-  };
+      const isConfirmed = await showConfirm(
+        "Confirm Deletion",
+        `${t('admin_srv_lh_confirm_delete')}\n\n"${progTitle}"`
+      );
+      if (!isConfirmed) return;
+
+      try {
+        await deleteDoc(doc(db, "Programs", id));
+        queryClient.invalidateQueries({ queryKey: ['adminManage_livelihoodPrograms'] });
+        await showAlert("Success", "Program deleted successfully.");
+      } catch (error) {
+        console.error("Error deleting program:", error);
+        await showAlert("Error", t('admin_srv_lh_err_delete'));
+      }
+    };
 
   const handleAddProgram = async (e) => {
     e.preventDefault();
@@ -252,7 +260,7 @@ export default function ServiceLivelihood({ onBack }) {
       setShowAddModal(false);
     } catch (err) {
       console.error("Error saving program:", err);
-      alert(t('admin_srv_lh_err_save'));
+      await showAlert("Error", t('admin_srv_lh_err_save'));
     }
     setSaving(false);
   };
@@ -262,7 +270,7 @@ export default function ServiceLivelihood({ onBack }) {
     if (prog && prog.slots > 0) {
       const left = getSlotsLeft(prog);
       if (left !== null && left <= 0) {
-        alert(`No slots left for "${prog.title}". Cannot approve.`);
+        await showAlert("Slots Full", `No slots left for "${prog.title}". Cannot approve.`);
         return;
       }
     }
@@ -699,11 +707,11 @@ export default function ServiceLivelihood({ onBack }) {
         {showAddModal && (
           <div className="as-modal-overlay" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>
             <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }} onClick={e => e.stopPropagation()}>
-              <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
+              <div className="as-modal-header">
+                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
                   {editingProgramId ? t('admin_srv_lh_modal_edit_title') : t('admin_srv_lh_modal_add_title')}
                 </h2>
-                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>×</button>
+                <button className="as-modal-close" onClick={() => { setShowAddModal(false); setNewProgram(BLANK); setEditingProgramId(null); }}>&times;</button>
               </div>
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleAddProgram}>
@@ -874,16 +882,19 @@ export default function ServiceLivelihood({ onBack }) {
                 style={{ maxWidth: "560px" }}
                 onClick={e => e.stopPropagation()}
               >
-                <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                  <h2 style={{ color: "#111827", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>{t('admin_srv_lh_det_title')}</h2>
-                  <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => setSelectedParticipant(null)}>×</button>
+                <div className="as-modal-header">
+                  <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>{t('admin_srv_lh_det_title')}</h2>
+                  <button className="as-modal-close" onClick={() => setSelectedParticipant(null)}>&times;</button>
                 </div>
 
                 <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
                   <div className="admin-details" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
-                      <div>
-                        <strong>{t('admin_srv_lh_det_ref')}</strong> <span style={{ fontFamily: "monospace" }}>{selectedParticipant.regNum || selectedParticipant.id}</span>
+                      <div style={{ fontSize: "1rem" }}>
+                        <strong>{t('admin_srv_lh_det_ref')}</strong>{" "}
+                        <span style={{ fontSize: "1rem", color: "#111827", fontWeight: 500 }}>
+                          {selectedParticipant.regNum || selectedParticipant.id}
+                        </span>
                       </div>
                       <StatusBadge status={selectedParticipant.status} t={t} />
                     </div>
@@ -935,9 +946,9 @@ export default function ServiceLivelihood({ onBack }) {
         {showRejectModal && (
           <div className="as-modal-overlay" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
             <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={e => e.stopPropagation()}>
-              <div className="as-modal-header" style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <h2 style={{ color: "#111827", margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_lh_rej_title')}</h2>
-                <button className="as-modal-close" style={{ color: "#6b7280" }} onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>×</button>
+              <div className="as-modal-header">
+                <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{t('admin_srv_lh_rej_title')}</h2>
+                <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>&times;</button>
               </div>
               <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
                 <form onSubmit={handleConfirmReject}>

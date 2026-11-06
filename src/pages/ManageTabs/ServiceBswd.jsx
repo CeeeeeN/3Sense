@@ -542,13 +542,13 @@ export default function ServiceBswd({ onBack }) {
               style={{ maxWidth: "600px" }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{ padding: "18px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
-                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700, color: "#111827" }}>
+              <div className="as-modal-header">
+                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
                   {selectedItem.type === "tip" ? t('admin_srv_bswd_modal_tip_title') : t('admin_srv_bswd_modal_rep_title')}
                 </h2>
                 <button 
+                  className="as-modal-close"
                   onClick={() => setSelectedItem(null)}
-                  style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
                 >&times;</button>
               </div>
 

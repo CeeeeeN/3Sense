@@ -1039,16 +1039,13 @@ export default function HouseholdManagement() {
       )}
 
       {showStatusModal && statusData && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "420px" }}>
+        <div className="as-modal-overlay" onClick={() => { setShowStatusModal(false); setStatusData(null); }}>
+          <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>{t('admin_hm_status_title')}</h2>
+              <h2 style={{ color: "#ffffff", margin: 0 }}>{t('admin_hm_status_title')}</h2>
               <button
                 className="as-modal-close"
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setStatusData(null);
-                }}
+                onClick={() => { setShowStatusModal(false); setStatusData(null); }}
               >
                 &times;
               </button>
