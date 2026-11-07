@@ -1,11 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { db } from "../firebase/firebase";
-import { collection, query, where, orderBy, onSnapshot, limit, or, and, collectionGroup, getDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, or, and } from "firebase/firestore";
 import { ActivityIcon, EquipmentIcon, ProgramIcon, DocumentIcon, ReservationIcon, ShieldCheckIcon, AlertCircleIcon, InboxIcon } from "../components/Icons";
 import { useLanguage } from "../context/LanguageContext";
-import {
-  localizePurpose,
-} from "../utils/serviceTranslations";
 
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
@@ -33,9 +30,8 @@ const STATUS = {
   claimed: { label: "Picked up", color: "#c125d6", bg: "rgba(45,177,123,0.1)" },
   processing: { label: "Being prepared", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
   returned: { label: "Returned", color: "#4f46e5", bg: "rgba(79,70,229,0.1)" },
-  ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
-  new: { label: "New", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
-  cancelled: { label: "Cancelled", color: "#64748b", bg: "rgba(100,116,139,0.1)" },
+  ready_for_pickup: { label: "Ready to pick up", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
+  new: { label: "Sent", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
 };
 
 // ── Reusable Components ──
@@ -114,8 +110,8 @@ function Foot({ status, refNum }) {
 }
 
 // ── MAIN ACTIVITY PAGE ──
-export default function ActivityPage({ memberID: propMemberID, householdID: propHouseholdID, UID: propUID }) {
-  const { t, language } = useLanguage();
+export default function ActivityPage({ onNavigate, memberID: propMemberID, householdID: propHouseholdID, UID: propUID }) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("programs");
   const [loading, setLoading] = useState(true);
 
@@ -141,7 +137,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
   const householdID = propHouseholdID || getSaved("householdID", null);
 
   // Helper to build the hybrid query conditions safely
-  const buildIdentityQuery = useCallback(() => {
+  const buildIdentityQuery = () => {
     const strictResidentMatch = and(
       where("householdID", "==", householdID),
       where("residentID", "==", residentID)
@@ -154,101 +150,31 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
     }
     
     return or(...conditions);
-  }, [householdID, residentID, userUID]);
+  };
 
   // --- FIREBASE REAL-TIME LISTENERS ---
 
   // Initial Loading Check
   useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) {
-        if (!residentID) setLoading(true);
-        else setLoading(false);
-      }
-    });
-    return () => { active = false; };
+    if (!residentID) { setLoading(true); return; }
+    setLoading(false);
   }, [residentID]);
 
-  // A. Fetch Programs (Combined: Livelihood and General Programs)
+  // A. Fetch Programs
   useEffect(() => {
     if (!residentID) return;
-
-    // 1. Query Livelihood Programs
-    const qLivelihood = query(
+    const qPrograms = query(
       collection(db, "livelihoodRegistrations"),
       buildIdentityQuery(),
       orderBy("submittedAt", "desc"),
       limit(progLimit)
     );
-
-    // 2. Query General Programs from 'attendees' to get the REAL admin status.
-    // NOTE: We explicitly omit orderBy() here to bypass the strict Firebase composite index error.
-    // The results will be sorted chronologically on the client side below.
-    const qGeneral = query(
-      collectionGroup(db, "attendees"),
-      where("residentID", "==", residentID)
-    );
-
-    let livelihoodData = [];
-    let generalData = [];
-
-    const updateCombinedPrograms = () => {
-      const combined = [...livelihoodData, ...generalData];
-      
-      // Client-side sorting (Newest first)
-      combined.sort((a, b) => {
-        const timeA = (a.createdAt || a.submittedAt)?.toMillis ? (a.createdAt || a.submittedAt).toMillis() : 0;
-        const timeB = (b.createdAt || b.submittedAt)?.toMillis ? (b.createdAt || b.submittedAt).toMillis() : 0;
-        return timeB - timeA;
-      });
-      
-      // Apply the limit after sorting
-      setPrograms(combined.slice(0, progLimit));
-    };
-
-    const unsubLivelihood = onSnapshot(qLivelihood, (snap) => {
-      livelihoodData = snap.docs.map(doc => ({
-        id: doc.id, 
-        name: doc.data().programName, 
-        date: doc.data().programDate,
-        category: "Livelihood",
-        ...doc.data()
-      }));
-      updateCombinedPrograms();
+    const unsubPrograms = onSnapshot(qPrograms, (snapshot) => {
+      setPrograms(snapshot.docs.map(doc => ({
+        id: doc.id, name: doc.data().programName, date: doc.data().programDate, ...doc.data()
+      })));
     });
-
-    const unsubGeneral = onSnapshot(qGeneral, async (snap) => {
-      // Fetch the parent Program document to get the title and date
-      const resolvedDocs = await Promise.all(snap.docs.map(async (attendeeDoc) => {
-        const programRef = attendeeDoc.ref.parent.parent; 
-        let programData = {};
-        
-        if (programRef) {
-          const programSnap = await getDoc(programRef);
-          if (programSnap.exists()) {
-            programData = programSnap.data();
-          }
-        }
-        
-        return {
-          id: attendeeDoc.id, 
-          programId: programRef?.id,
-          name: programData.programName || programData.title || "General Program", 
-          date: programData.programDate || programData.date,
-          category: "General Program",
-          ...attendeeDoc.data() // This pulls in the REAL status (Approved/Rejected/Pending)
-        };
-      }));
-      
-      generalData = resolvedDocs;
-      updateCombinedPrograms();
-    });
-
-    return () => { 
-      unsubLivelihood(); 
-      unsubGeneral(); 
-    };
+    return () => unsubPrograms();
   }, [userUID, residentID, progLimit]);
 
   // B. Fetch Documents
@@ -264,7 +190,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubDocs();
-  }, [residentID, docLimit, buildIdentityQuery]);
+  }, [userUID, residentID, docLimit]);
 
   // C. Fetch Reservations
   useEffect(() => {
@@ -279,7 +205,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubReservations();
-  }, [residentID, resLimit, buildIdentityQuery]);
+  }, [userUID, residentID, resLimit]);
 
   // D. Fetch Equipment Rentals
   useEffect(() => {
@@ -294,7 +220,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
       setEquipment(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubEquipment();
-  }, [residentID, eqLimit, buildIdentityQuery]);
+  }, [userUID, residentID, eqLimit]);
 
   // E. Fetch Services (Combined: Peace & Order and BSWD)
   useEffect(() => {
@@ -349,7 +275,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
     });
 
     return () => { unsubInc(); unsubBswd(); };
-  }, [residentID, servicesLimit, buildIdentityQuery]);
+  }, [userUID, residentID, servicesLimit]);
 
   // F. Fetch Feedback
   useEffect(() => {
@@ -364,7 +290,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
       setFeedback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubFeedback();
-  }, [residentID, feedbackLimit, buildIdentityQuery]);
+  }, [userUID, residentID, feedbackLimit]);
 
   // Format Firestore Timestamps and plain "YYYY-MM-DD" strings
   const formatDate = (timestamp) => {
@@ -375,12 +301,12 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
       return isNaN(d) ? timestamp : d.toLocaleDateString("en-US", opts);
     }
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString(language === "fil" ? "fil-PH" : "en-US", { month: "long", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString("en-US", opts);
   };
 
 
   // ── 6.1 Programs Tab ──
-  const renderProgramsTab = () => {
+  const ProgramsFacilitiesTab = () => {
     if (programs.length === 0) return <EmptyState message={t('activity_no_programs')} />;
     return (
       <div className="act2-list">
@@ -408,7 +334,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
   };
 
   // ── 6.2 Documents Tab ──
-  const renderDocumentsTab = () => {
+  const DocumentsTab = () => {
     if (documents.length === 0) return <EmptyState message={t('activity_no_documents')} />;
     return (
       <div className="act2-list">
@@ -418,14 +344,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
               <div className="act2-card__main">
                 <span className="act2-card__cat">Document request</span>
                 <div className="act2-card__title">{item.documentName || item.documentType || item.name}</div>
-                <div className="act2-card__meta">{t('activity_date_requested')}: {formatDate(item.submittedAt || item.createdAt)}</div>
-                <div className="act2-card__ref">Ref: {item.requestID || item.refNum || item.refId || item.id}</div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_processed_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- ${t('reason', 'Reason')}: ${item.rejectionReason}`}</span>
-                  </div>
-                )}
+                <div className="act2-card__subtitle">Requested on {formatDate(item.submittedAt || item.createdAt)}</div>
               </div>
               <Foot status={item.status} refNum={item.requestID || item.refNum || item.refId || item.id} />
             </div>
@@ -444,7 +363,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
   };
 
   // ── 6.3 Reservations Tab ──
-  const renderReservationsTab = () => {
+  const ReservationsTab = () => {
     if (reservations.length === 0) return <EmptyState message={t('activity_no_reservations')} />;
     return (
       <div className="act2-list">
@@ -452,15 +371,10 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{localizePurpose(item.purpose || item.eventName, language)}</div>
-                <div className="act2-card__subtitle">{item.facilityName || item.facility}</div>
-                <div className="act2-card__meta">Ref: {item.reservationID || item.refNum || item.id} · {formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || t('tba', 'TBA')}</div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- ${t('reason', 'Reason')}: ${item.rejectionReason}`} </span>
-                  </div>
-                )}
+                <span className="act2-card__cat">Facility booking</span>
+                <div className="act2-card__title">{item.facilityName || item.facility}</div>
+                <div className="act2-card__subtitle">{formatDate(item.date || item.submittedAt)} at {item.time || item.startTime || "time to be announced"}</div>
+                {(item.purpose || item.eventName) && <div className="act2-card__meta act2-card__meta--clamp">{item.purpose || item.eventName}</div>}
               </div>
               <Foot status={item.status} refNum={item.reservationID || item.refNum || item.id} />
             </div>
@@ -479,7 +393,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
   };
 
   // ── 6.4 Equipment Tab ──
-  const renderEquipmentTab = () => {
+  const EquipmentTab = () => {
     if (equipment.length === 0) return <EmptyState message={t('activity_no_equipment')} />;
     return (
       <div className="act2-list">
@@ -487,19 +401,17 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{item.equipmentName || t('eq_rental_header_default', 'Equipment Rental')}</div>
-                <div className="act2-card__subtitle">{t('activity_quantity')}: {item.quantity} {item.quantity > 1 ? t('qty_units') : t('qty_unit')} · {localizePurpose(item.purpose, language)}</div>
+                <span className="act2-card__cat">Equipment rental</span>
+                <div className="act2-card__title">{item.equipmentName || "Equipment Rental"}</div>
+                <div className="act2-card__subtitle">
+                  Quantity: {item.quantity}
+                </div>
                 <div className="act2-card__meta">
                   {item.pickUpDate && item.pickUpDate !== item.returnDate
                     ? `Pick up: ${formatDate(item.pickUpDate)}. Return: ${formatDate(item.returnDate)}.`
                     : `Pick up and return on ${formatDate(item.pickUpDate)}`}
                 </div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- ${t('reason', 'Reason')}: ${item.rejectionReason}`} </span>
-                  </div>
-                )}
+                {item.purpose && <div className="act2-card__meta act2-card__meta--clamp">{item.purpose}</div>}
               </div>
               <Foot status={item.status} refNum={item.rentalID || item.id} />
             </div>
@@ -517,8 +429,8 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
     );
   };
 
-  // ── 6.5 Services Tab
-  const renderServicesTab = () => {
+  // ── 6.5 Services Tab ──
+  const ServicesTab = () => {
     if (services.length === 0) return <EmptyState message={t('activity_no_services')} />;
     return (
       <div className="act2-list">
@@ -546,8 +458,8 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
     );
   };
 
-  // ── 6.6 Feedback Tab
-  const renderFeedbackTab = () => {
+  // ── 6.6 Feedback Tab ──
+  const FeedbackTab = () => {
     if (feedback.length === 0) return <EmptyState message={t('activity_no_feedback')} />;
     return (
       <div className="act2-list">
@@ -576,12 +488,12 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
 
   // ── TABS CONFIG ──
   const TABS = [
-    { key: "programs", label: t('activity_tab_programs'), icon: <ProgramIcon />, count: programs.length, render: renderProgramsTab },
-    { key: "documents", label: t('activity_tab_documents'), icon: <DocumentIcon />, count: documents.length, render: renderDocumentsTab },
-    { key: "reservations", label: t('activity_tab_reservations'), icon: <ReservationIcon />, count: reservations.length, render: renderReservationsTab },
-    { key: "equipment", label: t('activity_tab_equipment'), icon: <EquipmentIcon />, count: equipment.length, render: renderEquipmentTab },
-    { key: "services", label: t('activity_tab_services'), icon: <AlertCircleIcon />, count: services.length, render: renderServicesTab },
-    { key: "feedback", label: t('activity_tab_feedback'), icon: <ActivityIcon />, count: feedback.length, render: renderFeedbackTab },
+    { key: "programs", label: t('activity_tab_programs'), icon: <ProgramIcon />, count: programs.length, component: <ProgramsFacilitiesTab /> },
+    { key: "documents", label: t('activity_tab_documents'), icon: <DocumentIcon />, count: documents.length, component: <DocumentsTab /> },
+    { key: "reservations", label: t('activity_tab_reservations'), icon: <ReservationIcon />, count: reservations.length, component: <ReservationsTab /> },
+    { key: "equipment", label: t('activity_tab_equipment'), icon: <EquipmentIcon />, count: equipment.length, component: <EquipmentTab /> },
+    { key: "services", label: t('activity_tab_services'), icon: <AlertCircleIcon />, count: services.length, component: <ServicesTab /> },
+    { key: "feedback", label: t('activity_tab_feedback'), icon: <ActivityIcon />, count: feedback.length, component: <FeedbackTab /> },
   ];
 
   const current = TABS.find((tab) => tab.key === activeTab);
@@ -597,7 +509,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
   if (!residentID) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#64748b' }}>
-        {t('activity_select_profile', 'Please select a profile to view activity history.')}
+        Please select a profile to view activity history.
       </div>
     );
   }
@@ -643,7 +555,7 @@ export default function ActivityPage({ memberID: propMemberID, householdID: prop
 
           {/* Tab Content */}
           <div className="act2-tab-body">
-            {current?.render ? current.render() : null}
+            {current?.component}
           </div>
 
         </div>
