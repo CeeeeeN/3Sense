@@ -3188,6 +3188,8 @@ eq_blocked: 'Blocked',
     admin_req_btn_claimed: 'Mark Claimed',
     admin_req_btn_returned: 'Mark Returned',
     admin_req_btn_unreturned: 'Report Unreturned',
+    admin_req_page_next: 'Next',
+    admin_req_page_prev: 'Previous',
     
     // Reject Modal
     admin_req_rej_title: 'Confirm Rejection',
@@ -6830,6 +6832,8 @@ eq_blocked: 'Naka-block',
     admin_req_btn_claimed: 'Markahang Nakuha Na',
     admin_req_btn_returned: 'Markahang Naisoli Na',
     admin_req_btn_unreturned: 'Iulat na Hindi Naisoli',
+    admin_req_page_next: 'Susunod',
+    admin_req_page_prev: 'Nakaraan',
     
     // Reject Modal
     admin_req_rej_title: 'Kumpirmahin ang Pagtanggi',
