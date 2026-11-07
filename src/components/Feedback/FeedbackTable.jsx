@@ -22,7 +22,7 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview, isActi
   const renderPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
-    
+
     if (totalPages <= maxVisible) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
@@ -41,8 +41,8 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview, isActi
         className={`af-page-btn ${currentPage === page ? "active" : ""}`}
         onClick={() => typeof page === 'number' ? setCurrentPage(page) : null}
         disabled={typeof page !== 'number'}
-        style={{ 
-          cursor: typeof page === 'number' ? 'pointer' : 'default', 
+        style={{
+          cursor: typeof page === 'number' ? 'pointer' : 'default',
           border: typeof page !== 'number' ? 'none' : '',
           background: typeof page !== 'number' ? 'transparent' : ''
         }}
@@ -59,82 +59,86 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview, isActi
       ) : (
         <>
           <div className="req-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="req-table" style={{ minWidth: '1000px' }}>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Resident</th>
-                <th>Facility</th>
-                <th style={{ width: '30%' }}>Comment</th>
-                <th>Sentiment</th>
-                <th>Severity</th>
-                {isActionTab && <th>Time Remaining</th>}
-                <th>Status</th>
-                <th style={{ textAlign: 'center' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentData.map((fb) => (
-                <tr key={fb.docId}>
-                  <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{fb.createdAt}</td>
-                  <td style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>{fb.userName || "Resident"}</td>
-                  <td style={{ fontWeight: 500 }}>{fb.facilityName}</td>
-                  <td>
-                    <div style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#475569', fontSize: '0.9rem' }} title={fb.comment}>
-                      "{fb.comment}"
-                    </div>
-                  </td>
-                  <td>
-                    <span style={{ color: fb.sentiment === 'Positive' ? '#166534' : fb.sentiment === 'Negative' ? '#991b1b' : '#92400e', fontWeight: 600, fontSize: '0.85rem' }}>
-                      {fb.sentiment || "Pending AI"}
-                    </span>
-                  </td>
-                  <td><SeverityBadge severity={fb.severity} /></td>
-                  
-                  {isActionTab && (
-                    <td>
-                      {fb.timerText && fb.timerText !== "N/A" ? (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '4px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          background: fb.isOverdue ? '#fef2f2' : '#f0fdf4',
-                          color: fb.isOverdue ? '#dc2626' : '#16a34a',
-                          border: `1px solid ${fb.isOverdue ? '#fecaca' : '#bbf7d0'}`,
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {fb.isOverdue ? <AlertCircle size={12} /> : <Clock size={12} />}
-                          {fb.timerText}
-                        </span>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>N/A</span>
-                      )}
-                    </td>
-                  )}
-
-                  <td>
-                    <span className={`status-badge ${String(fb.status || "pending").replace(' ', '_').toLowerCase()}`}>
-                      {String(fb.status || "Pending").charAt(0).toUpperCase() + String(fb.status || "pending").slice(1).replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button className="btn-view" onClick={() => onReview(fb)}>Review</button>
-                  </td>
+            <table className="req-table" style={{ width: '100%' }}>
+              <thead>
+                <tr style={{ textAlign: 'center' }}>
+                  <th>Date</th>
+                  <th>Resident</th>
+                  <th>Facility</th>
+                  <th>Sentiment</th>
+                  <th>Severity</th>
+                  {isActionTab && <th>Time Remaining</th>}
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {currentData.map((fb) => (
+                  <tr key={fb.docId} style={{ textAlign: 'center' }}>
+                    <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{fb.createdAt}</td>
+                    <td style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155' }}>
+                      {fb.userName || "Resident"}
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{fb.facilityName}</td>
+                    <td>
+                      <span style={{
+                        color: fb.sentiment === 'Positive' ? '#166534' : fb.sentiment === 'Negative' ? '#991b1b' : '#92400e',
+                        fontWeight: 600,
+                        fontSize: '0.85rem'
+                      }}>
+                        {fb.sentiment || "Pending AI"}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
+                        <SeverityBadge severity={fb.severity} />
+                      </div>
+                    </td>
+
+                    {isActionTab && (
+                      <td>
+                        {fb.timerText && fb.timerText !== "N/A" ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            background: fb.isOverdue ? '#fef2f2' : '#f0fdf4',
+                            color: fb.isOverdue ? '#dc2626' : '#16a34a',
+                            border: `1px solid ${fb.isOverdue ? '#fecaca' : '#bbf7d0'}`,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {fb.isOverdue ? <AlertCircle size={12} /> : <Clock size={12} />}
+                            {fb.timerText}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>N/A</span>
+                        )}
+                      </td>
+                    )}
+
+                    <td>
+                      <span className={`status-badge ${String(fb.status || "pending").replace(' ', '_').toLowerCase()}`}>
+                        {String(fb.status || "Pending").charAt(0).toUpperCase() + String(fb.status || "pending").slice(1).replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      <button className="btn-view" onClick={() => onReview(fb)}>Review</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* --- PAGINATION CONTROLS BOTTOM BAR --- */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             padding: '16px 24px',
             borderTop: '1px solid #e2e8f0',
             background: '#f8fafc',
@@ -143,16 +147,16 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview, isActi
             flexWrap: 'wrap',
             gap: '16px'
           }}>
-            
+
             {/* Rows Per Page Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b' }}>
               <span>Rows per page:</span>
-              <select 
-                value={itemsPerPage} 
+              <select
+                value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                style={{ 
-                  padding: '4px 8px', 
-                  borderRadius: '6px', 
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   background: 'white',
                   color: '#334155',
@@ -169,19 +173,19 @@ export default function FeedbackTable({ dataList, emptyMessage, onReview, isActi
             {/* Page Buttons */}
             {totalPages > 1 && (
               <div className="af-pagination" style={{ display: 'flex', gap: '8px', margin: 0 }}>
-                <button 
-                  className="af-page-btn" 
+                <button
+                  className="af-page-btn"
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                   style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
                 >
                   Previous
                 </button>
-                
+
                 {renderPageNumbers()}
-                
-                <button 
-                  className="af-page-btn" 
+
+                <button
+                  className="af-page-btn"
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                   style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}

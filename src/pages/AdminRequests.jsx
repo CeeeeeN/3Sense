@@ -278,6 +278,21 @@ export default function AdminRequests() {
     setUnreturnedNotes('');
   };
 
+  const closeDetailsModal = () => {
+    setIsModalOpen(false);
+    setSelectedRequest(null);
+  };
+
+  const closeRejectModal = () => {
+    setIsRejectModalOpen(false);
+    setRejectReason('');
+  };
+
+  const closeUnreturnedModal = () => {
+    setIsUnreturnedModalOpen(false);
+    setUnreturnedNotes('');
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setIsRejectModalOpen(false);
@@ -793,7 +808,7 @@ export default function AdminRequests() {
 
         {/* VIEW DETAILS MODAL */}
         {isModalOpen && selectedRequest && (
-          <div className="as-modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" onClick={closeDetailsModal}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
                 <h2>{activeTab === 'Facility' ? t('admin_req_modal_title_fac') : activeTab === 'Equipment' ? t('admin_req_modal_title_eq') : t('admin_req_modal_title_doc')}</h2>
@@ -1106,11 +1121,11 @@ export default function AdminRequests() {
 
         {/* REJECT REMARKS MODAL */}
         {isRejectModalOpen && selectedRequest && (
-          <div className="as-modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" style={{ zIndex: 10001 }} onClick={closeRejectModal}>
             <div className="modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
                 <h2>{t('admin_req_rej_title')}</h2>
-                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
+                <button className="as-modal-close" onClick={closeRejectModal}><X size={22} /></button>
               </div>
               <div className="modal-body">
                 <p style={{ marginBottom: '1.25rem', fontSize: '0.9rem', color: '#64748b', lineHeight: '1.6' }}>
@@ -1133,7 +1148,7 @@ export default function AdminRequests() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn-view" onClick={closeModal}>{t('admin_req_rej_cancel')}</button>
+                <button className="btn-view" onClick={closeRejectModal}>{t('admin_req_rej_cancel')}</button>
                 <button
                   className="btn-reject"
                   onClick={handleConfirmReject}
@@ -1148,7 +1163,7 @@ export default function AdminRequests() {
 
         {/* REPORT UNRETURNED CONFIRMATION MODAL */}
         {isUnreturnedModalOpen && selectedRequest && (
-          <div className="as-modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" style={{ zIndex: 10001 }} onClick={closeUnreturnedModal}>
             <div className="modal-content" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header" style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1159,7 +1174,7 @@ export default function AdminRequests() {
                   </div>
                   <h2 style={{ color: '#7c2d12', margin: 0 }}>{t('admin_req_unret_title')}</h2>
                 </div>
-                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
+                <button className="as-modal-close" onClick={closeUnreturnedModal}><X size={22} /></button>
               </div>
 
               <div className="modal-body">
@@ -1206,7 +1221,7 @@ export default function AdminRequests() {
               </div>
 
               <div className="modal-footer">
-                <button className="btn-view" onClick={closeModal}>{t('admin_req_rej_cancel')}</button>
+                <button className="btn-view" onClick={closeUnreturnedModal}>{t('admin_req_rej_cancel')}</button>
                 <button
                   onClick={handleConfirmUnreturned}
                   style={{

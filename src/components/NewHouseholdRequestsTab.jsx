@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import { useLanguage } from '../context/LanguageContext';
 
 export default function NewHouseholdRequestsTab({ newHouseholds }) {
-  const { showAlert, showConfirm } = useAlert(); 
+  const { showAlert, showConfirm } = useAlert();
   const { t } = useLanguage(); // NEW: Destructure hook
 
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -44,12 +44,12 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
       `${t('admin_nh_confirm_desc')} ${newStatus}?`
     );
     if (!isConfirmed) return;
-    
+
     setIsSaving(true);
     try {
       // Processes the new household creation and migrates the resident
       await processHouseholdTransfer(id, newStatus, selectedRequest);
-      
+
       // Update local modal state to reflect the change immediately
       setSelectedRequest(prev => ({ ...prev, status: newStatus }));
 
@@ -65,13 +65,13 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
   // Filter logic
   const filteredHouseholds = newHouseholds.filter((req) => {
     const matchesStatus = statusFilter === "All" || req.status === statusFilter;
-    
+
     if (!searchTerm) return matchesStatus;
 
     const searchLower = searchTerm.toLowerCase();
     const addressString = `${req.newHouseNumber || ""} ${req.newStreet || ""}`.toLowerCase();
-    
-    const matchesSearch = 
+
+    const matchesSearch =
       (req.requesterName?.toLowerCase().includes(searchLower)) ||
       (req.UID?.toLowerCase().includes(searchLower)) ||
       (req.transferID?.toLowerCase().includes(searchLower)) ||
@@ -178,9 +178,9 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
           <tbody>
             {currentItems.length > 0 ? (
               currentItems.map((req) => (
-                <tr 
-                  key={req.id} 
-                  onClick={() => handleReview(req)} 
+                <tr
+                  key={req.id}
+                  onClick={() => handleReview(req)}
                   style={{ cursor: "pointer", textAlign: "center" }}
                 >
                   <td>{req.dateSubmitted}</td>
@@ -191,10 +191,26 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
                   <td>{req.newHouseNumber} {req.newStreet}</td>
                   <td>
                     <span style={{
-                      padding: '4px 10px', borderRadius: '12px', display: 'inline-block', fontSize: '0.8rem', fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
                       background: req.status === 'Approved' ? '#dcfce7' : req.status === 'Rejected' ? '#fee2e2' : '#fef3c7',
                       color: req.status === 'Approved' ? '#166534' : req.status === 'Rejected' ? '#991b1b' : '#92400e'
                     }}>
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        minWidth: '6px',
+                        minHeight: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: req.status === 'Approved' ? '#16a34a' : req.status === 'Rejected' ? '#dc2626' : '#d97706',
+                        display: 'inline-block',
+                        flexShrink: 0
+                      }} />
                       {(() => {
                         const st = (req.status || "Pending");
                         if (st === "Approved") return t('admin_nh_filter_approved');
@@ -205,8 +221,8 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
                     </span>
                   </td>
                   <td>
-                    <button 
-                      className="btn-view" 
+                    <button
+                      className="btn-view"
                       style={{ padding: '6px 12px' }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -236,11 +252,11 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className="as-btn-ghost"
-              style={{ 
-                padding: "6px 12px", 
-                fontSize: "0.85rem", 
-                opacity: currentPage === 1 ? 0.5 : 1, 
-                cursor: currentPage === 1 ? "not-allowed" : "pointer" 
+              style={{
+                padding: "6px 12px",
+                fontSize: "0.85rem",
+                opacity: currentPage === 1 ? 0.5 : 1,
+                cursor: currentPage === 1 ? "not-allowed" : "pointer"
               }}
             >
               {t('admin_nh_page_prev')}
@@ -252,11 +268,11 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="as-btn-ghost"
-              style={{ 
-                padding: "6px 12px", 
-                fontSize: "0.85rem", 
-                opacity: currentPage === totalPages ? 0.5 : 1, 
-                cursor: currentPage === totalPages ? "not-allowed" : "pointer" 
+              style={{
+                padding: "6px 12px",
+                fontSize: "0.85rem",
+                opacity: currentPage === totalPages ? 0.5 : 1,
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer"
               }}
             >
               {t('admin_nh_page_next')}
@@ -268,9 +284,9 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
       {/* ── NEW HOUSEHOLD REVIEW MODAL ── */}
       {showModal && selectedRequest && (
         <div className="as-modal-overlay" onClick={closeModal}>
-          <div 
-            className="as-modal-content" 
-            style={{ maxWidth: "600px" }} 
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "600px" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="as-modal-header">
@@ -280,16 +296,34 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
 
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
               <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 20px' }}>
-                
+
                 {/* Header Information */}
-                <div style={{ gridColumn: '1 / -1', paddingBottom: '12px', borderBottom: '1px solid #e5e7eb' }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ color: "#6b7280", fontSize: "0.85rem" }}>{t('admin_nh_modal_lbl_req_id')} {selectedRequest.transferID || selectedRequest.id}</span>
+                <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
+                  <strong>{t('admin_nh_modal_lbl_req_id')}</strong> <span>{selectedRequest.transferID || selectedRequest.id}</span><br />
+                  <strong>{t('admin_nh_modal_lbl_date')}</strong> <span>{selectedRequest.dateSubmitted}</span><br />
+                  <div style={{ marginTop: '8px' }}>
+                    <strong>{t('admin_hm_modal_lbl_status')}</strong>{' '}
                     <span style={{
-                      padding: '4px 10px', borderRadius: '12px', display: 'inline-block', fontSize: '0.8rem', fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
                       background: selectedRequest.status === 'Approved' ? '#dcfce7' : selectedRequest.status === 'Rejected' ? '#fee2e2' : '#fef3c7',
                       color: selectedRequest.status === 'Approved' ? '#166534' : selectedRequest.status === 'Rejected' ? '#991b1b' : '#92400e'
                     }}>
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        minWidth: '6px',
+                        minHeight: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: selectedRequest.status === 'Approved' ? '#16a34a' : selectedRequest.status === 'Rejected' ? '#dc2626' : '#d97706',
+                        display: 'inline-block',
+                        flexShrink: 0
+                      }} />
                       {(() => {
                         const st = (selectedRequest.status || "Pending");
                         if (st === "Approved") return t('admin_nh_filter_approved');
@@ -299,8 +333,6 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
                       })()}
                     </span>
                   </div>
-                  <strong style={{ display: "block", marginBottom: "4px" }}>{t('admin_nh_modal_lbl_date')}</strong>
-                  <span>{selectedRequest.dateSubmitted}</span>
                 </div>
 
                 {/* Identity Information */}
@@ -337,10 +369,10 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
                   {selectedRequest.proofURL ? (
                     <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px", background: "#f9fafb", display: "inline-block" }}>
                       <a href={selectedRequest.proofURL} target="_blank" rel="noopener noreferrer" title="Click to view full size">
-                        <img 
-                          src={selectedRequest.proofURL} 
-                          alt="Proof of Residency" 
-                          style={{ maxWidth: "100%", maxHeight: "250px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }} 
+                        <img
+                          src={selectedRequest.proofURL}
+                          alt="Proof of Residency"
+                          style={{ maxWidth: "100%", maxHeight: "250px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }}
                         />
                       </a>
                       <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>{t('admin_nh_modal_proof_hint')}</div>
@@ -351,31 +383,31 @@ export default function NewHouseholdRequestsTab({ newHouseholds }) {
                     </span>
                   )}
                 </div>
-                
+
               </div>
             </div>
 
             <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-            {selectedRequest.status === "Pending" && (
-                  <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-                    <button 
-                      className="reject-btn" 
-                      onClick={() => handleUpdateStatus(selectedRequest.id, "Rejected")}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? t('admin_nh_modal_btn_processing') : t('admin_nh_modal_btn_reject')}
-                    </button>
-                    <button 
-                      className="approve-btn" 
-                      onClick={() => handleUpdateStatus(selectedRequest.id, "Approved")}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? t('admin_nh_modal_btn_creating') : t('admin_nh_modal_btn_approve')}
-                    </button>
-                  </div>
-                )}
-              </div>
+              {selectedRequest.status === "Pending" && (
+                <div style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                  <button
+                    className="reject-btn"
+                    onClick={() => handleUpdateStatus(selectedRequest.id, "Rejected")}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? t('admin_nh_modal_btn_processing') : t('admin_nh_modal_btn_reject')}
+                  </button>
+                  <button
+                    className="approve-btn"
+                    onClick={() => handleUpdateStatus(selectedRequest.id, "Approved")}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? t('admin_nh_modal_btn_creating') : t('admin_nh_modal_btn_approve')}
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
         </div>
       )}
     </>

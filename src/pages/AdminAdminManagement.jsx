@@ -25,7 +25,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 export default function AdminManagement() {
   const queryClient = useQueryClient();
-  const { t } = useLanguage(); // NEW: Destructure hook
+  const { t } = useLanguage(); 
   const { showAlert, showConfirm } = useAlert(); 
 
   const [currentUser, setCurrentUser] = useState(null);
@@ -127,7 +127,7 @@ export default function AdminManagement() {
   const handleApprove = async (req) => {
     const isConfirmed = await showConfirm(
       t('admin_mgt_prompt_approve_title'),
-      `${t('admin_mgt_prompt_approve_desc')} ${req.fullName}?`
+      `${t('admin_mgt_prompt_approve_desc')}\n\n"${req.fullName}"?`
     );
     
     if (!isConfirmed) return;
@@ -160,6 +160,8 @@ export default function AdminManagement() {
         `Approved admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
+      setShowViewModal(false);
+      setSelectedAdmin(null);
       await showAlert("Success", t('admin_mgt_toast_app_success'));
     } catch (error) {
       console.error("Error approving admin:", error);
@@ -170,7 +172,7 @@ export default function AdminManagement() {
   const handleReject = async (req) => {
     const isConfirmed = await showConfirm(
       t('admin_mgt_prompt_rej_title'),
-      t('admin_mgt_prompt_rej_desc')
+      `${t('admin_mgt_prompt_rej_desc')}\n\n"${req.fullName}"?`
     );
 
     if (!isConfirmed) return;
@@ -191,6 +193,8 @@ export default function AdminManagement() {
         `Rejected admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
+      setShowViewModal(false);
+      setSelectedAdmin(null);
       await showAlert("Success", t('admin_mgt_toast_rej_success'));
     } catch (error) {
       console.error("Error rejecting admin:", error);
@@ -200,8 +204,8 @@ export default function AdminManagement() {
 
   const handleDeleteAdmin = async (admin) => {
     const isConfirmed = await showConfirm(
-      t('admin_mgt_prompt_del_title'),
-      `${t('admin_mgt_prompt_del_desc')} ${admin.fullName}?`
+      "Confirm Deletion",
+      `${t('admin_mgt_prompt_del_desc')}\n\n"${admin.fullName}"?`
     );
 
     if (!isConfirmed) return;
@@ -220,6 +224,8 @@ export default function AdminManagement() {
         `Deleted admin account of ${admin.fullName} (${admin.email}) (ID: ${admin.uid})`
       );
 
+      setShowViewModal(false);
+      setSelectedAdmin(null);
       await showAlert("Success", t('admin_mgt_toast_del_success'));
     } catch (error) {
       console.error("Error deleting admin:", error);
@@ -783,7 +789,9 @@ export default function AdminManagement() {
         <div className="as-modal-overlay" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>
           <div className="as-modal-content" style={{ maxWidth: "440px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>{activeTab === "requests" ? t('admin_mgt_modal_req_title') : t('admin_mgt_modal_adm_title')}</h2>
+              <h2 style={{ color: "#ffffff", margin: 0 }}>
+                {activeTab === "requests" ? t('admin_mgt_modal_req_title') : t('admin_mgt_modal_adm_title')}
+              </h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
             </div>
 
@@ -843,19 +851,13 @@ export default function AdminManagement() {
                   <>
                     <button
                       className="btn-reject"
-                      onClick={() => {
-                        handleReject(selectedAdmin);
-                        setShowViewModal(false);
-                      }}
+                      onClick={() => handleReject(selectedAdmin)}
                     >
                       {t('admin_mgt_btn_reject')}
                     </button>
                     <button
                       className="btn-approve"
-                      onClick={() => {
-                        handleApprove(selectedAdmin);
-                        setShowViewModal(false);
-                      }}
+                      onClick={() => handleApprove(selectedAdmin)}
                     >
                       {t('admin_mgt_btn_approve')}
                     </button>
@@ -866,10 +868,7 @@ export default function AdminManagement() {
                   {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && (
                     <button
                       className="btn-reject"
-                      onClick={() => {
-                        handleDeleteAdmin(selectedAdmin);
-                        setShowViewModal(false);
-                      }}
+                      onClick={() => handleDeleteAdmin(selectedAdmin)}
                     >
                       {t('admin_mgt_btn_del_acc')}
                     </button>
