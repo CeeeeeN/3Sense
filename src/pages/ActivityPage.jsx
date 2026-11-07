@@ -15,23 +15,23 @@ const getSaved = (key, fallback) => {
 
 // ── STATUS CONFIG ──
 const STATUS = {
-  open: { label: "Open", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
+  open: { label: "Open for sign-up", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
   ongoing: { label: "Ongoing", color: "#1a56a0", bg: "rgba(26,86,160,0.1)" },
   completed: { label: "Completed", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
-  pending: { label: "Pending", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
-  pending_ai: { label: "Pending AI", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
-  responded: { label: "Responded", color: "#d86a11", bg: "rgba(45,177,123,0.1)" },
-  analyzed: { label: "Analyzed", color: "#1a56a0", bg: "rgba(26,86,160,0.1)" },
+  pending: { label: "Waiting for review", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  pending_ai: { label: "Waiting for review", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  responded: { label: "Answered", color: "#d86a11", bg: "rgba(45,177,123,0.1)" },
+  analyzed: { label: "Being checked", color: "#1a56a0", bg: "rgba(26,86,160,0.1)" },
   approved: { label: "Approved", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
   rejected: { label: "Rejected", color: "#e03e3e", bg: "rgba(224,62,62,0.1)" },
-  received: { label: "Received", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
-  under_review: { label: "Under Review", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  received: { label: "We got your report", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
+  under_review: { label: "Being checked", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
   resolved: { label: "Resolved", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
-  claimed: { label: "Claimed", color: "#c125d6", bg: "rgba(45,177,123,0.1)" },
-  processing: { label: "Processing", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
+  claimed: { label: "Picked up", color: "#c125d6", bg: "rgba(45,177,123,0.1)" },
+  processing: { label: "Being prepared", color: "#e8a020", bg: "rgba(232,160,32,0.1)" },
   returned: { label: "Returned", color: "#4f46e5", bg: "rgba(79,70,229,0.1)" },
-  ready_for_pickup: { label: "Ready for Pickup", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
-  new: { label: "New", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
+  ready_for_pickup: { label: "Ready to pick up", color: "#2DB17B", bg: "rgba(45,177,123,0.1)" },
+  new: { label: "Sent", color: "#317D89", bg: "rgba(49,125,137,0.1)" },
 };
 
 // ── Reusable Components ──
@@ -53,6 +53,58 @@ function EmptyState({ message }) {
       <div className="act2-empty__icon"><InboxIcon /></div>
       <div className="act2-empty__title">{t("activity_no_records")}</div>
       <div className="act2-empty__sub">{message}</div>
+    </div>
+  );
+}
+
+// One short sentence that tells the resident what the status means
+const STATUS_HELP = {
+  pending: "We got your request. Please wait for the barangay to review it.",
+  pending_ai: "We got your request. Please wait for the barangay to review it.",
+  under_review: "The barangay is checking your request.",
+  analyzed: "The barangay is checking your request.",
+  processing: "Your request is being prepared.",
+  approved: "Good news! Your request was approved.",
+  rejected: "Sorry, your request was not approved.",
+  ready_for_pickup: "Ready! Please come to the barangay hall to pick it up.",
+  claimed: "You already picked this up.",
+  returned: "Thank you! Item has been returned.",
+  received: "We got your report. The barangay will follow up.",
+  responded: "The barangay has answered. Please check your messages.",
+  resolved: "This matter has been settled.",
+  completed: "All done.",
+  open: "You can still join this program.",
+  ongoing: "This program is happening now.",
+  new: "We got it. Thank you!",
+};
+
+function StatusHelp({ status }) {
+  const key = status ? status.toLowerCase().replace(/ /g, "_") : "pending";
+  const text = STATUS_HELP[key];
+  if (!text) return null;
+  return <div className="act2-card__help">{text}</div>;
+}
+
+// Rejection reason, shown only when the request was rejected
+function Remarks({ item }) {
+  const { t } = useLanguage();
+  const text = item.remarks || item.rejectionReason;
+  if (item.status?.toLowerCase() !== "rejected" || !text) return null;
+  return (
+    <div className="act2-card__remarks">
+      <div className="act2-card__remarks-header"><AlertCircleIcon /> Reason</div>
+      <p className="act2-card__remarks-body">{text}</p>
+    </div>
+  );
+}
+
+// Bottom of every card: status, what it means, reference number
+function Foot({ status, refNum }) {
+  return (
+    <div className="act2-card__foot">
+      <StatusBadge status={status} />
+      <StatusHelp status={status} />
+      <div className="act2-card__ref">Reference no.: {refNum}</div>
     </div>
   );
 }
@@ -240,12 +292,16 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     return () => unsubFeedback();
   }, [userUID, residentID, feedbackLimit]);
 
-  // Helper to format Firestore Timestamps safely
+  // Format Firestore Timestamps and plain "YYYY-MM-DD" strings
   const formatDate = (timestamp) => {
     if (!timestamp) return t('unknown_date');
-    if (typeof timestamp === 'string') return timestamp;
+    const opts = { month: "long", day: "numeric", year: "numeric" };
+    if (typeof timestamp === 'string') {
+      const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(timestamp) ? `${timestamp}T00:00:00` : timestamp);
+      return isNaN(d) ? timestamp : d.toLocaleDateString("en-US", opts);
+    }
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString("en-US", opts);
   };
 
 
@@ -260,10 +316,9 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item.category || "Program"}</span>
                 <div className="act2-card__title">{item.programName || item.name || item.eventName}</div>
-                <div className="act2-card__meta">{t('date')}: {formatDate(item.createdAt || item.date || item.submittedAt)}</div>
-                <div className="act2-card__ref">Ref: {item.regNum || item.id}</div>
+                <div className="act2-card__subtitle">Signed up on {formatDate(item.createdAt || item.date || item.submittedAt)}</div>
               </div>
-              <StatusBadge status={item.status || "pending"} />
+              <Foot status={item.status || "pending"} refNum={item.regNum || item.id} />
             </div>
           </div>
         ))}
@@ -287,18 +342,13 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
+                <span className="act2-card__cat">Document request</span>
                 <div className="act2-card__title">{item.documentName || item.documentType || item.name}</div>
-                <div className="act2-card__meta">{t('activity_date_requested')}: {formatDate(item.submittedAt || item.createdAt)}</div>
-                <div className="act2-card__ref">Ref: {item.requestID || item.refNum || item.refId || item.id}</div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_processed_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`}</span>
-                  </div>
-                )}
+                <div className="act2-card__subtitle">Requested on {formatDate(item.submittedAt || item.createdAt)}</div>
               </div>
-              <StatusBadge status={item.status} />
+              <Foot status={item.status} refNum={item.requestID || item.refNum || item.refId || item.id} />
             </div>
+            <Remarks item={item} />
           </div>
         ))}
         {documents.length >= docLimit && (
@@ -321,26 +371,14 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
-                <div className="act2-card__title">{item.purpose || item.eventName}</div>
-                <div className="act2-card__subtitle">{item.facilityName || item.facility}</div>
-                <div className="act2-card__meta">Ref: {item.reservationID || item.refNum || item.id} · {formatDate(item.date || item.submittedAt)} · {item.time || item.startTime || "TBA"}</div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
-                  </div>
-                )}
+                <span className="act2-card__cat">Facility booking</span>
+                <div className="act2-card__title">{item.facilityName || item.facility}</div>
+                <div className="act2-card__subtitle">{formatDate(item.date || item.submittedAt)} at {item.time || item.startTime || "time to be announced"}</div>
+                {(item.purpose || item.eventName) && <div className="act2-card__meta act2-card__meta--clamp">{item.purpose || item.eventName}</div>}
               </div>
-              <StatusBadge status={item.status} />
+              <Foot status={item.status} refNum={item.reservationID || item.refNum || item.id} />
             </div>
-            {item.status?.toLowerCase() === "rejected" && item.remarks && (
-              <div className="act2-card__remarks">
-                <div className="act2-card__remarks-header">
-                  <AlertCircleIcon /> {t('remarks')}
-                </div>
-                <p className="act2-card__remarks-body">{item.remarks}</p>
-              </div>
-            )}
+            <Remarks item={item} />
           </div>
         ))}
         {reservations.length >= resLimit && (
@@ -363,28 +401,21 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
+                <span className="act2-card__cat">Equipment rental</span>
                 <div className="act2-card__title">{item.equipmentName || "Equipment Rental"}</div>
-                <div className="act2-card__subtitle">{t('activity_quantity')}: {item.quantity} {item.quantity > 1 ? t('qty_units') : t('qty_unit')} · {item.purpose}</div>
+                <div className="act2-card__subtitle">
+                  Quantity: {item.quantity}
+                </div>
                 <div className="act2-card__meta">
-                  Ref: {item.rentalID || item.id} · {t('activity_pickup')}: {formatDate(item.pickUpDate)} · {t('activity_return')}: {formatDate(item.returnDate)}
+                  {item.pickUpDate && item.pickUpDate !== item.returnDate
+                    ? `Pick up: ${formatDate(item.pickUpDate)}. Return: ${formatDate(item.returnDate)}.`
+                    : `Pick up and return on ${formatDate(item.pickUpDate)}`}
                 </div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - <strong>{formatDate(item.processedAt)}</strong> {item.rejectionReason && `- Reason: ${item.rejectionReason}`} </span>
-                  </div>
-                )}
+                {item.purpose && <div className="act2-card__meta act2-card__meta--clamp">{item.purpose}</div>}
               </div>
-              <StatusBadge status={item.status} />
+              <Foot status={item.status} refNum={item.rentalID || item.id} />
             </div>
-            {item.status?.toLowerCase() === "rejected" && item.remarks && (
-              <div className="act2-card__remarks">
-                <div className="act2-card__remarks-header">
-                  <AlertCircleIcon /> {t('remarks')}
-                </div>
-                <p className="act2-card__remarks-body">{item.remarks}</p>
-              </div>
-            )}
+            <Remarks item={item} />
           </div>
         ))}
         {equipment.length >= eqLimit && (
@@ -398,7 +429,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   };
 
-  // ── 6.5 Services Tab
+  // ── 6.5 Services Tab ──
   const ServicesTab = () => {
     if (services.length === 0) return <EmptyState message={t('activity_no_services')} />;
     return (
@@ -408,18 +439,11 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
             <div className="act2-card__row">
               <div className="act2-card__main">
                 <span className="act2-card__cat">{item._serviceCategory}</span>
-                <div className="act2-card__title">
-                  {item.incidentType || item.about || item.name || "Service Report"}
-                </div>
-                <div className="act2-card__subtitle" style={{ marginTop: '4px', color: '#64748b', fontSize: '0.85rem' }}>
-                  {item.location || item.tip || item.description || "—"}
-                </div>
-                <div className="act2-card__meta" style={{ marginTop: '4px' }}>
-                  {t('activity_date_requested')}: {formatDate(item.createdAt || item.submittedAt)}
-                </div>
-                <div className="act2-card__ref">Ref: {item.refNum || item.id}</div>
+                <div className="act2-card__title">{item.incidentType || item.about || item.name || "Service Report"}</div>
+                <div className="act2-card__subtitle">Sent on {formatDate(item.createdAt || item.submittedAt)}</div>
+                {(item.location || item.tip || item.description) && <div className="act2-card__meta act2-card__meta--clamp">{item.location || item.tip || item.description}</div>}
               </div>
-              <StatusBadge status={item.status || "received"} />
+              <Foot status={item.status || "received"} refNum={item.refNum || item.id} />
             </div>
           </div>
         ))}
@@ -434,7 +458,7 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
     );
   };
 
-  // ── 6.6 Feedback Tab
+  // ── 6.6 Feedback Tab ──
   const FeedbackTab = () => {
     if (feedback.length === 0) return <EmptyState message={t('activity_no_feedback')} />;
     return (
@@ -443,20 +467,11 @@ export default function ActivityPage({ onNavigate, memberID: propMemberID, house
           <div key={item.id} className="act2-card">
             <div className="act2-card__row">
               <div className="act2-card__main">
+                <span className="act2-card__cat">Your feedback</span>
                 <div className="act2-card__title">{item.facilityName || "General Service"}</div>
-                <div className="act2-card__subtitle" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                  <span style={{ color: '#e8a020' }}>★</span> {item.rating} / 5 {t('activity_feedback_rating')}
-                </div>
-                <div className="act2-card__meta" style={{ marginTop: '4px' }}>{t('activity_date_requested')}: {formatDate(item.createdAt)}</div>
-                <div className="act2-card__ref">Ref: {item.referenceID || item.id}</div>
-                {item.processedBy && (
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheckIcon />
-                    <span>{t('activity_handled_by')}: <strong>{item.processedBy}</strong> ({item.processedRole}) - ({formatDate(item.processedAt)})</span>
-                  </div>
-                )}
+                <div className="act2-card__subtitle">Your rating: {item.rating} out of 5 stars</div>
               </div>
-              <StatusBadge status={item.status || "pending"} />
+              <Foot status={item.status || "pending"} refNum={item.referenceID || item.id} />
             </div>
           </div>
         ))}
