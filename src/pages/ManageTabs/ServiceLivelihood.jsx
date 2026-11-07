@@ -919,7 +919,6 @@ export default function ServiceLivelihood({ onBack }) {
                       className="btn-reject"
                       onClick={() => {
                         const targetId = selectedParticipant.id;
-                        setSelectedParticipant(null);
                         setRejectTarget(targetId);
                         setRejectReason("");
                         setShowRejectModal(true);
