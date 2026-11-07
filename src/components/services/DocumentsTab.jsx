@@ -62,7 +62,6 @@ const BigCheck = () => (
 
 // ── Validity reminder (big yellow notice, can be dismissed) ───────────────────
 function ValidityReminderBanner() {
-  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(false);
   const { t } = useLanguage();
   if (dismissed) return null;
@@ -96,6 +95,11 @@ function StepIndicator({ step, onStepClick }) {
         const num = i + 1;
         const done = num < step;
         const active = num === step;
+        
+        const clickable = done;
+        const Node = clickable ? "button" : "div";
+        const nodeProps = clickable ? { onClick: () => onStepClick(num), type: "button" } : {};
+
         return (
           <li key={label} className="lv-steps__li" aria-current={active ? "step" : undefined}>
             <Node className={`lv-steps__item lv-steps__node${done ? " is-done" : active ? " is-active" : ""}${clickable ? " is-link" : ""}`} {...nodeProps}>
@@ -161,26 +165,19 @@ function Step1({ docTypes, selected, onSelect, error }) {
 
 // ── Step 2: your details ──────────────────────────────────────────────────────
 function Step2({ docType, form, setForm, errors }) {
+  const { t, language } = useLanguage();
+  const [previewUrl, setPreviewUrl] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
 
-  // Thumbnail for image uploads; revoked when the file changes or the step unmounts
-  useEffect(() => {
-    const f = form.validIdFile;
-    if (f && f.type && f.type.startsWith("image/")) {
-      const url = URL.createObjectURL(f);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setPreviewUrl(null);
-  }, [form.validIdFile]);
-
-  const handleFile = async (e) => {
-    const input = e.target;
-    const file = input.files[0];
+  const handleFile = (e) => {
+    const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("File must be under 5MB."); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      alert(t("doc_err_file_size", "File must be under 5MB."));
+      return;
+    }
     set("validId", file.name);
     set("validIdFile", file);
 
@@ -405,6 +402,7 @@ function Step2({ docType, form, setForm, errors }) {
 
 // ── Step 3: review ────────────────────────────────────────────────────────────
 function Step3({ docType, form }) {
+  const { t, language } = useLanguage();
   const extraFields = docType?.customFields || [];
   const effectivePurpose = form.purposeOption === "Other"
     ? (form.purposeOther || t("doc_other", "Other"))
@@ -478,10 +476,7 @@ function Step4({ refNum, onReset }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function DocumentsTab({ userData, householdID, userName }) {
-  const { t } = useLanguage();
-  const residentID = userData?.residentID || getSaved("memberID", null);
-  const userUID = userData?.UID || getSaved("UID", null);
-
+  const residentID = userData?.residentID || userData?.id || getSaved("memberID", null);
   const [docTypes, setDocTypes] = useState([]);
   const [step, setStep] = useState(1);
   const [docType, setDocType] = useState(null);
@@ -499,22 +494,15 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   });
 
   useEffect(() => {
-    const q = query(
-      collection(db, "documents"),
-      limit(50)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
       setDocTypes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
   }, []);
 
-  // ─── BUG FIX (R19): Robust resident auto-fill fetch logic ───
   const loadResidentData = useCallback(async () => {
     let sourceData = userData;
 
-    // Fallback 1: Try Session LocalStorage
     if (!sourceData || (!sourceData.firstName && !sourceData.lastName)) {
       try {
         const sessionData = JSON.parse(localStorage.getItem("brgy_session") || "{}");
@@ -526,7 +514,6 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       }
     }
 
-    // Fallback 2: Direct Firestore query if props/session are insufficient
     if ((!sourceData || !sourceData.firstName) && householdID && residentID) {
       try {
         const resSnap = await getDoc(doc(db, "households", householdID, "residents", residentID));
@@ -542,20 +529,25 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       const rawRes = sourceData.residentData || sourceData;
       const fullAddress = rawRes.address || [rawRes.houseNumber, rawRes.street, rawRes.barangay || "Malanday", rawRes.city || "Valenzuela City"]
         .filter(Boolean).join(", ");
+
       setForm(f => ({
         ...f,
-        firstName: rawRes.firstName || f.firstName || "",
-        middleName: rawRes.middleName || f.middleName || "",
-        lastName: rawRes.lastName || f.lastName || "",
-        dob: rawRes.birthDate || rawRes.dob || f.dob || "",
-        civilStatus: rawRes.civilStatus || f.civilStatus || "Single",
-        address: fullAddress || f.address || "",
-        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || f.contact || ""),
-        email: rawRes.email || f.email || "",
-        residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || f.residingSince || ""),
+        firstName: rawRes.firstName || "",
+        middleName: rawRes.middleName || "",
+        lastName: rawRes.lastName || "",
+        dob: rawRes.birthDate || rawRes.dob || "",
+        civilStatus: rawRes.civilStatus || "Single",
+        address: fullAddress || "",
+        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || ""),
+        email: rawRes.email || "",
+        residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || ""),
       }));
     }
-  }, [userData]);
+  }, [userData, householdID, residentID]);
+
+  useEffect(() => {
+    loadResidentData();
+  }, [loadResidentData]);
 
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return; }
@@ -563,26 +555,34 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   }, [step]);
 
   const validateStep1 = () => {
-    if (!docType) { setErrors({ docType: "Please select a document type." }); return false; }
+    if (!docType) {
+      setErrors({ docType: t("doc_err_select", "Please select a document type.") });
+      return false;
+    }
     return true;
   };
 
   const validateStep2 = () => {
     const e = {};
-    if (!form.firstName.trim()) e.firstName = "Required.";
-    if (!form.lastName.trim()) e.lastName = "Required.";
-    if (!form.dob) e.dob = "Required.";
-    if (!form.address.trim()) e.address = "Required.";
-    if (!String(form.contact || "").trim()) e.contact = "Required.";
-    if (!form.residingSince) e.residingSince = "Required.";
-    if (!form.purposeOption) e.purposeOption = "Required.";
-    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) e.purposeOther = "Please specify your purpose.";
-    if (!form.validId) e.validId = "Please upload a valid ID.";
+    if (!form.firstName.trim()) e.firstName = t("doc_err_required", "Required.");
+    if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
+    if (!form.dob) e.dob = t("doc_err_required", "Required.");
+    if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
+    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
+    if (!form.residingSince) e.residingSince = t("doc_err_required", "Required.");
+    if (!form.purposeOption) e.purposeOption = t("doc_err_required", "Required.");
+    if (form.purposeOption === "Other" && !form.purposeOther?.trim()) {
+      e.purposeOther = t("doc_err_specify_purpose", "Please specify your purpose.");
+    }
+    if (!form.validId) e.validId = t("doc_err_upload_id", "Please upload a valid ID.");
     const extra = docType?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
-      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
+      if (f.type === "checkbox") {
+        if (!form[f.id]) e[f.id] = t("doc_err_confirm", "You must confirm this to proceed.");
+      } else {
+        if (!form[f.id]?.toString().trim()) e[f.id] = t("doc_err_required", "Required.");
+      }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -617,13 +617,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         });
 
         const effectivePurpose = form.purposeOption === "Other" ? form.purposeOther : form.purposeOption;
-
-        const submissionForm = {
-          ...form,
-          purpose: effectivePurpose,
-          validIdUrl: uploadedIdUrl,
-          UID: userUID
-        };
+        const submissionForm = { ...form, purpose: effectivePurpose, validIdUrl: uploadedIdUrl };
 
         const generatedRef = await submitDocumentRequest(householdID, residentID || "", userName || "Unknown", docType, submissionForm, customData);
         setRefNum(generatedRef);
@@ -650,21 +644,20 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   };
 
   const handleReset = () => {
-    setStep(1); setDocType(null); setErrors({});
-    setForm({ firstName: "", middleName: "", lastName: "", dob: "", civilStatus: "Single", address: "", contact: "", email: "", ctc: "", residingSince: "", purposeOption: "", purposeOther: "", validId: "", validIdFile: null });
-  };
-
-  const goToStep = (n) => {
-    if (isSubmitting) return;
+    setStep(1);
+    setDocType(null);
     setErrors({});
-    // Reset transient request inputs while maintaining personal info
-    setForm(prev => ({
-      ...prev,
-      purposeOption: "",
-      purposeOther: "",
-      validId: "",
-      validIdFile: null,
-    }));
+    
+    // Explicitly wipe the form clean BEFORE we load the resident data again
+    setForm({
+      firstName: "", middleName: "", lastName: "",
+      dob: "", civilStatus: "Single", address: "",
+      contact: "", email: "", residingSince: "",
+      purposeOption: "", purposeOther: "", 
+      validId: "", validIdFile: null,
+    });
+    
+    // Now trigger the auto-fill pulling strictly from the resident context
     loadResidentData();
   };
 
