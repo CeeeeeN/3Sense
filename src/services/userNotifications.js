@@ -1,6 +1,6 @@
 import {
   collection,
-  setDoc, // <-- Imported setDoc
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -8,9 +8,12 @@ import {
   getDocs,
   query,
   where,
+  orderBy, 
+  limit, 
+  startAfter,
   onSnapshot,
   serverTimestamp,
-  writeBatch // <-- Imported writeBatch
+  writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
@@ -82,22 +85,14 @@ async function sendPushToResidentOrHousehold(householdID, residentID, title, mes
 
 /**
  * Create a personal in-app notification and automatically trigger an Expo lock-screen push notification.
- *
- * @param {string} householdID – The household's Firestore document ID
- * @param {string} residentID  – The resident's doc ID within that household ("head", "member_xxx", or "household")
- * @param {string} title       – Notification title
- * @param {string} message     – Notification message body
- * @param {string} type        – "document_update" | "facility_update" | "equipment_update" | "announcement" | "general"
- * @param {string} [refNum]    – Optional reference number / deep-link ID
  */
 export async function createUserNotification(householdID, residentID, title, message, type, refNum = "") {
   try {
     // ─── OPTIMIZED: 1-Write Creation ───
-    // Generate the doc locally so we can include the ID in the initial setDoc payload
     const newNotifRef = doc(collection(db, "user_notifications"));
 
     await setDoc(newNotifRef, {
-      userNotificationID: newNotifRef.id, // Set immediately, bypassing the old updateDoc
+      userNotificationID: newNotifRef.id, 
       householdID: householdID.trim(),
       residentID: residentID ? residentID.trim() : "household",
       title,
@@ -115,6 +110,60 @@ export async function createUserNotification(householdID, residentID, title, mes
 
   } catch (err) {
     console.error("Failed to create user notification:", err);
+  }
+}
+
+/**
+ * Create a category-targeted announcement notification for a specific resident,
+ * preventing duplicate notifications for the same resident and announcement.
+ */
+export async function createAnnouncementNotification({
+  householdID,
+  residentID,
+  announcementID,
+  title,
+  message,
+  category = "",
+}) {
+  if (!householdID || !residentID || !announcementID) return false;
+
+  try {
+    const cleanHH = householdID.trim();
+    const cleanRes = residentID.trim();
+    const cleanAnn = announcementID.trim();
+
+    // Deterministic document ID to prevent duplicate notifications for the same resident and announcement
+    const notifDocID = `ann_${cleanAnn}_${cleanRes}`;
+    const notifRef = doc(db, "user_notifications", notifDocID);
+
+    const existingSnap = await getDoc(notifRef);
+    if (existingSnap.exists()) {
+      // Notification already exists for this resident and announcement - skip duplicate!
+      return false;
+    }
+
+    await setDoc(notifRef, {
+      userNotificationID: notifDocID,
+      householdID: cleanHH,
+      residentID: cleanRes,
+      title: title || "New Announcement",
+      message: message || "",
+      type: "announcement",
+      refNum: cleanAnn,
+      category: category || "",
+      isRead: false,
+      createdAt: serverTimestamp(),
+    });
+
+    // Dispatch Live Mobile Push Notification (Non-blocking)
+    sendPushToResidentOrHousehold(cleanHH, cleanRes, title || "New Announcement", message || "", cleanAnn).catch(e =>
+      console.warn("Silent push notification error:", e)
+    );
+
+    return true;
+  } catch (err) {
+    console.error("Failed to create announcement notification:", err);
+    return false;
   }
 }
 
@@ -137,11 +186,12 @@ export async function createNotification(type, message, triggeredBy, refNum = ""
 }
 
 /**
- * Real-time listener for in-app notifications
+ * ─── OPTIMIZED: Lazy Loading Initial Batch (Top 20) ───
+ * Replaces the old subscribeToUserNotifications to prevent massive db read costs.
  */
 export function subscribeToUserNotifications(householdID, residentID, callback) {
   if (!householdID || !residentID) {
-    callback([]);
+    callback([], null);
     return () => { };
   }
 
@@ -152,21 +202,44 @@ export function subscribeToUserNotifications(householdID, residentID, callback) 
   );
 
   return onSnapshot(q, (snapshot) => {
-    const notifications = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
-
-    notifications.sort((a, b) => {
-      const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-      const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+    const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    notifs.sort((a, b) => {
+      const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+      const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
       return tb - ta;
     });
-
-    callback(notifications);
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
+    callback(notifs, lastVisible); 
   }, (err) => {
     console.error("Notification listener error:", err);
-    callback([]);
+    callback([], null);
+  });
+}
+
+/**
+ * ─── OPTIMIZED: Fetch Next Batch (Infinite Scroll) ───
+ * Call this function when the user scrolls to the bottom of the modal.
+ */
+export function fetchMoreNotifications(householdID, residentID, lastVisible, callback) {
+  if (!householdID || !residentID || !lastVisible) {
+    return;
+  }
+  
+  const q = query(
+    collection(db, "user_notifications"),
+    where("householdID", "==", householdID.trim()),
+    where("residentID", "in", [residentID.trim(), "household", "all"]),
+    orderBy("createdAt", "desc"),
+    startAfter(lastVisible),
+    limit(20)
+  );
+  
+  getDocs(q).then((snapshot) => {
+    const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const newLastVisible = snapshot.docs[snapshot.docs.length - 1];
+    callback(notifs, newLastVisible);
+  }).catch((err) => {
+    console.error("Failed to fetch more notifications", err);
   });
 }
 
@@ -191,7 +264,6 @@ export async function markAllNotificationsAsRead(notifications) {
     if (unread.length === 0) return;
 
     // ─── OPTIMIZED: Batched Atomic Write ───
-    // Updates up to 500 unread notifications in exactly 1 network request
     const batch = writeBatch(db);
 
     unread.forEach((n) => {

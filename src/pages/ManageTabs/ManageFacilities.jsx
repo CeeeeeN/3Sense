@@ -5,11 +5,13 @@ import { auth, db } from "../../firebase/firebase";
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
-function DescriptionPreview({ text }) {
+function DescriptionPreview({ text, t }) {
   const [expanded, setExpanded] = React.useState(false);
   if (!text) return null;
   const isLong = text.length > PREVIEW_LIMIT;
@@ -33,11 +35,13 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageFacilities() {
-  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+  const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("All");
-  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc, cap_desc, cap_asc
+  const [sortOrder, setSortOrder] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -62,7 +66,6 @@ export default function ManageFacilities() {
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -77,7 +80,6 @@ export default function ManageFacilities() {
     return () => unsubscribe();
   }, []);
 
-  // ─── OPTIMIZED: React Query instead of onSnapshot ───
   const { data: facilities = [], isLoading } = useQuery({
     queryKey: ['adminManage_facilities'],
     queryFn: async () => {
@@ -97,7 +99,7 @@ export default function ManageFacilities() {
         };
       });
     },
-    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 
   useEffect(() => {
@@ -118,7 +120,6 @@ export default function ManageFacilities() {
     
     try {
       await updateDoc(doc(db, "facilities", selectedFacility.id), { blockedDates: newBlocked });
-      // Refresh cache so UI stays in sync
       queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
     } catch(err) {
       console.error(err);
@@ -147,27 +148,32 @@ export default function ManageFacilities() {
     setShowAddModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this facility?")) {
-      try {
-        await deleteDoc(doc(db, "facilities", id));
-        logTransaction(
-          adminName,
-          adminRole,
-          "DELETED_FACILITY",
-          `Deleted facility with ID: ${id}`,
-        );
-        // Refresh cache
-        queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
-      } catch(error) {
-        console.error("Error deleting facility: ", error);
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_DELETING_FACILITY",
-          `Error deleting facility with ID: ${id}\n${error.message}`,
-        );
-      }
+  const handleDelete = async (id, facName) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_fac_confirm_delete')}\n\n"${facName}"`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "facilities", id));
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_FACILITY",
+        `Deleted facility with ID: ${id}`
+      );
+      queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
+      await showAlert("Success", "Facility deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting facility: ", error);
+      await showAlert("Error", "Failed to delete facility. Please try again.");
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_DELETING_FACILITY",
+        `Error deleting facility with ID: ${id}\n${error.message}`
+      );
     }
   };
 
@@ -188,7 +194,6 @@ export default function ManageFacilities() {
         logTransaction(adminName, adminRole, "ADDED_FACILITY", `Added new facility: ${newFacility.facilityName} (ID: ${newRef.id})`);
       }
       
-      // Refresh cache so the new/edited item appears immediately
       queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
 
       setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, purposeOptions: [], customFields: [] });
@@ -217,7 +222,7 @@ export default function ManageFacilities() {
   };
 
   const handleGenerateGlobalQR = () => {
-    const residentAppUrl = "https://3-sense.vercel.app/";
+    const residentAppUrl = "https://www.3s-sense.site/";
     const encodedUrl = `${residentAppUrl}?serviceId=facilities_global&serviceName=${encodeURIComponent("All Facilities")}&category=Facilities`;
     setSelectedQR({ name: "Facility Reservation Portal", qrValue: encodedUrl });
   };
@@ -313,22 +318,22 @@ export default function ManageFacilities() {
   };
 
   if (isLoading) {
-    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Facilities...</div>;
+    return <div style={{ padding: "40px", textAlign: "center" }}>{t('admin_fac_loading')}</div>;
   }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Facilities</h1>
-          <p className="as-subtitle">Manage reservable barangay facilities and availability calendar</p>
+          <h1>{t('admin_fac_title')}</h1>
+          <p className="as-subtitle">{t('admin_fac_subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="as-qr-btn" onClick={handleGenerateGlobalQR}>
-            <Manage_IconQR /> Generate Global QR
+            <Manage_IconQR /> {t('admin_fac_btn_global_qr')}
           </button>
           <button className="as-btn-aqua" onClick={openAddModal}>
-            <IconAdd /> Add Facility
+            <IconAdd /> {t('admin_fac_btn_add')}
           </button>
         </div>
       </div>
@@ -337,7 +342,7 @@ export default function ManageFacilities() {
       <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          <input type="text" placeholder="Search facilities..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
+          <input type="text" placeholder={t('admin_fac_search_placeholder')} value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
         </div>
 
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -346,9 +351,9 @@ export default function ManageFacilities() {
             onChange={(e) => setFilterAvailability(e.target.value)}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
           >
-            <option value="All">All Statuses</option>
-            <option value="Available">Enabled</option>
-            <option value="Unavailable">Disabled</option>
+            <option value="All">{t('admin_fac_filter_all')}</option>
+            <option value="Available">{t('admin_fac_filter_enabled')}</option>
+            <option value="Unavailable">{t('admin_fac_filter_disabled')}</option>
           </select>
 
           <select
@@ -356,12 +361,12 @@ export default function ManageFacilities() {
             onChange={(e) => setSortOrder(e.target.value)}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
           >
-            <option value="date_desc">Added: Newest First</option>
-            <option value="date_asc">Added: Oldest First</option>
-            <option value="name_asc">Name: A to Z</option>
-            <option value="name_desc">Name: Z to A</option>
-            <option value="cap_desc">Capacity: High to Low</option>
-            <option value="cap_asc">Capacity: Low to High</option>
+            <option value="date_desc">{t('admin_fac_sort_date_new')}</option>
+            <option value="date_asc">{t('admin_fac_sort_date_old')}</option>
+            <option value="name_asc">{t('admin_fac_sort_name_asc')}</option>
+            <option value="name_desc">{t('admin_fac_sort_name_desc')}</option>
+            <option value="cap_desc">{t('admin_fac_sort_cap_desc')}</option>
+            <option value="cap_asc">{t('admin_fac_sort_cap_asc')}</option>
           </select>
         </div>
       </div>
@@ -372,18 +377,18 @@ export default function ManageFacilities() {
             <div className="as-card-header">
               <h2 className="as-card-title">{fac.facilityName || fac.name}</h2>
               <span className={`as-badge ${fac.available ? "open" : "ongoing"}`}>
-                {fac.available ? "Enabled" : "Disabled"}
+                {fac.available ? t('admin_fac_card_enabled') : t('admin_fac_card_disabled')}
               </span>
             </div>
-            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.description || fac.fullDescription} /></div>
+            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.description || fac.fullDescription} t={t} /></div>
             <ul className="as-card-details">
-              <li><strong>Capacity:</strong> {fac.capacity ? `Up to ${fac.capacity} persons` : "—"}</li>
+              <li><strong>{t('admin_fac_card_capacity')}</strong> {fac.capacity ? `${t('admin_fac_card_capacity_val')} ${fac.capacity} ${t('admin_fac_card_capacity_persons')}` : "—"}</li>
               <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>
             </ul>
             <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>Calendar</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>Edit</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id)}>Delete</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>{t('admin_fac_btn_calendar')}</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>{t('admin_fac_btn_edit')}</button>
+              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id, fac.facilityName || fac.name)}>{t('admin_fac_btn_delete')}</button>
             </div>
           </div>
         ))}
@@ -397,7 +402,7 @@ export default function ManageFacilities() {
             disabled={currentPage === 1}
             style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: "not-allowed" }}
           >
-            Previous
+            {t('admin_doc_page_prev')}
           </button>
           {renderPageNumbers()}
           <button
@@ -406,16 +411,16 @@ export default function ManageFacilities() {
             disabled={currentPage === totalPages}
             style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: "not-allowed" }}
           >
-            Next
+            {t('admin_doc_page_next')}
           </button>
         </div>
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '800px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>{editingFacilityId ? "Edit Facility" : "Add Facility"}</h2>
+              <h2>{editingFacilityId ? t('admin_fac_modal_edit_title') : t('admin_fac_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
             </div>
             
@@ -424,15 +429,15 @@ export default function ManageFacilities() {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div className="as-form-group">
-                  <label className="as-form-label">Facility Name</label>
-                    <input type="text" className="as-form-input" required placeholder="e.g. Barangay Hall"
+                  <label className="as-form-label">{t('admin_fac_modal_name')}</label>
+                    <input type="text" className="as-form-input" required placeholder={t('admin_fac_modal_name_ph')}
                       value={newFacility.facilityName} onChange={(e) => setNewFacility({...newFacility, facilityName: e.target.value})} 
                     />
                   </div>
 
                   <div className="as-form-group">
-                    <label className="as-form-label">Capacity</label>
-                    <input type="number" className="as-form-input" required placeholder="e.g. 200" min="1"
+                    <label className="as-form-label">{t('admin_fac_modal_capacity')}</label>
+                    <input type="number" className="as-form-input" required placeholder={t('admin_fac_modal_capacity_ph')} min="1"
                       value={newFacility.capacity} onChange={(e) => setNewFacility({...newFacility, capacity: e.target.value})} 
                     />
                   </div>
@@ -440,14 +445,14 @@ export default function ManageFacilities() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div className="as-form-group">
-                    <label className="as-form-label">Opening Time</label>
+                    <label className="as-form-label">{t('admin_fac_modal_open')}</label>
                     <input type="time" className="as-form-input" required
                       value={newFacility.openTime} onChange={(e) => setNewFacility({...newFacility, openTime: e.target.value})} 
                     />
                   </div>
 
                   <div className="as-form-group">
-                    <label className="as-form-label">Closing Time</label>
+                    <label className="as-form-label">{t('admin_fac_modal_close')}</label>
                     <input type="time" className="as-form-input" required
                       value={newFacility.closeTime} onChange={(e) => setNewFacility({...newFacility, closeTime: e.target.value})} 
                     />
@@ -455,26 +460,26 @@ export default function ManageFacilities() {
                 </div>
 
                 <div className="as-form-group">
-                    <label className="as-form-label">Full Description</label>
-                    <textarea className="as-form-textarea" required rows="3" placeholder="Hall details, inclusions like tables, chairs, stage, etc."
+                    <label className="as-form-label">{t('admin_fac_modal_desc')}</label>
+                    <textarea className="as-form-textarea" required rows="3" placeholder={t('admin_fac_modal_desc_ph')}
                       value={newFacility.description} onChange={(e) => setNewFacility({...newFacility, description: e.target.value})} 
                     />
                 </div>
 
                 <div className="as-form-section">
-                  <h3 className="as-form-section-title">Availability Setting</h3>
+                  <h3 className="as-form-section-title">{t('admin_fac_modal_avail_title')}</h3>
                   <label className="as-checkbox-label">
                     <input type="checkbox" className="as-checkbox" checked={newFacility.available} onChange={(e) => setNewFacility({...newFacility, available: e.target.checked})} />
-                    Available for Reservation
+                    {t('admin_fac_modal_avail_check')}
                   </label>
                 </div>
 
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    Default Collected Fields
+                    {t('admin_doc_modal_default_fields')}
                   </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '12px', marginTop: '-10px' }}>The following information is automatically collected. Do not recreate them in the form builder.</p>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '12px', marginTop: '-10px' }}>{t('admin_doc_modal_default_desc')}</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {["Full Name", "Contact Number", "Purpose of Reservation", "Reservation Date", "Start Time", "End Time", "Estimated Number of Pax", "Additional Notes"].map(f => (
                       <span key={f} style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -488,10 +493,10 @@ export default function ManageFacilities() {
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                    Purpose of Reservation Options <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
+                    {t('admin_doc_modal_purpose_title')} <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>
-                    These options appear in the "Purpose of Reservation" dropdown on the resident facility request form. An "Other" option is always included automatically.
+                    {t('admin_doc_modal_purpose_desc')}
                   </p>
                   {purposeFormError && (
                     <p style={{ fontSize: '0.8rem', color: '#e03e3e', fontWeight: 600, marginBottom: '8px' }}>{purposeFormError}</p>
@@ -500,7 +505,7 @@ export default function ManageFacilities() {
                     <input
                       type="text"
                       className="as-form-input"
-                      placeholder="e.g. Event, Meeting, Seminar, Practice..."
+                      placeholder={t('admin_doc_modal_purpose_ph')}
                       value={purposeInput}
                       onChange={e => setPurposeInput(e.target.value)}
                       onKeyDown={e => {
@@ -541,7 +546,7 @@ export default function ManageFacilities() {
                         setPurposeFormError('');
                       }}
                     >
-                      {editingPurposeIdx !== null ? 'Update' : '+ Add'}
+                      {editingPurposeIdx !== null ? t('admin_doc_modal_purpose_btn_update') : t('admin_doc_modal_purpose_btn_add')}
                     </button>
                     {editingPurposeIdx !== null && (
                       <button
@@ -550,7 +555,7 @@ export default function ManageFacilities() {
                         style={{ padding: '8px 12px', fontSize: '0.82rem' }}
                         onClick={() => { setEditingPurposeIdx(null); setPurposeInput(''); }}
                       >
-                        Cancel
+                        {t('admin_doc_modal_purpose_btn_cancel')}
                       </button>
                     )}
                   </div>
@@ -563,7 +568,7 @@ export default function ManageFacilities() {
                             type="button"
                             onClick={() => { setEditingPurposeIdx(idx); setPurposeInput(opt); }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#317D89', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
-                          >Edit</button>
+                          >{t('admin_doc_modal_purpose_btn_edit')}</button>
                           <button
                             type="button"
                             onClick={() => {
@@ -572,21 +577,21 @@ export default function ManageFacilities() {
                               if (editingPurposeIdx === idx) { setEditingPurposeIdx(null); setPurposeInput(''); }
                             }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e03e3e', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
-                          >Remove</button>
+                          >{t('admin_doc_modal_purpose_btn_remove')}</button>
                         </div>
                       ))}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0faf5', border: '1px dashed #a7d7c1', borderRadius: '8px', padding: '6px 10px' }}>
-                        <span style={{ flex: 1, fontSize: '0.83rem', color: '#2DB17B', fontStyle: 'italic' }}>Other (always included – shows a free-text field)</span>
+                        <span style={{ flex: 1, fontSize: '0.83rem', color: '#2DB17B', fontStyle: 'italic' }}>{t('admin_doc_modal_purpose_other')}</span>
                       </div>
                     </div>
                   ) : (
-                    <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>No options added yet. Add at least one above.</p>
+                    <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>{t('admin_doc_modal_purpose_empty')}</p>
                   )}
                 </div>
 
                 <div className="as-modal-actions">
-                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>
-                  <button type="submit" className="as-btn-aqua" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>Save Facility</button>
+                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>{t('admin_fac_modal_btn_cancel')}</button>
+                  <button type="submit" className="as-btn-aqua" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>{t('admin_fac_modal_btn_save')}</button>
                 </div>
               </form>
             </div>
@@ -595,15 +600,15 @@ export default function ManageFacilities() {
       )}
 
       {showCalendarModal && selectedFacility && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '600px' }}>
+        <div className="as-modal-overlay" onClick={() => setShowCalendarModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>Availability Calendar - {selectedFacility.name || selectedFacility.facilityName}</h2>
+              <h2>{t('admin_fac_cal_title')} {selectedFacility.name || selectedFacility.facilityName}</h2>
               <button className="as-modal-close" onClick={() => setShowCalendarModal(false)}>&times;</button>
             </div>
             <div className="as-modal-body" style={{ padding: '20px' }}>
               <p className="as-modal-desc" style={{ marginBottom: '20px', textAlign: 'center' }}>
-                Click a date to toggle its availability. Red dates are blocked and cannot be reserved by users.
+                {t('admin_fac_cal_desc')}
               </p>
               
               <div className="sv-calendar" style={{ margin: '0 auto', maxWidth: '400px' }}>
@@ -631,13 +636,13 @@ export default function ManageFacilities() {
                   })}
                 </div>
                 <div className="sv-cal-legend" style={{ justifyContent: 'center' }}>
-                  <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />Available</span>
-                  <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />Blocked</span>
+                  <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--available" />{t('admin_fac_cal_available')}</span>
+                  <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />{t('admin_fac_cal_blocked')}</span>
                 </div>
               </div>
               
               <div className="as-modal-actions" style={{ justifyContent: 'flex-end', marginTop: '30px' }}>
-                <button className="as-btn-aqua" onClick={() => setShowCalendarModal(false)}>Done</button>
+                <button className="as-btn-aqua" onClick={() => setShowCalendarModal(false)}>{t('admin_fac_cal_btn_done')}</button>
               </div>
             </div>
           </div>
@@ -645,20 +650,20 @@ export default function ManageFacilities() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '450px' }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: '450px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>QR Code Generated</h2>
+              <h2>{t('admin_fac_qr_title')}</h2>
               <button className="as-modal-close" onClick={() => setSelectedQR(null)}>&times;</button>
             </div>
             <div className="as-modal-body" style={{ textAlign: 'center' }}>
               <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
               <h3>{selectedQR.name}</h3>
-              <p className="as-modal-desc">Residents can scan this shared code to access all Facility reservations.</p>
+              <p className="as-modal-desc">{t('admin_fac_qr_desc')}</p>
               <div className="as-qr-holder" style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                 <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true}/>
               </div>
-              <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: '100%' }}><IconDownload /> Download QR Code (PNG)</button>
+              <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: '100%' }}><IconDownload /> {t('admin_fac_qr_download')}</button>
             </div>
           </div>
         </div>

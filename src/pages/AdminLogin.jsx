@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import '../AdminStyle.css';
+import "../AdminStyle.css";
 import { auth, db } from "../firebase/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 const LoginPage = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [identifier, setIdentifier] = useState(""); // email or username
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,9 +17,7 @@ const LoginPage = () => {
 
   const togglePassword = () => setPasswordVisible(!passwordVisible);
 
-  // Helper: look up email by username from both collections
   const getEmailFromUsername = async (username) => {
-    // Check approvedAdmins
     const approvedQ = query(
       collection(db, "approvedAdmins"),
       where("username", "==", username)
@@ -29,7 +27,6 @@ const LoginPage = () => {
       return approvedSnap.docs[0].data().email;
     }
 
-    // Check pendingAdmins
     const pendingQ = query(
       collection(db, "pendingAdmins"),
       where("username", "==", username)
@@ -48,12 +45,10 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      // Determine if input is email or username
       const isEmail = identifier.includes("@");
       let emailToUse = identifier;
 
       if (!isEmail) {
-        // Look up email from username
         const foundEmail = await getEmailFromUsername(identifier);
         if (!foundEmail) {
           setError("No account found with that username.");
@@ -63,11 +58,9 @@ const LoginPage = () => {
         emailToUse = foundEmail;
       }
 
-      // Sign in with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, emailToUse, password);
       const user = userCredential.user;
 
-      // Check if user exists in approvedAdmins
       const approvedQ = query(
         collection(db, "approvedAdmins"),
         where("uid", "==", user.uid)
@@ -81,14 +74,11 @@ const LoginPage = () => {
           position: adminDoc.position || "Admin",
           role: adminDoc.role || adminDoc.position || "Super Admin",
         };
-        // 🔥 Immediately cache role in sessionStorage to prevent sidebar link flickering
         sessionStorage.setItem("adminUserData", JSON.stringify(adminData));
-
         navigate("/admin/dashboard");
         return;
       }
 
-      // Check if still pending
       const pendingQ = query(
         collection(db, "pendingAdmins"),
         where("uid", "==", user.uid)
@@ -109,7 +99,6 @@ const LoginPage = () => {
       }
 
       await auth.signOut();
-
     } catch (err) {
       setError("Invalid credentials. Please try again.");
     }
@@ -150,101 +139,85 @@ const LoginPage = () => {
     setResetLoading(false);
   };
 
+  const adminFeatures = [
+    {
+      title: "Manage document requests",
+      desc: "Review, issue, and track barangay clearances and certificates.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="8" y="2" width="8" height="4" rx="1" />
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          <line x1="9" y1="12" x2="15" y2="12" />
+          <line x1="9" y1="16" x2="15" y2="16" />
+        </svg>
+      ),
+    },
+    {
+      title: "Resident & household management",
+      desc: "Maintain demographic databases and resident verification status.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+    },
+    {
+      title: "Post barangay announcements",
+      desc: "Broadcast emergency alerts and official community notices.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      ),
+    },
+    {
+      title: "View reports and analytics",
+      desc: "Generate summary data on incidents and service analytics.",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
     <div className="login-page">
       <div className="left-panel">
         <a className="left-logo">
           <img src="/icons/logo.png" className="logo-img" alt="Logo" />
-          <div className="left-logo-text">Barangay 3S+ Malanday</div>
+          <div className="left-logo-text">
+            Barangay 3S+ Malanday
+            <span>Administrative Management System</span>
+          </div>
         </a>
 
         <div className="left-content">
           <h2>
-            Administrative<br />
-            <span>Control Panel</span>
+            Administrative <span>Control Panel</span>
           </h2>
           <p>
             Secure access for authorized barangay officials to manage residents,
             documents, reports, and announcements.
           </p>
-          <div className="feature-box">
-            <svg
-              className="feature-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="8" y="2" width="8" height="4" rx="1" />
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-              <line x1="9" y1="12" x2="15" y2="12" />
-              <line x1="9" y1="16" x2="15" y2="16" />
-            </svg>
 
-            <span>Manage document requests</span>
-          </div>
-
-          <div className="feature-box">
-            <svg
-              className="feature-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-
-            <span>Resident & household management</span>
-          </div>
-
-          <div className="feature-box">
-            <svg
-              className="feature-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M11 5h6" />
-              <path d="M11 9h7" />
-              <path d="M13 13h5" />
-              <path d="M4 4h.01" />
-              <path d="M4 8h.01" />
-              <path d="M4 12h.01" />
-              <path d="M4 16h.01" />
-              <path d="M4 20h.01" />
-            </svg>
-
-            <span>Post barangay announcements</span>
-          </div>
-
-          <div className="feature-box">
-            <svg
-              className="feature-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-
-            <span>View reports and analytics</span>
-          </div>
+          <ul className="admin-features-list">
+            {adminFeatures.map((f) => (
+              <li className="admin-feature-item" key={f.title}>
+                <span className="admin-feature-icon">{f.icon}</span>
+                <div className="admin-feature-text">
+                  <h4>{f.title}</h4>
+                  <p>{f.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="footer">© 2026 Barangay 3S+ Malanday. All rights reserved.</div>
@@ -260,28 +233,28 @@ const LoginPage = () => {
             Admin Access
           </div>
 
-          <h2>Welcome, Admin</h2>
-          <p>Log in using your approved administrator credentials.</p>
+          <h2>Welcome back!</h2>
+          <p>Enter your Administrator credentials to continue.</p>
 
           {error && (
-            <p style={{ color: "#d9534f", fontSize: "14px", marginBottom: "10px" }}>
+            <div className="login-alert-error">
               {error}
-            </p>
+            </div>
           )}
 
           {resetSent && (
-            <p style={{ color: "#28a745", fontSize: "14px", marginBottom: "10px", background: "#f0fff4", padding: "10px", borderRadius: "8px" }}>
+            <div className="login-alert-success">
               Password reset email sent! Check your inbox.
-            </p>
+            </div>
           )}
 
           <form id="adminLoginForm" onSubmit={handleSubmit}>
             <div className="field">
               <label>Username / Email</label>
               <div className="input-wrap">
-                <svg className="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
-                  <path d="M5.5 21a6.5 6.5 0 0 1 13 0" />
                 </svg>
                 <input
                   type="text"
@@ -296,8 +269,8 @@ const LoginPage = () => {
             <div className="field">
               <label>Password</label>
               <div className="input-wrap has-toggle">
-                <svg className="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                <svg className="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
                 <input
@@ -325,29 +298,23 @@ const LoginPage = () => {
               </div>
             </div>
 
-            <div style={{ textAlign: "right", marginBottom: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
               <button
                 type="button"
                 onClick={handleForgotPassword}
                 disabled={resetLoading}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--teal)",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  padding: 0,
-                  textDecoration: "underline"
-                }}
+                className="btn-ghost-sm"
               >
-                {resetLoading ? "Sending..." : "Forgot Password?"}
+                {resetLoading ? "Sending..." : "Forgot password?"}
               </button>
             </div>
 
             <button type="submit" className="btn-main" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
+              {loading ? "Signing in..." : <>Sign In <span style={{ marginLeft: "4px" }}>&rarr;</span></>}
             </button>
           </form>
+
+          <div className="divider">or</div>
 
           <div className="bottom-link">
             Need access? <Link to="/admin/signup">Request Admin Approval</Link>

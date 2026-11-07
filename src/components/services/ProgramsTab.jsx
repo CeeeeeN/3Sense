@@ -3,12 +3,11 @@ import {
   collection,
   onSnapshot,
   doc,
-  addDoc,
-  setDoc,
   query,
   where,
   serverTimestamp,
-  limit
+  limit,
+  writeBatch // <-- IMPORTED WRITEBATCH
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { createNotification } from "../../services/notifications";
@@ -230,7 +229,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
   }, [userData]);
 
   useEffect(() => {
-    // BOUNDED QUERY: Cap the programs fetch to prevent downloading years of historical data
     const q = query(
       collection(db, "Programs"),
       limit(100)
@@ -240,7 +238,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
       setPrograms(
         snapshot.docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          // Client-side filtering remains intact
           .filter((p) => p.programType !== "livelihood" && p.status !== "Completed")
       );
       setLoadingPrograms(false);
@@ -252,7 +249,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     if (programs.length === 0) return;
 
     const unsubs = programs.map((prog) => {
-      // BOUNDED QUERY: Prevent the N+1 read multiplier from crashing the app
       const attendeesQuery = query(
         collection(db, "Programs", prog.id, "attendees"),
         limit(300)
@@ -274,12 +270,10 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     const activeUserId = userData?.userID || userData?.residentID || "";
     const hid = householdID || "";
 
-    // Need at least one identifier
     if (!activeUserId && !hid) return;
 
     setLoadingMyRegs(true);
 
-    // Query by userID (most reliable) or householdID as fallback
     const [queryField, queryValue] = activeUserId
       ? ["userID", activeUserId]
       : ["householdID", hid];
@@ -287,14 +281,12 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     const q = query(
       collection(db, "programRegistrations"),
       where(queryField, "==", queryValue)
-      // No orderBy — avoids composite index requirement; sorted client-side below
     );
 
     const unsub = onSnapshot(
       q,
       (snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Newest first, client-side
         docs.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
         setMyRegs(docs);
         setLoadingMyRegs(false);
@@ -366,12 +358,15 @@ export default function ProgramsTab({ userData, householdID, userName }) {
         const timeLabel = [formatTime(prog?.startTime), formatTime(prog?.endTime)].filter(Boolean).join(" – ");
         const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ");
         const activeUserId = userData?.userID || userData?.residentID || "";
-
-        // Permanent UID
         const userUID = userData?.UID || getSaved("UID", null);
 
+        // CREATE A FIRESTORE BATCH WRITER
+        const batch = writeBatch(db);
+
         // 1️⃣ Flat collection → "My Registrations" view
-        await addDoc(collection(db, "programRegistrations"), {
+        // Instead of addDoc, we generate a random reference first so we can attach it to the batch
+        const flatRegRef = doc(collection(db, "programRegistrations"));
+        batch.set(flatRegRef, {
           regNum: reg,
           UID: userUID,
           firstName: form.firstName,
@@ -398,8 +393,9 @@ export default function ProgramsTab({ userData, householdID, userName }) {
 
         // 2️⃣ Attendee sub-doc → ManagePrograms workspace
         if (activeUserId && prog?.id) {
-          await setDoc(
-            doc(db, "Programs", prog.id, "attendees", activeUserId),
+          const attendeeRef = doc(db, "Programs", prog.id, "attendees", activeUserId);
+          batch.set(
+            attendeeRef,
             {
               UID: userUID,
               userID: activeUserId,
@@ -417,9 +413,12 @@ export default function ProgramsTab({ userData, householdID, userName }) {
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             },
-            { merge: true }
+            { merge: true } // Preserves any existing data in the document
           );
         }
+
+        // EXECUTE THE BATCH! Both write simultaneously, ensuring no sync issues.
+        await batch.commit();
 
         // 3️⃣ Notification
         await createNotification(
@@ -449,8 +448,31 @@ export default function ProgramsTab({ userData, householdID, userName }) {
   };
 
   const resetForm = () => {
-    setStep(1); setErrors({});
-    setForm(BLANK);
+    setStep(1); 
+    setErrors({});
+    
+    // Re-populate the auto-fill data instead of wiping it completely blank
+    let fullAddress = "";
+    if (userData) {
+      fullAddress = [
+        userData.houseNumber, 
+        userData.street, 
+        userData.barangay, 
+        userData.city
+      ].filter(Boolean).join(", ");
+    }
+    
+    setForm({
+      firstName: userData?.firstName || "",
+      middleName: userData?.middleName || "",
+      lastName: userData?.lastName || "",
+      address: fullAddress,
+      contact: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      email: userData?.email || "",
+      idFile: "", // Keep the uploaded file blank
+      programId: "", // Keep the selected program blank
+    });
+    
     setView("main");
   };
 

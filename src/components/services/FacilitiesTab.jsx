@@ -2,13 +2,13 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, query, limit, where } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { submitFacilityReservation, submitEquipmentRental } from "../../services/services";
-import { createNotification } from "../../services/notifications";
 import { BuildingIcon, ChevronRightIcon, ChevronLeftIcon, ServiceInfoIcon, ServiceCheckCircleIcon, ServiceClockIcon } from "../Icons";
 import { useAlert } from "../../context/AlertContext";
 import { useLanguage } from "../../context/LanguageContext";
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+import {
+  CALENDAR_DAYS,
+  CALENDAR_MONTHS,
+} from "../../utils/serviceTranslations";
 
 // ── SESSION HELPER ──
 const getSaved = (key, fallback) => {
@@ -133,16 +133,20 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
               <div className="sv-facility-card__left">
                 <div className="sv-facility-card__icon-wrap"><BuildingIcon /></div>
                 <div>
-                  <div className="sv-facility-card__title">{f.facilityName || f.name || f.title}</div>
+                  <div className="sv-facility-card__title">
+                    {f.facilityName || f.name || f.title}
+                  </div>
                   <div className="sv-facility-card__meta">
-                    <span>{f.capacity ? t("fac_capacity_label", `Up to ${f.capacity} persons`) : ""}</span>
+                    <span>{f.capacity ? t("fac_capacity_label", f.capacity) : ""}</span>
                     <span className="sv-facility-card__dot" />
                     <span>{f.openTime && f.closeTime ? (() => {
-                      const fmt = (t) => { if (!t) return ''; const [h, m] = t.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
+                      const fmt = (tm) => { if (!tm) return ''; const [h, m] = tm.split(':'); const hh = parseInt(h, 10); const s = hh >= 12 ? 'PM' : 'AM'; const h12 = hh % 12 || 12; return `${h12}:${m} ${s}`; };
                       return fmt(f.openTime) + ' – ' + fmt(f.closeTime);
                     })() : f.hours}</span>
                   </div>
-                  <div className="sv-facility-card__desc">{f.description || f.fullDescription || f.desc}</div>
+                  <div className="sv-facility-card__desc">
+                    {f.description || f.fullDescription || f.desc}
+                  </div>
                 </div>
               </div>
               <div className="sv-facility-card__right">
@@ -150,7 +154,9 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
                   <span className="sv-avail-dot" />{f.available ? t("fac_available", "Available") : t("fac_unavailable", "Unavailable")}
                 </span>
                 {f.available && (
-                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>{t("fac_reserve", "Reserve")} <ChevronRightIcon /></button>
+                  <button className="sv-btn-primary sv-btn-sm" onClick={() => setReservationFacility(f)}>
+                    {t("fac_reserve", "Reserve")} <ChevronRightIcon />
+                  </button>
                 )}
               </div>
             </div>
@@ -161,7 +167,7 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
       {reservationFacility && (
         <div className="rsv-overlay" onClick={e => e.target === e.currentTarget && setReservationFacility(null)}>
           <div className="rsv-modal">
-            <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label="Close">
+            <button className="rsv-modal__close" onClick={() => setReservationFacility(null)} aria-label={t("close", "Close")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
             <ReservationForm
@@ -180,10 +186,13 @@ export default function FacilitiesTab({ userData, householdID, userName, userID 
 }
 
 function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDates = [] }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const daysList = CALENDAR_DAYS[language] || CALENDAR_DAYS.en;
+  const monthsList = CALENDAR_MONTHS[language] || CALENDAR_MONTHS.en;
 
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -223,11 +232,11 @@ function Calendar({ selectedDate, onSelectDate, fullyBookedDates = [], blockedDa
     <div className="sv-calendar">
       <div className="sv-cal-nav">
         <button className="sv-cal-arrow" onClick={prevMonth}><ChevronLeftIcon /></button>
-        <span className="sv-cal-title">{MONTHS[viewMonth]} {viewYear}</span>
+        <span className="sv-cal-title">{monthsList[viewMonth]} {viewYear}</span>
         <button className="sv-cal-arrow" onClick={nextMonth}><ChevronRightIcon /></button>
       </div>
       <div className="sv-cal-grid">
-        {DAYS.map(d => <div key={d} className="sv-cal-day-label">{d}</div>)}
+        {daysList.map(d => <div key={d} className="sv-cal-day-label">{d}</div>)}
         {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const d = i + 1;
@@ -282,10 +291,11 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
   const { showAlert } = useAlert();
   const { t } = useLanguage();
 
-  const facilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
+  const rawFacilityName = facility?.name || facility?.title || facility?.facilityName || "Barangay Multi-Purpose Hall";
+  const facilityName = rawFacilityName;
   const facilityDesc = facility
-    ? `Reserve a time slot for ${facilityName}. Approval is required before confirmation.`
-    : "Reserve a facility for your event. Approval is required before confirmation.";
+    ? t("fac_res_desc_specific", facilityName)
+    : t("fac_res_desc_default", "Reserve a facility for your event. Approval is required before confirmation.");
 
   const [approvedReservations, setApprovedReservations] = useState([]);
   const [allActiveReservations, setAllActiveReservations] = useState([]);
@@ -351,27 +361,41 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
     return () => unsub();
   }, []);
 
-  const [form, setForm] = useState({
-    fullName: "", email: "", contactNumber: "",
-    purpose: "", date: "", startTime: "", endTime: "",
-    attendees: "", notes: ""
+  const [form, setForm] = useState(() => {
+    const name = userData ? [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ") : "";
+    return {
+      fullName: name, 
+      email: userData?.email || "", 
+      contactNumber: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      purpose: "", 
+      date: "", 
+      startTime: "", 
+      endTime: "",
+      attendees: "", 
+      notes: ""
+    };
   });
+  
   const [refNum, setRefNum] = useState("");
-  const [dateStatus, setDateStatus] = useState(null);
+  const [_dateStatus, setDateStatus] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    if (userData) {
-      const name = [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ");
-      setForm(f => ({
-        ...f,
-        fullName: name,
-        email: userData.email || "",
-        contactNumber: userData.contactNumber != null ? String(userData.contactNumber) : ""
-      }));
-    }
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active && userData) {
+        const name = [userData.firstName, userData.middleName, userData.lastName].filter(Boolean).join(" ");
+        setForm(f => ({
+          ...f,
+          fullName: name,
+          email: userData.email || "",
+          contactNumber: userData.contactNumber != null ? String(userData.contactNumber) : ""
+        }));
+      }
+    });
+    return () => { active = false; };
   }, [userData]);
 
   const hasApprovedOverlapOnDate = (date, startTime, endTime) => {
@@ -383,42 +407,45 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
 
   const validate = () => {
     const e = {};
-    if (!form.email?.trim()) e.email = "Email is required.";
-    if (!form.purpose.trim()) e.purpose = "Purpose of use is required.";
-    if (!form.date) e.date = "Please select a date.";
-    if (!form.startTime) e.startTime = "Start time is required.";
-    if (!form.endTime) e.endTime = "End time is required.";
+    if (!form.email?.trim()) e.email = t("fac_err_email", "Email is required.");
+    if (!form.purpose.trim()) e.purpose = t("fac_err_purpose", "Purpose of use is required.");
+    if (!form.date) e.date = t("fac_err_date", "Please select a date.");
+    if (!form.startTime) e.startTime = t("fac_err_start_time", "Start time is required.");
+    if (!form.endTime) e.endTime = t("fac_err_end_time", "End time is required.");
     if (!form.attendees || String(form.attendees).trim() === "")
-      e.attendees = "Estimated number of attendees is required.";
+      e.attendees = t("fac_err_attendees", "Estimated number of attendees is required.");
 
     if (form.date && form.date < MIN_RESERVATION_DATE) {
-      e.date = "Reservations must be made at least 3 days in advance. Please select a later date.";
+      e.date = t("fac_err_advance", "Reservations must be made at least 3 days in advance. Please select a later date.");
     }
 
     if (form.startTime && form.endTime && form.startTime >= form.endTime)
-      e.endTime = "End time must be after start time.";
+      e.endTime = t("fac_err_time_order", "End time must be after start time.");
 
     const open = facility?.openTime;
     const close = facility?.closeTime;
     if (open && form.startTime && form.startTime < open)
-      e.startTime = `Start time cannot be before opening time (${to12h(open)}).`;
+      e.startTime = t("fac_err_before_open", to12h(open));
     if (close && form.startTime && form.startTime > close)
-      e.startTime = `Start time cannot be after closing time (${to12h(close)}).`;
+      e.startTime = t("fac_err_after_close", to12h(close));
     if (open && form.endTime && form.endTime < open)
-      e.endTime = `End time cannot be before opening time (${to12h(open)}).`;
+      e.endTime = t("fac_err_end_before_open", to12h(open));
     if (close && form.endTime && form.endTime > close)
-      e.endTime = `End time cannot be after closing time (${to12h(close)}).`;
+      e.endTime = t("fac_err_end_after_close", to12h(close));
 
     const capacityNum = facility?.capacity ? parseInt(String(facility.capacity).replace(/\D/g, ""), 10) : null;
     const attendeesNum = form.attendees ? parseInt(form.attendees, 10) : null;
     if (capacityNum && attendeesNum && attendeesNum > capacityNum)
-      e.attendees = `Number of attendees exceeds facility capacity (max: ${capacityNum}).`;
+      e.attendees = t("fac_err_capacity_exceeded", capacityNum);
 
     const extra = facility?.customFields || [];
     extra.forEach(f => {
       if (!f.required) return;
-      if (f.type === "checkbox") { if (!form[f.id]) e[f.id] = "You must confirm this to proceed."; }
-      else { if (!form[f.id]?.toString().trim()) e[f.id] = "Required."; }
+      if (f.type === "checkbox") {
+        if (!form[f.id]) e[f.id] = t("doc_err_confirm", "You must confirm this to proceed.");
+      } else {
+        if (!form[f.id]?.toString().trim()) e[f.id] = t("doc_err_required", "Required.");
+      }
     });
     return e;
   };
@@ -432,7 +459,7 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       return form.startTime < r.endTime && r.startTime < form.endTime;
     });
     if (hasOverlap) {
-      setErrors({ timeOverlap: "The selected time slot conflicts with an existing reservation. Please select a different time." });
+      setErrors({ timeOverlap: t("fac_err_time_conflict", "The selected time slot conflicts with an existing reservation. Please select a different time.") });
       return;
     }
 
@@ -483,28 +510,28 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to submit reservation:", error);
-      await showAlert("Submission Failed", error.message || "Failed to submit reservation. Please try again.");
+      await showAlert(t("fac_submission_failed", "Submission Failed"), error.message || t("fac_failed_msg", "Failed to submit reservation. Please try again."));
     }
   };
 
   if (submitted) return (
     <div className="sv-success-wrap">
       <div className="sv-success-icon"><ServiceCheckCircleIcon /></div>
-      <h3 className="sv-success-title">Reservation Submitted</h3>
-      <p className="sv-success-sub">Your reservation request has been submitted and is awaiting barangay approval.</p>
+      <h3 className="sv-success-title">{t("fac_submitted_header", "Reservation Submitted")}</h3>
+      <p className="sv-success-sub">{t("fac_submitted_desc", "Your reservation request has been submitted and is awaiting barangay approval.")}</p>
       <div className="dr-ref-box" style={{ margin: '1rem 0', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-        <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Reference Number</span>
+        <span className="dr-ref-label" style={{ display: 'block', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>{t("reference_number", "Reference Number")}</span>
         <span className="dr-ref-num" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '2px' }}>{refNum}</span>
       </div>
 
       {Object.keys(selectedEquipment).length > 0 && (
         <div style={{ fontSize: '13px', color: '#64748b', background: '#f1f5f9', padding: '10px', borderRadius: '6px', marginBottom: '1rem', textAlign: 'center' }}>
-          Your bundled equipment request has also been submitted and will be reviewed alongside this facility.
+          {t("fac_bundled_equip_note", "Your bundled equipment request has also been submitted and will be reviewed alongside this facility.")}
         </div>
       )}
 
-      <div className="sv-status-badge"><ServiceClockIcon /> Pending Approval</div>
-      <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>Close</button>
+      <div className="sv-status-badge"><ServiceClockIcon /> {t("status_pending", "Pending Approval")}</div>
+      <button className="sv-btn-outline" style={{ marginTop: '1rem' }} onClick={onBack}>{t("close", "Close")}</button>
     </div>
   );
 
@@ -541,15 +568,16 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
           <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
         <span style={{ flex: 1, lineHeight: "1.5" }}>
-          Reservations must be submitted at least{" "}
-          <strong>3 days before</strong> your intended date. The earliest available date is{" "}
+          {t("fac_lead_time_prefix", "Reservations must be submitted at least ")}
+          <strong>{t("fac_advance_desc_highlight", "3 days before")}</strong>
+          {t("fac_lead_time_mid", " your intended date. The earliest available date is ")}
           <strong>{MIN_RESERVATION_DATE}</strong>.
         </span>
       </div>
 
       <div className="sv-form-body">
         <div className="sv-fields">
-          <div className="sv-field-section-label">{t("eq_requester_info", "Requester Information")}</div>
+          <div className="sv-field-section-label">{t("fac_requester_info", "Requester Information")}</div>
           <div className="sv-field-row">
             <div className="sv-field">
               <label className="sv-label">{t("doc_full_name", "Full Name")}</label>
@@ -605,28 +633,28 @@ function ReservationForm({ onBack, facility, userData, householdID, userName, us
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
               </svg>
-              Facility hours: <strong>{to12h(facility.openTime)}</strong> – <strong>{to12h(facility.closeTime)}</strong>
+              {t("fac_hours_prefix", "Facility hours:")} <strong>{to12h(facility.openTime)}</strong> – <strong>{to12h(facility.closeTime)}</strong>
             </div>
           )}
           <div className="sv-field">
             <label className="sv-label">
-              Estimated Number of Attendees <span className="sv-required">*</span>
+              {t("fac_attendees_label", "Estimated Number of Attendees")} <span className="sv-required">*</span>
               {facility?.capacity && (
                 <span style={{ fontWeight: 400, fontSize: '0.8rem', color: '#64748b', marginLeft: '6px' }}>
-                  (Max: {facility.capacity})
+                  {t("fac_max_capacity", facility.capacity)}
                 </span>
               )}
             </label>
             <input
               className={`sv-input${errors.attendees ? " sv-input--error" : ""}`}
-              type="number" placeholder="e.g. 50" min="1" value={form.attendees}
+              type="number" placeholder={t("fac_attendees_placeholder", "e.g. 50")} min="1" value={form.attendees}
               onChange={e => { set("attendees", e.target.value); setErrors(p => ({ ...p, attendees: "" })); }}
             />
             {errors.attendees && <span className="sv-error-msg">{errors.attendees}</span>}
           </div>
           <div className="sv-field">
             <label className="sv-label">{t("eq_additional_notes", "Additional Notes")} <span className="sv-optional">({t("optional", "Optional")})</span></label>
-            <textarea className="sv-textarea" placeholder="Any special setup requirements, equipment needed, etc." rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
+            <textarea className="sv-textarea" placeholder={t("fac_notes_placeholder", "Any special setup requirements, equipment needed, etc.")} rows={3} value={form.notes} onChange={e => set("notes", e.target.value)} />
           </div>
         </div>
 

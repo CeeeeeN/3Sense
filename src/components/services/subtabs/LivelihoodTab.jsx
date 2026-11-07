@@ -3,7 +3,8 @@ import { BriefcaseIcon } from "../../Icons";
 import { db } from "../../../firebase/firebase";
 import {
   collection, onSnapshot, query, where,
-  addDoc, serverTimestamp, orderBy, limit
+  doc, serverTimestamp, orderBy, limit,
+  writeBatch // <-- IMPORTED WRITEBATCH
 } from "firebase/firestore";
 import { useLanguage } from "../../../context/LanguageContext";
 
@@ -155,6 +156,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           title: r.title || r.name || "Untitled Program",
           description: r.description || "",
           date: r.date || "",
+          endDate: r.endDate || "",
           startTime: r.startTime || "",
           endTime: r.endTime || "",
           location: r.location || "",
@@ -176,9 +178,9 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     if (programs.length === 0) return;
 
     const unsubs = programs.map((prog) => {
+      // Changed to query the attendees subcollection to match admin flow
       const q = query(
-        collection(db, "livelihoodRegistrations"),
-        where("programId", "==", prog.id),
+        collection(db, "Programs", prog.id, "attendees"),
         limit(300)
       );
 
@@ -254,7 +256,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   const getSlotsLeft = (prog) => {
     if (!prog.slots) return null;
-    return prog.slots - getApprovedCount(prog.id);
+    return Math.max(prog.slots - getApprovedCount(prog.id), 0);
   };
 
   const userActiveRegForProgram = (programId) =>
@@ -286,29 +288,35 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   const handleNext = async () => {
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    
     if (step === 3) {
       setSubmitting(true);
       try {
         const reg = generateRegNum();
         const timeLabel = [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ");
-
-        // Permanent UID
+        const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ");
+        const activeUserId = userData?.userID || userData?.residentID || "";
         const userUID = userData?.UID || getSaved("UID", null);
 
-        await addDoc(collection(db, "livelihoodRegistrations"), {
+        // CREATE A FIRESTORE BATCH WRITER
+        const batch = writeBatch(db);
+
+        // 1️⃣ Flat collection → "My Registrations" view
+        const flatRegRef = doc(collection(db, "livelihoodRegistrations"));
+        batch.set(flatRegRef, {
           regNum: reg,
           UID: userUID,
           firstName: form.firstName,
           middleName: form.middleName || "",
           lastName: form.lastName,
-          fullName: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "),
+          fullName,
           address: form.address,
           contact: form.contact,
           contactNumber: form.contact,
           email: form.email || "",
           idFileName: form.idFile || "",
           householdID: householdID || "",
-          userID: userData?.userID || "",
+          userID: activeUserId,
           residentID: userData?.residentID || "",
           programId: selectedProgram?.id || "",
           programName: selectedProgram?.title || "",
@@ -319,6 +327,36 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
           submittedAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+
+        // 2️⃣ Attendee sub-doc → Admin Dashboard workspace
+        if (activeUserId && selectedProgram?.id) {
+          const attendeeRef = doc(db, "Programs", selectedProgram.id, "attendees", activeUserId);
+          batch.set(
+            attendeeRef,
+            {
+              UID: userUID,
+              userID: activeUserId,
+              regNum: reg,
+              userName: userName || fullName,
+              fullName,
+              contact: form.contact,
+              contactNumber: form.contact,
+              householdID: householdID || "",
+              residentID: userData?.residentID || "",
+              programId: selectedProgram.id,
+              programName: selectedProgram.title || "",
+              programDate: selectedProgram.date || "",
+              status: "pending",
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true } // Preserves existing document fields
+          );
+        }
+
+        // EXECUTE BATCH
+        await batch.commit();
+
         setRegNum(reg);
         setStep(4);
       } catch (err) {
@@ -332,8 +370,31 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   };
 
   const resetForm = () => {
-    setStep(1); setErrors({});
-    setForm(BLANK_FORM);
+    setStep(1); 
+    setErrors({});
+    
+    // Re-populate the auto-fill data instead of wiping it completely blank
+    let fullAddress = "";
+    if (userData) {
+      fullAddress = [
+        userData.houseNumber, 
+        userData.street, 
+        userData.barangay, 
+        userData.city
+      ].filter(Boolean).join(", ");
+    }
+    
+    setForm({
+      firstName: userData?.firstName || "",
+      middleName: userData?.middleName || "",
+      lastName: userData?.lastName || "",
+      address: fullAddress,
+      contact: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      email: userData?.email || "",
+      idFile: "", // Keep the uploaded file blank
+      programId: "", // Keep the selected program blank
+    });
+    
     setView("main");
   };
 
@@ -419,7 +480,15 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
                     />
 
                     <ul className="lv-meta">
-                      {p.date && <li><Ico>{ICONS.calendar}</Ico><span>{formatDate(p.date)}</span></li>}
+                      {(p.date || p.endDate) && (
+                        <li>
+                          <Ico>{ICONS.calendar}</Ico>
+                          <span>
+                            {p.date ? formatDate(p.date) : ""}
+                            {p.endDate && p.endDate !== p.date ? ` – ${formatDate(p.endDate)}` : ""}
+                          </span>
+                        </li>
+                      )}
                       {timeLabel && <li><Ico>{ICONS.clock}</Ico><span>{timeLabel}</span></li>}
                       {p.location && <li><Ico>{ICONS.pin}</Ico><span>{p.location}</span></li>}
                     </ul>

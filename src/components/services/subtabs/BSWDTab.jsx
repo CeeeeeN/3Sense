@@ -38,12 +38,19 @@ const BigCheck = () => (
 const BLANK_REPORT = { name: "", location: "", landmark: "", lastSeen: "", description: "", photo: "" };
 const BLANK_TIP = { about: "", tip: "", contact: "" };
 
+const getInitialReportState = (userData) => {
+  return {
+    ...BLANK_REPORT,
+    name: userData ? [userData.firstName, userData.lastName].filter(Boolean).join(" ") : ""
+  };
+};
+
 export default function BSWDTab({ userData, householdID }) {
   const { t } = useLanguage();
   const [view, setView] = useState(null); // null | "report" | "tip"
   const topRef = useRef(null);
 
-  const [reportForm, setReportForm] = useState(BLANK_REPORT);
+  const [reportForm, setReportForm] = useState(() => getInitialReportState(userData));
   const [reportErrors, setReportErrors] = useState({});
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [reportFile, setReportFile] = useState(null);
@@ -243,10 +250,10 @@ export default function BSWDTab({ userData, householdID }) {
                 <h3 className="bz-heading">{t("bswd_rep_done_heading")}</h3>
                 <p className="bz-text">{t("bswd_rep_done_sub")}</p>
                 <div className="bf-done__btns">
-                  <button type="button" className="bf-secondary" onClick={() => { setReportForm(BLANK_REPORT); setReportSubmitted(false); setReportFile(null); }}>
+                  <button type="button" className="bf-secondary" onClick={() => { setReportForm(getInitialReportState(userData)); setReportSubmitted(false); setReportFile(null); }}>
                     {t("bswd_rep_btn_another")}
                   </button>
-                  <button type="button" className="bf-secondary" onClick={() => { setReportForm(BLANK_REPORT); setReportSubmitted(false); setReportFile(null); setView(null); }}>
+                  <button type="button" className="bf-secondary" onClick={() => { setReportForm(getInitialReportState(userData)); setReportSubmitted(false); setReportFile(null); setView(null); }}>
                     {t("bswd_rep_btn_done")}
                   </button>
                 </div>

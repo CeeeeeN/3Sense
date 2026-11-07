@@ -23,7 +23,9 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { logTransaction } from "../../services/logger";
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Import hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
@@ -51,10 +53,12 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageDocuments() {
-  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+  const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortCatalog, setSortCatalog] = useState("date_desc"); // date_desc, date_asc, name_asc, name_desc
+  const [sortCatalog, setSortCatalog] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -77,7 +81,6 @@ export default function ManageDocuments() {
   const [editingPurposeIdx, setEditingPurposeIdx] = useState(null);
   const [purposeFormError, setPurposeFormError] = useState("");
 
-  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -92,14 +95,13 @@ export default function ManageDocuments() {
     return () => unsubscribe();
   }, []);
 
-  // ─── OPTIMIZED: React Query instead of onSnapshot ───
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['adminManage_documents'],
     queryFn: async () => {
       const docsQuery = query(
         collection(db, "documents"),
         orderBy("createdAt", "desc"),
-        limit(150) // Adjust limit as needed
+        limit(150)
       );
       const snapshot = await getDocs(docsQuery);
       return snapshot.docs.map((doc) => {
@@ -112,7 +114,7 @@ export default function ManageDocuments() {
         };
       });
     },
-    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 
   useEffect(() => {
@@ -136,27 +138,32 @@ export default function ManageDocuments() {
     setShowAddModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this document type?")) {
-      try {
-        await deleteDoc(doc(db, "documents", id));
-        logTransaction(
-          adminName,
-          adminRole,
-          "DELETED_DOCUMENT_TYPE",
-          `Deleted document type with ID: ${id}`,
-        );
-        // Refresh cache
-        queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
-      } catch (error) {
-        console.error("Error deleting document type: ", error);
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_DELETING_DOCUMENT_TYPE",
-          `Error deleting document type with ID: ${id}\n${error.message}`,
-        );
-      }
+  const handleDelete = async (id, docName) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_doc_confirm_delete')}\n\n"${docName}"`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "documents", id));
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_DOCUMENT_TYPE",
+        `Deleted document type with ID: ${id}`
+      );
+      queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
+      await showAlert("Success", "Document type deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting document type: ", error);
+      await showAlert("Error", "Failed to delete document type. Please try again.");
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_DELETING_DOCUMENT_TYPE",
+        `Error deleting document type with ID: ${id}\n${error.message}`
+      );
     }
   };
 
@@ -181,7 +188,6 @@ export default function ManageDocuments() {
         logTransaction(adminName, adminRole, "ADDED_DOCUMENT_TYPE", `Added new document type: ${newDocument.documentName} (ID: ${newRef.id})`);
       }
       
-      // Refresh cache so the new/edited item appears immediately
       queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
 
       setNewDocument({
@@ -227,7 +233,7 @@ export default function ManageDocuments() {
   };
 
   const handleGenerateGlobalQR = () => {
-    const residentAppUrl = "https://3-sense.vercel.app/";
+    const residentAppUrl = "https://www.3s-sense.site/";
     const encodedUrl = `${residentAppUrl}?serviceId=documents_global&serviceName=${encodeURIComponent("All Documents")}&category=Documents`;
     setSelectedQR({ name: "Document Request Portal", qrValue: encodedUrl });
   };
@@ -315,24 +321,22 @@ export default function ManageDocuments() {
   };
 
   if (isLoading) {
-    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Documents...</div>;
+    return <div style={{ padding: "40px", textAlign: "center" }}>{t('admin_doc_loading')}</div>;
   }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Documents</h1>
-          <p className="as-subtitle">
-            Manage barangay document types, fees, and processing times
-          </p>
+          <h1>{t('admin_doc_title')}</h1>
+          <p className="as-subtitle">{t('admin_doc_subtitle')}</p>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
           <button className="as-qr-btn" onClick={handleGenerateGlobalQR}>
-            <Manage_IconQR /> Generate Global QR
+            <Manage_IconQR /> {t('admin_doc_btn_global_qr')}
           </button>
           <button className="as-btn-aqua" onClick={openAddModal}>
-            <IconAdd /> Add Document Type
+            <IconAdd /> {t('admin_doc_btn_add')}
           </button>
         </div>
       </div>
@@ -356,7 +360,7 @@ export default function ManageDocuments() {
           </svg>
           <input
             type="text"
-            placeholder="Search documents..."
+            placeholder={t('admin_doc_search_placeholder')}
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
           />
@@ -367,10 +371,10 @@ export default function ManageDocuments() {
           onChange={(e) => setSortCatalog(e.target.value)}
           style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
         >
-          <option value="date_desc">Added: Newest First</option>
-          <option value="date_asc">Added: Oldest First</option>
-          <option value="name_asc">Name: A to Z</option>
-          <option value="name_desc">Name: Z to A</option>
+          <option value="date_desc">{t('admin_doc_sort_date_new')}</option>
+          <option value="date_asc">{t('admin_doc_sort_date_old')}</option>
+          <option value="name_asc">{t('admin_doc_sort_name_asc')}</option>
+          <option value="name_desc">{t('admin_doc_sort_name_desc')}</option>
         </select>
       </div>
 
@@ -385,11 +389,11 @@ export default function ManageDocuments() {
             )}
             <ul className="as-card-details">
               <li>
-                <Manage_IconClock /> <strong>Processing:</strong>{" "}
+                <Manage_IconClock /> <strong>{t('admin_doc_card_processing')}</strong>{" "}
                 {doc.processingTime}
               </li>
               <li>
-                <strong>Fee:</strong> {doc.fee}
+                <strong>{t('admin_doc_card_fee')}</strong> {doc.fee}
               </li>
             </ul>
             <div
@@ -401,7 +405,7 @@ export default function ManageDocuments() {
                 style={{ padding: "8px 16px", flex: 1 }}
                 onClick={() => handleEdit(doc)}
               >
-                Edit
+                {t('admin_doc_btn_edit')}
               </button>
               <button
                 className="as-btn-ghost"
@@ -411,9 +415,9 @@ export default function ManageDocuments() {
                   color: "red",
                   borderColor: "#fca5a5",
                 }}
-                onClick={() => handleDelete(doc.id)}
+                onClick={() => handleDelete(doc.id, doc.documentName || doc.title)}
               >
-                Delete
+                {t('admin_doc_btn_delete')}
               </button>
             </div>
           </div>
@@ -428,7 +432,7 @@ export default function ManageDocuments() {
             disabled={currentPage === 1}
             style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: "not-allowed" }}
           >
-            Previous
+            {t('admin_doc_page_prev')}
           </button>
           {renderPageNumbers()}
           <button
@@ -437,17 +441,17 @@ export default function ManageDocuments() {
             disabled={currentPage === totalPages}
             style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: "not-allowed" }}
           >
-            Next
+            {t('admin_doc_page_next')}
           </button>
         </div>
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "600px" }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: "600px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
               <h2>
-                {editingDocId ? "Edit Document Type" : "Add Document Type"}
+                {editingDocId ? t('admin_doc_modal_edit_title') : t('admin_doc_modal_add_title')}
               </h2>
               <button
                 className="as-modal-close"
@@ -460,12 +464,12 @@ export default function ManageDocuments() {
             <div className="as-modal-body" style={{ alignItems: "stretch" }}>
               <form className="as-form" onSubmit={handleAddDocument}>
                 <div className="as-form-group">
-                  <label className="as-form-label">Document Name</label>
+                  <label className="as-form-label">{t('admin_doc_modal_name')}</label>
                   <input
                     type="text"
                     className="as-form-input"
                     required
-                    placeholder="e.g. Barangay Clearance"
+                    placeholder={t('admin_doc_modal_name_ph')}
                     value={newDocument.documentName}
                     onChange={(e) =>
                       setNewDocument({ ...newDocument, documentName: e.target.value })
@@ -475,12 +479,12 @@ export default function ManageDocuments() {
 
                 <div className="as-form-row">
                   <div className="as-form-group">
-                    <label className="as-form-label">Processing Time</label>
+                    <label className="as-form-label">{t('admin_doc_modal_time')}</label>
                     <input
                       type="text"
                       className="as-form-input"
                       required
-                      placeholder="e.g. 1-2 Working Days"
+                      placeholder={t('admin_doc_modal_time_ph')}
                       value={newDocument.processingTime}
                       onChange={(e) =>
                         setNewDocument({
@@ -491,12 +495,12 @@ export default function ManageDocuments() {
                     />
                   </div>
                   <div className="as-form-group">
-                    <label className="as-form-label">Fee</label>
+                    <label className="as-form-label">{t('admin_doc_modal_fee')}</label>
                     <input
                       type="text"
                       className="as-form-input"
                       required
-                      placeholder="e.g. ₱50.00 or Free"
+                      placeholder={t('admin_doc_modal_fee_ph')}
                       value={newDocument.fee}
                       onChange={(e) =>
                         setNewDocument({ ...newDocument, fee: e.target.value })
@@ -506,11 +510,11 @@ export default function ManageDocuments() {
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Description (Preview)</label>
+                  <label className="as-form-label">{t('admin_doc_modal_desc')}</label>
                   <input
                     type="text"
                     className="as-form-input"
-                    placeholder="e.g. General barangay clearance"
+                    placeholder={t('admin_doc_modal_desc_ph')}
                     value={newDocument.description}
                     onChange={(e) =>
                       setNewDocument({
@@ -523,12 +527,12 @@ export default function ManageDocuments() {
 
                 <div className="as-form-group">
                   <label className="as-form-label">
-                    Reminder (Detailed Info)
+                    {t('admin_doc_modal_reminder')}
                   </label>
                   <textarea
                     className="as-form-textarea"
                     rows="2"
-                    placeholder="e.g. Valid only when filed and approved by the Office of the Punong Barangay"
+                    placeholder={t('admin_doc_modal_reminder_ph')}
                     value={newDocument.reminder}
                     onChange={(e) =>
                       setNewDocument({
@@ -568,7 +572,7 @@ export default function ManageDocuments() {
                       ></rect>
                       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg>
-                    Default Collected Fields
+                    {t('admin_doc_modal_default_fields')}
                   </h3>
                   <p
                     style={{
@@ -578,8 +582,7 @@ export default function ManageDocuments() {
                       marginTop: "-10px",
                     }}
                   >
-                    The following information is automatically collected. Do not
-                    recreate them in the form builder.
+                    {t('admin_doc_modal_default_desc')}
                   </p>
                   <div
                     style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
@@ -637,10 +640,10 @@ export default function ManageDocuments() {
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                    Purpose of Request Options <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
+                    {t('admin_doc_modal_purpose_title')} <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>
-                    These options appear in the "Purpose of Request" dropdown on the resident form. An "Other" option is always included automatically.
+                    {t('admin_doc_modal_purpose_desc')}
                   </p>
                   {purposeFormError && (
                     <p style={{ fontSize: '0.8rem', color: '#e03e3e', fontWeight: 600, marginBottom: '8px' }}>{purposeFormError}</p>
@@ -649,7 +652,7 @@ export default function ManageDocuments() {
                     <input
                       type="text"
                       className="as-form-input"
-                      placeholder="e.g. Employment, Scholarship, Loan..."
+                      placeholder={t('admin_doc_modal_purpose_ph')}
                       value={purposeInput}
                       onChange={e => setPurposeInput(e.target.value)}
                       onKeyDown={e => {
@@ -690,7 +693,7 @@ export default function ManageDocuments() {
                         setPurposeFormError('');
                       }}
                     >
-                      {editingPurposeIdx !== null ? 'Update' : '+ Add'}
+                      {editingPurposeIdx !== null ? t('admin_doc_modal_purpose_btn_update') : t('admin_doc_modal_purpose_btn_add')}
                     </button>
                     {editingPurposeIdx !== null && (
                       <button
@@ -699,7 +702,7 @@ export default function ManageDocuments() {
                         style={{ padding: '8px 12px', fontSize: '0.82rem' }}
                         onClick={() => { setEditingPurposeIdx(null); setPurposeInput(''); }}
                       >
-                        Cancel
+                        {t('admin_doc_modal_purpose_btn_cancel')}
                       </button>
                     )}
                   </div>
@@ -712,7 +715,7 @@ export default function ManageDocuments() {
                             type="button"
                             onClick={() => { setEditingPurposeIdx(idx); setPurposeInput(opt); }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#317D89', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
-                          >Edit</button>
+                          >{t('admin_doc_modal_purpose_btn_edit')}</button>
                           <button
                             type="button"
                             onClick={() => {
@@ -721,15 +724,15 @@ export default function ManageDocuments() {
                               if (editingPurposeIdx === idx) { setEditingPurposeIdx(null); setPurposeInput(''); }
                             }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e03e3e', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
-                          >Remove</button>
+                          >{t('admin_doc_modal_purpose_btn_remove')}</button>
                         </div>
                       ))}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0faf5', border: '1px dashed #a7d7c1', borderRadius: '8px', padding: '6px 10px' }}>
-                        <span style={{ flex: 1, fontSize: '0.83rem', color: '#2DB17B', fontStyle: 'italic' }}>Other (always included – shows a free-text field)</span>
+                        <span style={{ flex: 1, fontSize: '0.83rem', color: '#2DB17B', fontStyle: 'italic' }}>{t('admin_doc_modal_purpose_other')}</span>
                       </div>
                     </div>
                   ) : (
-                    <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>No options added yet. Add at least one above.</p>
+                    <p style={{ fontSize: '0.8rem', color: '#a0b5c8', fontStyle: 'italic' }}>{t('admin_doc_modal_purpose_empty')}</p>
                   )}
                 </div>
 
@@ -746,14 +749,14 @@ export default function ManageDocuments() {
                     className="as-btn-ghost"
                     onClick={() => setShowAddModal(false)}
                   >
-                    Cancel
+                    {t('admin_doc_modal_btn_cancel_main')}
                   </button>
                   <button
                     type="submit"
                     className="as-btn-aqua"
                     style={{ padding: "8px 16px", fontSize: "0.9rem" }}
                   >
-                    Save Document Type
+                    {t('admin_doc_modal_btn_save')}
                   </button>
                 </div>
               </form>
@@ -763,10 +766,10 @@ export default function ManageDocuments() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "450px" }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: "450px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>QR Code Generated</h2>
+              <h2>{t('admin_doc_qr_title')}</h2>
               <button
                 className="as-modal-close"
                 onClick={() => setSelectedQR(null)}
@@ -780,8 +783,7 @@ export default function ManageDocuments() {
               </div>
               <h3>{selectedQR.name}</h3>
               <p className="as-modal-desc">
-                Residents can scan this shared code to access all Document
-                Requests.
+                {t('admin_doc_qr_desc')}
               </p>
               <div
                 className="as-qr-holder"
@@ -804,7 +806,7 @@ export default function ManageDocuments() {
                 onClick={handleDownloadQR}
                 style={{ width: "100%" }}
               >
-                <IconDownload /> Download QR Code (PNG)
+                <IconDownload /> {t('admin_doc_qr_download')}
               </button>
             </div>
           </div>
