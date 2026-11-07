@@ -1241,6 +1241,15 @@ body:has(.af-modal-overlay) {
   @apply bg-emerald-50 text-emerald-700 border border-emerald-200 before:bg-emerald-500;
 }
 
+.status-badge.under_review,
+.status-badge.under-review {
+  @apply bg-orange-50 text-orange-700 border border-orange-200 before:bg-orange-600;
+}
+
+.status-badge.analyzed {
+  @apply bg-sky-100 text-sky-700 border border-sky-200 before:bg-sky-600;
+}
+
 .status-badge.acted-upon,
 .status-badge[class*="acted upon"] {
   @apply bg-emerald-50 text-emerald-700 border border-emerald-200 before:bg-emerald-500;
@@ -1944,9 +1953,9 @@ body:has(.af-modal-overlay) {
   .req-table td {
     @apply px-4 py-3 text-[0.85rem];
   }
-  .req-table th:nth-child(4),
-  .req-table td:nth-child(4) {
-    @apply hidden;
+  .req-table th:nth-child(2),
+  .req-table td:nth-child(2) {
+    display: none !important;
   }
   .modal-content {
     @apply mx-3 max-w-[95vw];
@@ -2150,22 +2159,52 @@ body:has(.af-modal-overlay) {
   .filter-select {
     @apply w-full py-[0.7rem];
   }
+/* ── Compact, No-Gap Mobile Table ── */
   .req-table-wrapper {
-    @apply overflow-x-auto;
+    @apply w-full overflow-x-auto border-0 shadow-none rounded-lg;
+    -webkit-overflow-scrolling: touch;
   }
+
+  /* Overrides the inline minWidth: 850px so tables fit mobile screens */
   .req-table {
-    @apply min-w-[540px] text-xs;
+    min-width: 100% !important;
+    width: 100% !important;
+    table-layout: auto;
+    font-size: 0.75rem;
   }
-  .req-table th,
+
+  /* Compact padding eliminates large gaps between columns */
+  .req-table th {
+    padding: 8px 6px !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap;
+    letter-spacing: 0;
+  }
+
   .req-table td {
-    @apply px-3 py-3;
+    padding: 8px 6px !important;
+    font-size: 0.75rem !important;
   }
-  .req-table th:nth-child(4),
-  .req-table td:nth-child(4),
-  .req-table th:nth-child(5),
-  .req-table td:nth-child(5) {
-    @apply hidden;
+
+  /* Compact buttons and badges for mobile screens */
+  .req-table .btn-view {
+    height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 0.7rem !important;
+    white-space: nowrap;
   }
+
+  .req-table .status-badge {
+    padding: 2px 6px !important;
+    font-size: 0.68rem !important;
+    gap: 4px !important;
+  }
+
+  .req-table .status-badge::before {
+    width: 4px !important;
+    height: 4px !important;
+  }
+  
   .btn-view,
   .btn-approve,
   .btn-reject {
