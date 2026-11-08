@@ -13,9 +13,9 @@ import {
   where,
   getCountFromServer,
 } from "firebase/firestore";
-import { db } from "../../firebase/firebase";
+import { db, auth } from "../../firebase/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useLanguage } from '../../context/LanguageContext';
 import { useAlert } from "../../context/AlertContext";
 import { logTransaction } from "../../services/logger";
 import { onAuthStateChanged } from "firebase/auth";
