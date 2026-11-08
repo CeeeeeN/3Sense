@@ -60,11 +60,11 @@ export default function ManageFacilities() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  
+
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -115,13 +115,13 @@ export default function ManageFacilities() {
     let newBlocked;
     if (current.includes(dateStr)) newBlocked = current.filter(d => d !== dateStr);
     else newBlocked = [...current, dateStr];
-    
-    setSelectedFacility(prev => ({...prev, blockedDates: newBlocked}));
-    
+
+    setSelectedFacility(prev => ({ ...prev, blockedDates: newBlocked }));
+
     try {
       await updateDoc(doc(db, "facilities", selectedFacility.id), { blockedDates: newBlocked });
       queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
-    } catch(err) {
+    } catch (err) {
       console.error(err);
     }
   };
@@ -131,15 +131,15 @@ export default function ManageFacilities() {
   });
 
   const handleEdit = (fac) => {
-    setNewFacility({ 
-      facilityName:  fac.facilityName || fac.name || "",
-      capacity:      fac.capacity || "", 
-      openTime:      fac.openTime || "08:00",
-      closeTime:     fac.closeTime || "17:00",
-      description:   fac.description || fac.fullDescription || "",
-      available:     fac.available !== false,
+    setNewFacility({
+      facilityName: fac.facilityName || fac.name || "",
+      capacity: fac.capacity || "",
+      openTime: fac.openTime || "08:00",
+      closeTime: fac.closeTime || "17:00",
+      description: fac.description || fac.fullDescription || "",
+      available: fac.available !== false,
       purposeOptions: fac.purposeOptions || [],
-      customFields:  fac.customFields || []
+      customFields: fac.customFields || []
     });
     setPurposeInput("");
     setEditingPurposeIdx(null);
@@ -193,7 +193,7 @@ export default function ManageFacilities() {
         await updateDoc(newRef, { facilityID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_FACILITY", `Added new facility: ${newFacility.facilityName} (ID: ${newRef.id})`);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
 
       setNewFacility({ facilityName: "", capacity: "", openTime: "08:00", closeTime: "17:00", description: "", available: true, purposeOptions: [], customFields: [] });
@@ -202,7 +202,7 @@ export default function ManageFacilities() {
       setPurposeFormError("");
       setEditingFacilityId(null);
       setShowAddModal(false);
-    } catch(error) {
+    } catch (error) {
       console.error("Error saving facility: ", error);
     }
   };
@@ -249,7 +249,7 @@ export default function ManageFacilities() {
         const name = (f.facilityName || f.name || "").toLowerCase();
         const matchesSearch = name.includes(searchTerm.toLowerCase());
         const isAvail = f.available !== false;
-        const matchesAvail = 
+        const matchesAvail =
           filterAvailability === "All" ||
           (filterAvailability === "Available" && isAvail) ||
           (filterAvailability === "Unavailable" && !isAvail);
@@ -376,19 +376,55 @@ export default function ManageFacilities() {
           <div className="as-card" key={fac.id}>
             <div className="as-card-header">
               <h2 className="as-card-title">{fac.facilityName || fac.name}</h2>
-              <span className={`as-badge ${fac.available ? "open" : "ongoing"}`}>
-                {fac.available ? t('admin_fac_card_enabled') : t('admin_fac_card_disabled')}
+              <span
+                className="as-badge"
+                style={{
+                  background: fac.available !== false ? "#dcfce7" : "#fee2e2",
+                  color: fac.available !== false ? "#166534" : "#991b1b",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  padding: "3px 10px",
+                  borderRadius: "12px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {fac.available !== false ? t('admin_fac_card_enabled') : t('admin_fac_card_disabled')}
               </span>
             </div>
-            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={fac.description || fac.fullDescription} t={t} /></div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <DescriptionPreview text={fac.description || fac.fullDescription} t={t} />
+            </div>
+
             <ul className="as-card-details">
-              <li><strong>{t('admin_fac_card_capacity')}</strong> {fac.capacity ? `${t('admin_fac_card_capacity_val')} ${fac.capacity} ${t('admin_fac_card_capacity_persons')}` : "—"}</li>
-              <li><Manage_IconClock /> {fac.openTime && fac.closeTime ? `${fac.openTime} - ${fac.closeTime}` : fac.hours}</li>
+              <li>
+                <strong>{t('admin_fac_card_capacity')}</strong>{" "}
+                {fac.capacity ? `${t('admin_fac_card_capacity_val')} ${fac.capacity} ${t('admin_fac_card_capacity_persons')}` : "—"}
+              </li>
+<li>
+  <strong>{t('admin_card_lbl_time')}</strong> {fac.openTime && fac.closeTime ? `${fac.openTime} – ${fac.closeTime}` : (fac.hours || "08:00 – 17:00")}
+</li>
+              {fac.purposeOptions && fac.purposeOptions.length > 0 && (
+                <li>
+                  <strong>Use Cases:</strong> {fac.purposeOptions.length} supported
+                </li>
+              )}
             </ul>
-            <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(fac)}>{t('admin_fac_btn_calendar')}</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(fac)}>{t('admin_fac_btn_edit')}</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(fac.id, fac.facilityName || fac.name)}>{t('admin_fac_btn_delete')}</button>
+
+            <div className="as-card-footer" style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}>
+              <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1 }} onClick={() => openCalendar(fac)}>
+                {t('admin_fac_btn_calendar')}
+              </button>
+              <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1 }} onClick={() => handleEdit(fac)}>
+                {t('admin_fac_btn_edit')}
+              </button>
+              <button
+                className="as-btn-ghost"
+                style={{ padding: "8px 16px", flex: 1, color: "#dc2626", borderColor: "#fca5a5" }}
+                onClick={() => handleDelete(fac.id, fac.facilityName || fac.name)}
+              >
+                {t('admin_fac_btn_delete')}
+              </button>
             </div>
           </div>
         ))}
@@ -423,22 +459,22 @@ export default function ManageFacilities() {
               <h2>{editingFacilityId ? t('admin_fac_modal_edit_title') : t('admin_fac_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
             </div>
-            
+
             <div className="as-modal-body" style={{ alignItems: 'stretch' }}>
               <form className="as-form" onSubmit={handleAddFacility}>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div className="as-form-group">
-                  <label className="as-form-label">{t('admin_fac_modal_name')}</label>
+                    <label className="as-form-label">{t('admin_fac_modal_name')}</label>
                     <input type="text" className="as-form-input" required placeholder={t('admin_fac_modal_name_ph')}
-                      value={newFacility.facilityName} onChange={(e) => setNewFacility({...newFacility, facilityName: e.target.value})} 
+                      value={newFacility.facilityName} onChange={(e) => setNewFacility({ ...newFacility, facilityName: e.target.value })}
                     />
                   </div>
 
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_fac_modal_capacity')}</label>
                     <input type="number" className="as-form-input" required placeholder={t('admin_fac_modal_capacity_ph')} min="1"
-                      value={newFacility.capacity} onChange={(e) => setNewFacility({...newFacility, capacity: e.target.value})} 
+                      value={newFacility.capacity} onChange={(e) => setNewFacility({ ...newFacility, capacity: e.target.value })}
                     />
                   </div>
                 </div>
@@ -447,29 +483,29 @@ export default function ManageFacilities() {
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_fac_modal_open')}</label>
                     <input type="time" className="as-form-input" required
-                      value={newFacility.openTime} onChange={(e) => setNewFacility({...newFacility, openTime: e.target.value})} 
+                      value={newFacility.openTime} onChange={(e) => setNewFacility({ ...newFacility, openTime: e.target.value })}
                     />
                   </div>
 
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_fac_modal_close')}</label>
                     <input type="time" className="as-form-input" required
-                      value={newFacility.closeTime} onChange={(e) => setNewFacility({...newFacility, closeTime: e.target.value})} 
+                      value={newFacility.closeTime} onChange={(e) => setNewFacility({ ...newFacility, closeTime: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="as-form-group">
-                    <label className="as-form-label">{t('admin_fac_modal_desc')}</label>
-                    <textarea className="as-form-textarea" required rows="3" placeholder={t('admin_fac_modal_desc_ph')}
-                      value={newFacility.description} onChange={(e) => setNewFacility({...newFacility, description: e.target.value})} 
-                    />
+                  <label className="as-form-label">{t('admin_fac_modal_desc')}</label>
+                  <textarea className="as-form-textarea" required rows="3" placeholder={t('admin_fac_modal_desc_ph')}
+                    value={newFacility.description} onChange={(e) => setNewFacility({ ...newFacility, description: e.target.value })}
+                  />
                 </div>
 
                 <div className="as-form-section">
                   <h3 className="as-form-section-title">{t('admin_fac_modal_avail_title')}</h3>
                   <label className="as-checkbox-label">
-                    <input type="checkbox" className="as-checkbox" checked={newFacility.available} onChange={(e) => setNewFacility({...newFacility, available: e.target.checked})} />
+                    <input type="checkbox" className="as-checkbox" checked={newFacility.available} onChange={(e) => setNewFacility({ ...newFacility, available: e.target.checked })} />
                     {t('admin_fac_modal_avail_check')}
                   </label>
                 </div>
@@ -492,7 +528,7 @@ export default function ManageFacilities() {
 
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
                     {t('admin_doc_modal_purpose_title')} <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>
@@ -610,7 +646,7 @@ export default function ManageFacilities() {
               <p className="as-modal-desc" style={{ marginBottom: '20px', textAlign: 'center' }}>
                 {t('admin_fac_cal_desc')}
               </p>
-              
+
               <div className="sv-calendar" style={{ margin: '0 auto', maxWidth: '400px' }}>
                 <div className="sv-cal-nav">
                   <button className="sv-cal-arrow" onClick={prevMonth}><ChevronLeftIcon /></button>
@@ -622,10 +658,10 @@ export default function ManageFacilities() {
                   {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const d = i + 1;
-                    const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                    const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                     const isBlocked = (selectedFacility?.blockedDates || []).includes(dateStr);
                     return (
-                      <button key={d} 
+                      <button key={d}
                         className={`sv-cal-cell sv-cal-cell--${isBlocked ? "reserved" : "available"}`}
                         onClick={() => toggleDate(dateStr)}
                         style={{ cursor: 'pointer' }}
@@ -640,7 +676,7 @@ export default function ManageFacilities() {
                   <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />{t('admin_fac_cal_blocked')}</span>
                 </div>
               </div>
-              
+
               <div className="as-modal-actions" style={{ justifyContent: 'flex-end', marginTop: '30px' }}>
                 <button className="as-btn-aqua" onClick={() => setShowCalendarModal(false)}>{t('admin_fac_cal_btn_done')}</button>
               </div>
@@ -661,7 +697,7 @@ export default function ManageFacilities() {
               <h3>{selectedQR.name}</h3>
               <p className="as-modal-desc">{t('admin_fac_qr_desc')}</p>
               <div className="as-qr-holder" style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
-                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true}/>
+                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true} />
               </div>
               <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: '100%' }}><IconDownload /> {t('admin_fac_qr_download')}</button>
             </div>

@@ -123,13 +123,13 @@ export default function ManageDocuments() {
 
   const handleEdit = (docType) => {
     setNewDocument({
-      documentName:   docType.documentName || docType.title || "",
+      documentName: docType.documentName || docType.title || "",
       processingTime: docType.processingTime || "",
-      fee:            docType.fee || "",
-      description:    docType.description || "",
-      reminder:       docType.reminder || "",
+      fee: docType.fee || "",
+      description: docType.description || "",
+      reminder: docType.reminder || "",
       purposeOptions: docType.purposeOptions || [],
-      customFields:   docType.customFields || [],
+      customFields: docType.customFields || [],
     });
     setPurposeInput("");
     setEditingPurposeIdx(null);
@@ -187,7 +187,7 @@ export default function ManageDocuments() {
         await updateDoc(newRef, { documentID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_DOCUMENT_TYPE", `Added new document type: ${newDocument.documentName} (ID: ${newRef.id})`);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_documents'] });
 
       setNewDocument({
@@ -384,22 +384,24 @@ export default function ManageDocuments() {
             <div className="as-card-header">
               <h2 className="as-card-title">{doc.documentName || doc.title}</h2>
             </div>
-            {doc.description && (
-              <div style={{ marginBottom: "10px" }}><DescriptionPreview text={doc.description} /></div>
-            )}
-            <ul className="as-card-details">
+
+            <DescriptionPreview text={doc.description} />
+
+            <ul className="as-card-details" style={{ marginTop: "12px" }}>
               <li>
-                <Manage_IconClock /> <strong>{t('admin_doc_card_processing')}</strong>{" "}
-                {doc.processingTime}
+                <strong>{t('admin_doc_card_processing')}</strong> {doc.processingTime || "1–2 Days"}
               </li>
               <li>
-                <strong>{t('admin_doc_card_fee')}</strong> {doc.fee}
+                <strong>{t('admin_doc_card_fee')}</strong> {doc.fee || "Free"}
               </li>
+              {doc.purposeOptions && doc.purposeOptions.length > 0 && (
+                <li>
+                  <strong>{t('admin_card_lbl_purposes')}</strong> {doc.purposeOptions.length} {t('admin_card_lbl_preset_opts')}
+                </li>
+              )}
             </ul>
-            <div
-              className="as-card-footer"
-              style={{ gap: "10px", display: "flex" }}
-            >
+
+            <div className="as-card-footer" style={{ gap: "10px", display: "flex" }}>
               <button
                 className="as-btn-ghost"
                 style={{ padding: "8px 16px", flex: 1 }}
@@ -412,7 +414,7 @@ export default function ManageDocuments() {
                 style={{
                   padding: "8px 16px",
                   flex: 1,
-                  color: "red",
+                  color: "#dc2626",
                   borderColor: "#fca5a5",
                 }}
                 onClick={() => handleDelete(doc.id, doc.documentName || doc.title)}
@@ -639,7 +641,7 @@ export default function ManageDocuments() {
 
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
                     {t('admin_doc_modal_purpose_title')} <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>

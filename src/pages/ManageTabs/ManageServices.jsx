@@ -159,7 +159,7 @@ export default function ManageServices() {
       "acted upon": { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
     };
     return (
-      <div style={{ marginTop: "12px", padding: "12px", background: "#eff0f0", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+      <div style={{ marginTop: "12px", padding: "14px", background: "#f8fafc", borderRadius: "12px", border: "1px solid #edf2f7" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "10px" }}>
           <span style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>{t('admin_srv_stat_total')}</span>
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}>{stats.total}</span>

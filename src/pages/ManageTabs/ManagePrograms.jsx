@@ -71,9 +71,9 @@ function StatusBadge({ status, t }) {
   const s = raw.toLowerCase().trim();
 
   const map = {
-    approved:   { bg: "#dcfce7", color: "#166534", dot: "#16a34a" },
-    pending:    { bg: "#fef3c7", color: "#92400e", dot: "#d97706" },
-    rejected:   { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+    approved: { bg: "#dcfce7", color: "#166534", dot: "#16a34a" },
+    pending: { bg: "#fef3c7", color: "#92400e", dot: "#d97706" },
+    rejected: { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
     registered: { bg: "#dbeafe", color: "#1e40af", dot: "#2563eb" },
   };
 
@@ -114,9 +114,9 @@ function StatusBadge({ status, t }) {
 
 function StatBar({ stats, t }) {
   const statusColors = {
-    pending:    { bg: "#fef3c7", text: "#92400e", dot: "#d97706" },
-    approved:   { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
-    rejected:   { bg: "#fee2e2", text: "#991b1b", dot: "#dc2626" },
+    pending: { bg: "#fef3c7", text: "#92400e", dot: "#d97706" },
+    approved: { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
+    rejected: { bg: "#fee2e2", text: "#991b1b", dot: "#dc2626" },
     registered: { bg: "#dbeafe", text: "#1e40af", dot: "#2563eb" },
   };
 
@@ -130,7 +130,7 @@ function StatBar({ stats, t }) {
         {Object.entries(stats.byStatus).map(([status, count]) => {
           const key = status.toLowerCase().trim();
           const c = statusColors[key] || { bg: "#f3f4f6", text: "#4b5563", dot: "#9ca3af" };
-          
+
           let translatedStatus = status;
           if (key === 'approved') translatedStatus = t('admin_prog_stat_approved');
           if (key === 'pending') translatedStatus = t('admin_prog_stat_pending');
@@ -234,13 +234,13 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
           updatedAt: serverTimestamp(),
         });
       }
-      
+
       const residentID = a.userID || a.residentID;
       const hhID = a.householdID;
       if (residentID && hhID) {
         await createUserNotification(hhID, residentID, "Program Registration Approved", `Your registration for "${program.title}" has been approved!`, "general", a.id);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
     } catch (err) { console.error(err); }
@@ -266,16 +266,16 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
           status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
         });
       }
-      
+
       const residentID = a?.userID || a?.residentID;
       const hhID = a?.householdID;
       if (residentID && hhID) {
         await createUserNotification(hhID, residentID, "Program Registration Rejected", `Your registration for "${program.title}" was rejected. Reason: ${rejectReason.trim()}`, "general", a.id);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
-      
+
       setShowRejectModal(false); setRejectTarget(null); setRejectReason("");
     } catch (err) { console.error(err); }
     setSaving(false);
@@ -296,7 +296,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
       for (const regDoc of regSnap.docs) {
         await updateDoc(doc(db, "programRegistrations", regDoc.id), { status: "pending", rejectReason: "", updatedAt: serverTimestamp() });
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
 
@@ -538,7 +538,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
                     </button>
                   </div>
                 </form>
-                </div>
+              </div>
             </div>
           </div>
         )}
@@ -596,7 +596,7 @@ export default function ManagePrograms() {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Hook implementation
   const { showAlert, showConfirm } = useAlert();
-  
+
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -650,7 +650,7 @@ export default function ManagePrograms() {
     queryKey: ['adminManage_programStats', programs.map(p => p.id)],
     queryFn: async () => {
       const statsObj = {};
-      
+
       await Promise.all(programs.map(async (prog) => {
         const baseRef = collection(db, "Programs", prog.id, "attendees");
 
@@ -683,7 +683,7 @@ export default function ManagePrograms() {
           latest: latestDate,
         };
       }));
-      
+
       return statsObj;
     },
     enabled: programs.length > 0,
@@ -794,9 +794,9 @@ export default function ManagePrograms() {
         });
         logTransaction(adminName, adminRole, "CREATED_PROGRAM", `Created new program: "${newProgram.title}"`);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programs'] });
-      
+
       setNewProgram(EMPTY_PROGRAM);
       setEditingProgramId(null);
       setShowAddModal(false);
@@ -913,15 +913,31 @@ export default function ManagePrograms() {
                   </div>
                   <DescriptionPreview text={prog.description} />
                   <ul className="as-card-details">
-                    <li><Manage_IconLocation /> {prog.location}</li>
                     <li>
-                      <Manage_IconCalendar />
-                      {prog.date}
-                      {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
-                      {" • "}{prog.time}
+                      <strong>{t('admin_card_lbl_location')}</strong>
+                      <span style={{ textAlign: 'right', maxWidth: '65%' }}>{prog.location || '—'}</span>
                     </li>
-                    <li><strong>{t('admin_prog_card_target')}</strong> {prog.demographic}</li>
-                    <li><strong>{t('admin_prog_card_slots')}</strong> {prog.slots || t('admin_prog_card_unlimited')}</li>
+                    <li>
+                      <strong>{t('admin_card_lbl_date')}</strong>
+                      <span>
+                        {prog.date}
+                        {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
+                      </span>
+                    </li>
+                    {prog.time && (
+                      <li>
+                        <strong>{t('admin_card_lbl_time')}</strong>
+                        <span>{prog.time}</span>
+                      </li>
+                    )}
+                    <li>
+                      <strong>{t('admin_card_lbl_target')}</strong>
+                      <span>{prog.demographic}</span>
+                    </li>
+                    <li>
+                      <strong>{t('admin_prog_card_slots')}</strong>
+                      <span>{prog.slots || t('admin_prog_card_unlimited')}</span>
+                    </li>
                   </ul>
                   <div style={{ marginTop: "10px", fontSize: "0.85rem", color: "#6B7280" }}>
                     <strong>{t('admin_prog_card_reqs')}</strong>{" "}
@@ -985,11 +1001,11 @@ export default function ManagePrograms() {
         </>
       )}
 
-{showAddModal && (
+      {showAddModal && (
         <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div 
-            className="as-modal-content" 
-            style={{ maxWidth: "700px", width: "100%" }} 
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "700px", width: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="as-modal-header">
