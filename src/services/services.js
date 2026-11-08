@@ -440,9 +440,25 @@ export async function getHouseholdResidents(householdID) {
 }
 
 export async function transferHouseholdHeadRole(householdID, currentHeadID, newHeadID) {
+  // 1. Fetch the current head's profile to check their branch status
+  const currentHeadRef = doc(db, "households", householdID, "residents", currentHeadID);
+  const currentHeadSnap = await getDoc(currentHeadRef);
+  
+  let newRoleForOldHead = "Member";
+  
+  if (currentHeadSnap.exists()) {
+    const headData = currentHeadSnap.data();
+    // If the old head is currently in a branch other than the Main Branch (BR-001),
+    // they should be demoted to Branch Head of their respective branch, not a basic Member!
+    if (headData.branchID && headData.branchID !== "BR-001") {
+      newRoleForOldHead = "Branch Head";
+    }
+  }
+
   const batch = writeBatch(db);
-  batch.update(doc(db, "households", householdID, "residents", currentHeadID), { role: "Member", updatedAt: serverTimestamp() });
+  batch.update(currentHeadRef, { role: newRoleForOldHead, updatedAt: serverTimestamp() });
   batch.update(doc(db, "households", householdID, "residents", newHeadID), { role: "Household Head", updatedAt: serverTimestamp() });
+  
   await batch.commit();
 }
 

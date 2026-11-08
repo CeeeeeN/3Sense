@@ -4,7 +4,6 @@ import { getMemberProfile, updateMemberProfile } from "../services/profile";
 import { fetchUserTransactions } from "../services/services";
 import QRCode from "qrcode";
 
-import TransferHouseholdModal from "../components/TransferHouseholdModal";
 import TransferHeadModal from "../components/TransferHeadModal";
 import TransferBranchHeadModal from "../components/TransferBranchHeadModal";
 import RemoveMemberModal from "../components/RemoveMemberModal";
@@ -1097,12 +1096,6 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 </label>
               }
             />
-            <SettingRow
-              icon={IconTransfer}
-              title={t('profile_transfer_household', 'Transfer Household')}
-              description={t('profile_transfer_household_desc')}
-              onClick={() => setActiveModal('transfer')}
-            />
           </Card>
 
           <Card icon={IconSupport} title={t('profile_settings_support', 'Support')} flush>
@@ -1117,14 +1110,6 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       )}
 
       {/* ── SETTINGS ACTION MODALS ── */}
-      {activeModal === 'transfer' && (
-        <TransferHouseholdModal
-          onClose={() => setActiveModal(null)}
-          currentHouseholdID={householdID}
-          userData={data}
-          memberID={memberID}
-        />
-      )}
 
       {activeModal === 'removeMember' && (
         <RemoveMemberModal
