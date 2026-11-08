@@ -40,6 +40,17 @@ const formatSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+// Turns "50", 50, "₱50", "PHP 50.00", "Free", 0 into a number (or 0 for free).
+// Returns null when there is no fee info, or the raw string if it isn't numeric.
+const parseFee = (fee) => {
+  if (fee === undefined || fee === null || fee === "") return null;
+  if (typeof fee === "number") return fee;
+  const raw = String(fee).trim();
+  if (/free|libre|walang/i.test(raw)) return 0;
+  const n = parseFloat(raw.replace(/[^0-9.]/g, ""));
+  return Number.isNaN(n) ? raw : n;
+};
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const Ico = ({ size = 22, children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
@@ -62,6 +73,39 @@ const ArrowLeft = () => (
 const BigCheck = () => (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
 );
+
+// ── Fee + processing time pills (shared by Step 1 cards and Step 2 box) ───────
+function DocMeta({ doc, className }) {
+  const { t, language } = useLanguage();
+  const noteSaysFree = /free of charge|libre|walang bayad/i.test(doc?.reminder || doc?.note || "");
+  const parsed = noteSaysFree ? 0 : parseFee(doc?.fee);
+  const days = doc?.processingTime || doc?.days;
+  if (parsed === null && !days) return null;
+
+  let feePill = null;
+  if (parsed === 0) {
+    feePill = <span className="dz-pill dz-pill--free">{t("doc_free", "Free")}</span>;
+  } else if (typeof parsed === "string") {
+    feePill = <span className="dz-pill dz-pill--fee">{localizeFee(parsed, language)}</span>;
+  } else if (typeof parsed === "number") {
+    const amount = parsed.toLocaleString("en-PH", {
+      minimumFractionDigits: Number.isInteger(parsed) ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
+    feePill = (
+      <span className="dz-pill dz-pill--fee" aria-label={`${amount} pesos`}>
+        <span className="dz-peso" aria-hidden="true">₱</span>{amount}
+      </span>
+    );
+  }
+
+  return (
+    <span className={className}>
+      {feePill}
+      {days ? <span className="dz-pill">{localizeDays(days, language)}</span> : null}
+    </span>
+  );
+}
 
 // ── Validity reminder (big yellow notice, can be dismissed) ───────────────────
 function ValidityReminderBanner() {
@@ -150,7 +194,7 @@ function StepIndicator({ step, onStepClick }) {
 
 // ── Step 1: choose a document ─────────────────────────────────────────────────
 function Step1({ docTypes, selected, onSelect, error }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   return (
     <section className="bz-card">
       <h3 className="bz-heading">{t("doc_choose_title", "Choose the document you need")}</h3>
@@ -159,8 +203,6 @@ function Step1({ docTypes, selected, onSelect, error }) {
       <div className="dz-docs" role="radiogroup" aria-label={t("doc_documents", "Documents")}>
         {docTypes.map(d => {
           const isSel = selected?.id === d.id;
-          const fee = d.fee;
-          const days = d.processingTime || d.days;
           return (
             <button
               type="button"
@@ -174,12 +216,7 @@ function Step1({ docTypes, selected, onSelect, error }) {
               <span className="dz-doc__body">
                 <span className="dz-doc__name">{d.documentName || d.title || d.name}</span>
                 <span className="dz-doc__desc">{d.description || d.desc}</span>
-                {(fee || days) && (
-                  <span className="dz-doc__pills">
-                    {fee ? <span className="dz-pill dz-pill--fee">{localizeFee(fee, language)}</span> : null}
-                    {days ? <span className="dz-pill">{localizeDays(days, language)}</span> : null}
-                  </span>
-                )}
+                <DocMeta doc={d} className="dz-doc__pills" />
               </span>
               <span className="dz-doc__check">
                 {isSel && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
@@ -251,6 +288,7 @@ function Step2({ docType, form, setForm, errors }) {
             {docType.icon ? <span className="dz-chosen-icon">{docType.icon}</span> : null}
             {docType.documentName || docType.title || docType.name}
           </div>
+          <DocMeta doc={docType} className="dz-chosen-pills" />
           {(docType.reminder || docType.note) && (
             <div className="dz-chosen-note">
               {localizeReminder(docType.reminder || docType.note, language)}

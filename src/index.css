@@ -17530,6 +17530,47 @@ button.lv-steps__node:focus-visible {
   }
 }
 
+/* Peso price: bigger and bolder than the other pills, with a ₱ badge */
+.dz-pill--fee {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.85rem 0.25rem 0.3rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  background: #317D89;
+}
+
+.dz-peso {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-family: 'Inter', Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #17535d;
+  background: #fff;
+  border-radius: 50%;
+}
+
+/* Free documents */
+.dz-pill--free {
+  color: #14532d;
+  background: #e8f7ef;
+  border: 1.5px solid #9fd8b9;
+}
+
+/* Pills inside the "You are requesting" box (Step 2) */
+.dz-chosen-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
 
 /* ===================== SCAN PAGE ===================== */
 
