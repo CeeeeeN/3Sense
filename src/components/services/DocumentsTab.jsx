@@ -232,22 +232,43 @@ function Step1({ docTypes, selected, onSelect, error }) {
 }
 
 // ── Step 2: your details ──────────────────────────────────────────────────────
-function Step2({ docType, form, setForm, errors }) {
+function Step2({ docType, form, setForm, errors, setErrors }) {
   const { t, language } = useLanguage();
   const [previewUrl, setPreviewUrl] = useState(null);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const extraFields = docType?.customFields || [];
   const purposeOptions = docType?.purposeOptions || [];
+
+  // Removes a single field's error (no-op if it has none)
+  const clearError = (k) =>
+    setErrors(prev => {
+      if (!prev[k]) return prev;
+      const { [k]: _removed, ...rest } = prev;
+      return rest;
+    });
+
+  // Sets the value, and removes that field's error once it has a valid value
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+
+    const isValid =
+      typeof v === "boolean" ? v
+      : k === "contact" ? isValidPHMobile(v)
+      : v !== null && v !== undefined && String(v).trim() !== "";
+
+    if (isValid) clearError(k);
+  };
 
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       alert(t("doc_err_file_size", "File must be under 5MB."));
+      e.target.value = ""; // allows re-selecting the same file later
       return;
     }
     set("validId", file.name);
     set("validIdFile", file);
+    clearError("validId");
 
     if (file.type.startsWith("image/")) {
       setPreviewUrl(URL.createObjectURL(file));
@@ -374,7 +395,14 @@ function Step2({ docType, form, setForm, errors }) {
                 id="dz-purpose"
                 className={`bf-input bf-select${errors.purposeOption ? " bf-input--error" : ""}`}
                 value={form.purposeOption}
-                onChange={e => { set("purposeOption", e.target.value); if (e.target.value !== "Other") set("purposeOther", ""); }}
+                onChange={e => {
+                  const val = e.target.value;
+                  set("purposeOption", val);
+                  if (val !== "Other") {
+                    set("purposeOther", "");
+                    clearError("purposeOther"); // "Other" box is hidden now, so its error should go too
+                  }
+                }}
               >
                 <option value="">{t("doc_choose_list", "Choose from the list...")}</option>
                 {purposeOptions.map(opt => <option key={opt} value={opt}>{localizePurpose(opt, language)}</option>)}
@@ -722,6 +750,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
   };
 
   const goToStep = (newStep) => {
+    setErrors({});
     setStep(newStep);
   };
 
@@ -736,7 +765,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
           {(step === 1 || step === 2) && <ValidityReminderBanner />}
 
           {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} error={errors.docType} />}
-          {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
+          {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} setErrors={setErrors} />}
           {step === 3 && <Step3 docType={docType} form={form} />}
           {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
 
