@@ -2947,6 +2947,7 @@ eq_blocked: 'Blocked',
     // List & Pagination
     admin_srv_po_loading: 'Loading reports…',
     admin_srv_po_incoming: 'Incoming Reports',
+    admin_srv_po_btn_back_incoming: '← Back to Incoming Reports',
     admin_srv_po_empty: 'No reports match your filters.',
     admin_srv_po_page_prev: 'Prev',
     admin_srv_po_page_next: 'Next',
@@ -2990,6 +2991,8 @@ eq_blocked: 'Blocked',
     
     // Confirmations
     admin_srv_po_confirm_delete_grp: 'Are you sure you want to delete',
+    admin_srv_po_confirm_resolve_title: 'Confirm Resolution',
+    admin_srv_po_confirm_resolve_desc: 'Are you sure you want to mark this incident report as Resolved? This will notify the resident.',
 
     // ─── ADMIN SERVICE VAWC ───
     admin_srv_vawc_back: '← Back to Services Hub',
@@ -6600,6 +6603,7 @@ eq_blocked: 'Naka-block',
     // List & Pagination
     admin_srv_po_loading: 'Ikinakarga ang mga ulat…',
     admin_srv_po_incoming: 'Papasok na mga Ulat',
+    admin_srv_po_btn_back_incoming: '← Bumalik sa mga Papasok na Ulat',
     admin_srv_po_empty: 'Walang ulat na tumutugma sa iyong mga filter.',
     admin_srv_po_page_prev: 'Nakaraan',
     admin_srv_po_page_next: 'Susunod',
@@ -6643,6 +6647,8 @@ eq_blocked: 'Naka-block',
     
     // Confirmations
     admin_srv_po_confirm_delete_grp: 'Sigurado ka bang gusto mong burahin ang',
+    admin_srv_po_confirm_resolve_title: 'Kumpirmahin ang Paglutas',
+    admin_srv_po_confirm_resolve_desc: 'Sigurado ka bang nais mong markahan ang ulat ng insidenteng ito bilang Nalutas? Maaabisuhan ang residente.',
 
     // ─── ADMIN SERVICE VAWC ───
     admin_srv_vawc_back: '← Bumalik sa Hub ng Serbisyo',

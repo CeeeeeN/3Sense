@@ -1909,6 +1909,64 @@ body:has(.af-modal-overlay) {
   @apply w-[140px] h-[140px] rounded-[10px] border border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-slate-50 text-[0.85rem];
 }
 
+
+/* ===================================================== */
+/* PEACE & ORDER ADDITIONAL   */
+/* ===================================================== */
+
+.po-stats-grid {
+  @apply grid grid-cols-4 gap-4 mb-5 max-[1024px]:!grid-cols-2 max-[1024px]:!gap-2.5;
+}
+
+.po-workspace-grid {
+  @apply grid grid-cols-[minmax(350px,1.15fr)_1.85fr] gap-5 min-h-[60vh] w-full max-w-full min-w-0 box-border max-[1024px]:!flex max-[1024px]:!flex-col max-[1024px]:!gap-4 max-[1024px]:!min-h-0;
+}
+
+.po-inbox-panel {
+  @apply bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col w-full min-w-0 box-border;
+}
+
+.po-detail-panel {
+  @apply bg-white rounded-xl border border-gray-200 p-6 flex flex-col w-full min-w-0 box-border max-[1024px]:!p-4;
+}
+
+.po-mobile-back-btn {
+  @apply !hidden max-[1024px]:!inline-flex max-[1024px]:!w-fit max-[1024px]:!self-start max-[1024px]:!px-3.5 max-[1024px]:!py-[7px] max-[1024px]:!text-[0.82rem] max-[1024px]:!font-semibold max-[1024px]:!rounded-lg max-[1024px]:!bg-white max-[1024px]:!border-[1.5px] max-[1024px]:!border-slate-300 max-[1024px]:!text-slate-700 max-[1024px]:!mb-3.5 max-[1024px]:!gap-1.5 max-[1024px]:!shadow-xs max-[1024px]:!transition-all max-[1024px]:!duration-150 hover:max-[1024px]:!bg-slate-100 hover:max-[1024px]:!border-slate-400 hover:max-[1024px]:!text-slate-900;
+}
+
+.po-inbox-panel.mobile-hidden,
+.po-detail-panel.mobile-hidden {
+  @apply max-[1024px]:!hidden;
+}
+
+.po-action-inputs {
+  @apply flex gap-4 items-end w-full min-w-0 max-[1024px]:!flex-col max-[1024px]:!items-stretch;
+}
+
+.po-btn-status {
+  @apply flex-1 inline-flex items-center justify-center gap-1.5 py-[9px] px-3.5 text-[0.84rem] font-semibold rounded-lg border-[1.5px] border-slate-200 bg-white text-slate-500 cursor-pointer transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.po-btn-status .dot {
+  @apply w-[7px] h-[7px] rounded-full bg-current;
+}
+
+.po-btn-responded:hover:not(:disabled) {
+  @apply bg-blue-50 border-blue-300 text-blue-700;
+}
+
+.po-btn-responded.active {
+  @apply bg-blue-50 border-blue-500 text-blue-700 shadow-[0_0_0_1px_#3b82f6];
+}
+
+.po-btn-resolved:hover:not(:disabled) {
+  @apply bg-green-50 border-green-300 text-green-700;
+}
+
+.po-btn-resolved.active {
+  @apply bg-green-50 border-green-500 text-green-700 shadow-[0_0_0_1px_#22c55e];
+}
+
 /* =========================
    TABLET (1024px)
 ========================= */
