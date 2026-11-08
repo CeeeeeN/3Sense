@@ -4,7 +4,7 @@ import { db } from "../../../firebase/firebase";
 import {
   collection, onSnapshot, query, where,
   doc, serverTimestamp, orderBy, limit,
-  writeBatch // <-- IMPORTED WRITEBATCH
+  writeBatch
 } from "firebase/firestore";
 import { useLanguage } from "../../../context/LanguageContext";
 
@@ -13,6 +13,18 @@ const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
   catch { return fallback; }
 };
+
+// ── Phone helpers (same as Documents) ──────────────────────────────
+// Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
+const normalizePHMobile = (value) => {
+  let d = String(value || "").replace(/\D/g, "");
+  if (d.startsWith("63") && d.length >= 12) d = "0" + d.slice(2);
+  else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
+  return d.slice(0, 11);
+};
+
+// Exactly 11 digits, starting with 09
+const isValidPHMobile = (value) => /^09\d{9}$/.test(String(value || ""));
 
 // ── Helpers ────────────────────────────────────────────────────────
 const generateRegNum = () => {
@@ -129,7 +141,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
         middleName: userData.middleName || "",
         lastName: userData.lastName || "",
         address: fullAddress,
-        contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
+        contact: normalizePHMobile(userData.contactNumber ?? userData.contact ?? ""),
         email: userData.email || "",
       }));
     }
@@ -263,7 +275,25 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     myRegs.find(r => r.programId === programId && ["pending", "approved"].includes((r.status || "").toLowerCase()));
 
   // ── Form helpers ─────────────────────────────────────────────────
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  // Removes a single field's error (no-op if it has none)
+  const clearError = (k) =>
+    setErrors(prev => {
+      if (!prev[k]) return prev;
+      const { [k]: _removed, ...rest } = prev;
+      return rest;
+    });
+
+  // Sets the value, and removes that field's error once it has a valid value
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+
+    const isValid =
+      k === "contact" ? isValidPHMobile(v)
+      : v !== null && v !== undefined && String(v).trim() !== "";
+
+    if (isValid) clearError(k);
+  };
+
   const selectedProgram = programs.find(p => p.id === form.programId);
 
   const validateStep1 = () => {
@@ -271,7 +301,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     if (!form.firstName.trim()) e.firstName = t("lh_err_first_name");
     if (!form.lastName.trim()) e.lastName = t("lh_err_last_name");
     if (!form.address.trim()) e.address = t("lh_err_address");
-    if (!String(form.contact || "").trim()) e.contact = t("lh_err_contact");
+    if (!isValidPHMobile(form.contact)) e.contact = t("doc_err_phone", "Contact number must be exactly 11 digits (09XXXXXXXXX).");
     if (!form.idFile) e.idFile = t("lh_err_id");
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -286,9 +316,10 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
   // ── Submit ────────────────────────────────────────────────────────
   const handleNext = async () => {
+    setErrors({});
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
-    
+
     if (step === 3) {
       setSubmitting(true);
       try {
@@ -370,31 +401,31 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
   };
 
   const resetForm = () => {
-    setStep(1); 
+    setStep(1);
     setErrors({});
-    
+
     // Re-populate the auto-fill data instead of wiping it completely blank
     let fullAddress = "";
     if (userData) {
       fullAddress = [
-        userData.houseNumber, 
-        userData.street, 
-        userData.barangay, 
+        userData.houseNumber,
+        userData.street,
+        userData.barangay,
         userData.city
       ].filter(Boolean).join(", ");
     }
-    
+
     setForm({
       firstName: userData?.firstName || "",
       middleName: userData?.middleName || "",
       lastName: userData?.lastName || "",
       address: fullAddress,
-      contact: userData?.contactNumber != null ? String(userData.contactNumber) : "",
+      contact: normalizePHMobile(userData?.contactNumber ?? userData?.contact ?? ""),
       email: userData?.email || "",
       idFile: "", // Keep the uploaded file blank
       programId: "", // Keep the selected program blank
     });
-    
+
     setView("main");
   };
 
@@ -590,7 +621,7 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
     <div className="bz-page">
       <Hero />
 
-      <div className="bz-wrap" ref={topRef}>
+      <div className={`bz-wrap${step === 1 ? " lh-wrap--wide" : ""}`} ref={topRef}>
         {step < 4 && (
           <section className="bz-card">
             <BackButton label={t("lh_back_to_programs")} onClick={() => { setView("main"); setErrors({}); }} />
@@ -629,60 +660,87 @@ export default function LivelihoodTab({ userData, householdID, userName }) {
 
             {/* ── Step 1 ── */}
             {step === 1 && (
-              <div className="bf-form lv-form">
+              <div className="lv-form">
                 <h3 className="bz-heading">{t("lh_form_step1_heading")}</h3>
 
-                <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-first">{t("lh_lbl_first_name")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
-                  <input id="lv-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder={t("lh_ph_first_name")} />
-                  {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
-                </div>
-                <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-middle">{t("lh_lbl_middle_name")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
-                  <input id="lv-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder={t("lh_ph_middle_name")} />
-                </div>
-                <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-last">{t("lh_lbl_last_name")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
-                  <input id="lv-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder={t("lh_ph_last_name")} />
-                  {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
-                </div>
-                <div className="bf-field">
-                  <label className="bf-label" htmlFor="lv-address">{t("lh_lbl_address")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
-                  <input id="lv-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder={t("lh_ph_address")} />
-                  {errors.address && <div className="bf-error">{errors.address}</div>}
-                </div>
-                <div className="bf-row">
-                  <div className="bf-field">
-                    <label className="bf-label" htmlFor="lv-contact">{t("lh_lbl_contact")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
-                    <input id="lv-contact" className={`bf-input${errors.contact ? " bf-input--error" : ""}`} value={form.contact} onChange={e => set("contact", e.target.value)} placeholder={t("lh_ph_contact")} />
-                    {errors.contact && <div className="bf-error">{errors.contact}</div>}
-                  </div>
-                  <div className="bf-field">
-                    <label className="bf-label" htmlFor="lv-email">{t("lh_lbl_email")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
-                    <input id="lv-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder={t("lh_ph_email")} />
-                  </div>
-                </div>
+                <div className="bf-form">
+                  <div className="bf-group">
+                    <div className="bf-group__title">{t("doc_personal_info", "Personal information")}</div>
 
-                <div className="bf-field">
-                  <div className="bf-label">{t("lh_lbl_id")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></div>
-                  <label className={`bf-photo${form.idFile ? " is-filled" : ""}${errors.idFile ? " is-error" : ""}`}>
-                    <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: "none" }} onChange={e => e.target.files[0] && set("idFile", e.target.files[0].name)} />
-                    <Ico size={28}>{form.idFile ? ICONS.check : ICONS.upload}</Ico>
-                    <span className="bf-photo__text">
-                      {form.idFile ? (
-                        <>
-                          <strong>{t("lh_id_added")}</strong>
-                          <small>{form.idFile} · {t("lh_id_change")}</small>
-                        </>
-                      ) : (
-                        <>
-                          <strong>{t("lh_id_add")}</strong>
-                          <small>{t("lh_id_hint")}</small>
-                        </>
-                      )}
-                    </span>
-                  </label>
-                  {errors.idFile && <div className="bf-error">{errors.idFile}</div>}
+                    <div className="bf-form--tight">
+                      <div className="bf-field">
+                        <label className="bf-label" htmlFor="lv-first">{t("lh_lbl_first_name")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                        <input id="lv-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder={t("lh_ph_first_name")} />
+                        {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
+                      </div>
+                      <div className="bf-field">
+                        <label className="bf-label" htmlFor="lv-middle">{t("lh_lbl_middle_name")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                        <input id="lv-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder={t("lh_ph_middle_name")} />
+                      </div>
+                      <div className="bf-field">
+                        <label className="bf-label" htmlFor="lv-last">{t("lh_lbl_last_name")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                        <input id="lv-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder={t("lh_ph_last_name")} />
+                        {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
+                      </div>
+
+                      <div className="bf-field">
+                        <label className="bf-label" htmlFor="lv-contact">{t("lh_lbl_contact")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                        <input
+                          id="lv-contact"
+                          className={`bf-input${errors.contact ? " bf-input--error" : ""}`}
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel"
+                          maxLength={11}
+                          value={form.contact}
+                          onChange={e => set("contact", normalizePHMobile(e.target.value))}
+                          placeholder="09123456789"
+                        />
+                        {errors.contact && <div className="bf-error">{errors.contact}</div>}
+                      </div>
+                      <div className="bf-field bf-field--span2">
+                        <label className="bf-label" htmlFor="lv-email">{t("lh_lbl_email")} <span className="bf-pill">{t("bswd_pill_optional")}</span></label>
+                        <input id="lv-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder={t("lh_ph_email")} />
+                      </div>
+
+                      <div className="bf-field bf-field--full">
+                        <label className="bf-label" htmlFor="lv-address">{t("lh_lbl_address")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></label>
+                        <input id="lv-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder={t("lh_ph_address")} />
+                        {errors.address && <div className="bf-error">{errors.address}</div>}
+                      </div>
+
+                      <div className="bf-field bf-field--full">
+                        <div className="bf-label">{t("lh_lbl_id")} <span className="bf-pill bf-pill--req">{t("bswd_pill_required")}</span></div>
+                        <label className={`bf-photo${form.idFile ? " is-filled" : ""}${errors.idFile ? " is-error" : ""}`}>
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.pdf"
+                            style={{ display: "none" }}
+                            onChange={e => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              set("idFile", file.name); // also clears the red error
+                            }}
+                          />
+                          <Ico size={28}>{form.idFile ? ICONS.check : ICONS.upload}</Ico>
+                          <span className="bf-photo__text">
+                            {form.idFile ? (
+                              <>
+                                <strong>{t("lh_id_added")}</strong>
+                                <small>{form.idFile} · {t("lh_id_change")}</small>
+                              </>
+                            ) : (
+                              <>
+                                <strong>{t("lh_id_add")}</strong>
+                                <small>{t("lh_id_hint")}</small>
+                              </>
+                            )}
+                          </span>
+                        </label>
+                        {errors.idFile && <div className="bf-error">{errors.idFile}</div>}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
