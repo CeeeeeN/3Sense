@@ -11,6 +11,17 @@ import {
   localizeReminder,
 } from "../../utils/serviceTranslations";
 
+// Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
+const normalizePHMobile = (value) => {
+  let d = String(value || "").replace(/\D/g, "");
+  if (d.startsWith("63") && d.length >= 12) d = "0" + d.slice(2);
+  else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
+  return d.slice(0, 11);
+};
+
+// Exactly 11 digits, starting with 09
+const isValidPHMobile = (value) => /^09\d{9}$/.test(String(value || ""));
+
 const CIVIL_STATUS_OPTIONS = [
   { value: "Single", labelKey: "status_single" },
   { value: "Married", labelKey: "status_married" },
@@ -21,14 +32,6 @@ const CIVIL_STATUS_OPTIONS = [
 const getSaved = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem("brgy_session") || "{}")[key] || fallback; }
   catch { return fallback; }
-};
-
-// Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
-const normalizePHMobile = (value) => {
-  let d = String(value || "").replace(/\D/g, "");
-  if (d.startsWith("63") && d.length >= 12) d = "0" + d.slice(2);
-  else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
-  return d.slice(0, 11);
 };
 
 const formatSize = (bytes) => {
@@ -66,14 +69,42 @@ function ValidityReminderBanner() {
   const { t } = useLanguage();
   if (dismissed) return null;
   return (
-    <div className="bz-note dz-banner">
-      <span className="dz-banner__icon"><Ico size={26}>{ICONS.warning}</Ico></span>
-      <div className="dz-banner__text">
-        <strong>{t("doc_validity_title", "Document Validity Reminder")}</strong>
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: "12px",
+      background: "#fffbeb", border: "1px solid #fcd34d",
+      borderRadius: "10px", padding: "10px 14px",
+      // The wizard already has a 1rem gap between items, so pull the bottom
+      // in by 0.25rem to get the same 0.75rem as the Equipment alert.
+      margin: "0.1rem 0 -0.25rem",
+      fontSize: "14px", color: "#92400e",
+    }}>
+      <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+      <div style={{ flex: 1 }}>
+        <strong style={{ display: "block", marginBottom: "2px", color: "#78350f" }}>
+          {t("doc_validity_title", "Document Validity Reminder")}
+        </strong>
         {t("doc_validity_desc", "Barangay documents issued through this system are valid for 6 months from the date of issuance. Please ensure you use your document within this period. After expiry, a new request will be required.")}
       </div>
-      <button type="button" className="dz-banner__x" onClick={() => setDismissed(true)} aria-label={t("close", "Dismiss reminder")}>
-        <Ico size={22}>{ICONS.close}</Ico>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label={t("close", "Dismiss reminder")}
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#92400e",
+          padding: "0",
+          flexShrink: 0,
+          lineHeight: 1,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </button>
     </div>
   );
@@ -95,7 +126,7 @@ function StepIndicator({ step, onStepClick }) {
         const num = i + 1;
         const done = num < step;
         const active = num === step;
-        
+
         const clickable = done;
         const Node = clickable ? "button" : "div";
         const nodeProps = clickable ? { onClick: () => onStepClick(num), type: "button" } : {};
@@ -233,69 +264,60 @@ function Step2({ docType, form, setForm, errors }) {
         <div className="bf-group">
           <div className="bf-group__title">{t("doc_personal_info", "Personal information")}</div>
 
-          <div className="bf-form bf-form--tight">
-            <div className="bf-row">
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-first">{t("doc_first_name", "First name")} {reqPill}</label>
-                <input id="dz-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
-                {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
-              </div>
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-last">{t("doc_last_name", "Last name")} {reqPill}</label>
-                <input id="dz-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
-                {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
-              </div>
+          <div className="bf-form--tight">
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-first">{t("doc_first_name", "First name")} {reqPill}</label>
+              <input id="dz-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="Juan" />
+              {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
             </div>
-
-            <div className="bf-row">
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-middle">{t("doc_middle_name", "Middle name")} {optPill}</label>
-                <input id="dz-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
-              </div>
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-dob">{t("profile_birthdate", "Date of birth")} {reqPill}</label>
-                <input id="dz-dob" className={`bf-input${errors.dob ? " bf-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
-                {errors.dob && <div className="bf-error">{errors.dob}</div>}
-              </div>
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-middle">{t("doc_middle_name", "Middle name")} {optPill}</label>
+              <input id="dz-middle" className="bf-input" value={form.middleName} onChange={e => set("middleName", e.target.value)} placeholder="Santos" />
             </div>
-
-            <div className="bf-row">
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-civil">{t("profile_civil_status", "Civil status")}</label>
-                <select id="dz-civil" className="bf-input bf-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
-                  {CIVIL_STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{t(s.labelKey, s.value)}</option>)}
-                </select>
-              </div>
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-since">{t("doc_residing_since_year", "Living here since (year)")} {reqPill}</label>
-                <input id="dz-since" className={`bf-input${errors.residingSince ? " bf-input--error" : ""}`} type="number" min="1900" max="2026" value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder={t("doc_residing_year_ph", "For example: 2010")} />
-                {errors.residingSince && <div className="bf-error">{errors.residingSince}</div>}
-              </div>
-            </div>
-
-            <div className="bf-row">
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-contact">{t("doc_phone_number", "Phone number")} {reqPill}</label>
-                <input
-                  id="dz-contact"
-                  className={`bf-input${errors.contact ? " bf-input--error" : ""}`}
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={11}
-                  value={form.contact}
-                  onChange={e => set("contact", e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  onBlur={e => set("contact", normalizePHMobile(e.target.value))}
-                  placeholder="09123456789"
-                />
-                {errors.contact && <div className="bf-error">{errors.contact}</div>}
-              </div>
-              <div className="bf-field">
-                <label className="bf-label" htmlFor="dz-email">{t("profile_email", "Email")} {optPill}</label>
-                <input id="dz-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
-              </div>
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-last">{t("doc_last_name", "Last name")} {reqPill}</label>
+              <input id="dz-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+              {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
             </div>
 
             <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-dob">{t("profile_birthdate", "Date of birth")} {reqPill}</label>
+              <input id="dz-dob" className={`bf-input${errors.dob ? " bf-input--error" : ""}`} type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+              {errors.dob && <div className="bf-error">{errors.dob}</div>}
+            </div>
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-civil">{t("profile_civil_status", "Civil status")}</label>
+              <select id="dz-civil" className="bf-input bf-select" value={form.civilStatus} onChange={e => set("civilStatus", e.target.value)}>
+                {CIVIL_STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{t(s.labelKey, s.value)}</option>)}
+              </select>
+            </div>
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-since">{t("doc_residing_since_year", "Living here since (year)")} {reqPill}</label>
+              <input id="dz-since" className={`bf-input${errors.residingSince ? " bf-input--error" : ""}`} type="number" min="1900" max={new Date().getFullYear()} value={form.residingSince} onChange={e => set("residingSince", e.target.value)} placeholder={t("doc_residing_year_ph", "For example: 2010")} />
+              {errors.residingSince && <div className="bf-error">{errors.residingSince}</div>}
+            </div>
+
+            <div className="bf-field">
+              <label className="bf-label" htmlFor="dz-contact">{t("doc_phone_number", "Phone number")} {reqPill}</label>
+              <input
+                id="dz-contact"
+                className={`bf-input${errors.contact ? " bf-input--error" : ""}`}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                maxLength={11}
+                value={form.contact}
+                onChange={e => set("contact", normalizePHMobile(e.target.value))}
+                placeholder="09123456789"
+              />
+              {errors.contact && <div className="bf-error">{errors.contact}</div>}
+            </div>
+            <div className="bf-field bf-field--span2">
+              <label className="bf-label" htmlFor="dz-email">{t("profile_email", "Email")} {optPill}</label>
+              <input id="dz-email" className="bf-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="juan@email.com" />
+            </div>
+
+            <div className="bf-field bf-field--full">
               <label className="bf-label" htmlFor="dz-address">{t("doc_home_address", "Home address")} {reqPill}</label>
               <input id="dz-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={e => set("address", e.target.value)} placeholder={t("doc_address_ph", "House No., Street, Barangay Malanday, Valenzuela City")} />
               {errors.address && <div className="bf-error">{errors.address}</div>}
@@ -307,8 +329,8 @@ function Step2({ docType, form, setForm, errors }) {
         <div className="bf-group">
           <div className="bf-group__title">{t("doc_your_request", "Your request")}</div>
 
-          <div className="bf-form bf-form--tight">
-            <div className="bf-field">
+          <div className="bf-form--tight">
+            <div className="bf-field bf-field--span2">
               <label className="bf-label" htmlFor="dz-purpose">{t("doc_why_need", "Why do you need this document?")} {reqPill}</label>
               <select
                 id="dz-purpose"
@@ -337,7 +359,7 @@ function Step2({ docType, form, setForm, errors }) {
               </div>
             )}
 
-            <div className="bf-field">
+            <div className="bf-field bf-field--full">
               <div className="bf-label">{t("doc_valid_id", "Valid ID")} {reqPill}</div>
               <label className={`bf-photo${form.validId ? " is-filled" : ""}${errors.validId ? " is-error" : ""}`}>
                 <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleFile} style={{ display: "none" }} />
@@ -371,11 +393,11 @@ function Step2({ docType, form, setForm, errors }) {
           <div className="bf-group">
             <div className="bf-group__title">{t("doc_more_info_needed", "More information needed")}</div>
 
-            <div className="bf-form bf-form--tight">
+            <div className="bf-form--tight">
               {extraFields.map(f => {
                 if (f.type === "checkbox") {
                   return (
-                    <div className="bf-field" key={f.id}>
+                    <div className="bf-field bf-field--full" key={f.id}>
                       <label className={`bf-check${form[f.id] ? " is-on" : ""}${errors[f.id] ? " is-error" : ""}`}>
                         <input type="checkbox" className="bf-check__box" checked={!!form[f.id]} onChange={e => set(f.id, e.target.checked)} />
                         <span>{f.label} {f.required && <span className="bf-pill bf-pill--req">{t("required", "Required")}</span>}</span>
@@ -538,7 +560,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
         dob: rawRes.birthDate || rawRes.dob || "",
         civilStatus: rawRes.civilStatus || "Single",
         address: fullAddress || "",
-        contact: rawRes.contactNumber != null ? String(rawRes.contactNumber) : (rawRes.contact || ""),
+        contact: normalizePHMobile(rawRes.contactNumber ?? rawRes.contact ?? ""),
         email: rawRes.email || "",
         residingSince: rawRes.residingSinceYear ? String(rawRes.residingSinceYear) : (rawRes.residingSince || ""),
       }));
@@ -568,7 +590,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
     if (!form.dob) e.dob = t("doc_err_required", "Required.");
     if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
-    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
+    if (!isValidPHMobile(form.contact)) e.contact = t("doc_err_phone", "Contact number must be exactly 11 digits (09XXXXXXXXX).");
     if (!form.residingSince) e.residingSince = t("doc_err_required", "Required.");
     if (!form.purposeOption) e.purposeOption = t("doc_err_required", "Required.");
     if (form.purposeOption === "Other" && !form.purposeOther?.trim()) {
@@ -647,16 +669,16 @@ export default function DocumentsTab({ userData, householdID, userName }) {
     setStep(1);
     setDocType(null);
     setErrors({});
-    
+
     // Explicitly wipe the form clean BEFORE we load the resident data again
     setForm({
       firstName: "", middleName: "", lastName: "",
       dob: "", civilStatus: "Single", address: "",
       contact: "", email: "", residingSince: "",
-      purposeOption: "", purposeOther: "", 
+      purposeOption: "", purposeOther: "",
       validId: "", validIdFile: null,
     });
-    
+
     // Now trigger the auto-fill pulling strictly from the resident context
     loadResidentData();
   };
@@ -672,7 +694,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
       </div>
 
       <div className="dr-wizard-body">
-        <div className="dz-wrap" ref={topRef}>
+        <div className={`dz-wrap${step === 2 ? " dz-wrap--wide" : ""}`} ref={topRef}>
           {(step === 1 || step === 2) && <ValidityReminderBanner />}
 
           {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} error={errors.docType} />}
