@@ -232,7 +232,7 @@ function Step1({ docTypes, selected, onSelect, error }) {
 }
 
 // ── Step 2: your details ──────────────────────────────────────────────────────
-function Step2({ docType, form, setForm, errors }) {
+function Step2({ docType, form, setForm, errors, setErrors }) {
   const { t, language } = useLanguage();
   const [previewUrl, setPreviewUrl] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -248,6 +248,11 @@ function Step2({ docType, form, setForm, errors }) {
     }
     set("validId", file.name);
     set("validIdFile", file);
+
+    setErrors(prev => {
+      const { validId, ...rest } = prev;
+      return rest;
+    });
 
     if (file.type.startsWith("image/")) {
       setPreviewUrl(URL.createObjectURL(file));
@@ -736,7 +741,7 @@ export default function DocumentsTab({ userData, householdID, userName }) {
           {(step === 1 || step === 2) && <ValidityReminderBanner />}
 
           {step === 1 && <Step1 docTypes={docTypes} selected={docType} onSelect={d => { setDocType(d); setErrors({}); }} error={errors.docType} />}
-          {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} />}
+          {step === 2 && <Step2 docType={docType} form={form} setForm={setForm} errors={errors} setErrors={setErrors} />}
           {step === 3 && <Step3 docType={docType} form={form} />}
           {step === 4 && <Step4 refNum={refNum} onReset={handleReset} />}
 
