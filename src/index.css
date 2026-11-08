@@ -16093,6 +16093,140 @@ button.lv-steps__node:focus-visible {
   }
 }
 
+/* =====================================================================
+   PROGRAMS / FACILITIES / EQUIPMENT: no hover animation
+   Cards stay perfectly still. Buttons only change colour (no lift).
+   ===================================================================== */
+
+.lv-card,
+.lv-card:hover,
+.lv-card:focus-within,
+.sv-facility-card,
+.sv-facility-card:hover,
+.sv-facility-card:focus-within,
+.sv-facilities-list > *,
+.sv-facilities-list > *:hover,
+.lv-grid > *,
+.lv-grid > *:hover,
+.lh-prog-card,
+.lh-prog-card:hover,
+.sv-program-card,
+.sv-program-card:hover {
+  transform: none !important;
+  animation: none !important;
+  transition: none !important;
+  translate: none !important;
+  scale: none !important;
+  background: #fff !important;
+  border-color: var(--sv-card-border) !important;
+  box-shadow: var(--sv-card-shadow) !important;
+}
+
+/* Everything inside the cards stays still on hover too */
+.lv-card:hover *,
+.sv-facility-card:hover *,
+.lh-prog-card:hover *,
+.sv-program-card:hover * {
+  transform: none !important;
+  animation: none !important;
+}
+
+/* Buttons: remove the lift, keep a simple colour change */
+.sv-facility-card .sv-btn-primary,
+.sv-facility-card .sv-btn-primary:hover,
+.sv-facility-card .sv-btn-primary:active,
+.lv-card .lv-register,
+.lv-card .lv-register:hover,
+.lv-card .lv-register:active,
+.sv-program-card__cta,
+.sv-program-card__cta:hover {
+  transform: none !important;
+  transition: background 0.15s !important;
+}
+
+/* The "Learn more" arrow no longer slides */
+.sv-program-card__cta:hover {
+  gap: 4px !important;
+}
+
+/* =====================================================================
+   Documents + Programs: shared 3-column form
+   Paste this at the very BOTTOM of your Services stylesheet.
+   (Delete any "PROGRAMS REGISTRATION: match the Documents form" or
+   "DOCUMENTS: personal info fields in 3 columns" blocks from earlier.)
+   ===================================================================== */
+
+/* Fields live directly inside .bf-form--tight, which is now the grid */
+.dz-wizard .bf-form--tight {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-top: 0.9rem;
+}
+
+.dz-wizard .bf-form--tight > .bf-field--full  { grid-column: 1 / -1; }
+.dz-wizard .bf-form--tight > .bf-field--span2 { grid-column: span 2; }
+
+/* Same card width for Documents step 2 and Programs steps 1-2 */
+.dz-wrap.dz-wrap--wide {
+  max-width: 1120px;
+}
+
+/* Program picker (Programs step 2), teal like Documents */
+.dz-wizard .lv-picks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.dz-wizard .lv-pick {
+  height: 100%;
+}
+
+.dz-wizard .lv-pick:hover:not(:disabled) {
+  border-color: #317D89;
+}
+
+.dz-wizard .lv-pick.is-active {
+  background: #e9f6f8;
+  border-color: #317D89;
+  box-shadow: 0 0 0 4px rgba(49, 125, 137, 0.18);
+}
+
+.dz-wizard .lv-pick.is-active .lv-pick__check {
+  background: #317D89;
+  border-color: #317D89;
+}
+
+.dz-wizard .lv-pick:focus-visible {
+  outline-color: #317D89;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .dz-wizard .bf-form--tight {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .dz-wizard .lv-picks {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dz-wizard .bf-form--tight {
+    grid-template-columns: 1fr;
+  }
+
+  .dz-wizard .bf-form--tight > .bf-field--span2 {
+    grid-column: 1 / -1;
+  }
+}
+
+
 /* ===================== SCAN PAGE ===================== */
 
 .scan-desktop-block {
@@ -18322,6 +18456,119 @@ button.lv-steps__node:focus-visible {
   animation: none !important;
   border-color: var(--sv-card-border, #c9d8e8) !important;
   box-shadow: var(--sv-card-shadow, 0 1px 2px rgba(15, 31, 53, 0.06), 0 3px 10px rgba(26, 79, 138, 0.07)) !important;
+}
+
+/* =====================================================================
+   ACTIVITY TAB BAR = SERVICES TAB BAR
+   Same size, gap, colours and mobile behaviour as .sv-tab-bar / .sv-tab.
+   Keep this block LAST.
+   ===================================================================== */
+
+.act2-tabbar {
+  background: #fff;
+  border-bottom: 2px solid #e8eef6;
+  border-radius: 16px 16px 0 0;
+  padding: 0 1.5rem;
+}
+
+.act2-tabbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.act2-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  padding: 1rem 1.35rem;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #5e7a99;
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.act2-tab:hover {
+  color: #31547c;
+}
+
+.act2-tab.act2-tab--active {
+  color: #31547c;
+  font-weight: 800;
+  border-bottom-color: #31547c;
+}
+
+.act2-tab.act2-tab--active:hover {
+  color: #25636e;
+  border-bottom-color: #25636e;
+}
+
+/* Same small-screen behaviour as Services: tabs scroll sideways */
+@media (max-width: 768px) {
+  .act2-tabbar {
+    justify-content: flex-start;
+    padding: 0 0.25rem;
+  }
+
+  .act2-tabbar__inner {
+    justify-content: flex-start;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .act2-tab {
+    flex: 0 0 auto;
+    padding: 0.9rem 1rem;
+    font-size: 0.85rem;
+    gap: 0.4rem;
+    scroll-snap-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .act2-tab {
+    padding: 0.9rem 1rem;
+    font-size: 0.85rem;
+    gap: 0.4rem;
+  }
+
+  .act2-tab__icon svg {
+    width: auto;
+    height: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .act2-tab {
+    padding: 0.8rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Activity outer spacing = Services (.sv-content) */
+.act2-content {
+  padding-top: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .act2-content {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* ===================== EMERGENCY PAGE ===================== */
