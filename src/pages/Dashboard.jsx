@@ -42,7 +42,7 @@ function UnifiedAnnouncementPopup({ ann, onClose }) {
     teal: "#317D89", blue: "#1a4f8a", green: "#0d7a55",
     amber: "#e8a020", red: "#e03e3e",
   };
-  const annColor = dotColors[ann.dotColor] || "#317D89";
+  const annColor = TONE_HEX[ann.toneKey] || dotColors[ann.dotColor] || "#317D89";
 
   return (
     <div className="db-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -332,30 +332,27 @@ function EquipmentRentalAlertModal({ rentals, currentIdx, total, onClose, onPrev
   );
 }
 
-function SubLabel({ icon, label }) {
+function TagIcon() {
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "0.5rem",
-      padding: "0.85rem 0 0.75rem",
-      borderBottom: "1.5px solid #f0f4f9",
-      marginBottom: "1rem",
-      color: "#5e7a99",
-    }}>
-      {icon}
-      <span style={{
-        fontFamily: "'Poppins', sans-serif",
-        fontSize: "0.72rem",
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-      }}>{label}</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function SubLabel({ icon, label, count }) {
+  return (
+    <div className="db-sublabel">
+      <span className="db-sublabel__icon">{icon}</span>
+      <span className="db-sublabel__text">{label}</span>
+      {count > 0 && <span className="db-sublabel__count">{count}</span>}
     </div>
   );
 }
 
-const ITEMS_PER_PAGE = 4;
+const ITEMS_PER_PAGE = 4;   // announcements list
+const ALERTS_PER_PAGE = 6;  // alert cards (3 columns x 2 rows)
 
 function PaginationBar({ current, total, onChange }) {
   const { t } = useLanguage();
@@ -393,6 +390,34 @@ function PaginationBar({ current, total, onChange }) {
     </div>
   );
 }
+
+// ── Colour by resident category ──
+// Add or change rows to match your real category names. The first keyword
+// found inside the category name wins. Colours: pink, blue, purple, green,
+// amber, orange, indigo, red, teal.
+const CATEGORY_TONES = [
+  ["student",        "pink"],
+  ["lgbt",           "blue"],
+  ["senior",         "purple"],
+  ["pwd",            "indigo"],
+  ["disab",          "indigo"],
+  ["solo parent",    "amber"],
+  ["pregnan",        "orange"],
+  ["4ps",            "green"],
+  ["youth",          "teal"],
+  ["indigent",       "red"],
+];
+
+const TONE_HEX = {
+  pink: "#c2185b", blue: "#1a56a0", purple: "#703381", green: "#1e8a5e",
+  amber: "#b45309", orange: "#c2410c", indigo: "#4338ca", red: "#c62828", teal: "#317D89",
+};
+
+const getCategoryTone = (category) => {
+  const c = String(category || "").trim().toLowerCase();
+  const hit = CATEGORY_TONES.find(([keyword]) => c.includes(keyword));
+  return hit ? hit[1] : "teal";
+};
 
 // ── Helpers for Alerts & Announcements ──
 const extractCategories = (d) => {
@@ -479,16 +504,6 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   const [overdueRentals, setOverdueRentals] = useState([]);
   const [eqAlertIdx, setEqAlertIdx] = useState(0);
   const [showEqModal, setShowEqModal] = useState(true);
-  const [isMobile480, setIsMobile480] = useState(typeof window !== 'undefined' ? window.innerWidth <= 480 : false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile480(window.innerWidth <= 480);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const [widgets, setWidgets] = useState([
     { icon: <VerifiedVisitIcon />, color: "teal", value: "...", labelKey: "widget_verified_visits", subKey: "widget_verified_sub", badgeKey: "widget_badge_active", badgeIcon: <TrendUpIcon /> },
@@ -736,13 +751,23 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
       const targetsEveryone = annCategories.length === 0 || annCategories.includes("all residents");
 
       // Targeted alert: announcement category must equal one of the resident's profile categories
-      const isAlert = !targetsEveryone && userCategories.some(uc => {
-        const u = String(uc).trim().toLowerCase();
-        if (!u) return false;
-        return annCategories.includes(u);
-      });
+      const matchedCategory = targetsEveryone ? null : annCategories.find(c =>
+        userCategories.some(uc => String(uc).trim().toLowerCase() === c)
+      );
+      const isAlert = Boolean(matchedCategory);
 
-      return { ...ann, dotColor: dc, catClass: cc, icon, isSmartAlert: isAlert };
+      // Who the announcement is for (keeps the original spelling, e.g. "PWD", "Students")
+      const audienceNames = (Array.isArray(annRawCat) ? annRawCat : String(annRawCat).split(","))
+        .map(c => String(c).trim())
+        .filter(c => c && c.toLowerCase() !== "all residents");
+      const audience = isAlert
+        ? (audienceNames.find(n => n.toLowerCase() === matchedCategory) || audienceNames[0])
+        : audienceNames[0];
+
+      // Colour follows the audience (students = pink, LGBT = blue, PWD = indigo ...)
+      const toneKey = getCategoryTone(audience || "");
+
+      return { ...ann, dotColor: dc, toneKey, audience, catClass: cc, icon, isSmartAlert: isAlert };
     });
   };
 
@@ -791,8 +816,8 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
   }, [propsHouseholdID, memberID, smartAlertsList]);
 
   // Pagination + filter derived values
-  const alertTotalPages = Math.max(1, Math.ceil(smartAlertsList.length / ITEMS_PER_PAGE));
-  const pagedAlerts = smartAlertsList.slice((alertPage - 1) * ITEMS_PER_PAGE, alertPage * ITEMS_PER_PAGE);
+  const alertTotalPages = Math.max(1, Math.ceil(smartAlertsList.length / ALERTS_PER_PAGE));
+  const pagedAlerts = smartAlertsList.slice((alertPage - 1) * ALERTS_PER_PAGE, alertPage * ALERTS_PER_PAGE);
 
   const filterOptions = ["All", ...new Set(generalAnnsList.map(a => a.announcementCategory).filter(Boolean))];
 
@@ -803,6 +828,17 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
   const annTotalPages = Math.max(1, Math.ceil(filteredAnns.length / ITEMS_PER_PAGE));
   const pagedAnns = filteredAnns.slice((annPage - 1) * ITEMS_PER_PAGE, annPage * ITEMS_PER_PAGE);
+
+  // Equipment banner: values used by the .db-banner markup below
+  const hasUnreturned = overdueRentals.some(r => r.status === 'Unreturned');
+  const rentalName = overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment';
+  const bannerTitle = hasUnreturned
+    ? (overdueRentals.length > 1
+      ? t('dashboard_eq_unreturned_multi', overdueRentals.length)
+      : t('dashboard_eq_unreturned_single'))
+    : (overdueRentals.length > 1
+      ? t('dashboard_eq_overdue_multi', overdueRentals.length)
+      : t('dashboard_eq_overdue_single'));
 
   return (
     <main className="db-page">
@@ -818,56 +854,37 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
 
       <div className="db-content">
 
-        {overdueRentals.length > 0 && (
-          <div style={{ marginBottom: "-0.75rem" }}>
+        {/* ── Action banners (styles in the Dashboard CSS: .db-banner) ── */}
+        <div className="db-banners">
+          {overdueRentals.length > 0 && (
             <div
+              className={`db-banner db-banner--clickable ${hasUnreturned ? 'db-banner--orange' : 'db-banner--red'}`}
+              role="button"
+              tabIndex={0}
               onClick={() => setShowEqModal(true)}
-              style={{
-                display: isMobile480 ? "block" : "flex",
-                alignItems: isMobile480 ? "unset" : "center",
-                justifyContent: isMobile480 ? "unset" : "space-between",
-                gap: isMobile480 ? "0" : "12px",
-                backgroundColor: overdueRentals.some(r => r.status === 'Unreturned') ? "#fff7ed" : "#fef2f2",
-                borderLeft: `4px solid ${overdueRentals.some(r => r.status === 'Unreturned') ? "#ea580c" : "#ef4444"}`,
-                padding: "12px 16px",
-                borderRadius: "8px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                cursor: "pointer",
-                transition: "transform 0.1s ease-in-out",
-                textAlign: isMobile480 ? "center" : "left"
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.01)"}
-              onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+              onKeyDown={(e) => e.key === 'Enter' && setShowEqModal(true)}
             >
-              <div style={{ flex: isMobile480 ? "unset" : 1, marginBottom: isMobile480 ? "10px" : "0" }}>
-                <h4 style={{
-                  margin: 0,
-                  fontSize: "0.9rem",
-                  color: overdueRentals.some(r => r.status === 'Unreturned') ? "#9a3412" : "#991b1b",
-                  fontFamily: "'Poppins', sans-serif"
-                }}>
-                  {overdueRentals.some(r => r.status === 'Unreturned')
-                    ? (overdueRentals.length > 1 ? t('dashboard_eq_unreturned_multi', overdueRentals.length) : t('dashboard_eq_unreturned_single'))
-                    : (overdueRentals.length > 1 ? t('dashboard_eq_overdue_multi', overdueRentals.length) : t('dashboard_eq_overdue_single'))
-                  }
-                </h4>
+              <div className="db-banner__icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
 
-                <p style={{
-                  margin: 0,
-                  fontSize: "0.8rem",
-                  color: overdueRentals.some(r => r.status === 'Unreturned') ? "#c2410c" : "#b91c1c",
-                  fontFamily: "'Poppins', sans-serif"
-                }}>
+              <div className="db-banner__body">
+                <h4 className="db-banner__title">{bannerTitle}</h4>
+                <p className="db-banner__text">
                   {overdueRentals.length > 1 ? (
                     <>
                       {t('dashboard_eq_return_multi_prefix', 'Please return your rented ')}
-                      <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment'}</strong>
+                      <strong>{rentalName}</strong>
                       {t('dashboard_eq_return_multi_suffix', overdueRentals.length - 1)}
                     </>
                   ) : (
                     <>
                       {t('dashboard_eq_return_single_prefix', 'Please return your rented ')}
-                      <strong>{overdueRentals[0]?.equipmentName || overdueRentals[0]?.type || 'Equipment'}</strong>
+                      <strong>{rentalName}</strong>
                       {t('dashboard_eq_return_single_suffix', ' to the Barangay Hall as soon as possible.')}
                     </>
                   )}
@@ -875,33 +892,21 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
               </div>
 
               <button
+                type="button"
+                className="db-banner__btn"
                 onClick={(e) => { e.stopPropagation(); setShowEqModal(true); }}
-                style={{
-                  backgroundColor: overdueRentals.some(r => r.status === 'Unreturned') ? "#ea580c" : "#ef4444",
-                  color: "#fff",
-                  border: "none",
-                  padding: "6px 14px",
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  fontFamily: "'Poppins', sans-serif",
-                  whiteSpace: "nowrap",
-                  display: "block",
-                  margin: isMobile480 ? "10px auto 0 auto" : "0"
-                }}
               >
                 {t('dashboard_review_now')}
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        <FeedbackAlerts
-          householdID={propsHouseholdID}
-          residentID={memberID}
-          onNavigate={onNavigate}
-        />
+          <FeedbackAlerts
+            householdID={propsHouseholdID}
+            residentID={memberID}
+            onNavigate={onNavigate}
+          />
+        </div>
 
         {/* ── 1. Your Summary ── */}
         <SectionCard icon={<GridIcon />} title={t('dashboard_summary_title')} subtitle={t('dashboard_summary_sub')}>
@@ -933,10 +938,10 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           }
         >
           {/* Alerts */}
-          <div style={{ padding: "0 1.5rem" }}>
-            <SubLabel icon={<BoltIcon />} label={t('dashboard_alerts_label')} />
+          <div className="db-block">
+            <SubLabel icon={<BoltIcon />} label={t('dashboard_alerts_label')} count={smartAlertsList.length} />
             {annLoading ? (
-              <SkeletonCards />
+              <SkeletonCards count={3} />
             ) : smartAlertsList.length === 0 ? (
               <EmptyState
                 icon={<BoltIcon />}
@@ -945,38 +950,36 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
               />
             ) : (
               <>
-                <div className="db-alerts-grid" style={{ marginBottom: "0.5rem" }}>
+                <div className="db-alerts-grid">
                   {pagedAlerts.map((a) => {
                     const posted = getPostedAt(a);
                     return (
                       <div
                         key={a.id}
-                        className={`alert-card alert-card--${a.dotColor}`}
+                        className={`alert-card tone-${a.toneKey || a.dotColor}`}
                         onClick={() => setSelectedAnn(a)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => e.key === "Enter" && setSelectedAnn(a)}
                       >
-                        <div className="alert-card__top-bar" />
-                        <div className="alert-card__header">
+                        <div className="alert-card__top">
                           <div className="alert-card__icon-wrap">{a.icon}</div>
-                          <span className="alert-card__tag">{a.category}</span>
-                        </div>
-                        <div className="alert-card__body">
-                          <div className="alert-card__meta">
-                            {isRecent(posted) && <span className="alert-card__new">{t('dashboard_new_badge', 'New')}</span>}
-                            <span>{timeAgo(posted, t)}</span>
+                          <div className="alert-card__top-text">
+                            <span className="alert-card__tag"><TagIcon /> {a.category}</span>
+                            <div className="alert-card__meta">
+                              {isRecent(posted) && <span className="alert-card__new">{t('dashboard_new_badge', 'New')}</span>}
+                              <span className="alert-card__time"><ClockIcon /> {timeAgo(posted, t)}</span>
+                            </div>
                           </div>
-                          <div className="alert-card__title">{a.title}</div>
-                          <div className="alert-card__desc" style={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>{a.description}</div>
+                        </div>
+
+                        <div className="alert-card__title">{a.title}</div>
+                        <div className="alert-card__desc">{a.description}</div>
+
+                        <div className="alert-card__foot">
                           <span className="alert-card__cta">
-                            {t('view_details')} <ArrowRightIcon />
+                            {t('view_details')}
+                            <span className="alert-card__arrow"><ArrowRightIcon /></span>
                           </span>
                         </div>
                       </div>
@@ -989,12 +992,12 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
           </div>
 
           {/* Barangay Announcements */}
-          <div style={{ padding: "0.5rem 1.5rem 1.25rem" }}>
-            <SubLabel icon={<BellIcon />} label={t('dashboard_ann_label')} />
+          <div className="db-block">
+            <SubLabel icon={<BellIcon />} label={t('dashboard_ann_label')} count={generalAnnsList.length} />
 
             <div className="ann-toolbar">
               <div className="ann-search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
                 <input
@@ -1027,43 +1030,57 @@ export default function Dashboard({ userName = "", onNavigate, householdID: prop
               />
             ) : (
               <>
-                <div className="ann-table-header">
-                  {[t('dashboard_th_title', 'TITLE'), t('dashboard_th_date', 'DATE'), t('dashboard_th_category', 'CATEGORY'), ""].map((h, i) => (
-                    <div key={i} className="ann-table-header__cell">{h}</div>
+                <div className="ann-list">
+                  <div className="ann-table-header">
+                    {["", t('dashboard_th_title', 'TITLE'), t('dashboard_th_date', 'DATE'), t('dashboard_th_category', 'CATEGORY'), ""].map((h, i) => (
+                      <div key={i} className="ann-table-header__cell">{h}</div>
+                    ))}
+                  </div>
+                  {pagedAnns.map((a, idx) => (
+                    <div
+                      key={a.id}
+                      className={`ann-row tone-${a.toneKey || a.dotColor}${idx === pagedAnns.length - 1 ? " ann-row--last" : ""}`}
+                      onClick={() => setSelectedAnn(a)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === "Enter" && setSelectedAnn(a)}
+                    >
+                      <div className="ann-row__icon" aria-hidden="true">{a.icon}</div>
+
+                      <div className="ann-row__body">
+                        <div className="ann-row__title-line">
+                          <span className="ann-row__title">{a.title}</span>
+                          {a.isSmartAlert && <span className="ann-row__alert-badge">{t('dashboard_alert_badge', 'ALERT')}</span>}
+                        </div>
+                        <div className="ann-row__desc">{a.description}</div>
+                        <div className="ann-row__mobile-meta">
+                          <span><ClockIcon /> {timeAgo(getPostedAt(a), t) || a.date}</span>
+                          <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
+                          {a.audience && <span className="ann-row__aud"><TagIcon /> {a.audience}</span>}
+                        </div>
+                      </div>
+
+                      <div className="ann-row__date">
+                        {isRecent(getPostedAt(a)) && <span className="ann-row__fresh" />}
+                        <ClockIcon /> {timeAgo(getPostedAt(a), t) || a.date}
+                      </div>
+
+                      <div className="ann-row__cat">
+                        <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
+                        {a.audience && <span className="ann-row__aud"><TagIcon /> {a.audience}</span>}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="ann-row__chevron"
+                        aria-label={t('view_details')}
+                        onClick={e => { e.stopPropagation(); setSelectedAnn(a); }}
+                      >
+                        <ChevronIcon />
+                      </button>
+                    </div>
                   ))}
                 </div>
-                {pagedAnns.map((a, idx) => (
-                  <div
-                    key={a.id}
-                    className={`ann-row${idx === pagedAnns.length - 1 ? " ann-row--last" : ""}`}
-                    onClick={() => setSelectedAnn(a)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <div className="ann-row__body">
-                      <div className="ann-row__title-line">
-                        <span className="ann-row__title">{a.title}</span>
-                        {a.isSmartAlert && <span className="ann-row__new-badge" style={{ background: "#ffe4e6", color: "#e11d48" }}>{t('dashboard_alert_badge', 'ALERT')}</span>}
-                      </div>
-                      <div className="ann-row__desc" style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 1,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>{a.description}</div>
-                    </div>
-                    <div className="ann-row__date">
-                      {isRecent(getPostedAt(a)) && <span className="ann-row__fresh" />}
-                      {timeAgo(getPostedAt(a), t) || a.date}
-                    </div>
-                    <div className="ann-row__cat">
-                      <span className={`ann-row__cat-tag ${a.catClass || "db-cat-service"}`}>{a.announcementCategory}</span>
-                    </div>
-                    <button className="ann-row__chevron" onClick={e => { e.stopPropagation(); setSelectedAnn(a); }}>
-                      <ChevronIcon />
-                    </button>
-                  </div>
-                ))}
                 <PaginationBar current={annPage} total={annTotalPages} onChange={setAnnPage} />
               </>
             )}
