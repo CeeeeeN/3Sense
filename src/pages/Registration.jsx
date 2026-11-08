@@ -11,14 +11,80 @@ import {
 
 // ─── ID Validation (Strict PhilSys National ID Check) ─────────────────────────
 async function validateIsGovernmentId(imageBase64) {
-  return new Promise((resolve) =>
-    setTimeout(() => resolve({
-      isValid: true,
-      reason: null,
-      detectedType: "PhilSys National ID",
-      idNumber: null,
-    }), 1000)
-  );
+  try {
+    const formData = new FormData();
+    formData.append("base64Image", imageBase64);
+    formData.append("apikey", "helloworld");
+    formData.append("language", "eng");
+    formData.append("isOverlayRequired", false);
+    formData.append("detectOrientation", true);
+    formData.append("scale", true);
+    formData.append("OCREngine", 2);
+
+    const response = await fetch("https://api.ocr.space/parse/image", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+    if (result.IsErroredOnProcessing || !result.ParsedResults || !result.ParsedResults[0]) {
+      return {
+        isValid: false,
+        reason: "Image text could not be read clearly. Please align your PhilSys ID and retry.",
+        detectedType: null,
+      };
+    }
+
+    const text = (result.ParsedResults[0].ParsedText || "").toUpperCase();
+
+    // 1. Strict PhilSys Header Check
+    const philsysHeaders = [
+      "PHILIPPINE IDENTIFICATION",
+      "PAMBANSANG PAGKAKAKILANLAN",
+      "REPUBLIKA NG PILIPINAS",
+      "PHILSYS"
+    ];
+    const hasHeader = philsysHeaders.some(h => text.includes(h));
+
+    // 2. Strict 16-digit PCN Check (XXXX-XXXX-XXXX-XXXX or 16 continuous digits)
+    const pcnRegex = /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/;
+    const idMatch = text.match(pcnRegex);
+
+    // 3. Strict Field Label Check (Requires at least 2 matching labels)
+    const fieldLabels = [
+      "LAST NAME", "APELYIDO",
+      "GIVEN NAMES", "MGA PANGALAN", "PANGALAN",
+      "DATE OF BIRTH", "KAPANGANAKAN",
+      "ADDRESS", "TIRAHAN"
+    ];
+    const labelMatches = fieldLabels.filter(label => text.includes(label));
+    const hasSufficientLabels = labelMatches.length >= 2;
+
+    // Strict multi-factor validation
+    const isValidPhilSys = (hasHeader && idMatch) || (hasHeader && hasSufficientLabels) || (idMatch && hasSufficientLabels);
+
+    if (isValidPhilSys) {
+      return {
+        isValid: true,
+        reason: null,
+        detectedType: "PhilSys National ID",
+        idNumber: idMatch ? idMatch[0].replace(/[\s]/g, '-') : null,
+      };
+    }
+
+    return {
+      isValid: false,
+      reason: "No valid PhilSys National ID detected. Please ensure your physical card is clearly visible inside the frame.",
+      detectedType: null,
+    };
+  } catch (err) {
+    console.error("[validateIsGovernmentId] Error:", err);
+    return {
+      isValid: null,
+      reason: "Verification service temporarily unavailable. Please try again.",
+      detectedType: null,
+    };
+  }
 }
 
 // ─── LIVE OCR INTEGRATION ─────────────────────────────────────────────────────
@@ -280,17 +346,6 @@ const STEP_ICONS = [
   <SvgGradCap size={22} />,
   <SvgHome size={22} />,
   <SvgClipboard size={22} />,
-];
-
-const STEPS = [
-  { label: "ID Scan" },
-  { label: "Selfie" },
-  { label: "Personal Info" },
-  { label: "Address" },
-  { label: "Category" },
-  { label: "Education" },
-  { label: "Household" },
-  { label: "Review & Submit" },
 ];
 
 function useCamera() {
@@ -1679,7 +1734,7 @@ export default function Registration({ onBack, branchingPayload }) {
               </div>
               <button onClick={() => setShowPrivacyModal(false)}
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.4rem", color: "#6b7280", lineHeight: 1 }}>
-                &times;
+                ×
               </button>
             </div>
             <div style={{ overflowY: "auto", padding: "1.5rem", flex: 1, fontSize: "0.875rem", color: "#374151" }}>
@@ -1715,4 +1770,4 @@ export default function Registration({ onBack, branchingPayload }) {
       )}
     </div>
   );
-}
+}
