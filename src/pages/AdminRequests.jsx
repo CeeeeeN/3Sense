@@ -10,13 +10,13 @@ import { logTransaction } from '../services/logger';
 import { formatDisplayEmail } from '../utils/maskEmail';
 import { getFamilyNumber } from '../utils/householdNumbers';
 import { useAlert } from '../context/AlertContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // NEW: Import Language Hook
 import { useLanguage } from '../context/LanguageContext';
 
 export default function AdminRequests() {
-  const queryClient = useQueryClient(); 
+  const queryClient = useQueryClient();
   const { showAlert } = useAlert();
   const { t } = useLanguage(); // NEW: Destructure hook
 
@@ -64,7 +64,7 @@ export default function AdminRequests() {
     const mName = middleName ? `${middleName} ` : '';
     return `${firstName || ''} ${mName}${lastName || ''}`.trim() || 'Unknown Resident';
   };
-  
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -110,7 +110,7 @@ export default function AdminRequests() {
         };
       });
     },
-    enabled: activeTab === 'Facility', 
+    enabled: activeTab === 'Facility',
     staleTime: 1000 * 60 * 30,
   });
 
@@ -140,7 +140,7 @@ export default function AdminRequests() {
         };
       });
     },
-    enabled: activeTab === 'Document', 
+    enabled: activeTab === 'Document',
     staleTime: 1000 * 60 * 30,
   });
 
@@ -199,13 +199,13 @@ export default function AdminRequests() {
       const safeId = String(req.id || "").toLowerCase();
       const safeStatus = String(req.status || "").toLowerCase();
 
-      const matchesSearch = 
+      const matchesSearch =
         safeResidentName.includes(safeSearchTerm) ||
         safeType.includes(safeSearchTerm) ||
         safeId.includes(safeSearchTerm);
-        
+
       const matchesStatus = filterStatus === 'All' || safeStatus === filterStatus.toLowerCase();
-      
+
       return matchesSearch && matchesStatus;
     }).sort((a, b) => {
       if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
@@ -231,7 +231,7 @@ export default function AdminRequests() {
   const renderPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
-    
+
     if (totalPages <= maxVisible) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
@@ -250,8 +250,8 @@ export default function AdminRequests() {
         className={`af-page-btn ${currentPage === page ? "active" : ""}`}
         onClick={() => typeof page === 'number' ? setCurrentPage(page) : null}
         disabled={typeof page !== 'number'}
-        style={{ 
-          cursor: typeof page === 'number' ? 'pointer' : 'default', 
+        style={{
+          cursor: typeof page === 'number' ? 'pointer' : 'default',
           border: typeof page !== 'number' ? 'none' : '',
           background: typeof page !== 'number' ? 'transparent' : ''
         }}
@@ -303,10 +303,10 @@ export default function AdminRequests() {
 
   const updateLocalCache = (category, docId, newStatus) => {
     const queryKey = category === 'Facility' ? ['adminManage_facRequests'] :
-                     category === 'Document' ? ['adminManage_docRequests'] :
-                     ['adminManage_eqRequests'];
+      category === 'Document' ? ['adminManage_docRequests'] :
+        ['adminManage_eqRequests'];
 
-    queryClient.setQueryData(queryKey, (old = []) => 
+    queryClient.setQueryData(queryKey, (old = []) =>
       old.map(req => req.docId === docId ? { ...req, status: newStatus } : req)
     );
   };
@@ -317,14 +317,14 @@ export default function AdminRequests() {
 
     if (target.category === 'Facility') {
       const targetData = target.allData;
-      
+
       const overlapQuery = query(
         collection(db, 'facility_reservations'),
         where('facilityId', '==', String(targetData.facilityId)),
         where('date', '==', targetData.date),
         where('status', 'in', ['Approved', 'approved', 'Completed', 'completed'])
       );
-      
+
       const checkSnap = await getDocs(overlapQuery);
       const hasOverlap = checkSnap.docs.some(doc => {
         if (doc.id === target.docId) return false;
@@ -340,7 +340,7 @@ export default function AdminRequests() {
 
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Approved',
         processedBy: adminName,
         processedRole: adminRole,
@@ -350,9 +350,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "APPROVED_REQUEST", `Approved ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         const label = target.type;
         let notifType = 'document_update';
@@ -381,7 +381,7 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Ready for Pickup',
         processedBy: adminName,
         processedRole: adminRole,
@@ -391,9 +391,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "READY_FOR_PICKUP", `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         const notifType = target.category === 'Equipment' ? 'equipment_update' : 'document_update';
         await createUserNotification(
@@ -418,7 +418,7 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Claimed',
         processedBy: adminName,
         processedRole: adminRole,
@@ -428,7 +428,7 @@ export default function AdminRequests() {
       if (target.category === 'Equipment') {
         const eqId = target.allData?.equipmentID;
         const requestedQty = Number(target.allData?.quantity || 0);
-        
+
         if (eqId && requestedQty > 0) {
           const eqRef = doc(db, 'equipment', eqId);
           await updateDoc(eqRef, {
@@ -441,9 +441,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "CLAIMED_REQUEST", `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         const notifType = target.category === 'Equipment' ? 'equipment_update' : 'document_update';
         await createUserNotification(
@@ -468,7 +468,7 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Returned',
         returnedProcessedBy: adminName,
         returnedProcessedRole: adminRole,
@@ -478,7 +478,7 @@ export default function AdminRequests() {
       if (target.category === 'Equipment') {
         const eqId = target.allData?.equipmentID;
         const requestedQty = Number(target.allData?.quantity || 0);
-        
+
         if (eqId && requestedQty > 0) {
           const eqRef = doc(db, 'equipment', eqId);
           await updateDoc(eqRef, {
@@ -491,9 +491,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "RETURNED_EQUIPMENT", `Marked ${target.category} request (Ref: ${target.docId}) as returned for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         await createUserNotification(
           hhID, residentID,
@@ -533,8 +533,8 @@ export default function AdminRequests() {
       );
 
       const residentID = target.allData?.residentID || target.allData?.userID || '';
-      const hhID       = target.allData?.householdID || '';
-      const refNum     = target.id || '';
+      const hhID = target.allData?.householdID || '';
+      const refNum = target.id || '';
 
       if (residentID && hhID) {
         await createUserNotification(
@@ -573,9 +573,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "REJECT_REQUEST", `Rejected ${selectedRequest.category} request (Ref: ${selectedRequest.docId}) for ${selectedRequest.residentName}`);
 
       const residentID = selectedRequest.allData?.residentID || selectedRequest.allData?.userID || "";
-      const hhID       = selectedRequest.allData?.householdID || "";
-      const refNum     = selectedRequest.id || "";
-      
+      const hhID = selectedRequest.allData?.householdID || "";
+      const refNum = selectedRequest.id || "";
+
       if (residentID && hhID) {
         const label = selectedRequest.type || 'Request';
         let notifType = 'document_update';
@@ -786,22 +786,22 @@ export default function AdminRequests() {
 
         {!loading && filteredRequests.length > 0 && totalPages > 1 && (
           <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
-            <button 
-              className="af-page-btn" 
+            <button
+              className="af-page-btn"
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
             >
-              {t('admin_req_page_prev') || 'Previous'}
+              {t('admin_req_page_prev')}
             </button>
             {renderPageNumbers()}
-            <button 
-              className="af-page-btn" 
+            <button
+              className="af-page-btn"
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
               style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
             >
-              {t('admin_req_page_next') || 'Next'}
+              {t('admin_req_page_next')}
             </button>
           </div>
         )}
@@ -960,7 +960,7 @@ export default function AdminRequests() {
                             padding: '12px 14px', marginTop: '4px', fontSize: '0.85rem', color: '#9a3412',
                           }}>
                             <svg style={{ flexShrink: 0, marginTop: '2px' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                             </svg>
                             <div>
                               <strong style={{ display: 'block', color: '#7c2d12', marginBottom: '2px' }}>{t('admin_req_lbl_overdue_title')}</strong>
@@ -1018,10 +1018,10 @@ export default function AdminRequests() {
                             <label style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{t('admin_req_lbl_id')}</label>
                             <div style={{ marginTop: '8px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc', display: 'flex', justifyContent: 'center' }}>
                               <a href={selectedRequest.allData.validIdUrl} target="_blank" rel="noopener noreferrer">
-                                <img 
-                                  src={selectedRequest.allData.validIdUrl} 
-                                  alt="Resident Valid ID" 
-                                  style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px' }} 
+                                <img
+                                  src={selectedRequest.allData.validIdUrl}
+                                  alt="Resident Valid ID"
+                                  style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px' }}
                                 />
                               </a>
                             </div>
@@ -1059,7 +1059,7 @@ export default function AdminRequests() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="modal-footer">
                 {(
                   String(selectedRequest.status || "").toLowerCase() === 'pending' ||
@@ -1068,52 +1068,52 @@ export default function AdminRequests() {
                   ((['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment') ||
                   (String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment')
                 ) && (
-                  <div className="modal-footer">
-                    {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
-                      <>
-                        <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
-                          <XCircle size={16} /> {t('admin_req_btn_reject')}
+                    <div className="modal-footer">
+                      {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
+                        <>
+                          <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
+                            <XCircle size={16} /> {t('admin_req_btn_reject')}
+                          </button>
+                          <button className="btn-approve" onClick={() => handleApprove()}>
+                            <CheckCircle size={16} /> {t('admin_req_btn_approve')}
+                          </button>
+                        </>
+                      )}
+                      {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+                        <button className="btn-approve" onClick={() => handleReadyForPickup()}>
+                          <CheckCircle size={16} /> {t('admin_req_btn_ready')}
                         </button>
-                        <button className="btn-approve" onClick={() => handleApprove()}>
-                          <CheckCircle size={16} /> {t('admin_req_btn_approve')}
+                      )}
+                      {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+                        <button className="btn-approve" onClick={() => handleClaimed()}>
+                          <CheckCircle size={16} /> {t('admin_req_btn_claimed')}
                         </button>
-                      </>
-                    )}
-                    {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-                      <button className="btn-approve" onClick={() => handleReadyForPickup()}>
-                        <CheckCircle size={16} /> {t('admin_req_btn_ready')}
-                      </button>
-                    )}
-                    {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-                      <button className="btn-approve" onClick={() => handleClaimed()}>
-                        <CheckCircle size={16} /> {t('admin_req_btn_claimed')}
-                      </button>
-                    )}
-                    {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
-                      <button className="btn-approve" onClick={() => handleReturned()}>
-                        <CheckCircle size={16} /> {t('admin_req_btn_returned')}
-                      </button>
-                    )}
-                    {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
-                      <button
-                        onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
-                        style={{
-                          height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
-                          fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          gap: '6px', padding: '0 16px', borderRadius: '8px',
-                          background: '#fff7ed', color: '#c2410c',
-                          border: '1.5px solid #fed7aa',
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                        {t('admin_req_btn_unreturned')}
-                      </button>
-                    )}
-                  </div>
-                )}
+                      )}
+                      {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
+                        <button className="btn-approve" onClick={() => handleReturned()}>
+                          <CheckCircle size={16} /> {t('admin_req_btn_returned')}
+                        </button>
+                      )}
+                      {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
+                        <button
+                          onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
+                          style={{
+                            height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+                            fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            gap: '6px', padding: '0 16px', borderRadius: '8px',
+                            background: '#fff7ed', color: '#c2410c',
+                            border: '1.5px solid #fed7aa',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {t('admin_req_btn_unreturned')}
+                        </button>
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -1169,7 +1169,7 @@ export default function AdminRequests() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
                   </div>
                   <h2 style={{ color: '#7c2d12', margin: 0 }}>{t('admin_req_unret_title')}</h2>
@@ -1214,7 +1214,7 @@ export default function AdminRequests() {
 
                 <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '7px', padding: '10px 12px' }}>
                   <svg style={{ flexShrink: 0, marginTop: '1px' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                   {t('admin_req_unret_notif')}
                 </div>
@@ -1234,7 +1234,7 @@ export default function AdminRequests() {
                   onMouseOut={(e) => e.currentTarget.style.background = '#c2410c'}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
                   {t('admin_req_unret_confirm')}
                 </button>

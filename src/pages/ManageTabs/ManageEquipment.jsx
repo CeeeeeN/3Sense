@@ -60,11 +60,11 @@ export default function ManageEquipment() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  
+
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -115,13 +115,13 @@ export default function ManageEquipment() {
     let newBlocked;
     if (current.includes(dateStr)) newBlocked = current.filter(d => d !== dateStr);
     else newBlocked = [...current, dateStr];
-    
-    setSelectedEquipment(prev => ({...prev, blockedDates: newBlocked}));
-    
+
+    setSelectedEquipment(prev => ({ ...prev, blockedDates: newBlocked }));
+
     try {
       await updateDoc(doc(db, "equipment", selectedEquipment.id), { blockedDates: newBlocked });
       queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
-    } catch(err) {
+    } catch (err) {
       console.error(err);
     }
   };
@@ -131,11 +131,11 @@ export default function ManageEquipment() {
   });
 
   const handleEdit = (eq) => {
-    setNewEquipment({ 
-      equipmentName:  eq.equipmentName || eq.name || "",
-      quantity:       eq.quantity || "", 
-      description:    eq.description || eq.fullDescription || "",
-      available:      eq.available !== false,
+    setNewEquipment({
+      equipmentName: eq.equipmentName || eq.name || "",
+      quantity: eq.quantity || "",
+      description: eq.description || eq.fullDescription || "",
+      available: eq.available !== false,
       purposeOptions: eq.purposeOptions || []
     });
     setPurposeInput("");
@@ -174,7 +174,7 @@ export default function ManageEquipment() {
     try {
       const equipmentPayload = {
         ...newEquipment,
-        quantity: Number(newEquipment.quantity) 
+        quantity: Number(newEquipment.quantity)
       };
 
       if (editingEquipmentId) {
@@ -185,7 +185,7 @@ export default function ManageEquipment() {
         await updateDoc(newRef, { equipmentID: newRef.id });
         logTransaction(adminName, adminRole, "ADDED_EQUIPMENT", `Added new equipment: ${equipmentPayload.equipmentName} (ID: ${newRef.id})`);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
 
       setNewEquipment({ equipmentName: "", quantity: "", description: "", available: true, purposeOptions: [] });
@@ -194,7 +194,7 @@ export default function ManageEquipment() {
       setPurposeFormError("");
       setEditingEquipmentId(null);
       setShowAddModal(false);
-    } catch(error) {
+    } catch (error) {
       console.error("Error saving equipment: ", error);
     }
   };
@@ -241,7 +241,7 @@ export default function ManageEquipment() {
         const name = (e.equipmentName || e.name || "").toLowerCase();
         const matchesSearch = name.includes(searchTerm.toLowerCase());
         const isAvail = e.available !== false;
-        const matchesAvail = 
+        const matchesAvail =
           filterAvailability === "All" ||
           (filterAvailability === "Available" && isAvail) ||
           (filterAvailability === "Unavailable" && !isAvail);
@@ -365,18 +365,52 @@ export default function ManageEquipment() {
           <div className="as-card" key={eq.id}>
             <div className="as-card-header">
               <h2 className="as-card-title">{eq.equipmentName || eq.name}</h2>
-              <span className={`as-badge ${eq.available ? "open" : "ongoing"}`}>
-                {eq.available ? t('admin_eq_card_avail') : t('admin_eq_card_unavail')}
+              <span
+                className="as-badge"
+                style={{
+                  background: eq.available !== false ? "#dcfce7" : "#fee2e2",
+                  color: eq.available !== false ? "#166534" : "#991b1b",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  padding: "3px 10px",
+                  borderRadius: "12px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {eq.available !== false ? t('admin_eq_card_avail') : t('admin_eq_card_unavail')}
               </span>
             </div>
-            <div style={{ marginBottom: '12px' }}><DescriptionPreview text={eq.description || eq.fullDescription} t={t} /></div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <DescriptionPreview text={eq.description || eq.fullDescription} t={t} />
+            </div>
+
             <ul className="as-card-details">
-              <li><strong>{t('admin_eq_card_inventory')}</strong> {eq.quantity ? `${eq.quantity} ${t('admin_eq_card_units')}` : "—"}</li>
+              <li>
+                <strong>{t('admin_eq_card_inventory')}</strong>{" "}
+                {eq.quantity ? `${eq.quantity} ${t('admin_eq_card_units')}` : "—"}
+              </li>
+              {eq.purposeOptions && eq.purposeOptions.length > 0 && (
+                <li>
+                  <strong>{t('admin_card_lbl_purposes')}</strong> {eq.purposeOptions.length} {t('admin_card_lbl_preset_opts')}
+                </li>
+              )}
             </ul>
-            <div className="as-card-footer" style={{ gap: '10px', display: 'flex', flexWrap: 'wrap' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => openCalendar(eq)}>{t('admin_eq_btn_block_dates')}</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1 }} onClick={() => handleEdit(eq)}>{t('admin_eq_btn_edit')}</button>
-              <button className="as-btn-ghost" style={{ padding: '8px 16px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(eq.id, eq.equipmentName || eq.name)}>{t('admin_eq_btn_delete')}</button>
+
+            <div className="as-card-footer" style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}>
+              <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1 }} onClick={() => openCalendar(eq)}>
+                {t('admin_eq_btn_block_dates')}
+              </button>
+              <button className="as-btn-ghost" style={{ padding: "8px 16px", flex: 1 }} onClick={() => handleEdit(eq)}>
+                {t('admin_eq_btn_edit')}
+              </button>
+              <button
+                className="as-btn-ghost"
+                style={{ padding: "8px 16px", flex: 1, color: "#dc2626", borderColor: "#fca5a5" }}
+                onClick={() => handleDelete(eq.id, eq.equipmentName || eq.name)}
+              >
+                {t('admin_eq_btn_delete')}
+              </button>
             </div>
           </div>
         ))}
@@ -397,37 +431,37 @@ export default function ManageEquipment() {
               <h2>{editingEquipmentId ? t('admin_eq_modal_edit_title') : t('admin_eq_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
             </div>
-            
+
             <div className="as-modal-body" style={{ alignItems: 'stretch' }}>
               <form className="as-form" onSubmit={handleAddEquipment}>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div className="as-form-group">
-                  <label className="as-form-label">{t('admin_eq_modal_name')}</label>
+                    <label className="as-form-label">{t('admin_eq_modal_name')}</label>
                     <input type="text" className="as-form-input" required placeholder={t('admin_eq_modal_name_ph')}
-                      value={newEquipment.equipmentName} onChange={(e) => setNewEquipment({...newEquipment, equipmentName: e.target.value})} 
+                      value={newEquipment.equipmentName} onChange={(e) => setNewEquipment({ ...newEquipment, equipmentName: e.target.value })}
                     />
                   </div>
 
                   <div className="as-form-group">
                     <label className="as-form-label">{t('admin_eq_modal_qty')}</label>
                     <input type="number" className="as-form-input" required placeholder={t('admin_eq_modal_qty_ph')} min="1"
-                      value={newEquipment.quantity} onChange={(e) => setNewEquipment({...newEquipment, quantity: e.target.value})} 
+                      value={newEquipment.quantity} onChange={(e) => setNewEquipment({ ...newEquipment, quantity: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="as-form-group">
-                    <label className="as-form-label">{t('admin_eq_modal_desc')}</label>
-                    <textarea className="as-form-textarea" required rows="3" placeholder={t('admin_eq_modal_desc_ph')}
-                      value={newEquipment.description} onChange={(e) => setNewEquipment({...newEquipment, description: e.target.value})} 
-                    />
+                  <label className="as-form-label">{t('admin_eq_modal_desc')}</label>
+                  <textarea className="as-form-textarea" required rows="3" placeholder={t('admin_eq_modal_desc_ph')}
+                    value={newEquipment.description} onChange={(e) => setNewEquipment({ ...newEquipment, description: e.target.value })}
+                  />
                 </div>
 
                 <div className="as-form-section">
                   <h3 className="as-form-section-title">{t('admin_eq_modal_avail_title')}</h3>
                   <label className="as-checkbox-label">
-                    <input type="checkbox" className="as-checkbox" checked={newEquipment.available} onChange={(e) => setNewEquipment({...newEquipment, available: e.target.checked})} />
+                    <input type="checkbox" className="as-checkbox" checked={newEquipment.available} onChange={(e) => setNewEquipment({ ...newEquipment, available: e.target.checked })} />
                     {t('admin_eq_modal_avail_check')}
                   </label>
                 </div>
@@ -450,7 +484,7 @@ export default function ManageEquipment() {
 
                 <div className="as-form-section" style={{ marginTop: '20px' }}>
                   <h3 className="as-form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
                     {t('admin_doc_modal_purpose_title')} <span style={{ color: '#e03e3e', marginLeft: 2 }}>*</span>
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '10px', marginTop: '-2px' }}>
@@ -513,10 +547,10 @@ export default function ManageEquipment() {
                           <span style={{ flex: 1, fontSize: '0.83rem', color: '#0f1f35' }}>{opt}</span>
                           <button type="button" onClick={() => { setEditingPurposeIdx(idx); setPurposeInput(opt); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#317D89', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}>{t('admin_doc_modal_purpose_btn_edit')}</button>
                           <button type="button" onClick={() => {
-                              const updated = (newEquipment.purposeOptions || []).filter((_, i) => i !== idx);
-                              setNewEquipment({ ...newEquipment, purposeOptions: updated });
-                              if (editingPurposeIdx === idx) { setEditingPurposeIdx(null); setPurposeInput(''); }
-                            }}
+                            const updated = (newEquipment.purposeOptions || []).filter((_, i) => i !== idx);
+                            setNewEquipment({ ...newEquipment, purposeOptions: updated });
+                            if (editingPurposeIdx === idx) { setEditingPurposeIdx(null); setPurposeInput(''); }
+                          }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e03e3e', fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px' }}
                           >{t('admin_doc_modal_purpose_btn_remove')}</button>
                         </div>
@@ -551,7 +585,7 @@ export default function ManageEquipment() {
               <p className="as-modal-desc" style={{ marginBottom: '20px', textAlign: 'center' }}>
                 {t('admin_eq_cal_desc')}
               </p>
-              
+
               <div className="sv-calendar" style={{ margin: '0 auto', maxWidth: '400px' }}>
                 <div className="sv-cal-nav">
                   <button className="sv-cal-arrow" onClick={prevMonth}><ChevronLeftIcon /></button>
@@ -563,10 +597,10 @@ export default function ManageEquipment() {
                   {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const d = i + 1;
-                    const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                    const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                     const isBlocked = (selectedEquipment?.blockedDates || []).includes(dateStr);
                     return (
-                      <button key={d} 
+                      <button key={d}
                         className={`sv-cal-cell sv-cal-cell--${isBlocked ? "reserved" : "available"}`}
                         onClick={() => toggleDate(dateStr)}
                         style={{ cursor: 'pointer' }}
@@ -581,7 +615,7 @@ export default function ManageEquipment() {
                   <span className="sv-legend-item"><span className="sv-legend-dot sv-legend-dot--reserved" />{t('admin_fac_cal_blocked')}</span>
                 </div>
               </div>
-              
+
               <div className="as-modal-actions" style={{ justifyContent: 'flex-end', marginTop: '30px' }}>
                 <button className="as-btn-aqua" onClick={() => setShowCalendarModal(false)}>{t('admin_fac_cal_btn_done')}</button>
               </div>
@@ -602,7 +636,7 @@ export default function ManageEquipment() {
               <h3>{selectedQR.name}</h3>
               <p className="as-modal-desc">{t('admin_eq_qr_desc')}</p>
               <div className="as-qr-holder" style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
-                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true}/>
+                <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true} />
               </div>
               <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: '100%' }}><IconDownload /> {t('admin_eq_qr_download')}</button>
             </div>

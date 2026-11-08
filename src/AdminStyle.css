@@ -837,42 +837,43 @@ nav {
 
 /* Service Card Grid */
 .as-card-grid {
-  @apply grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6 bg-[white] shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-6 rounded-[0_0_12px_12px];
+  @apply grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6 p-6 rounded-b-xl bg-slate-50;
 }
 
 /* Individual Card */
 .as-card {
-  @apply border border bg-[white] transition-transform duration-[0.2s,box-shadow] delay-[0.2s] flex flex-col p-5 rounded-xl border-solid hover:translate-y-[-3px] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)];
+  @apply flex flex-col bg-white border border-slate-200 rounded-2xl p-[20px_16px] shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:border-slate-300;
+}
+
+.as-card:hover {
+  @apply !-translate-y-1 !border-slate-300 ![box-shadow:0_12px_24px_rgba(15,31,53,0.08)];
 }
 .as-card-header {
-  @apply flex justify-between items-center mb-3;
+  @apply flex justify-between items-start gap-3 mb-3;
 }
 .as-card-title {
-  @apply text-lg font-bold text-gray-900 m-0;
+  @apply text-base font-bold text-slate-900 leading-snug m-0;
 }
 .as-card-desc {
-  @apply text-gray-500 text-sm leading-normal grow mb-4 break-words;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  @apply text-[0.85rem] text-slate-500 leading-relaxed grow mb-3.5 break-words;
 }
 .as-card-details {
-  @apply flex flex-col gap-2.5 mt-0 mb-5 mx-0 p-0;
-  list-style: none;
+  @apply list-none p-3.5 m-0 mb-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col gap-2.5;
 }
 .as-card-details li {
-  @apply flex items-center gap-2 text-gray-600 text-sm;
+  @apply text-[0.875rem] text-slate-600 flex justify-between items-start gap-3;
 }
-.as-card-details li svg {
-  @apply text-gray-400;
+.as-card-details li strong {
+  @apply text-slate-800 font-semibold shrink-0;
 }
 
 /* Badges */
 .as-badge {
   @apply text-xs font-semibold px-3 py-1 rounded-full;
 }
-
+.as-badge.ongoing,
 .as-badge.on-going {
-  @apply bg-green-100 text-green-600;
+  @apply bg-emerald-100 text-emerald-700;
 }
 .as-badge.upcoming {
   @apply bg-yellow-100 text-yellow-700;
@@ -883,8 +884,41 @@ nav {
 
 /* Card Footer */
 .as-card-footer {
-  @apply mt-auto pt-4 border-t border-solid;
+  @apply mt-auto pt-3.5 border-t border-slate-100 flex gap-2.5;
 }
+
+.as-card .as-btn-ghost {
+  @apply border border-slate-300 bg-white text-slate-700 font-semibold rounded-lg transition-colors hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900;
+}
+.as-card button[style*="color: red"],
+.as-card button[style*="color: #dc2626"] {
+  @apply bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:border-red-300;
+}
+.as-card button[style*="color: red"]:hover,
+.as-card button[style*="color: #dc2626"]:hover,
+.as-card button[style*="220, 38, 38"]:hover,
+.as-btn-ghost[style*="color: red"]:hover,
+.as-btn-ghost[style*="color: #dc2626"]:hover,
+.as-btn-ghost[style*="220, 38, 38"]:hover {
+  @apply !bg-red-100 !border-red-400 !text-red-700;
+}
+.as-card .as-btn-ghost:hover,
+.as-btn-ghost:not([style*="0369a1"]):not([style*="3, 105, 161"]):not([style*="dc2626"]):not([style*="220, 38, 38"]):not([style*="red"]):hover {
+  @apply !bg-slate-100 !border-slate-400 !text-slate-900;
+}
+.as-card button[style*="0369a1"],
+.as-card button[style*="3, 105, 161"],
+div[style*="grid"] button[style*="0369a1"],
+div[style*="grid"] button[style*="3, 105, 161"] {
+  @apply !transition-all !duration-150;
+}
+.as-card button[style*="0369a1"]:hover,
+.as-card button[style*="3, 105, 161"]:hover,
+div[style*="grid"] button[style*="0369a1"]:hover,
+div[style*="grid"] button[style*="3, 105, 161"]:hover {
+  @apply !bg-sky-100 !border-sky-400 !text-sky-600;
+}
+
 .as-qr-btn {
   @apply bg-[white] text-[#128FA6] border font-semibold text-[0.9rem] cursor-pointer flex items-center justify-center gap-2 transition-all duration-[0.2s] whitespace-nowrap px-4 py-2 rounded-md border-solid border-[#128FA6] hover:bg-[#128FA6] hover:text-[white];
 }

@@ -3091,6 +3091,13 @@ eq_blocked: 'Blocked',
     admin_srv_vawc_err_update: 'Error saving updated case information.',
     admin_srv_vawc_err_delete: 'Failed to delete case record.',
 
+    // ─── ADMIN MANAGE TABS ADDITIONALS ───
+    admin_card_lbl_date: 'Date:',
+    admin_card_lbl_target: 'Target:',
+    admin_card_lbl_purposes: 'Purposes:',
+    admin_card_lbl_preset_opts: 'preset options',
+    admin_card_lbl_location: 'Location:',
+    admin_card_lbl_time: 'Time:',
 
     // ─── ADMIN REQUESTS ───
     admin_req_title: 'Requests Management',
@@ -3130,6 +3137,10 @@ eq_blocked: 'Blocked',
     admin_req_th_status: 'Status',
     admin_req_th_action: 'Actions',
     admin_req_btn_details: 'More Details',
+
+    // Pagination
+    admin_req_page_prev: 'Previous',
+    admin_req_page_next: 'Next',
     
     // Modal Details - Section 1
     admin_req_modal_title_fac: 'Reservation Details',
@@ -3188,8 +3199,6 @@ eq_blocked: 'Blocked',
     admin_req_btn_claimed: 'Mark Claimed',
     admin_req_btn_returned: 'Mark Returned',
     admin_req_btn_unreturned: 'Report Unreturned',
-    admin_req_page_next: 'Next',
-    admin_req_page_prev: 'Previous',
     
     // Reject Modal
     admin_req_rej_title: 'Confirm Rejection',
@@ -6333,7 +6342,7 @@ eq_blocked: 'Naka-block',
     // Announcement Cards
     admin_ann_card_tba: 'TBA',
     admin_ann_card_time: 'Oras:',
-    admin_ann_card_audience: 'Target na Makikinig/Mababasa:',
+    admin_ann_card_audience: 'Target na Madla:',
     admin_ann_card_date_posted: 'Petsa ng Pagkaka-post:',
     admin_ann_card_posted_by: 'Na-post ni:',
     admin_ann_btn_edit: 'I-edit',
@@ -6735,6 +6744,13 @@ eq_blocked: 'Naka-block',
     admin_srv_vawc_err_update: 'Nagka-error sa pag-save ng na-update na impormasyon ng kaso.',
     admin_srv_vawc_err_delete: 'Nabigong burahin ang tala ng kaso.',
 
+    // ─── ADMIN MANAGE TABS ADDITIONALS ───
+    admin_card_lbl_date: 'Petsa:',
+    admin_card_lbl_target: 'Target:',
+    admin_card_lbl_purposes: 'Mga Layunin:',
+    admin_card_lbl_preset_opts: 'nakatakdang opsyon',
+    admin_card_lbl_location: 'Lokasyon:',
+    admin_card_lbl_time: 'Oras:',
 
     // ─── ADMIN REQUESTS ───
     admin_req_title: 'Pamamahala ng mga Kahilingan',
@@ -6775,6 +6791,10 @@ eq_blocked: 'Naka-block',
     admin_req_th_action: 'Aksyon',
     admin_req_btn_details: 'Iba pang Detalye',
     
+    // Pagination
+    admin_req_page_prev: 'Nakaraan',
+    admin_req_page_next: 'Susunod',
+
     // Modal Details - Section 1
     admin_req_modal_title_fac: 'Mga Detalye ng Reserbasyon',
     admin_req_modal_title_eq: 'Mga Detalye ng Paghiram',
@@ -6832,8 +6852,6 @@ eq_blocked: 'Naka-block',
     admin_req_btn_claimed: 'Markahang Nakuha Na',
     admin_req_btn_returned: 'Markahang Naisoli Na',
     admin_req_btn_unreturned: 'Iulat na Hindi Naisoli',
-    admin_req_page_next: 'Susunod',
-    admin_req_page_prev: 'Nakaraan',
     
     // Reject Modal
     admin_req_rej_title: 'Kumpirmahin ang Pagtanggi',

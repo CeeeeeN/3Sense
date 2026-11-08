@@ -139,10 +139,10 @@ export default function ManageAnnouncements() {
     setShowEmailBlast(true);
   };
 
-const handleDelete = async (id, annTitle) => {
+  const handleDelete = async (id, annTitle) => {
     const isConfirmed = await showConfirm(
       "Confirm Deletion",
-      `${t('admin_ann_confirm_delete')}\n\n"${annTitle}"`    
+      `${t('admin_ann_confirm_delete')}\n\n"${annTitle}"`
     );
     if (!isConfirmed) return;
 
@@ -203,7 +203,7 @@ const handleDelete = async (id, annTitle) => {
           `Added new announcement: ${newAnnouncement.title}`,
         );
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
 
       setNewAnnouncement({
@@ -347,32 +347,87 @@ const handleDelete = async (id, annTitle) => {
 
       <div className="as-card-grid">
         {filteredAnnouncements.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280', gridColumn: '1 / -1' }}>{t('admin_ann_empty')}</div>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280', gridColumn: '1 / -1' }}>
+            {t('admin_ann_empty')}
+          </div>
         ) : paginatedAnnouncements.map((ann) => (
           <div className="as-card" key={ann.id}>
             <div className="as-card-header">
               <h2 className="as-card-title">{ann.title}</h2>
-              <span className="as-badge open" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>{ann.announcementCategory}</span>
+              <span
+                className="as-badge"
+                style={{
+                  backgroundColor: "#ede9fe",
+                  color: "#6d28d9",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  padding: "3px 10px",
+                  borderRadius: "12px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {ann.announcementCategory || "General"}
+              </span>
             </div>
+
             <DescriptionPreview text={ann.description} t={t} />
-            <ul className="as-card-details">
-              <li><Manage_IconLocation /> {ann.location || t('admin_ann_card_tba')}</li>
-              {ann.time && <li><strong>{t('admin_ann_card_time')}</strong> {new Date(ann.time).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</li>}
-              <li><strong>{t('admin_ann_card_audience')}</strong> {ann.category}</li>
-              <li><strong>{t('admin_ann_card_date_posted')}</strong> {ann.date}</li>
-              <li><strong>{t('admin_ann_card_posted_by')}</strong> {ann.postedBy}</li>
+
+            <ul className="as-card-details" style={{ marginTop: "12px" }}>
+              <li>
+                <strong>{t('admin_card_lbl_location')}</strong>
+                <span style={{ textAlign: "right", maxWidth: "65%", wordBreak: "break-word" }}>
+                  {ann.location || t('admin_ann_card_tba')}
+                </span>
+              </li>
+              {ann.time && (
+                <li>
+                  <strong>{t('admin_card_lbl_time')}</strong>
+                  <span style={{ textAlign: "right", maxWidth: "65%" }}>
+                    {new Date(ann.time).toLocaleString(t('app_name') ? (t('admin_ann_title') === 'Mga Anunsyo' ? 'fil-PH' : 'en-US') : 'en-US', {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </span>
+                </li>
+              )}
+              <li>
+                <strong>{t('admin_ann_card_audience')}</strong>
+                <span style={{ textAlign: "right" }}>{ann.category}</span>
+              </li>
+              <li>
+                <strong>{t('admin_ann_card_date_posted')}</strong>
+                <span>{ann.date || "—"}</span>
+              </li>
+              <li>
+                <strong>{t('admin_ann_card_posted_by')}</strong>
+                <span style={{ textAlign: "right", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={ann.postedBy || "Admin"}>
+                  {ann.postedBy || "Admin"}
+                </span>
+              </li>
             </ul>
-            <div className="as-card-footer" style={{ gap: '8px', display: 'flex' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1 }} onClick={() => handleEdit(ann)}>{t('admin_ann_btn_edit')}</button>
+
+            <div className="as-card-footer" style={{ gap: "8px", display: "flex" }}>
+              <button className="as-btn-ghost" style={{ padding: "8px 12px", flex: 1 }} onClick={() => handleEdit(ann)}>
+                {t('admin_ann_btn_edit')}
+              </button>
               <button
                 className="as-btn-ghost"
-                style={{ padding: '8px 12px', flex: 1, color: '#0369a1', borderColor: '#bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                style={{ padding: "8px 12px", flex: 1, color: "#0369a1", borderColor: "#bae6fd" }}
                 onClick={() => handleEmailBlast(ann)}
                 title={t('admin_ann_btn_email_title')}
               >
                 {t('admin_ann_btn_email')}
               </button>
-              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(ann.id, ann.title)}>{t('admin_ann_btn_delete')}</button>            
+              <button
+                className="as-btn-ghost"
+                style={{ padding: "8px 12px", flex: 1, color: "#dc2626", borderColor: "#fca5a5" }}
+                onClick={() => handleDelete(ann.id, ann.title)}
+              >
+                {t('admin_ann_btn_delete')}
+              </button>
             </div>
           </div>
         ))}
