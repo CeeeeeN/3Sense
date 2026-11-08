@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { db } from "../../firebase/firebase";
+import { db, auth } from "../../firebase/firebase";
 import {
   collection, addDoc, doc, updateDoc, deleteDoc,
   serverTimestamp, query, orderBy, limit, getDocs, getCountFromServer, where
@@ -12,6 +12,8 @@ import { buildLivelihoodEmail } from "../../utils/emailTemplates";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
 import { useAlert } from "../../context/AlertContext";
+import { onAuthStateChanged } from "firebase/auth";
+import { logTransaction } from "../../services/logger";
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
@@ -63,6 +65,23 @@ export default function ServiceLivelihood({ onBack }) {
   const [editingProgramId, setEditingProgramId] = useState(null);
   const [emailBlastTarget, setEmailBlastTarget] = useState(null);
   const [newProgram, setNewProgram] = useState(BLANK);
+
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+  
+    useEffect(() => {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+          if (cachedProfile) {
+            const parsed = JSON.parse(cachedProfile);
+            setAdminName(parsed.fullName);
+            setAdminRole(parsed.role);
+          }
+        }
+      });
+      return () => unsubscribe();
+    }, []);
 
   useEffect(() => {
     runStatusMaintenance();
