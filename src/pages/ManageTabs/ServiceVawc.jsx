@@ -17,6 +17,8 @@ import { db } from "../../firebase/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
 import { useAlert } from "../../context/AlertContext";
+import { logTransaction } from "../../services/logger";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function ServiceVawc({ onBack, userRole }) {
   const queryClient = useQueryClient();
@@ -24,6 +26,23 @@ export default function ServiceVawc({ onBack, userRole }) {
   const { showAlert } = useAlert();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const cachedProfile = sessionStorage.getItem(`admin_profile_${user.uid}`);
+        if (cachedProfile) {
+          const parsed = JSON.parse(cachedProfile);
+          setAdminName(parsed.fullName);
+          setAdminRole(parsed.role);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Search & Filtering State
   const [searchQuery, setSearchQuery] = useState("");
@@ -207,6 +226,13 @@ export default function ServiceVawc({ onBack, userRole }) {
 
       const docRef = await addDoc(collection(db, "vawcCases"), payload);
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "CREATED_VAWC_CASE",
+        `Created new VAWC case record (Ref: ${payload.referenceNumber})`
+      );
+
       const newCaseWithId = { id: docRef.id, ...payload, createdAt: new Date() };
       queryClient.setQueryData(["adminManage_vawcCases"], (old = []) => [
         newCaseWithId,
@@ -294,6 +320,13 @@ export default function ServiceVawc({ onBack, userRole }) {
 
       await updateDoc(caseRef, updatedPayload);
 
+      logTransaction(
+        adminName,
+        adminRole,
+        "UPDATED_VAWC_CASE",
+        `Updated VAWC case record (Ref: ${editingCase.referenceNumber || editingCase.id})`
+      );
+
       queryClient.setQueryData(["adminManage_vawcCases"], (old = []) =>
         old.map((c) => (c.id === editingCase.id ? { ...c, ...updatedPayload } : c))
       );
@@ -316,6 +349,13 @@ export default function ServiceVawc({ onBack, userRole }) {
 
     try {
       await deleteDoc(doc(db, "vawcCases", caseToDelete.id));
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_VAWC_CASE",
+        `Deleted VAWC case record (Ref: ${caseToDelete.referenceNumber || caseToDelete.id})`
+      );
 
       queryClient.setQueryData(["adminManage_vawcCases"], (old = []) =>
         old.filter((c) => c.id !== caseToDelete.id)

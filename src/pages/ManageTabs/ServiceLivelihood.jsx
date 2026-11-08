@@ -290,6 +290,14 @@ export default function ServiceLivelihood({ onBack }) {
           p.regNum || p.id
         );
       }
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "APPROVED_LIVELIHOOD_REGISTRATION",
+        `Approved livelihood registration for ${p.fullName || p.firstName} in program: "${prog?.title || p.programName}" (Reg ID: ${p.id})`
+      );
+
       if (selectedParticipant && selectedParticipant.id === p.id) {
         setSelectedParticipant(prev => ({ ...prev, status: "approved" }));
       }
@@ -320,6 +328,14 @@ export default function ServiceLivelihood({ onBack }) {
           p.regNum || p.id
         );
       }
+
+      logTransaction(
+        adminName,
+        adminRole,
+        "REJECTED_LIVELIHOOD_REGISTRATION",
+        `Rejected livelihood registration for ${p.fullName || p.firstName} in program: "${p.programName}". Reason: ${rejectReason.trim()}`
+      );
+
       if (selectedParticipant && selectedParticipant.id === rejectTarget) {
         setSelectedParticipant(prev => ({ ...prev, status: "rejected", rejectReason: rejectReason.trim() }));
       }
@@ -985,7 +1001,17 @@ export default function ServiceLivelihood({ onBack }) {
           html={buildLivelihoodEmail(emailBlastTarget)}
           label="Approved Registrants"
           program={emailBlastTarget}
-          onClose={() => setEmailBlastTarget(null)}
+          onClose={() => {
+            setShowEmailBlast(false); // Make sure you also handle closing the modal state properly if you added one!
+            setEmailBlastTarget(null);
+            
+            logTransaction(
+              adminName, 
+              adminRole, 
+              "EMAILED_LIVELIHOOD_PROGRAM", 
+              `Email blast sent for livelihood program: ${emailBlastTarget.title}`
+            );
+          }}
         />
       )}
     </>

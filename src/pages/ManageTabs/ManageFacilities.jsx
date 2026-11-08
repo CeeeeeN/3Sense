@@ -120,6 +120,14 @@ export default function ManageFacilities() {
 
     try {
       await updateDoc(doc(db, "facilities", selectedFacility.id), { blockedDates: newBlocked });
+      
+      logTransaction(
+        adminName, 
+        adminRole, 
+        "MODIFIED_FACILITY_CALENDAR", 
+        `${actionWord} date ${dateStr} for facility: ${selectedFacility.facilityName || selectedFacility.name} (ID: ${selectedFacility.id})`
+      );
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_facilities'] });
     } catch (err) {
       console.error(err);
