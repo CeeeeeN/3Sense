@@ -120,6 +120,14 @@ export default function ManageEquipment() {
 
     try {
       await updateDoc(doc(db, "equipment", selectedEquipment.id), { blockedDates: newBlocked });
+      
+      logTransaction(
+        adminName, 
+        adminRole, 
+        "MODIFIED_EQUIPMENT_CALENDAR", 
+        `${actionWord} date ${dateStr} for equipment: ${selectedEquipment.equipmentName || selectedEquipment.name} (ID: ${selectedEquipment.id})`
+      );
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
     } catch (err) {
       console.error(err);

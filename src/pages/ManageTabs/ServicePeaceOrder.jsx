@@ -158,6 +158,7 @@ export default function ServicePeaceOrder({ onBack }) {
         members: [],
         createdAt: serverTimestamp()
       });
+      logTransaction(adminName, adminRole, "CREATED_TANOD_GROUP", `Created new Tanod group: ${trimmed}`);
       setNewGroupName("");
       queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) => [
         ...old,
@@ -175,6 +176,7 @@ export default function ServicePeaceOrder({ onBack }) {
       await updateDoc(doc(db, "tanodGroups", groupId), {
         members: arrayUnion(memberName)
       });
+      logTransaction(adminName, adminRole, "ADDED_TANOD_MEMBER", `Added member ${memberName} to group ID: ${groupId}`);
       setNewMemberInputs(prev => ({ ...prev, [groupId]: "" }));
       queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
         old.map(g => g.id === groupId ? { ...g, members: [...(g.members || []), memberName] } : g)
@@ -189,6 +191,7 @@ export default function ServicePeaceOrder({ onBack }) {
       await updateDoc(doc(db, "tanodGroups", groupId), {
         members: arrayRemove(memberName)
       });
+      logTransaction(adminName, adminRole, "REMOVED_TANOD_MEMBER", `Removed member ${memberName} from group ID: ${groupId}`);
       queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
         old.map(g => g.id === groupId ? { ...g, members: (g.members || []).filter(m => m !== memberName) } : g)
       );
@@ -201,6 +204,7 @@ export default function ServicePeaceOrder({ onBack }) {
     if (window.confirm(`${t('admin_srv_po_confirm_delete_grp')} ${groupName}?`)) {
       try {
         await deleteDoc(doc(db, "tanodGroups", groupId));
+        logTransaction(adminName, adminRole, "DELETED_TANOD_GROUP", `Deleted Tanod group: ${groupName} (ID: ${groupId})`);
         queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
           old.filter(g => g.id !== groupId)
         );

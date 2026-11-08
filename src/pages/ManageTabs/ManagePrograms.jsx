@@ -241,6 +241,13 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
         await createUserNotification(hhID, residentID, "Program Registration Approved", `Your registration for "${program.title}" has been approved!`, "general", a.id);
       }
 
+      logTransaction(
+        adminName, 
+        adminRole, 
+        "APPROVED_PROGRAM_REGISTRATION", 
+        `Approved registration for ${a.userName || a.fullName} in program: "${program.title}" (Program ID: ${program.id})`
+      );
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
     } catch (err) { console.error(err); }
@@ -273,6 +280,13 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
         await createUserNotification(hhID, residentID, "Program Registration Rejected", `Your registration for "${program.title}" was rejected. Reason: ${rejectReason.trim()}`, "general", a.id);
       }
 
+      logTransaction(
+        adminName, 
+        adminRole, 
+        "REJECTED_PROGRAM_REGISTRATION", 
+        `Rejected registration for ${a.userName || a.fullName} in program: "${program.title}". Reason: ${rejectReason.trim()}`
+      );
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
 
@@ -296,6 +310,13 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
       for (const regDoc of regSnap.docs) {
         await updateDoc(doc(db, "programRegistrations", regDoc.id), { status: "pending", rejectReason: "", updatedAt: serverTimestamp() });
       }
+
+      logTransaction(
+        adminName, 
+        adminRole, 
+        "REMOVED_PROGRAM_REGISTRATION", 
+        `Reverted approved status to pending for ${attendee.userName || attendee.fullName} in program: "${program.title}"`
+      );
 
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
