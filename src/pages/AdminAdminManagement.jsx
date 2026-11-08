@@ -18,15 +18,19 @@ import {
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 import { useAlert } from "../context/AlertContext"; 
-import { useQuery, useQueryClient } from "@tanstack/react-query"; // <-- Added React Query
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+// NEW: Import Language Hook
+import { useLanguage } from '../context/LanguageContext';
 
 export default function AdminManagement() {
-  const queryClient = useQueryClient(); // <-- For local cache mutations
+  const queryClient = useQueryClient();
+  const { t } = useLanguage(); 
+  const { showAlert, showConfirm } = useAlert(); 
+
   const [currentUser, setCurrentUser] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
-
-  const { showAlert, showConfirm } = useAlert(); 
 
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -48,7 +52,6 @@ export default function AdminManagement() {
   const [requestRowsPerPage, setRequestRowsPerPage] = useState(10);
   const [adminRowsPerPage, setAdminRowsPerPage] = useState(10);
 
-  // ─── 1. OPTIMIZED: Zero-Read Auth & Role Verification ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -74,7 +77,6 @@ export default function AdminManagement() {
     return () => unsubscribe();
   }, []);
 
-  // ─── 2. LAZY LOADED: Pending Admin Requests ───
   const { data: requests = [], isLoading: loadingRequests } = useQuery({
     queryKey: ['adminManage_pendingAdmins'],
     queryFn: async () => {
@@ -100,11 +102,10 @@ export default function AdminManagement() {
         };
       });
     },
-    enabled: isSuperAdmin && activeTab === "requests", // <-- Only fetches when on this tab
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    enabled: isSuperAdmin && activeTab === "requests", 
+    staleTime: 1000 * 60 * 30,
   });
 
-  // ─── 3. LAZY LOADED: Approved Admin Accounts ───
   const { data: admins = [], isLoading: loadingAdmins } = useQuery({
     queryKey: ['adminManage_approvedAdmins'],
     queryFn: async () => {
@@ -119,15 +120,14 @@ export default function AdminManagement() {
         };
       });
     },
-    enabled: isSuperAdmin && activeTab === "admins", // <-- Only fetches when on this tab
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    enabled: isSuperAdmin && activeTab === "admins",
+    staleTime: 1000 * 60 * 30,
   });
 
-  // ─── 4. OPTIMIZED: Zero-Read Mutations ───
   const handleApprove = async (req) => {
     const isConfirmed = await showConfirm(
-      "Approve Admin Account",
-      `Are you sure you want to approve ${req.fullName}?`
+      t('admin_mgt_prompt_approve_title'),
+      `${t('admin_mgt_prompt_approve_desc')}\n\n"${req.fullName}"?`
     );
     
     if (!isConfirmed) return;
@@ -136,7 +136,7 @@ export default function AdminManagement() {
       await addDoc(collection(db, "approvedAdmins"), {
         uid: req.uid,
         fullName: req.fullName,
-        email: req.email, // using original format, masking handles display later
+        email: req.email,
         contact: req.contact,
         position: req.position,
         role: "Standard Admin",
@@ -148,11 +148,9 @@ export default function AdminManagement() {
         status: "approved",
       });
 
-      // Surgically update local cache (0 Reads)
       queryClient.setQueryData(['adminManage_pendingAdmins'], (old = []) => 
         old.map(r => r.docId === req.docId ? { ...r, status: 'approved' } : r)
       );
-      // Invalidate admins so it correctly refetches the new addition when the tab is clicked
       queryClient.invalidateQueries({ queryKey: ['adminManage_approvedAdmins'] });
 
       logTransaction(
@@ -162,17 +160,19 @@ export default function AdminManagement() {
         `Approved admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
-      await showAlert("Success", "Admin approved successfully!");
+      setShowViewModal(false);
+      setSelectedAdmin(null);
+      await showAlert("Success", t('admin_mgt_toast_app_success'));
     } catch (error) {
       console.error("Error approving admin:", error);
-      await showAlert("Error", "Failed to approve admin. Please try again.");
+      await showAlert("Error", t('admin_mgt_toast_app_fail'));
     }
   };
 
   const handleReject = async (req) => {
     const isConfirmed = await showConfirm(
-      "Confirm Rejection",
-      "Are you sure you want to reject this request?"
+      t('admin_mgt_prompt_rej_title'),
+      `${t('admin_mgt_prompt_rej_desc')}\n\n"${req.fullName}"?`
     );
 
     if (!isConfirmed) return;
@@ -182,7 +182,6 @@ export default function AdminManagement() {
         status: "rejected",
       });
 
-      // Surgically update local cache (0 Reads)
       queryClient.setQueryData(['adminManage_pendingAdmins'], (old = []) => 
         old.map(r => r.docId === req.docId ? { ...r, status: 'rejected' } : r)
       );
@@ -194,17 +193,19 @@ export default function AdminManagement() {
         `Rejected admin registration for ${req.fullName} (${req.email}) (ID: ${req.uid})`
       );
 
-      await showAlert("Success", "Admin request rejected.");
+      setShowViewModal(false);
+      setSelectedAdmin(null);
+      await showAlert("Success", t('admin_mgt_toast_rej_success'));
     } catch (error) {
       console.error("Error rejecting admin:", error);
-      await showAlert("Error", "Failed to reject admin. Please try again.");
+      await showAlert("Error", t('admin_mgt_toast_rej_fail'));
     }
   };
 
   const handleDeleteAdmin = async (admin) => {
     const isConfirmed = await showConfirm(
-      "Delete Admin",
-      `This action cannot be undone. Delete admin account for ${admin.fullName}?`
+      "Confirm Deletion",
+      `${t('admin_mgt_prompt_del_desc')}\n\n"${admin.fullName}"?`
     );
 
     if (!isConfirmed) return;
@@ -212,7 +213,6 @@ export default function AdminManagement() {
     try {
       await deleteDoc(doc(db, "approvedAdmins", admin.docId));
 
-      // Surgically remove from local cache (0 Reads)
       queryClient.setQueryData(['adminManage_approvedAdmins'], (old = []) => 
         old.filter(a => a.docId !== admin.docId)
       );
@@ -224,10 +224,12 @@ export default function AdminManagement() {
         `Deleted admin account of ${admin.fullName} (${admin.email}) (ID: ${admin.uid})`
       );
 
-      await showAlert("Success", "Admin account deleted successfully.");
+      setShowViewModal(false);
+      setSelectedAdmin(null);
+      await showAlert("Success", t('admin_mgt_toast_del_success'));
     } catch (error) {
       console.error("Error deleting admin:", error);
-      await showAlert("Error", "Failed to delete admin. Please try again.");
+      await showAlert("Error", t('admin_mgt_toast_del_fail'));
     }
   };
 
@@ -239,7 +241,6 @@ export default function AdminManagement() {
         role: editedRole,
       });
 
-      // Surgically update local cache (0 Reads)
       queryClient.setQueryData(['adminManage_approvedAdmins'], (old = []) => 
         old.map(a => a.docId === selectedAdmin.docId ? { ...a, role: editedRole } : a)
       );
@@ -253,10 +254,10 @@ export default function AdminManagement() {
 
       setSelectedAdmin(null);
       setShowViewModal(false);
-      await showAlert("Success", "Admin system role updated successfully!");
+      await showAlert("Success", t('admin_mgt_toast_role_success'));
     } catch (error) {
       console.error("Error updating role:", error);
-      await showAlert("Error", "Failed to update role. Please try again.");
+      await showAlert("Error", t('admin_mgt_toast_role_fail'));
     }
   };
 
@@ -281,8 +282,7 @@ export default function AdminManagement() {
       .filter((req) => {
         const searchText = searchRequest.toLowerCase();
         const matchesSearch = (req.fullName || "").toLowerCase().includes(searchText);
-        const matchesStatus =
-          filterStatus === "All" || req.status === filterStatus;
+        const matchesStatus = filterStatus === "All" || req.status === filterStatus;
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
@@ -347,7 +347,7 @@ export default function AdminManagement() {
     return (
       <AdminLayout>
         <div style={{ textAlign: "center", padding: "60px" }}>
-          Loading...
+          {t('admin_mgt_loading')}
         </div>
       </AdminLayout>
     );
@@ -357,9 +357,9 @@ export default function AdminManagement() {
     return (
       <AdminLayout>
         <div style={{ textAlign: "center", padding: "60px" }}>
-          <h2 style={{ color: "#d9534f", marginTop: "16px" }}>Access Denied</h2>
+          <h2 style={{ color: "#d9534f", marginTop: "16px" }}>{t('admin_mgt_denied_title')}</h2>
           <p style={{ color: "#666", marginTop: "8px" }}>
-            Only Service Heads can access this page.
+            {t('admin_mgt_denied_desc')}
           </p>
         </div>
       </AdminLayout>
@@ -370,8 +370,8 @@ export default function AdminManagement() {
     <AdminLayout>
       <div className="requests-container">
         <div className="requests-header">
-          <h1 className="requests-title">Admin Management</h1>
-          <p className="requests-subtitle">Manage system administrative privileges, registrations, and accounts.</p>
+          <h1 className="requests-title">{t('admin_mgt_title')}</h1>
+          <p className="requests-subtitle">{t('admin_mgt_subtitle')}</p>
         </div>
 
         <div className="req-tabs">
@@ -379,13 +379,13 @@ export default function AdminManagement() {
             className={`req-tab ${activeTab === "requests" ? "active" : ""}`}
             onClick={() => setActiveTab("requests")}
           >
-            Registration Requests
+            {t('admin_mgt_tab_requests')}
           </button>
           <button
             className={`req-tab ${activeTab === "admins" ? "active" : ""}`}
             onClick={() => setActiveTab("admins")}
           >
-            Admin Accounts
+            {t('admin_mgt_tab_admins')}
           </button>
         </div>
 
@@ -406,7 +406,7 @@ export default function AdminManagement() {
                 />
                 <input
                   type="text"
-                  placeholder="Search requests..."
+                  placeholder={t('admin_mgt_search_req_ph')}
                   className="search-input"
                   value={searchRequest}
                   onChange={(e) => setSearchRequest(e.target.value)}
@@ -429,10 +429,10 @@ export default function AdminManagement() {
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
-                  <option value="All">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
+                  <option value="All">{t('admin_mgt_filter_status')}</option>
+                  <option value="pending">{t('admin_mgt_filter_pending')}</option>
+                  <option value="approved">{t('admin_mgt_filter_approved')}</option>
+                  <option value="rejected">{t('admin_mgt_filter_rejected')}</option>
                 </select>
 
                 <select
@@ -440,10 +440,10 @@ export default function AdminManagement() {
                   value={sortRequest}
                   onChange={(e) => setSortRequest(e.target.value)}
                 >
-                  <option value="date_desc">Date: Newest First</option>
-                  <option value="date_asc">Date: Oldest First</option>
-                  <option value="name_asc">Name: A to Z</option>
-                  <option value="name_desc">Name: Z to A</option>
+                  <option value="date_desc">{t('admin_mgt_sort_date_new')}</option>
+                  <option value="date_asc">{t('admin_mgt_sort_date_old')}</option>
+                  <option value="name_asc">{t('admin_mgt_sort_name_asc')}</option>
+                  <option value="name_desc">{t('admin_mgt_sort_name_desc')}</option>
                 </select>
               </div>
             </div>
@@ -452,18 +452,18 @@ export default function AdminManagement() {
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr style={{ textAlign: "center" }}>
-                    <th>Full Name</th>
-                    <th>Position</th>
-                    <th>Date Submitted</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>{t('admin_mgt_th_name')}</th>
+                    <th>{t('admin_mgt_th_pos')}</th>
+                    <th>{t('admin_mgt_th_date')}</th>
+                    <th>{t('admin_mgt_th_status')}</th>
+                    <th>{t('admin_mgt_th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingRequests ? (
                     <tr>
                       <td colSpan={5} style={{ textAlign: "center", padding: "24px", color: "#9ca3af" }}>
-                        Loading requests...
+                        {t('admin_mgt_req_loading')}
                       </td>
                     </tr>
                   ) : paginatedRequests.length > 0 ? (
@@ -483,7 +483,13 @@ export default function AdminManagement() {
                           <span
                             className={`status-badge ${(req.status || "pending").toLowerCase()}`}
                           >
-                            {(req.status || "Pending").charAt(0).toUpperCase() + (req.status || "Pending").slice(1).toLowerCase()}
+                            {(() => {
+                              const st = (req.status || "pending").toLowerCase();
+                              if (st === 'pending') return t('admin_mgt_filter_pending');
+                              if (st === 'approved') return t('admin_mgt_filter_approved');
+                              if (st === 'rejected') return t('admin_mgt_filter_rejected');
+                              return (req.status || "Pending").charAt(0).toUpperCase() + (req.status || "Pending").slice(1).toLowerCase();
+                            })()}
                           </span>
                         </td>
                         <td style={{ textAlign: "center" }}>
@@ -496,7 +502,7 @@ export default function AdminManagement() {
                               setShowViewModal(true);
                             }}
                           >
-                            More Details
+                            {t('admin_mgt_btn_details')}
                           </button>
                         </td>
                       </tr>
@@ -507,7 +513,7 @@ export default function AdminManagement() {
                         colSpan={5}
                         style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}
                       >
-                        No requests found.
+                        {t('admin_mgt_req_empty')}
                       </td>
                     </tr>
                   )}
@@ -527,7 +533,7 @@ export default function AdminManagement() {
                 gap: "16px"
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>Rows per page:</span>
+                  <span>{t('admin_mgt_page_rows')}</span>
                   <select
                     value={requestRowsPerPage}
                     onChange={(e) => setRequestRowsPerPage(Number(e.target.value))}
@@ -554,7 +560,7 @@ export default function AdminManagement() {
                       onClick={() => setRequestPage(prev => Math.max(prev - 1, 1))}
                       disabled={requestPage === 1}
                     >
-                      Previous
+                      {t('admin_mgt_page_prev')}
                     </button>
                     {renderPageNumbers(requestPage, totalRequestPages, setRequestPage)}
                     <button
@@ -562,7 +568,7 @@ export default function AdminManagement() {
                       onClick={() => setRequestPage(prev => Math.min(prev + 1, totalRequestPages))}
                       disabled={requestPage === totalRequestPages}
                     >
-                      Next
+                      {t('admin_mgt_page_next')}
                     </button>
                   </div>
                 )}
@@ -594,7 +600,7 @@ export default function AdminManagement() {
                 />
                 <input
                   type="text"
-                  placeholder="Search admin..."
+                  placeholder={t('admin_mgt_search_adm_ph')}
                   className="search-input"
                   value={searchAdmin}
                   onChange={(e) => setSearchAdmin(e.target.value)}
@@ -617,10 +623,10 @@ export default function AdminManagement() {
                   value={sortAdmin}
                   onChange={(e) => setSortAdmin(e.target.value)}
                 >
-                  <option value="name_asc">Name: A to Z</option>
-                  <option value="name_desc">Name: Z to A</option>
-                  <option value="role_asc">System Role: Ascending</option>
-                  <option value="role_desc">System Role: Descending</option>
+                  <option value="name_asc">{t('admin_mgt_sort_name_asc')}</option>
+                  <option value="name_desc">{t('admin_mgt_sort_name_desc')}</option>
+                  <option value="role_asc">{t('admin_mgt_sort_role_asc')}</option>
+                  <option value="role_desc">{t('admin_mgt_sort_role_desc')}</option>
                 </select>
               </div>
             </div>
@@ -629,18 +635,18 @@ export default function AdminManagement() {
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr style={{ textAlign: "center" }}>
-                    <th>Full Name</th>
-                    <th>Username</th>
-                    <th>Position</th>
-                    <th>System Role</th>
-                    <th>Action</th>
+                    <th>{t('admin_mgt_th_name')}</th>
+                    <th>{t('admin_mgt_th_username')}</th>
+                    <th>{t('admin_mgt_th_pos')}</th>
+                    <th>{t('admin_mgt_th_role')}</th>
+                    <th>{t('admin_mgt_th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingAdmins ? (
                     <tr>
                       <td colSpan={5} style={{ textAlign: "center", padding: "24px", color: "#9ca3af" }}>
-                        Loading admins...
+                        {t('admin_mgt_adm_loading')}
                       </td>
                     </tr>
                   ) : paginatedAdmins.length > 0 ? (
@@ -697,7 +703,7 @@ export default function AdminManagement() {
                               setShowViewModal(true);
                             }}
                           >
-                            More Details
+                            {t('admin_mgt_btn_details')}
                           </button>
                         </td>
                       </tr>
@@ -708,7 +714,7 @@ export default function AdminManagement() {
                         colSpan={5}
                         style={{ textAlign: "center", padding: "24px", color: "#6b7280" }}
                       >
-                        No admin accounts found.
+                        {t('admin_mgt_adm_empty')}
                       </td>
                     </tr>
                   )}
@@ -728,7 +734,7 @@ export default function AdminManagement() {
                 gap: "16px"
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>Rows per page:</span>
+                  <span>{t('admin_mgt_page_rows')}</span>
                   <select
                     value={adminRowsPerPage}
                     onChange={(e) => setAdminRowsPerPage(Number(e.target.value))}
@@ -755,7 +761,7 @@ export default function AdminManagement() {
                       onClick={() => setAdminPage(prev => Math.max(prev - 1, 1))}
                       disabled={adminPage === 1}
                     >
-                      Previous
+                      {t('admin_mgt_page_prev')}
                     </button>
                     {renderPageNumbers(adminPage, totalAdminPages, setAdminPage)}
                     <button
@@ -763,7 +769,7 @@ export default function AdminManagement() {
                       onClick={() => setAdminPage(prev => Math.min(prev + 1, totalAdminPages))}
                       disabled={adminPage === totalAdminPages}
                     >
-                      Next
+                      {t('admin_mgt_page_next')}
                     </button>
                   </div>
                 )}
@@ -783,21 +789,23 @@ export default function AdminManagement() {
         <div className="as-modal-overlay" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>
           <div className="as-modal-content" style={{ maxWidth: "440px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>{activeTab === "requests" ? "Request Details" : "Admin Details"}</h2>
+              <h2 style={{ color: "#ffffff", margin: 0 }}>
+                {activeTab === "requests" ? t('admin_mgt_modal_req_title') : t('admin_mgt_modal_adm_title')}
+              </h2>
               <button className="as-modal-close" onClick={() => { setShowViewModal(false); setSelectedAdmin(null); }}>&times;</button>
             </div>
 
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
               <div className="admin-details">
-                <p><strong>Full Name:</strong> {selectedAdmin.fullName}</p>
-                <p><strong>Email:</strong> {formatDisplayEmail(selectedAdmin.email, adminRole, currentUser?.uid === selectedAdmin.uid)}</p>
-                <p><strong>Contact:</strong> {selectedAdmin.contact}</p>
-                <p><strong>Position:</strong> {selectedAdmin.position}</p>
+                <p><strong>{t('admin_mgt_modal_lbl_name')}</strong> {selectedAdmin.fullName}</p>
+                <p><strong>{t('admin_mgt_modal_lbl_email')}</strong> {formatDisplayEmail(selectedAdmin.email, adminRole, currentUser?.uid === selectedAdmin.uid)}</p>
+                <p><strong>{t('admin_mgt_modal_lbl_contact')}</strong> {selectedAdmin.contact}</p>
+                <p><strong>{t('admin_mgt_modal_lbl_pos')}</strong> {selectedAdmin.position}</p>
 
                 {activeTab === "admins" && (
                   <div style={{ marginTop: "16px", borderTop: "1px dashed #ccc", paddingTop: "12px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <strong>System Role:</strong>
+                      <strong>{t('admin_mgt_modal_lbl_role')}</strong>
 
                       {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid ? (
                         <select
@@ -837,28 +845,21 @@ export default function AdminManagement() {
               </div>
             </div>
 
-            {/* Footer with actions and no redundant Close button */}
             <div className="modal-footer">
               {activeTab === "requests" ? (
                 selectedAdmin.status === "pending" ? (
                   <>
                     <button
                       className="btn-reject"
-                      onClick={() => {
-                        handleReject(selectedAdmin);
-                        setShowViewModal(false);
-                      }}
+                      onClick={() => handleReject(selectedAdmin)}
                     >
-                      Reject
+                      {t('admin_mgt_btn_reject')}
                     </button>
                     <button
                       className="btn-approve"
-                      onClick={() => {
-                        handleApprove(selectedAdmin);
-                        setShowViewModal(false);
-                      }}
+                      onClick={() => handleApprove(selectedAdmin)}
                     >
-                      Approve
+                      {t('admin_mgt_btn_approve')}
                     </button>
                   </>
                 ) : null
@@ -867,17 +868,14 @@ export default function AdminManagement() {
                   {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && (
                     <button
                       className="btn-reject"
-                      onClick={() => {
-                        handleDeleteAdmin(selectedAdmin);
-                        setShowViewModal(false);
-                      }}
+                      onClick={() => handleDeleteAdmin(selectedAdmin)}
                     >
-                      Delete Account
+                      {t('admin_mgt_btn_del_acc')}
                     </button>
                   )}
                   {isSuperAdmin && currentUser?.uid !== selectedAdmin.uid && editedRole !== (selectedAdmin.role || "Standard Admin") && (
                     <button className="btn-approve" onClick={handleSaveRole}>
-                      Save Role Changes
+                      {t('admin_mgt_btn_save_role')}
                     </button>
                   )}
                 </>

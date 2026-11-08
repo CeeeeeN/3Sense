@@ -5,6 +5,7 @@ import { auth, db } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { ROLE_PERMISSIONS } from "../services/permissions";
 import NotificationModal from "./NotificationModal";
+import { useLanguage } from "../context/LanguageContext";
 import {
   collection,
   query,
@@ -44,6 +45,8 @@ const getInitialAdminData = () => {
 export default function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const { lang, toggleLanguage } = useLanguage();
 
   const titles = {
     "/admin/dashboard": "Dashboard",
@@ -521,6 +524,31 @@ export default function AdminLayout({ children }) {
           <h1>{topBarTitle}</h1>
 
           <div className="top-actions">
+
+            {/* --- LANGUAGE TOGGLE BUTTON --- */}
+            <button
+              onClick={toggleLanguage}
+              style={{
+                background: "transparent",
+                border: "1px solid #cbd5e1", // Subtle border
+                borderRadius: "20px",
+                padding: "4px 12px",
+                color: "#f8fafc", // White text to match the dark header
+                fontSize: "0.85rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: "60px",
+                transition: "all 0.2s ease"
+              }}
+              title="Toggle Language"
+            >
+              {lang === 'fil' ? '🇵🇭 FIL' : '🇺🇸 ENG'}
+            </button>
+            {/* ----------------------------------- */}
+
             {/* NOTIFICATIONS BELL BUTTON */}
             <button
               className="bell-btn"

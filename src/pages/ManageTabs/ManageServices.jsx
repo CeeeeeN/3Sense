@@ -28,6 +28,9 @@ import ServiceLivelihood from "./ServiceLivelihood";
 import ServiceBswd from "./ServiceBswd";
 import ServiceVawc from "./ServiceVawc";
 
+// NEW: Import Language Hook
+import { useLanguage } from '../../context/LanguageContext'; 
+
 const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 // Helper to fetch server-side counts without downloading documents
@@ -69,6 +72,8 @@ const fetchCollectionStats = async (collectionName, statuses, dateField = "submi
 };
 
 export default function ManageServices() {
+  const { t } = useLanguage(); // NEW: Destructure hook
+
   const [activeDashboard, setActiveDashboard] = useState(null);
   const [selectedServiceQR, setSelectedServiceQR] = useState(null);
   const [userRole, setUserRole] = useState("Standard Admin");
@@ -86,11 +91,9 @@ export default function ManageServices() {
     return () => unsubscribeAuth();
   }, []);
 
-  // ─── FULLY OPTIMIZED: Server-side counts, no mass document downloading ───
   const { data: statsData = {}, isLoading } = useQuery({
     queryKey: ['adminManage_servicesStats'],
     queryFn: async () => {
-      // Execute all collection stats in parallel
       const [peace, livelihood, bswd, vawc] = await Promise.all([
         fetchCollectionStats("incidentReports", ["Pending", "Responded", "Resolved"], "submittedAt"),
         fetchCollectionStats("livelihoodRegistrations", ["Pending", "Approved", "Rejected"], "submittedAt"),
@@ -111,7 +114,7 @@ export default function ManageServices() {
 
   const handleGenerateQR = (serviceName, category) => {
     const today = getTodayStr();
-    const base = "https://3-sense.vercel.app/";
+    const base = "https://www.3s-sense.site/";
     const url =
       `${base}?serviceId=${encodeURIComponent(serviceName.toLowerCase())}` +
       `&serviceName=${encodeURIComponent(serviceName)}` +
@@ -156,27 +159,35 @@ export default function ManageServices() {
       "acted upon": { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
     };
     return (
-      <div style={{ marginTop: "12px", padding: "12px", background: "#eff0f0", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+      <div style={{ marginTop: "12px", padding: "14px", background: "#f8fafc", borderRadius: "12px", border: "1px solid #edf2f7" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "10px" }}>
-          <span style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>Total entries</span>
+          <span style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>{t('admin_srv_stat_total')}</span>
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}>{stats.total}</span>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px" }}>
           {Object.entries(stats.byStatus).map(([status, count]) => {
             const key = status.toLowerCase();
             const c = statusColors[key] || { bg: "#f3f4f6", text: "#4b5563", dot: "#9ca3af" };
-            const capitalizedStatus = status.charAt(0).toUpperCase() + status.slice(1);
+            
+            // Minimal internal translation for known statuses to maintain consistent colors while translating text
+            let displayStatus = status.charAt(0).toUpperCase() + status.slice(1);
+            if (key === 'pending') displayStatus = t('status_pending');
+            if (key === 'resolved') displayStatus = t('status_resolved');
+            if (key === 'responded') displayStatus = t('status_responded');
+            if (key === 'approved') displayStatus = t('status_approved');
+            if (key === 'rejected') displayStatus = t('status_rejected');
+            if (key === 'received') displayStatus = t('status_received');
 
             return (
               <span key={status} style={{ fontSize: "0.72rem", padding: "3px 8px", borderRadius: "10px", background: c.bg, color: c.text, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "5px" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: c.dot, display: "inline-block" }} />
-                {capitalizedStatus}: {count}
+                {displayStatus}: {count}
               </span>
             );
           })}
         </div>
         <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #e2e8f0", fontSize: "0.75rem", color: "#64748b", display: "flex", alignItems: "center", gap: "4px" }}>
-          <span>Latest:</span>
+          <span>{t('admin_srv_stat_latest')}</span>
           <span style={{ color: "#1e293b", fontWeight: 600 }}>{stats.latest}</span>
         </div>
       </div>
@@ -191,21 +202,21 @@ export default function ManageServices() {
     <div className="as-modal-overlay">
       <div className="as-modal-content" style={{ maxWidth: "450px" }}>
         <div className="as-modal-header">
-          <h2>QR Code Generated</h2>
+          <h2>{t('admin_srv_qr_title')}</h2>
           <button className="as-modal-close" onClick={() => setSelectedServiceQR(null)}>&times;</button>
         </div>
         <div className="as-modal-body" style={{ textAlign: "center" }}>
           <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
           <h3>{selectedServiceQR.name}</h3>
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "8px", padding: "10px 14px", marginBottom: "12px", fontSize: "0.82rem", color: "#92400e", textAlign: "left" }}>
-            ⚠️ <strong>This QR is valid for today only ({getTodayStr()}).</strong> A new QR must be generated each day.
+            ⚠️ <strong>{t('admin_srv_qr_warning')} ({getTodayStr()}).</strong> {t('admin_srv_qr_warning_end')}
           </div>
-          <p className="as-modal-desc">Residents can scan this code to access the {selectedServiceQR.name} page.</p>
+          <p className="as-modal-desc">{t('admin_srv_qr_desc')} {selectedServiceQR.name} page.</p>
           <div className="as-qr-holder" style={{ margin: "20px auto", display: "flex", justifyContent: "center" }}>
             <QRCodeSVG id="as-qr-svg" value={selectedServiceQR.qrValue} size={150} level={"H"} includeMargin={true} />
           </div>
           <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: "100%" }}>
-            <IconDownload /> Download QR (PNG)
+            <IconDownload /> {t('admin_srv_qr_download')}
           </button>
         </div>
       </div>
@@ -213,7 +224,7 @@ export default function ManageServices() {
   );
 
   if (isLoading) {
-    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Services Overview...</div>;
+    return <div style={{ padding: "40px", textAlign: "center" }}>{t('admin_srv_loading')}</div>;
   }
 
   return (
@@ -223,8 +234,8 @@ export default function ManageServices() {
           <>
             <div className="as-header-section">
               <div className="as-title-wrap">
-                <h1>Services</h1>
-                <p className="as-subtitle">Adaptive workspaces for handling different barangay services and departments</p>
+                <h1>{t('admin_srv_title')}</h1>
+                <p className="as-subtitle">{t('admin_srv_subtitle')}</p>
               </div>
             </div>
 
@@ -235,16 +246,16 @@ export default function ManageServices() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
                     <div style={{ background: "#eff6ff", color: "#1d4ed8", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Peace &amp; Order</h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Interactive Form &amp; Inbox</span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{t('admin_srv_peace_name')}</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{t('admin_srv_peace_badge')}</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Monitor incoming incident reports, dispatch barangay tanods, and manage blotters.</p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{t('admin_srv_peace_desc')}</p>
                   <StatBar stats={peaceStats} />
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("peace")}>Workspace &rarr;</button>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("peace")}>{t('admin_srv_card_workspace_btn')}</button>
                     <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("Peace and Order", "Services")}>
-                      <Manage_IconQR /> Generate QR Code
+                      <Manage_IconQR /> {t('admin_srv_card_qr_btn')}
                     </button>
                   </div>
                 </div>
@@ -256,16 +267,16 @@ export default function ManageServices() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
                     <div style={{ background: "#f0fdf4", color: "#15803d", padding: "12px", borderRadius: "12px" }}><BriefcaseIcon /></div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Livelihood</h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Registration System</span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{t('admin_srv_livelihood_name')}</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{t('admin_srv_livelihood_badge')}</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Approve or reject community registrations for training programs and assistance.</p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{t('admin_srv_livelihood_desc')}</p>
                   <StatBar stats={livelihoodStats} />
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("livelihood")}>Workspace &rarr;</button>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("livelihood")}>{t('admin_srv_card_workspace_btn')}</button>
                     <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("Livelihood", "Services")}>
-                      <Manage_IconQR /> Generate QR Code
+                      <Manage_IconQR /> {t('admin_srv_card_qr_btn')}
                     </button>
                   </div>
                 </div>
@@ -277,16 +288,16 @@ export default function ManageServices() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
                     <div style={{ background: "#f0fdf2", color: "#115e59", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>BSWD</h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Social Welfare</span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{t('admin_srv_bswd_name')}</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{t('admin_srv_bswd_badge')}</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Manage reports of displaced persons and community tips regarding resident welfare.</p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{t('admin_srv_bswd_desc')}</p>
                   <StatBar stats={bswdStats} />
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("bswd")}>Workspace &rarr;</button>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("bswd")}>{t('admin_srv_card_workspace_btn')}</button>
                     <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("BSWD", "Services")}>
-                      <Manage_IconQR /> Generate QR Code
+                      <Manage_IconQR /> {t('admin_srv_card_qr_btn')}
                     </button>
                   </div>
                 </div>
@@ -298,16 +309,16 @@ export default function ManageServices() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
                     <div style={{ background: "#fff1f2", color: "#e11d48", padding: "12px", borderRadius: "12px" }}><SirenIcon /></div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>VAWC</h3>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Case Management &amp; Desk Intake</span>
+                      <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{t('admin_srv_vawc_name')}</h3>
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{t('admin_srv_vawc_badge')}</span>
                     </div>
                   </div>
-                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>Log VAC/VAW incident reports, manage protective actions, and track referrals.</p>
+                  <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{t('admin_srv_vawc_desc')}</p>
                   <StatBar stats={vawcStats} />
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
-                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("vawc")}>Workspace &rarr;</button>
+                    <button className="as-btn-aqua" style={{ flex: "1 1 120px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => setActiveDashboard("vawc")}>{t('admin_srv_card_workspace_btn')}</button>
                     <button className="as-qr-btn" style={{ flex: "1 1 150px", justifyContent: "center", whiteSpace: "normal", textAlign: "center" }} onClick={() => handleGenerateQR("VAWC", "Services")}>
-                      <Manage_IconQR /> Generate QR Code
+                      <Manage_IconQR /> {t('admin_srv_card_qr_btn')}
                     </button>
                   </div>
                 </div>
@@ -320,15 +331,15 @@ export default function ManageServices() {
           <>
             <div className="as-header-section" style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
               <div className="as-title-wrap">
-                <h2>Informational Services</h2>
-                <p className="as-subtitle">Standard content guides mapping to external references or rules.</p>
+                <h2>{t('admin_srv_info_title')}</h2>
+                <p className="as-subtitle">{t('admin_srv_info_subtitle')}</p>
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
               {[
-                { name: "BADAC", color: { bg: "#fef3c7", text: "#b45309" }, desc: "Barangay Anti-Drug Abuse Council information and rehabilitation procedures." },
-                { name: "BOSCA", color: { bg: "#e0e7ff", text: "#4338ca" }, desc: "Barangay Office of Senior Citizens Affairs rights, applications, and guidelines." },
+                { name: t('admin_srv_badac_name'), color: { bg: "#fef3c7", text: "#b45309" }, desc: t('admin_srv_badac_desc') },
+                { name: t('admin_srv_bosca_name'), color: { bg: "#e0e7ff", text: "#4338ca" }, desc: t('admin_srv_bosca_desc') },
               ]
                 .filter((svc) => allowedServices.includes(svc.name))
                 .map((svc) => (
@@ -337,12 +348,12 @@ export default function ManageServices() {
                       <div style={{ background: svc.color.bg, color: svc.color.text, padding: "12px", borderRadius: "12px" }}><InfoIcon /></div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{svc.name}</h3>
-                        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Informational Content</span>
+                        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{t('admin_srv_info_content_badge')}</span>
                       </div>
                     </div>
                     <p style={{ color: "#4b5563", fontSize: "0.9rem", flex: 1 }}>{svc.desc}</p>
                     <button className="as-qr-btn" style={{ width: "100%", marginTop: "16px" }} onClick={() => handleGenerateQR(svc.name, "Services")}>
-                      <Manage_IconQR /> Generate QR Code
+                      <Manage_IconQR /> {t('admin_srv_card_qr_btn')}
                     </button>
                   </div>
                 ))}

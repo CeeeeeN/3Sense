@@ -10,15 +10,6 @@ import TransferBranchHeadModal from "../components/TransferBranchHeadModal";
 import RemoveMemberModal from "../components/RemoveMemberModal";
 import { useLanguage } from "../context/LanguageContext";
 
-const QR_PAT = [
-  true, true, true, false, true,
-  true, false, true, true, false,
-  true, true, false, true, true,
-  false, true, true, false, true,
-  true, false, true, true, true,
-];
-
-const TABS = ["Personal", "Address", "Category", "Education", "Household"];
 const CATS = ["Student", "Senior Citizen", "Solo Parent", "OFW", "LGBT", "Indigenous People", "PWD"];
 
 const BLANK = {
@@ -33,12 +24,6 @@ const BLANK = {
   totalMembers: "", householdClassification: "",
 };
 
-const STATUS_MAP = {
-  "Clear Case": { label: "Clear Case", cls: "clear", color: "#0d7a55", desc: "This resident has no pending cases or violations on record." },
-  "Pending Case": { label: "Pending Case", cls: "pending", color: "#e8a020", desc: "This resident has a case currently under review." },
-  "Violation": { label: "Violation", cls: "violation", color: "#e03e3e", desc: "This resident has a recorded violation." },
-};
-
 // ── UID GENERATOR FALLBACK ──
 const generateResidentUID = () => {
   const year = new Date().getFullYear();
@@ -48,7 +33,6 @@ const generateResidentUID = () => {
 };
 
 // ── Icons ──
-const IconQR = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3" /></svg>;
 const IconCamera = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>;
 const IconUpload = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" /></svg>;
 const IconTrash = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>;
@@ -62,22 +46,28 @@ const ProfileIconShield = () => <svg viewBox="0 0 24 24" fill="none" stroke="cur
 const IconHistory = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 8 12 12 14 14" /><path d="M3.05 11a9 9 0 1 0 .5-4.08" /><polyline points="3 3 3 9 9 9" /></svg>;
 const IconEdit = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>;
 const IconDl = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
-const ProfileIconX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
-const ProfileIconArrow = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>;
-const IconSave = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
+const ProfileIconX = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+const ProfileIconArrow = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>;
+const IconSave = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
+const IconAlert = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
+const IconCalSmall = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
 
 // Settings Icons
-const IconSettings = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
-const IconBell = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>;
-const IconSupport = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line><line x1="14.83" y1="9.17" x2="18.36" y2="5.64"></line><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line></svg>;
-const IconHelp = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
-const IconMessage = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>;
-const IconInfo = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
-const IconShield2 = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>;
-const IconTransfer = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="14" x2="21" y2="3"></line><polyline points="8 21 3 21 3 16"></polyline><line x1="20" y1="10" x2="3" y2="21"></line></svg>;
-const IconChevronRight = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>;
+const IconSettings = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
+const IconBell = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>;
+const IconSupport = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line></svg>;
+const IconHelp = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+const IconMessage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>;
+const IconInfo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+const IconShield2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>;
+const IconTransfer = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="14" x2="21" y2="3"></line><polyline points="8 21 3 21 3 16"></polyline><line x1="20" y1="10" x2="3" y2="21"></line></svg>;
+const IconGlobe = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>;
+const IconChevronRight = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>;
+const IconPhone = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>;
+const IconMail = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
+const IconClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
 
-// ── Components ──
+// ── Small components ──
 function InfoItem({ label, value }) {
   const { t } = useLanguage();
   return (
@@ -88,16 +78,16 @@ function InfoItem({ label, value }) {
   );
 }
 
-function Card({ icon: Icon, title, tag, children }) {
+function Card({ icon: Icon, title, tag, flush, children }) {
   return (
-    <div className="pf-card">
+    <section className={`pf-card${flush ? " pf-card--flush" : ""}`}>
       <div className="pf-card-header">
         <div className="pf-card-icon"><Icon /></div>
-        <span className="pf-card-title">{title}</span>
+        <h2 className="pf-card-title">{title}</h2>
         {tag && <span className="pf-section-tag">{tag}</span>}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -107,6 +97,25 @@ function Field({ label, req, children }) {
       <label className="pf-lbl">{label}{req && <span className="req"> *</span>}</label>
       {children}
     </div>
+  );
+}
+
+// One big, easy-to-tap settings row
+function SettingRow({ icon: Icon, title, description, action, onClick, danger }) {
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag
+      type={onClick ? "button" : undefined}
+      className={`pf-setting${onClick ? " is-link" : ""}${danger ? " is-danger" : ""}`}
+      onClick={onClick}
+    >
+      <span className="pf-setting__icon"><Icon /></span>
+      <span className="pf-setting__text">
+        <span className="pf-setting__title">{title}</span>
+        {description && <span className="pf-setting__desc">{description}</span>}
+      </span>
+      <span className="pf-setting__action">{action || (onClick && <IconChevronRight />)}</span>
+    </Tag>
   );
 }
 
@@ -127,71 +136,38 @@ function formatHistoryDate(isoString) {
 function HelpFaqModal({ onClose }) {
   const { t } = useLanguage();
   const faqs = [
-    {
-      q: t('help_faq_q1'),
-      a: t('help_faq_a1')
-    },
-    {
-      q: t('help_faq_q2'),
-      a: t('help_faq_a2')
-    },
-    {
-      q: t('help_faq_q3'),
-      a: t('help_faq_a3')
-    }
+    { q: t('help_faq_q1'), a: t('help_faq_a1') },
+    { q: t('help_faq_q2'), a: t('help_faq_a2') },
+    { q: t('help_faq_q3'), a: t('help_faq_a3') },
   ];
 
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '540px' }}>
+      <div className="pf-modal pf-modal--sm">
         <div className="pf-modal-head">
           <div>
             <h3>{t('profile_settings_help', 'Help & FAQ')}</h3>
             <p>{t('help_faq_sub', 'Frequently asked questions')}</p>
           </div>
-          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+          <button className="pf-modal-close" onClick={onClose} aria-label={t('close', 'Close')}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem', fontFamily: 'Poppins, sans-serif' }}>
-            {t('help_faq_heading', 'Frequently Asked Questions')}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div className="pf-modal-body pf-modal-body--plain">
+          <h4 className="pf-sub-heading">{t('help_faq_heading', 'Frequently Asked Questions')}</h4>
+          <div className="pf-faq-list">
             {faqs.map((faq, i) => (
-              <div
-                key={i}
-                style={{
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '10px',
-                  padding: '1rem',
-                  border: '1px solid var(--border)'
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-                  {faq.q}
-                </div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.5' }}>
-                  {faq.a}
-                </div>
+              <div key={i} className="pf-faq">
+                <div className="pf-faq__q">{faq.q}</div>
+                <div className="pf-faq__a">{faq.a}</div>
               </div>
             ))}
           </div>
 
-          <div
-            style={{
-              borderRadius: '12px',
-              backgroundColor: 'rgba(49, 125, 137, 0.08)',
-              border: '1px solid rgba(49, 125, 137, 0.25)',
-              padding: '1rem',
-              marginTop: '1.25rem'
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--teal)', marginBottom: '0.25rem' }}>
-              {t('help_still_need', 'Still need help?')}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: '1.45' }}>
+          <div className="pf-note pf-note--teal">
+            <strong>{t('help_still_need', 'Still need help?')}</strong>
+            <span>
               {t('help_visit_hall')}<br />
               {t('help_office_hours', 'Mon - Fri, 8:00 AM - 5:00 PM')}
-            </div>
+            </span>
           </div>
         </div>
       </div>
@@ -202,114 +178,44 @@ function HelpFaqModal({ onClose }) {
 function ContactModal({ onClose }) {
   const { t } = useLanguage();
   const contacts = [
-    {
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-          <circle cx="12" cy="10" r="3" />
-        </svg>
-      ),
-      label: t('contact_address_label', 'Address'),
-      value: "MH Del Pilar St. Malanday, 1444 Valenzuela, Philippines"
-    },
-    {
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-        </svg>
-      ),
-      label: t('contact_hotline_label', 'Hotline'),
-      value: "(02) 8-962-7327"
-    },
-    {
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-          <polyline points="22,6 12,13 2,6" />
-        </svg>
-      ),
-      label: t('contact_email_label', 'Email'),
-      value: "malanday.valenzuelacity@gmail.com"
-    },
-    {
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
-      ),
-      label: t('contact_hours_label', 'Office Hours'),
-      value: "Monday – Friday, 8:00 AM – 5:00 PM"
-    }
+    { icon: <ProfileIconPin />, label: t('contact_address_label', 'Address'), value: "MH Del Pilar St. Malanday, 1444 Valenzuela, Philippines" },
+    { icon: <IconPhone />, label: t('contact_hotline_label', 'Hotline'), value: "(02) 8-962-7327", href: "tel:+63289627327" },
+    { icon: <IconMail />, label: t('contact_email_label', 'Email'), value: "malanday.valenzuelacity@gmail.com", href: "mailto:malanday.valenzuelacity@gmail.com" },
+    { icon: <IconClock />, label: t('contact_hours_label', 'Office Hours'), value: "Monday – Friday, 8:00 AM – 5:00 PM" },
   ];
 
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '540px' }}>
+      <div className="pf-modal pf-modal--sm">
         <div className="pf-modal-head">
           <div>
             <h3>{t('contact_title', 'Contact Barangay')}</h3>
             <p>{t('contact_sub', 'Get in touch with the local office')}</p>
           </div>
-          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+          <button className="pf-modal-close" onClick={onClose} aria-label={t('close', 'Close')}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem', fontFamily: 'Poppins, sans-serif' }}>
-            {t('contact_heading', 'Get in Touch')}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {contacts.map((row, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '14px',
-                  padding: '12px 0',
-                  borderBottom: i === contacts.length - 1 ? 'none' : '1px solid var(--border)'
-                }}
-              >
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(49, 125, 137, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}
-                >
-                  {row.icon}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    {row.label}
-                  </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text)', lineHeight: '1.4' }}>
-                    {row.value}
-                  </div>
-                </div>
-              </div>
-            ))}
+        <div className="pf-modal-body pf-modal-body--plain">
+          <h4 className="pf-sub-heading">{t('contact_heading', 'Get in Touch')}</h4>
+          <div className="pf-contact-list">
+            {contacts.map((row, i) => {
+              const Inner = (
+                <>
+                  <span className="pf-contact__icon">{row.icon}</span>
+                  <span className="pf-contact__text">
+                    <span className="pf-contact__label">{row.label}</span>
+                    <span className="pf-contact__value">{row.value}</span>
+                  </span>
+                </>
+              );
+              return row.href
+                ? <a key={i} href={row.href} className="pf-contact is-link">{Inner}</a>
+                : <div key={i} className="pf-contact">{Inner}</div>;
+            })}
           </div>
 
-          <div
-            style={{
-              borderRadius: '12px',
-              backgroundColor: '#fff8e6',
-              border: '1px solid rgba(232, 160, 32, 0.35)',
-              padding: '1rem',
-              marginTop: '1.25rem'
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#b45309', marginBottom: '0.25rem' }}>
-              {t('contact_emergency_label', 'For Emergencies')}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: '1.45' }}>
-              {t('contact_emergency_desc')}
-            </div>
+          <div className="pf-note pf-note--amber">
+            <strong>{t('contact_emergency_label', 'For Emergencies')}</strong>
+            <span>{t('contact_emergency_desc')}</span>
           </div>
         </div>
       </div>
@@ -328,80 +234,37 @@ function AboutModal({ onClose }) {
 
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '520px' }}>
+      <div className="pf-modal pf-modal--sm">
         <div className="pf-modal-head">
           <div>
             <h3>{t('about_title', 'About 3S+ Malanday')}</h3>
             <p>{t('about_sub', 'System information and version')}</p>
           </div>
-          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+          <button className="pf-modal-close" onClick={onClose} aria-label={t('close', 'Close')}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '1.75rem', maxHeight: '68vh', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingBottom: '1.25rem' }}>
-            <div
-              style={{
-                width: '68px',
-                height: '68px',
-                borderRadius: '18px',
-                backgroundColor: 'rgba(49, 125, 137, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '10px',
-                border: '1.5px solid rgba(49, 125, 137, 0.25)',
-                color: 'var(--teal)'
-              }}
-            >
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="pf-modal-body pf-modal-body--plain">
+          <div className="pf-about-hero">
+            <div className="pf-about-hero__icon">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 <polyline points="9 12 11 14 15 10" />
               </svg>
             </div>
-            <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '1.15rem', color: 'var(--text)' }}>
-              3S+ Sense
-            </div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--muted)', marginTop: '2px' }}>
-              {t('about_system', 'Barangay Service Management System')}
-            </div>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                marginTop: '8px',
-                backgroundColor: 'rgba(49, 125, 137, 0.12)',
-                padding: '4px 12px',
-                borderRadius: '999px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                color: 'var(--teal)'
-              }}
-            >
-              Version 1.0.0
-            </div>
+            <div className="pf-about-hero__name">3S+ Sense</div>
+            <div className="pf-about-hero__sub">{t('about_system', 'Barangay Service Management System')}</div>
+            <div className="pf-about-hero__ver">Version 1.0.0</div>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+          <div className="pf-about-rows">
             {details.map((row, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '10px 0',
-                  borderBottom: i === details.length - 1 ? 'none' : '1px solid var(--border)'
-                }}
-              >
-                <span style={{ fontSize: '0.82rem', color: 'var(--muted)', fontWeight: 500 }}>{row.label}</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text)', fontWeight: 600 }}>{row.value}</span>
+              <div key={i} className="pf-about-row">
+                <span>{row.label}</span>
+                <strong>{row.value}</strong>
               </div>
             ))}
           </div>
 
-          <div style={{ fontSize: '0.75rem', color: 'var(--muted)', textAlign: 'center', marginTop: '1.5rem', lineHeight: '1.5' }}>
-            {t('about_copyright')}
-
-          </div>
+          <p className="pf-legal">{t('about_copyright')}</p>
         </div>
       </div>
     </div>
@@ -410,44 +273,29 @@ function AboutModal({ onClose }) {
 
 function PrivacyModal({ onClose }) {
   const { t } = useLanguage();
+  const sections = [
+    { title: t('privacy_notice_title', 'Data Privacy Notice'), body: t('privacy_notice_desc') },
+    { title: t('privacy_collect_title', 'What We Collect'), body: t('privacy_collect_desc') },
+    { title: t('privacy_use_title', 'How We Use It'), body: t('privacy_use_desc') },
+    { title: t('privacy_rights_title', 'Your Rights'), body: t('privacy_rights_desc') },
+  ];
   return (
     <div className="pf-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pf-modal" style={{ maxWidth: '560px' }}>
+      <div className="pf-modal pf-modal--sm">
         <div className="pf-modal-head">
           <div>
             <h3>{t('profile_settings_privacy', 'Privacy Policy')}</h3>
             <p>{t('privacy_sub', 'How we handle your data')}</p>
           </div>
-          <button className="pf-modal-close" onClick={onClose}><ProfileIconX /></button>
+          <button className="pf-modal-close" onClick={onClose} aria-label={t('close', 'Close')}><ProfileIconX /></button>
         </div>
-        <div className="pf-modal-body" style={{ padding: '1.5rem', maxHeight: '68vh', overflowY: 'auto' }}>
-          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '0.98rem', color: 'var(--text)', marginBottom: '0.45rem' }}>
-            {t('privacy_notice_title', 'Data Privacy Notice')}
-          </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
-            {t('privacy_notice_desc')}
-          </p>
-
-          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-            {t('privacy_collect_title', 'What We Collect')}
-          </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
-            {t('privacy_collect_desc')}
-          </p>
-
-          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-            {t('privacy_use_title', 'How We Use It')}
-          </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '1rem' }}>
-            {t('privacy_use_desc')}
-          </p>
-
-          <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', marginBottom: '0.35rem' }}>
-            {t('privacy_rights_title', 'Your Rights')}
-          </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', lineHeight: '1.6', marginBottom: '0' }}>
-            {t('privacy_rights_desc')}
-          </p>
+        <div className="pf-modal-body pf-modal-body--plain">
+          {sections.map((s, i) => (
+            <div key={i} className="pf-policy">
+              <h4>{s.title}</h4>
+              <p>{s.body}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -463,15 +311,14 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
-  const qrCanvasRef = useRef(null);
-  
+
   const [transactions, setTransactions] = useState([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txPage, setTxPage] = useState(1);
   const txPerPage = 8;
 
   // Profile picture state
-  const [profilePic, setProfilePic] = useState(null); 
+  const [profilePic, setProfilePic] = useState(null);
   const [picMenuOpen, setPicMenuOpen] = useState(false);
   const [uploadingPic, setUploadingPic] = useState(false);
   const picInputRef = useRef(null);
@@ -503,16 +350,16 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
     getMemberProfile(householdID, memberID)
       .then(async profile => {
         if (!isMounted) return;
-        
+
         let loadedProfile = profile || { ...BLANK };
-        
+
         // ── LAZY PATCH: Generate and save UID if the resident doesn't have one yet ──
         if (!loadedProfile.UID) {
           const newUID = generateResidentUID();
           loadedProfile.UID = newUID;
           try {
             await updateMemberProfile(householdID, memberID, { ...loadedProfile, UID: newUID });
-            
+
             // Sync with local storage
             const session = JSON.parse(localStorage.getItem("brgy_session") || "{}");
             session.UID = newUID;
@@ -690,7 +537,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
     try {
       const payload = { ...draft, sameAddress: computeSameAddress() };
       // ensure we don't accidentally overwrite the UID with empty if draft missed it
-      payload.UID = data.UID; 
+      payload.UID = data.UID;
       await updateMemberProfile(householdID, memberID, payload);
       setData(payload);
       setOpen(false);
@@ -753,14 +600,14 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
         return {
           label: t('profile_status_pending', 'Pending Case'),
           cls: "pending",
-          color: "#e8a020",
+          color: "#b07800",
           desc: t('profile_status_desc_pending', 'This resident has a case currently under review.')
         };
       case "Violation":
         return {
           label: t('profile_status_violation', 'Violation'),
           cls: "violation",
-          color: "#e03e3e",
+          color: "#c0392b",
           desc: t('profile_status_desc_violation', 'This resident has a recorded violation.')
         };
       case "Clear Case":
@@ -835,32 +682,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   };
 
   const totalPages = Math.ceil(transactions.length / txPerPage) || 1;
-
-  // ── Settings Row Component ──
-  const SettingRow = ({ icon: Icon, title, description, action, onClick }) => (
-    <div 
-      className="pf-setting-row" 
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", padding: "16px", cursor: onClick ? "pointer" : "default",
-        borderBottom: "1px solid #e5e7eb", transition: "background 0.2s"
-      }}
-    >
-      <div style={{
-        width: "36px", height: "36px", borderRadius: "8px", background: "rgba(49,125,137,0.1)",
-        display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", marginRight: "14px"
-      }}>
-        <Icon />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: "0.95rem", fontWeight: 500, color: "var(--text)" }}>{title}</div>
-        {description && <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "2px" }}>{description}</div>}
-      </div>
-      <div style={{ color: "var(--muted)", display: "flex", alignItems: "center" }}>
-        {action || (onClick && <IconChevronRight />)}
-      </div>
-    </div>
-  );
+  const fmtShort = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <div className="pf-root" onClick={(e) => { if (picMenuOpen && !e.target.closest('.pf-avatar-wrap')) setPicMenuOpen(false); }}>
@@ -875,9 +697,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       />
 
       {loading && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "var(--muted)", fontSize: "0.9rem" }}>
-          {t('profile_loading')}
-        </div>
+        <div className="pf-loading">{t('profile_loading')}</div>
       )}
 
       {!loading && (
@@ -892,12 +712,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             </button>
           </div>
 
+          {/* ── HERO ── */}
           <div className="pf-hero-card">
             <div className="pf-hero-avatar-col">
               <div className="pf-avatar-wrap">
                 <div className="pf-avatar-ring">
                   {uploadingPic ? (
-                    <div className="pf-avatar-placeholder" style={{ fontSize: "0.85rem", color: "var(--teal)", fontWeight: "600" }}>{t('profile_saving_pic')}</div>
+                    <div className="pf-avatar-placeholder pf-avatar-saving">{t('profile_saving_pic')}</div>
                   ) : profilePic ? (
                     <img src={profilePic} alt="Profile" className="pf-avatar-img" />
                   ) : (
@@ -945,12 +766,9 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             <div className="pf-hero-identity">
               <div className="pf-hero-name">{fullName || t('profile_full_name_fallback')}</div>
               <div className="pf-hero-id">{householdID || "MAL-XXXX-XXXXX"} &bull; {getRoleLabel(userRole)}</div>
-              
-              {/* DISPLAY PERMANENT UID HERE */}
+
               {data.UID && (
-                <div className="pf-hero-family-number" style={{ color: "#0d7a55", fontWeight: "600", marginTop: "4px", fontSize: "0.95rem" }}>
-                  {t('profile_uid_prefix')}{data.UID}
-                </div>
+                <div className="pf-hero-uid">{t('profile_uid_prefix')}{data.UID}</div>
               )}
 
               {data.familyNumber && (
@@ -958,7 +776,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                   {t('profile_family_number_prefix')}{data.familyNumber}
                 </div>
               )}
-              
+
               <div className="pf-hero-verified"><span className="pf-hero-dot" /> {t('profile_verified_resident')}</div>
               <div className="pf-hero-divider" />
               <div className="pf-hero-meta">
@@ -993,14 +811,15 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             </div>
           </div>
 
+          {/* ── INFORMATION CARDS ── */}
           <Card icon={ProfileIconUser} title={t('profile_card_personal')}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div className="pf-stack">
               <div className="pf-info-grid c3">
                 <InfoItem label={t('profile_lbl_first_name')} value={data.firstName} />
                 <InfoItem label={t('profile_lbl_middle_name')} value={data.middleName} />
                 <InfoItem label={t('profile_lbl_last_name')} value={data.lastName} />
               </div>
-              <div className="pf-info-grid">
+              <div className="pf-info-grid c3">
                 <InfoItem label={t('profile_lbl_dob')} value={data.birthDate} />
                 <InfoItem label={t('profile_lbl_birth_place')} value={data.birthPlace} />
                 <InfoItem label={t('profile_lbl_sex')} value={data.sex === "Male" ? t('reg_sex_male', 'Male') : data.sex === "Female" ? t('reg_sex_female', 'Female') : data.sex} />
@@ -1016,20 +835,18 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           </Card>
 
           <Card icon={ProfileIconPin} title={t('profile_card_address')}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div className="pf-info-grid">
-                <InfoItem label={t('profile_lbl_house_unit')} value={data.houseNumber} />
-                <InfoItem label={t('profile_lbl_street')} value={data.street} />
-                <InfoItem label={t('profile_lbl_barangay')} value={data.barangay} />
-                <InfoItem label={t('profile_lbl_city')} value={data.city} />
-                <InfoItem label={t('profile_lbl_province')} value={data.province} />
-                <InfoItem label={t('profile_lbl_region')} value={data.region} />
-              </div>
+            <div className="pf-info-grid c3">
+              <InfoItem label={t('profile_lbl_house_unit')} value={data.houseNumber} />
+              <InfoItem label={t('profile_lbl_street')} value={data.street} />
+              <InfoItem label={t('profile_lbl_barangay')} value={data.barangay} />
+              <InfoItem label={t('profile_lbl_city')} value={data.city} />
+              <InfoItem label={t('profile_lbl_province')} value={data.province} />
+              <InfoItem label={t('profile_lbl_region')} value={data.region} />
             </div>
           </Card>
 
           <Card icon={IconTag} title={t('profile_card_category')}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div className="pf-stack">
               <div className="pf-cat-grid">
                 {data.categories && data.categories.length > 0
                   ? data.categories.map(cat => (
@@ -1053,13 +870,11 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
           </Card>
 
           <Card icon={IconGrad} title={t('profile_card_education')}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div className="pf-info-grid">
-                <InfoItem label={t('profile_lbl_edu_attainment')} value={data.educationAttainment} />
-                <InfoItem label={t('profile_lbl_edu_status')} value={data.educationStatus} />
-                <InfoItem label={t('profile_lbl_occupation')} value={data.occupation} />
-                <InfoItem label={t('profile_lbl_employment_status')} value={data.employmentStatus} />
-              </div>
+            <div className="pf-info-grid">
+              <InfoItem label={t('profile_lbl_edu_attainment')} value={data.educationAttainment} />
+              <InfoItem label={t('profile_lbl_edu_status')} value={data.educationStatus} />
+              <InfoItem label={t('profile_lbl_occupation')} value={data.occupation} />
+              <InfoItem label={t('profile_lbl_employment_status')} value={data.employmentStatus} />
             </div>
           </Card>
 
@@ -1072,44 +887,39 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             </div>
           </Card>
 
+          {/* ── RECORD STATUS ── */}
           <Card icon={ProfileIconShield} title={t('profile_card_status')} tag={t('profile_card_status_tag')}>
-            <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+            <div className="pf-status-row">
               <div className={`pf-status-badge ${sInfo.cls}`}>
                 <span className="pf-sdot" />{sInfo.label}
               </div>
-              <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
-                <strong style={{ color: "var(--text)", fontFamily: "'Poppins',sans-serif", fontSize: "0.82rem" }}>{t('profile_current_standing')}</strong>
+              <div className="pf-status-desc">
+                <strong>{t('profile_current_standing')}</strong>
                 {sInfo.desc}
               </div>
             </div>
 
             {(data.adminRemarks || data.adminIncident) && (
-              <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "0.9rem 1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <div className="pf-remarks">
                 {data.adminRemarks && (
-                  <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.55 }}>
-                    <strong style={{ fontFamily: "'Poppins',sans-serif" }}>{t('profile_remarks_prefix')}</strong>{data.adminRemarks}
-                  </div>
+                  <div><strong>{t('profile_remarks_prefix')}</strong>{data.adminRemarks}</div>
                 )}
                 {data.adminIncident && (
-                  <div style={{ fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.55 }}>
-                    <strong style={{ fontFamily: "'Poppins',sans-serif", color: "var(--text)" }}>{t('profile_incident_prefix')}</strong>{data.adminIncident}
-                  </div>
+                  <div className="pf-remarks__muted"><strong>{t('profile_incident_prefix')}</strong>{data.adminIncident}</div>
                 )}
               </div>
             )}
 
             {data.adminLastUpdatedBy && (
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginBottom: "1rem", fontStyle: "italic" }}>
-                {t('profile_last_updated_by')}<strong style={{ fontStyle: "normal" }}>{data.adminLastUpdatedBy}</strong>
+              <div className="pf-updated-by">
+                {t('profile_last_updated_by')}<strong>{data.adminLastUpdatedBy}</strong>
                 {data.adminLastUpdatedByPosition ? ` (${data.adminLastUpdatedByPosition})` : ""}
                 {data.adminLastUpdatedAt ? ` · ${data.adminLastUpdatedAt}` : ""}
               </div>
             )}
 
-            <div style={{ background: "var(--bg)", borderRadius: "10px", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              <div style={{ fontFamily: "'Poppins',sans-serif", fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem" }}>
-                {t('profile_case_history')}
-              </div>
+            <div className="pf-history">
+              <div className="pf-history__title">{t('profile_case_history')}</div>
 
               {statusHistory.length > 0 ? (
                 statusHistory.map((entry, i) => {
@@ -1124,19 +934,15 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                   ].filter(Boolean).join(" ");
 
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0, marginTop: 5 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>
+                    <div key={i} className="pf-history__item">
+                      <span className="pf-history__dot" style={{ background: dotColor }} />
+                      <div>
+                        <div className="pf-history__main">
                           {t('profile_status_set_to')}"{entry.status}"
                           {entry.remarks ? ` — ${entry.remarks}` : ""}
                         </div>
-                        {entry.incident && (
-                          <div style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: 1 }}>
-                            {entry.incident}
-                          </div>
-                        )}
-                        <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>
+                        {entry.incident && <div className="pf-history__sub">{entry.incident}</div>}
+                        <div className="pf-history__by">
                           {formatHistoryDate(entry.setAt)}{t('profile_by_prefix')}{byLine}
                         </div>
                       </div>
@@ -1144,301 +950,167 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                   );
                 })
               ) : (
-                <div style={{ fontSize: "0.82rem", color: "var(--muted)", fontStyle: "italic" }}>
-                  {t('profile_no_status_changes')}
-                </div>
+                <div className="pf-history__empty">{t('profile_no_status_changes')}</div>
               )}
             </div>
           </Card>
 
-          {/* ADVANCED TRANSACTION HISTORY (From Incoming Branch) */}
+          {/* ── TRANSACTIONS (cards, no sideways scrolling) ── */}
           <Card icon={IconHistory} title={t('profile_card_transactions')}>
-            <div className="pf-table-wrap">
-              <table className="pf-table">
-                <thead>
-                  <tr>
-                    <th>{t('profile_tx_col_service')}</th>
-                    <th>{t('profile_tx_col_ref')}</th>
-                    <th>{t('profile_tx_col_date')}</th>
-                    <th>{t('profile_tx_col_status')}</th>
-                    <th>{t('profile_tx_col_category')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {txLoading ? (
-                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>{t('profile_tx_loading')}</td></tr>
-                  ) : transactions.length === 0 ? (
-                    <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>{t('profile_tx_empty')}</td></tr>
-                  ) : (
-                    transactions.slice((txPage - 1) * txPerPage, txPage * txPerPage).map((tx, i) => {
-                      const dateStr = tx.date?.toDate
-                        ? tx.date.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                        : tx.date ? new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
-                      
-                      const statusLower = (tx.status || "pending").toLowerCase().replace(/\s+/g, "-");
-                      const isOverdue = tx.status === "Overdue";
-                      const isUnreturned = tx.status === "Unreturned";
-                      const isAlerted = isOverdue || isUnreturned;
+            {txLoading ? (
+              <div className="pf-tx-empty">{t('profile_tx_loading')}</div>
+            ) : transactions.length === 0 ? (
+              <div className="pf-tx-empty">{t('profile_tx_empty')}</div>
+            ) : (
+              <div className="pf-tx-list">
+                {transactions.slice((txPage - 1) * txPerPage, txPage * txPerPage).map((tx, i) => {
+                  const dateStr = tx.date?.toDate
+                    ? fmtShort(tx.date.toDate())
+                    : tx.date ? fmtShort(new Date(tx.date)) : "—";
 
-                      const returnDateStr = tx.category === "Equipment" && tx.returnDate
-                        ? new Date(tx.returnDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                        : null;
+                  const statusLower = (tx.status || "pending").toLowerCase().replace(/\s+/g, "-");
+                  const isOverdue = tx.status === "Overdue";
+                  const isUnreturned = tx.status === "Unreturned";
 
-                      const returnDateColor = isUnreturned ? "#c2410c" : isOverdue ? "#dc2626" : "var(--muted)";
-                      const rowBg = isUnreturned
-                        ? "rgba(249,115,22,0.05)"
-                        : isOverdue
-                          ? "rgba(239,68,68,0.04)"
-                          : {};
+                  const returnDateStr = tx.category === "Equipment" && tx.returnDate
+                    ? fmtShort(new Date(tx.returnDate + "T00:00:00"))
+                    : null;
 
-                      return (
-                        <tr key={tx.id || i} style={isAlerted ? { background: rowBg } : {}}>
-                          <td>
-                            <div className="pf-tx-name">{tx.serviceName}</div>
-                            {returnDateStr && (
-                              <div style={{ fontSize: "0.72rem", color: returnDateColor, marginTop: "2px", display: "flex", alignItems: "center", gap: "4px" }}>
-                                {isAlerted ? (
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={returnDateColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                                  </svg>
-                                ) : (
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                                  </svg>
-                                )}
-                                {t('profile_tx_return_prefix')}{returnDateStr}
-                              </div>
-                            )}
-                          </td>
-                          <td><div className="pf-tx-date" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem" }}>{tx.refNum || "—"}</div></td>
-                          <td><div className="pf-tx-date">{dateStr}</div></td>
-                          <td>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                              <span className={`pf-tx-badge ${statusLower}`}>
-                                <span className="pf-tx-bdot" />
-                                {tx.status === "Unreturned" ? t('status_unreturned') : tx.status === "Overdue" ? t('status_overdue') : tx.status}
-                              </span>
-                              {isUnreturned && (
-                                <div style={{ fontSize: "0.65rem", color: "#c2410c", fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
-                                  {t('profile_tx_contact_brgy')}
-                                </div>
-                              )}
-                              {isOverdue && (
-                                <div style={{ fontSize: "0.65rem", color: "#dc2626", fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
-                                  {t('profile_tx_past_due')}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{tx.category}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                  return (
+                    <div key={tx.id || i} className={`pf-tx${isUnreturned ? " is-unreturned" : isOverdue ? " is-overdue" : ""}`}>
+                      <div className="pf-tx__top">
+                        <div className="pf-tx__name">{tx.serviceName}</div>
+                        <span className={`pf-tx-badge ${statusLower}`}>
+                          <span className="pf-tx-bdot" />
+                          {isUnreturned ? t('status_unreturned') : isOverdue ? t('status_overdue') : tx.status}
+                        </span>
+                      </div>
 
-              {/* Advanced Alert Banners */}
-              {!txLoading && transactions.some(tx => tx.status === "Unreturned") && (
-                <div style={{
-                  display: "flex", alignItems: "flex-start", gap: "12px",
-                  background: "rgba(249,115,22,0.08)", border: "1.5px solid rgba(249,115,22,0.35)",
-                  borderRadius: "10px", padding: "14px 16px", margin: "12px 0 0 0", fontSize: "13px", color: "#7c2d12",
-                }}>
-                  <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                  </svg>
-                  <div style={{ flex: 1, lineHeight: "1.6" }}>
-                    <strong style={{ display: "block", color: "#9a3412", marginBottom: "2px" }}>{t('profile_unreturned_banner_title')}</strong>
-                    {t('profile_unreturned_banner_text')}
-                  </div>
+                      <div className="pf-tx__meta">
+                        <div><span>{t('profile_tx_col_ref')}</span><strong className="pf-tx__ref">{tx.refNum || "—"}</strong></div>
+                        <div><span>{t('profile_tx_col_date')}</span><strong>{dateStr}</strong></div>
+                        <div><span>{t('profile_tx_col_category')}</span><strong>{tx.category || "—"}</strong></div>
+                      </div>
+
+                      {returnDateStr && (
+                        <div className="pf-tx__return">
+                          {(isOverdue || isUnreturned) ? <IconAlert /> : <IconCalSmall />}
+                          <span>{t('profile_tx_return_prefix')}{returnDateStr}</span>
+                        </div>
+                      )}
+                      {isUnreturned && <div className="pf-tx__hint">{t('profile_tx_contact_brgy')}</div>}
+                      {isOverdue && <div className="pf-tx__hint">{t('profile_tx_past_due')}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!txLoading && transactions.some(tx => tx.status === "Unreturned") && (
+              <div className="pf-alert pf-alert--orange">
+                <IconAlert />
+                <div>
+                  <strong>{t('profile_unreturned_banner_title')}</strong>
+                  {t('profile_unreturned_banner_text')}
                 </div>
-              )}
+              </div>
+            )}
 
-              {!txLoading && transactions.some(tx => tx.status === "Overdue") && (
-                <div style={{
-                  display: "flex", alignItems: "flex-start", gap: "12px",
-                  background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
-                  borderRadius: "10px", padding: "14px 16px", margin: "12px 0 0 0", fontSize: "13px", color: "#b91c1c",
-                }}>
-                  <svg style={{ flexShrink: 0, marginTop: "1px" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                  </svg>
-                  <div style={{ flex: 1, lineHeight: "1.6" }}>
-                    <strong style={{ display: "block", color: "#991b1b", marginBottom: "2px" }}>{t('profile_overdue_banner_title')}</strong>
-                    {t('profile_overdue_banner_text')}
-                  </div>
+            {!txLoading && transactions.some(tx => tx.status === "Overdue") && (
+              <div className="pf-alert pf-alert--red">
+                <IconAlert />
+                <div>
+                  <strong>{t('profile_overdue_banner_title')}</strong>
+                  {t('profile_overdue_banner_text')}
                 </div>
-              )}
+              </div>
+            )}
 
-              {transactions.length > txPerPage && (
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "1rem", gap: "0.5rem" }}>
-                  <button
-                    onClick={() => setTxPage(p => Math.max(1, p - 1))}
-                    disabled={txPage === 1}
-                    style={{
-                      padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
-                      background: txPage === 1 ? "#f1f5f9" : "var(--primary)", color: txPage === 1 ? "#94a3b8" : "#fff",
-                      border: "none", cursor: txPage === 1 ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    {t('profile_tx_prev')}
-                  </button>
-                  <div style={{ fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", color: "var(--text)", margin: "0 0.5rem" }}>
-                    {t('profile_tx_page_info', txPage, totalPages)}
-                  </div>
-                  <button
-                    onClick={() => setTxPage(p => Math.min(totalPages, p + 1))}
-                    disabled={txPage === totalPages}
-                    style={{
-                      padding: "0.4rem 0.8rem", borderRadius: "6px", fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
-                      background: txPage === totalPages ? "#f1f5f9" : "var(--primary)",
-                      color: txPage === totalPages ? "#94a3b8" : "#fff",
-                      border: "none", cursor: txPage === totalPages ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    {t('profile_tx_next')}
-                  </button>
-                </div>
-              )}
-            </div>
+            {transactions.length > txPerPage && (
+              <div className="pf-pager">
+                <button type="button" onClick={() => setTxPage(p => Math.max(1, p - 1))} disabled={txPage === 1}>
+                  {t('profile_tx_prev')}
+                </button>
+                <div className="pf-pager__info">{t('profile_tx_page_info', txPage, totalPages)}</div>
+                <button type="button" onClick={() => setTxPage(p => Math.min(totalPages, p + 1))} disabled={txPage === totalPages}>
+                  {t('profile_tx_next')}
+                </button>
+              </div>
+            )}
           </Card>
 
-          {/* ── SETTINGS AND PREFERENCES MENU (MOBILE APP MATCH) ── */}
-          <div style={{ marginBottom: "2rem" }}>
-            <Card icon={IconSettings} title={t('profile_settings_title', 'Preferences')}>
+          {/* ── PREFERENCES ── */}
+          <Card icon={IconSettings} title={t('profile_settings_title', 'Preferences')} flush>
+            <SettingRow
+              icon={IconGlobe}
+              title={t('profile_settings_language', 'Language')}
+              description={t('profile_settings_language_desc', 'Choose your preferred interface language.')}
+              action={
+                <div className="pf-seg" role="group" aria-label={t('profile_settings_language', 'Language')}>
+                  <button type="button" className={`pf-seg__btn${language === 'en' ? " is-on" : ""}`} onClick={() => setLanguage('en')}>
+                    {t('profile_settings_language_en', 'English')}
+                  </button>
+                  <button type="button" className={`pf-seg__btn${language === 'fil' ? " is-on" : ""}`} onClick={() => setLanguage('fil')}>
+                    {t('profile_settings_language_fil', 'Filipino')}
+                  </button>
+                </div>
+              }
+            />
+            {isHead && (
               <SettingRow
-                icon={() => (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="2" y1="12" x2="22" y2="12" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                )}
-                title={t('profile_settings_language', 'Language')}
-                description={t('profile_settings_language_desc', 'Choose your preferred interface language.')}
-                action={
-                  <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setLanguage('en')}
-                      style={{
-                        padding: '5px 12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        background: language === 'en' ? '#317D89' : 'transparent',
-                        color: language === 'en' ? '#fff' : '#64748b',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      {t('profile_settings_language_en', 'English')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLanguage('fil')}
-                      style={{
-                        padding: '5px 12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        background: language === 'fil' ? '#317D89' : 'transparent',
-                        color: language === 'fil' ? '#fff' : '#64748b',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      {t('profile_settings_language_fil', 'Filipino')}
-                    </button>
-                  </div>
-                }
+                icon={ProfileIconUser}
+                title={t('profile_transfer_head', 'Transfer Head Role')}
+                description={t('profile_transfer_head_desc')}
+                onClick={() => setActiveModal('transferHead')}
               />
-              {isHead && (
-                <SettingRow 
-                  icon={ProfileIconUser} 
-                  title={t('profile_transfer_head', 'Transfer Head Role')} 
-                  description={t('profile_transfer_head_desc')} 
-                  onClick={() => setActiveModal('transferHead')} 
-                />
-              )}
-              {/* Remove Member Button */}
-              {isHead && (
-                <SettingRow 
-                  icon={IconTrash} 
-                  title={t('profile_remove_member', 'Remove Member')} 
-                  description={t('profile_remove_member_desc')} 
-                  onClick={() => setActiveModal('removeMember')} 
-                />
-              )}
-              {isBranchHead && (
-                <SettingRow 
-                  icon={ProfileIconUser} 
-                  title={t('profile_transfer_branch', 'Transfer Branch Head Role')} 
-                  description={t('profile_transfer_branch_desc')} 
-                  onClick={() => setActiveModal('transferBranchHead')} 
-                />
-              )}
-              <SettingRow 
-                icon={IconBell} 
-                title={t('profile_settings_notif', 'Push Notifications')} 
-                description={t('profile_settings_notif_desc')} 
-                action={
-                  <label className="pf-toggle-switch" style={{ position: "relative", display: "inline-block", width: "40px", height: "24px" }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ opacity: 0, width: 0, height: 0 }} 
-                      checked={pushEnabled} 
-                      onChange={e => setPushEnabled(e.target.checked)} 
-                    />
-                    <span style={{
-                      position: "absolute", cursor: "pointer", top: 0, left: 0, right: 0, bottom: 0,
-                      backgroundColor: pushEnabled ? "#317D89" : "#cbd5e1", transition: "0.4s", borderRadius: "24px"
-                    }}>
-                      <span style={{
-                        position: "absolute", content: '""', height: "18px", width: "18px", left: "3px", bottom: "3px",
-                        backgroundColor: "white", transition: "0.4s", borderRadius: "50%",
-                        transform: pushEnabled ? "translateX(16px)" : "translateX(0)"
-                      }} />
-                    </span>
-                  </label>
-                }
+            )}
+            {isHead && (
+              <SettingRow
+                icon={IconTrash}
+                title={t('profile_remove_member', 'Remove Member')}
+                description={t('profile_remove_member_desc')}
+                onClick={() => setActiveModal('removeMember')}
+                danger
               />
-              <SettingRow 
-                icon={IconTransfer} 
-                title={t('profile_transfer_household', 'Transfer Household')} 
-                description={t('profile_transfer_household_desc')} 
-                onClick={() => setActiveModal('transfer')} 
+            )}
+            {isBranchHead && (
+              <SettingRow
+                icon={ProfileIconUser}
+                title={t('profile_transfer_branch', 'Transfer Branch Head Role')}
+                description={t('profile_transfer_branch_desc')}
+                onClick={() => setActiveModal('transferBranchHead')}
               />
-            </Card>
-          </div>
+            )}
+            <SettingRow
+              icon={IconBell}
+              title={t('profile_settings_notif', 'Push Notifications')}
+              description={t('profile_settings_notif_desc')}
+              action={
+                <label className="pf-toggle">
+                  <input
+                    type="checkbox"
+                    checked={pushEnabled}
+                    onChange={e => setPushEnabled(e.target.checked)}
+                    aria-label={t('profile_settings_notif', 'Push Notifications')}
+                  />
+                  <span className="pf-toggle__track"><span className="pf-toggle__knob" /></span>
+                </label>
+              }
+            />
+            <SettingRow
+              icon={IconTransfer}
+              title={t('profile_transfer_household', 'Transfer Household')}
+              description={t('profile_transfer_household_desc')}
+              onClick={() => setActiveModal('transfer')}
+            />
+          </Card>
 
-          <div style={{ marginBottom: "2rem" }}>
-            <Card icon={IconSupport} title={t('profile_settings_support', 'Support')}>
-              <SettingRow 
-                icon={IconHelp} 
-                title={t('profile_settings_help', 'Help & FAQ')} 
-                onClick={() => setActiveModal('help')} 
-              />
-              <SettingRow 
-                icon={IconMessage} 
-                title={t('profile_settings_contact', 'Contact Barangay')} 
-                onClick={() => setActiveModal('contact')} 
-              />
-              <SettingRow 
-                icon={IconInfo} 
-                title={t('profile_settings_about', 'About')} 
-                onClick={() => setActiveModal('about')} 
-              />
-              <SettingRow 
-                icon={IconShield2} 
-                title={t('profile_settings_privacy', 'Privacy Policy')} 
-                onClick={() => setActiveModal('privacy')} 
-              />
-            </Card>
-          </div>
+          <Card icon={IconSupport} title={t('profile_settings_support', 'Support')} flush>
+            <SettingRow icon={IconHelp} title={t('profile_settings_help', 'Help & FAQ')} onClick={() => setActiveModal('help')} />
+            <SettingRow icon={IconMessage} title={t('profile_settings_contact', 'Contact Barangay')} onClick={() => setActiveModal('contact')} />
+            <SettingRow icon={IconInfo} title={t('profile_settings_about', 'About')} onClick={() => setActiveModal('about')} />
+            <SettingRow icon={IconShield2} title={t('profile_settings_privacy', 'Privacy Policy')} onClick={() => setActiveModal('privacy')} />
+          </Card>
 
           <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
         </div>
@@ -1446,17 +1118,16 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
 
       {/* ── SETTINGS ACTION MODALS ── */}
       {activeModal === 'transfer' && (
-        <TransferHouseholdModal 
-          onClose={() => setActiveModal(null)} 
-          currentHouseholdID={householdID} 
+        <TransferHouseholdModal
+          onClose={() => setActiveModal(null)}
+          currentHouseholdID={householdID}
           userData={data}
-          memberID={memberID} 
+          memberID={memberID}
         />
       )}
 
-      {/* Remove Member Modal */}
       {activeModal === 'removeMember' && (
-        <RemoveMemberModal 
+        <RemoveMemberModal
           householdID={householdID}
           currentHeadID={memberID}
           onClose={() => setActiveModal(null)}
@@ -1464,10 +1135,10 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       )}
 
       {activeModal === 'transferHead' && (
-        <TransferHeadModal 
-          onClose={() => setActiveModal(null)} 
-          householdID={householdID} 
-          currentHeadID={memberID} 
+        <TransferHeadModal
+          onClose={() => setActiveModal(null)}
+          householdID={householdID}
+          currentHeadID={memberID}
           onLogout={() => {
             localStorage.removeItem("brgy_session");
             if (onNavigate) onNavigate("logout");
@@ -1476,11 +1147,11 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       )}
 
       {activeModal === 'transferBranchHead' && (
-        <TransferBranchHeadModal 
-          onClose={() => setActiveModal(null)} 
+        <TransferBranchHeadModal
+          onClose={() => setActiveModal(null)}
           householdID={householdID}
           currentBranchID={data.branchID} // Pass their current branch so it filters correctly
-          currentHeadID={memberID} 
+          currentHeadID={memberID}
           onLogout={() => {
             localStorage.removeItem("brgy_session");
             if (onNavigate) onNavigate("logout");
@@ -1493,35 +1164,27 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
       {activeModal === 'privacy' && <PrivacyModal onClose={() => setActiveModal(null)} />}
 
-
-      {/* ── LIVE CAMERA MODAL (From Current Branch) ── */}
+      {/* ── LIVE CAMERA MODAL ── */}
       {cameraModalOpen && (
-        <div className="pf-overlay" style={{ zIndex: 1050 }} onClick={(e) => { if (e.target === e.currentTarget) closeCamera(); }}>
-          <div className="pf-modal" style={{ maxWidth: "460px" }}>
+        <div className="pf-overlay pf-overlay--top" onClick={(e) => { if (e.target === e.currentTarget) closeCamera(); }}>
+          <div className="pf-modal pf-modal--sm">
             <div className="pf-modal-head">
               <div>
                 <h3>{t('profile_cam_title')}</h3>
                 <p>{t('profile_cam_desc')}</p>
               </div>
-              <button className="pf-modal-close" onClick={closeCamera}><ProfileIconX /></button>
+              <button className="pf-modal-close" onClick={closeCamera} aria-label={t('close', 'Close')}><ProfileIconX /></button>
             </div>
-            <div className="pf-modal-body" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "1.5rem" }}>
+            <div className="pf-modal-body pf-cam-body">
               {cameraError ? (
-                <div style={{ textAlign: "center", color: "#e03e3e", padding: "1.5rem", fontSize: "0.9rem" }}>
-                  {cameraError}
-                </div>
+                <div className="pf-cam-error">{cameraError}</div>
               ) : (
-                <div style={{ position: "relative", width: "100%", maxWidth: "340px", aspectRatio: "1/1", borderRadius: "50%", overflow: "hidden", border: "4px solid var(--teal)", background: "#000" }}>
-                  <video
-                    ref={videoRef}
-                    playsInline
-                    muted
-                    style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
-                  />
+                <div className="pf-cam-frame">
+                  <video ref={videoRef} playsInline muted />
                 </div>
               )}
             </div>
-            <div className="pf-modal-foot" style={{ justifyContent: "flex-end" }}>
+            <div className="pf-modal-foot pf-modal-foot--end">
               <button className="pf-btn-ghost" onClick={closeCamera}>{t('cancel')}</button>
               {!cameraError && (
                 <button className="pf-btn-primary" onClick={capturePhoto}>
@@ -1542,13 +1205,14 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                 <h3>{t('profile_edit_btn')}</h3>
                 <p>{t('profile_edit_sub')}</p>
               </div>
-              <button className="pf-modal-close" onClick={closeModal}><ProfileIconX /></button>
+              <button className="pf-modal-close" onClick={closeModal} aria-label={t('close', 'Close')}><ProfileIconX /></button>
             </div>
 
             <div className="pf-modal-tabs">
               {tabs.map((tabLabel, i) => (
                 <div key={i} className={`pf-modal-tab${i === tab ? " active" : i < tab ? " done" : ""}`} onClick={() => setTab(i)}>
-                  <div className="pf-tab-num">{i < tab ? "✓" : i + 1}</div>{tabLabel}
+                  <div className="pf-tab-num">{i < tab ? "✓" : i + 1}</div>
+                  <span className="pf-tab-label">{tabLabel}</span>
                 </div>
               ))}
             </div>
@@ -1640,7 +1304,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
                           <input type="checkbox" checked={draftCategories.includes(cat)} onChange={() => toggleCat(cat)} />
                           <span className="pf-chk-lbl">
                             <span className="pf-chk-box">{draftCategories.includes(cat) ? "✓" : ""}</span>
-                            {cat === "Student" ? t('reg_cat_student') : cat === "Senior Citizen" ? t('reg_cat_senior') : cat === "Solo Parent" ? t('reg_cat_solo_parent') : cat === "OFW" ? t('reg_cat_ofw') : cat === "LGBT" ? t('reg_cat_lgbt') : cat === "Indigenous People" ? t('reg_cat_ip') : cat === "PWD" ? t('reg_cat_pwd') : cat}
+                            {getCategoryLabel(cat)}
                           </span>
                         </label>
                       ))}
@@ -1710,12 +1374,12 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
             </div>
 
             <div className="pf-modal-foot">
-              <button className="pf-btn-ghost" onClick={tab === 0 ? closeModal : () => setTab(t => t - 1)}>
+              <button className="pf-btn-ghost" onClick={tab === 0 ? closeModal : () => setTab(n => n - 1)}>
                 {tab === 0 ? t('cancel') : t('profile_btn_back')}
               </button>
-              <div style={{ display: "flex", gap: "0.65rem" }}>
+              <div className="pf-modal-foot__right">
                 {tab < tabs.length - 1
-                  ? <button className="pf-btn-primary" onClick={() => setTab(t => t + 1)}>{t('profile_btn_next')} <ProfileIconArrow /></button>
+                  ? <button className="pf-btn-primary" onClick={() => setTab(n => n + 1)}>{t('profile_btn_next')} <ProfileIconArrow /></button>
                   : <button className="pf-btn-primary" onClick={save} disabled={saving}><IconSave /> {saving ? t('profile_btn_saving') : t('profile_save_changes')}</button>
                 }
               </div>

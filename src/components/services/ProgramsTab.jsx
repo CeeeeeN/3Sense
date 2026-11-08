@@ -3,16 +3,26 @@ import {
   collection,
   onSnapshot,
   doc,
-  addDoc,
-  setDoc,
   query,
   where,
   serverTimestamp,
-  limit
+  limit,
+  writeBatch
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { createNotification } from "../../services/notifications";
 import { useLanguage } from "../../context/LanguageContext";
+
+// Keeps digits only, max 11. Converts +63 / 63 / 9XXXXXXXXX into 09XXXXXXXXX
+const normalizePHMobile = (value) => {
+  let d = String(value || "").replace(/\D/g, "");
+  if (d.startsWith("63") && d.length >= 12) d = "0" + d.slice(2);
+  else if (d.length === 10 && d.startsWith("9")) d = "0" + d;
+  return d.slice(0, 11);
+};
+
+// Exactly 11 digits, starting with 09
+const isValidPHMobile = (value) => /^09\d{9}$/.test(String(value || ""));
 
 // ── SESSION HELPER ────────────────────────────────────────────────────────────
 const getSaved = (key, fallback) => {
@@ -92,97 +102,11 @@ const DocsIcon = () => (
     <polyline points="14 2 14 8 20 8" />
   </svg>
 );
-const MegaphoneIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 11l19-9-9 19-2-8-8-2z" />
-  </svg>
-);
 const CheckIcon = ({ size = 14, stroke = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
-
-// ── Description that clamps to 3 lines and expands with "more..." ─────────────
-function ExpandableDesc({ text }) {
-  const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const check = () => {
-      if (!open) setOverflowing(el.scrollHeight > el.clientHeight + 1);
-    };
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, [text, open]);
-
-  return (
-    <div className="lh-prog-card__desc-wrap">
-      <div ref={ref} className={`lh-prog-card__desc${open ? " lh-prog-card__desc--open" : ""}`}>
-        {text}
-      </div>
-      {(overflowing || open) && (
-        <button type="button" className="lh-more-btn" onClick={() => setOpen((o) => !o)}>
-          {open ? t("less", "less") : t("more_dots", "more...")}
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ── Program details panel shown on the register page ──────────────────────────
-function ProgramDetails({ program, slotsLeft, full }) {
-  const { t } = useLanguage();
-  const tag = getTagStyle(program.demographic || program.title || "");
-  const timeLabel = [formatTime(program.startTime), formatTime(program.endTime)].filter(Boolean).join(" – ");
-  const hasSlots = program.slots !== undefined && program.slots !== "";
-
-  return (
-    <div className="lh-detail">
-      <div className="lh-detail__head">
-        <span className="lh-prog-card__tag" style={{ background: `${tag.color}15`, color: tag.color }}>
-          {tag.label}
-        </span>
-        {hasSlots && (
-          <span className={`lh-prog-card__slots${full ? " lh-prog-card__slots--full" : ""}`}>
-            {full ? t("prog_badge_full", "Full") : `${slotsLeft} ${t("prog_slots_remaining", "slot(s) left")}`}
-          </span>
-        )}
-      </div>
-      <div className="lh-detail__title">{program.title}</div>
-      {program.description && <p className="lh-detail__desc">{program.description}</p>}
-
-      <div className="lh-detail__grid">
-        {program.date && (
-          <div className="lh-detail__item">
-            <CalendarIcon />
-            <span>
-              {formatDate(program.date)}
-              {program.endDate && program.endDate !== program.date ? ` – ${formatDate(program.endDate)}` : ""}
-            </span>
-          </div>
-        )}
-        {timeLabel && <div className="lh-detail__item"><ClockIcon /><span>{timeLabel}</span></div>}
-        {program.location && <div className="lh-detail__item"><PinIcon /><span>{program.location}</span></div>}
-        {program.demographic && <div className="lh-detail__item"><UsersIcon /><span>{program.demographic}</span></div>}
-      </div>
-
-      {program.requirements?.length > 0 && (
-        <div className="lh-detail__reqs">
-          <div className="lh-detail__reqs-title">{t("prog_requirements_label", "Requirements")}</div>
-          <ul>
-            {program.requirements.map((req, i) => <li key={i}>{req}</li>)}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ProgramsTab({ userData, householdID, userName }) {
@@ -192,6 +116,8 @@ export default function ProgramsTab({ userData, householdID, userName }) {
   const [regNum, setRegNum] = useState("");
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const topRef = useRef(null);
+  const mounted = useRef(false);
 
   // ── Programs (general only, exclude livelihood) ───────────────────
   const [programs, setPrograms] = useState([]);
@@ -223,14 +149,19 @@ export default function ProgramsTab({ userData, householdID, userName }) {
         middleName: userData.middleName || "",
         lastName: userData.lastName || "",
         address: fullAddress,
-        contact: userData.contactNumber != null ? String(userData.contactNumber) : "",
+        contact: normalizePHMobile(userData.contactNumber),
         email: userData.email || "",
       }));
     }
   }, [userData]);
 
+  // Scroll to the top of the form when the step changes
   useEffect(() => {
-    // BOUNDED QUERY: Cap the programs fetch to prevent downloading years of historical data
+    if (!mounted.current) { mounted.current = true; return; }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [step]);
+
+  useEffect(() => {
     const q = query(
       collection(db, "Programs"),
       limit(100)
@@ -240,7 +171,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
       setPrograms(
         snapshot.docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          // Client-side filtering remains intact
           .filter((p) => p.programType !== "livelihood" && p.status !== "Completed")
       );
       setLoadingPrograms(false);
@@ -252,7 +182,6 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     if (programs.length === 0) return;
 
     const unsubs = programs.map((prog) => {
-      // BOUNDED QUERY: Prevent the N+1 read multiplier from crashing the app
       const attendeesQuery = query(
         collection(db, "Programs", prog.id, "attendees"),
         limit(300)
@@ -274,12 +203,10 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     const activeUserId = userData?.userID || userData?.residentID || "";
     const hid = householdID || "";
 
-    // Need at least one identifier
     if (!activeUserId && !hid) return;
 
     setLoadingMyRegs(true);
 
-    // Query by userID (most reliable) or householdID as fallback
     const [queryField, queryValue] = activeUserId
       ? ["userID", activeUserId]
       : ["householdID", hid];
@@ -287,14 +214,12 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     const q = query(
       collection(db, "programRegistrations"),
       where(queryField, "==", queryValue)
-      // No orderBy — avoids composite index requirement; sorted client-side below
     );
 
     const unsub = onSnapshot(
       q,
       (snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Newest first, client-side
         docs.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
         setMyRegs(docs);
         setLoadingMyRegs(false);
@@ -340,7 +265,7 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     if (!form.firstName.trim()) e.firstName = t("doc_err_required", "Required.");
     if (!form.lastName.trim()) e.lastName = t("doc_err_required", "Required.");
     if (!form.address.trim()) e.address = t("doc_err_required", "Required.");
-    if (!String(form.contact || "").trim()) e.contact = t("doc_err_required", "Required.");
+    if (!isValidPHMobile(form.contact)) e.contact = t("doc_err_phone", "Contact number must be exactly 11 digits (09XXXXXXXXX).");
     if (!form.idFile) e.idFile = t("doc_err_upload_id", "Please upload a valid ID or Barangay Clearance.");
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -366,12 +291,14 @@ export default function ProgramsTab({ userData, householdID, userName }) {
         const timeLabel = [formatTime(prog?.startTime), formatTime(prog?.endTime)].filter(Boolean).join(" – ");
         const fullName = [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ");
         const activeUserId = userData?.userID || userData?.residentID || "";
-
-        // Permanent UID
         const userUID = userData?.UID || getSaved("UID", null);
 
+        // Firestore batch: both writes succeed or neither does
+        const batch = writeBatch(db);
+
         // 1️⃣ Flat collection → "My Registrations" view
-        await addDoc(collection(db, "programRegistrations"), {
+        const flatRegRef = doc(collection(db, "programRegistrations"));
+        batch.set(flatRegRef, {
           regNum: reg,
           UID: userUID,
           firstName: form.firstName,
@@ -398,8 +325,9 @@ export default function ProgramsTab({ userData, householdID, userName }) {
 
         // 2️⃣ Attendee sub-doc → ManagePrograms workspace
         if (activeUserId && prog?.id) {
-          await setDoc(
-            doc(db, "Programs", prog.id, "attendees", activeUserId),
+          const attendeeRef = doc(db, "Programs", prog.id, "attendees", activeUserId);
+          batch.set(
+            attendeeRef,
             {
               UID: userUID,
               userID: activeUserId,
@@ -420,6 +348,8 @@ export default function ProgramsTab({ userData, householdID, userName }) {
             { merge: true }
           );
         }
+
+        await batch.commit();
 
         // 3️⃣ Notification
         await createNotification(
@@ -448,9 +378,36 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     setStep(n);
   };
 
+  const goBackOrExit = () => {
+    if (step > 1) goToStep(step - 1);
+    else { setView("main"); setErrors({}); }
+  };
+
   const resetForm = () => {
-    setStep(1); setErrors({});
-    setForm(BLANK);
+    setStep(1);
+    setErrors({});
+
+    let fullAddress = "";
+    if (userData) {
+      fullAddress = [
+        userData.houseNumber,
+        userData.street,
+        userData.barangay,
+        userData.city
+      ].filter(Boolean).join(", ");
+    }
+
+    setForm({
+      firstName: userData?.firstName || "",
+      middleName: userData?.middleName || "",
+      lastName: userData?.lastName || "",
+      address: fullAddress,
+      contact: normalizePHMobile(userData?.contactNumber),
+      email: userData?.email || "",
+      idFile: "",
+      programId: "",
+    });
+
     setView("main");
   };
 
@@ -460,42 +417,34 @@ export default function ProgramsTab({ userData, householdID, userName }) {
     t("prog_step_confirm", "Confirmation")
   ];
 
+  const reqPill = <span className="bf-pill bf-pill--req">{t("required", "Required")}</span>;
+  const optPill = <span className="bf-pill">{t("optional", "Optional")}</span>;
+
+  const handleIdFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((er) => ({ ...er, idFile: t("doc_err_file_size", "File must be under 5MB.") }));
+      e.target.value = "";
+      return;
+    }
+    set("idFile", file.name);
+    setErrors((er) => ({ ...er, idFile: undefined }));
+  };
+
   // ════════════════════════════════════════════════════════════════
   // VIEW: MAIN
   // ════════════════════════════════════════════════════════════════
   if (view === "main") return (
     <div className="lh-page">
-      {/* ── RESTORED: Hero Section (Contains My Registrations button) ── */}
-      <div className="svc-hero" style={{ background: "linear-gradient(135deg, #1a3a4a 0%, #317D89 100%)" }}>
-        <div className="svc-hero__inner">
-          <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow">
-              <span className="svc-hero__eyebrow-icon"><MegaphoneIcon /></span>
-              Barangay Programs
-            </div>
-            <h2 className="svc-hero__title">Community Programs</h2>
-            <p className="svc-hero__sub">
-              Join barangay-organized programs designed to uplift and strengthen the community.
-              Register now to secure your slot before they fill up.
-            </p>
-            <div className="svc-hero__law">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              Organized by Barangay Malanday · Open to all qualified residents
-            </div>
-          </div>
-          <div className="svc-hero__right">
-            <button className="sv-btn-primary" style={{ fontSize: "0.8rem" }} onClick={() => setView("myregs")}>
-              <DocsIcon /> My Registrations
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Programs grid */}
       <div className="lh-programs-section">
-        <div className="lh-section-label">Available Programs</div>
+        <div className="lh-section-head">
+          <div className="lh-section-label">{t("prog_available", "Available Programs")}</div>
+          <button type="button" className="sv-btn-primary lh-myregs-btn" onClick={() => setView("myregs")}>
+            <DocsIcon /> {t("prog_my_registrations", "My Registrations")}
+          </button>
+        </div>
 
         {loadingPrograms ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>Loading programs…</div>
@@ -528,15 +477,19 @@ export default function ProgramsTab({ userData, householdID, userName }) {
                     </span>
                     {p.slots !== undefined && p.slots !== "" && (
                       <span className={`lh-prog-card__slots${full ? " lh-prog-card__slots--full" : low ? " lh-prog-card__slots--low" : ""}`}>
-                        {full ? t("prog_badge_full", "Full") : t("prog_slots_remaining", `${slotsNum} slots remaining`)}
+                        {full ? t("prog_badge_full", "Full") : `${slotsNum} ${t("prog_slots_left_word", "slots left")}`}
                       </span>
                     )}
                   </div>
 
                   <div className="lh-prog-card__name">{p.title}</div>
-                  
-                  {/* ── UPDATED: Kyla's Expandable Description ── */}
-                  <ExpandableDesc text={p.description || "—"} />
+
+                  {/* Full description, no more/less toggle */}
+                  <div className="lh-prog-card__desc-wrap">
+                    <div className="lh-prog-card__desc lh-prog-card__desc--open">
+                      {p.description || "—"}
+                    </div>
+                  </div>
 
                   <div className="lh-prog-card__meta">
                     {p.date && (
@@ -669,313 +622,279 @@ export default function ProgramsTab({ userData, householdID, userName }) {
   );
 
   // ════════════════════════════════════════════════════════════════
-  // VIEW: REGISTER FORM (3-step + success)
+  // VIEW: REGISTER FORM (3 steps + success), same look as Documents
   // ════════════════════════════════════════════════════════════════
   return (
-    <div className="lh-page">
-      <div className="po-form-topbar">
-        <button
-          className="vawc-back-btn"
-          onClick={() => {
-            if (step > 1) { setStep((s) => s - 1); setErrors({}); }
-            else { setView("main"); setErrors({}); }
-          }}
-        >
-          ‹ {step > 1 ? t("back", "Back") : t("back_to_programs", "Back to Programs")}
-        </button>
-      </div>
-
-      {/* Step indicator — same structure as the Documents wizard */}
+    <div className="dr-wizard dz-wizard">
       {step < 4 && (
-        <div className="lh-steps">
-          <ol className="dr-steps" aria-label="Registration progress">
-            {STEP_LABELS.map((label, i) => {
-              const n = i + 1;
-              const done = n < step;
-              const active = n === step;
-              const clickable = done && !submitting;
-              const Node = clickable ? "button" : "div";
-              const nodeProps = clickable
-                ? { type: "button", onClick: () => goToStep(n), "aria-label": `Go back to ${label}` }
-                : {};
-
-              return (
-                <li key={label} className="dr-step-item" aria-current={active ? "step" : undefined}>
-                  <Node className={`dr-step-node${clickable ? " dr-step-node--link" : ""}`} {...nodeProps}>
-                    <span className={`dr-step-circle${done ? " dr-step-circle--done" : active ? " dr-step-circle--active" : ""}`}>
-                      {done
-                        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                        : n}
-                    </span>
-                    <span className={`dr-step-label${active ? " dr-step-label--active" : done ? " dr-step-label--done" : ""}`}>{label}</span>
-                  </Node>
-                  {i < STEP_LABELS.length - 1 && (
-                    <span className={`dr-step-line${done ? " dr-step-line--done" : ""}`} aria-hidden="true" />
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+        <div className="dr-wizard-header">
+          <div className="dz-stepswrap">
+            <ol className="lv-steps" aria-label="Registration progress">
+              {STEP_LABELS.map((label, i) => {
+                const n = i + 1;
+                const done = n < step;
+                const active = n === step;
+                const clickable = done && !submitting;
+                const Node = clickable ? "button" : "div";
+                const nodeProps = clickable ? { type: "button", onClick: () => goToStep(n) } : {};
+                return (
+                  <li key={label} className="lv-steps__li" aria-current={active ? "step" : undefined}>
+                    <Node className={`lv-steps__item lv-steps__node${done ? " is-done" : active ? " is-active" : ""}${clickable ? " is-link" : ""}`} {...nodeProps}>
+                      <span className="lv-steps__dot">
+                        {done
+                          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                          : n}
+                      </span>
+                      <span className="lv-steps__label">{label}</span>
+                    </Node>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         </div>
       )}
 
-      <div className="lh-form-body">
+      <div className="dr-wizard-body">
+        <div className={`dz-wrap${step <= 2 ? " dz-wrap--wide" : ""}`} ref={topRef}>
 
-        {/* ── Step 1: Personal Info ── */}
-        {step === 1 && (
-          <>
-            <section className="dr-card">
-              <div className="dr-card__title">{t("prog_step_info", "Personal Information")}</div>
-              <div className="dr-grid">
-                <div className="dr-field">
-                  <label className="sv-label">{t("profile_first_name", "First Name")} <span className="sv-required">*</span></label>
-                  <input
-                    className={`sv-input${errors.firstName ? " sv-input--error" : ""}`}
-                    value={form.firstName}
-                    onChange={(e) => set("firstName", e.target.value)}
-                    placeholder="Juan"
-                  />
-                  {errors.firstName && <span className="sv-error-msg">{errors.firstName}</span>}
-                </div>
-                <div className="dr-field">
-                  <label className="sv-label">{t("profile_middle_name", "Middle Name")}</label>
-                  <input className="sv-input" value={form.middleName} onChange={(e) => set("middleName", e.target.value)} placeholder="Santos" />
-                </div>
-                <div className="dr-field">
-                  <label className="sv-label">{t("profile_last_name", "Last Name")} <span className="sv-required">*</span></label>
-                  <input
-                    className={`sv-input${errors.lastName ? " sv-input--error" : ""}`}
-                    value={form.lastName}
-                    onChange={(e) => set("lastName", e.target.value)}
-                    placeholder="Dela Cruz"
-                  />
-                  {errors.lastName && <span className="sv-error-msg">{errors.lastName}</span>}
-                </div>
-                <div className="dr-field">
-                  <label className="sv-label">{t("profile_contact", "Contact Number")} <span className="sv-required">*</span></label>
-                  <input
-                    className={`sv-input${errors.contact ? " sv-input--error" : ""}`}
-                    value={form.contact}
-                    onChange={(e) => set("contact", e.target.value)}
-                    placeholder="+63 912 345 6789"
-                  />
-                  {errors.contact && <span className="sv-error-msg">{errors.contact}</span>}
+          {/* ── Step 1: Personal info ── */}
+          {step === 1 && (
+            <section className="bz-card">
+              <h3 className="bz-heading">{t("prog_step_info", "Personal Info")}</h3>
+              <p className="bz-text">{t("doc_details_hint", "Check that your information is correct. Fill in anything that is empty.")}</p>
+
+              <div className="bf-form">
+                <div className="bf-group">
+                  <div className="bf-group__title">{t("doc_personal_info", "Personal information")}</div>
+                  <div className="bf-form--tight">
+                    <div className="bf-field">
+                      <label className="bf-label" htmlFor="pr-first">{t("profile_first_name", "First name")} {reqPill}</label>
+                      <input id="pr-first" className={`bf-input${errors.firstName ? " bf-input--error" : ""}`} value={form.firstName} onChange={(e) => set("firstName", e.target.value)} placeholder="Juan" />
+                      {errors.firstName && <div className="bf-error">{errors.firstName}</div>}
+                    </div>
+                    <div className="bf-field">
+                      <label className="bf-label" htmlFor="pr-middle">{t("profile_middle_name", "Middle name")} {optPill}</label>
+                      <input id="pr-middle" className="bf-input" value={form.middleName} onChange={(e) => set("middleName", e.target.value)} placeholder="Santos" />
+                    </div>
+                    <div className="bf-field">
+                      <label className="bf-label" htmlFor="pr-last">{t("profile_last_name", "Last name")} {reqPill}</label>
+                      <input id="pr-last" className={`bf-input${errors.lastName ? " bf-input--error" : ""}`} value={form.lastName} onChange={(e) => set("lastName", e.target.value)} placeholder="Dela Cruz" />
+                      {errors.lastName && <div className="bf-error">{errors.lastName}</div>}
+                    </div>
+
+                    <div className="bf-field">
+                      <label className="bf-label" htmlFor="pr-contact">{t("doc_phone_number", "Phone number")} {reqPill}</label>
+                      <input
+                        id="pr-contact"
+                        className={`bf-input${errors.contact ? " bf-input--error" : ""}`}
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        maxLength={11}
+                        value={form.contact}
+                        onChange={(e) => set("contact", normalizePHMobile(e.target.value))}
+                        placeholder="09123456789"
+                      />
+                      {errors.contact && <div className="bf-error">{errors.contact}</div>}
+                    </div>
+                    <div className="bf-field bf-field--span2">
+                      <label className="bf-label" htmlFor="pr-email">{t("profile_email", "Email")} {optPill}</label>
+                      <input id="pr-email" className="bf-input" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="juan@email.com" />
+                    </div>
+
+                    <div className="bf-field bf-field--full">
+                      <label className="bf-label" htmlFor="pr-address">{t("doc_home_address", "Home address")} {reqPill}</label>
+                      <input id="pr-address" className={`bf-input${errors.address ? " bf-input--error" : ""}`} value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="House No., Street, Barangay Malanday, Valenzuela City" />
+                      {errors.address && <div className="bf-error">{errors.address}</div>}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="dr-field dr-span-2">
-                  <label className="sv-label">{t("doc_address", "Complete Address")} <span className="sv-required">*</span></label>
-                  <input
-                    className={`sv-input${errors.address ? " sv-input--error" : ""}`}
-                    value={form.address}
-                    onChange={(e) => set("address", e.target.value)}
-                    placeholder="House No., Street, Barangay Malanday"
-                  />
-                  {errors.address && <span className="sv-error-msg">{errors.address}</span>}
-                </div>
-                <div className="dr-field dr-span-2">
-                  <label className="sv-label">{t("profile_email", "Email")} <span className="sv-optional">({t("optional", "Optional")})</span></label>
-                  <input className="sv-input" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="juan@email.com" />
+                <div className="bf-group">
+                  <div className="bf-group__title">{t("prog_identification", "Identification")}</div>
+                  <div className="bf-form--tight">
+                    <div className="bf-field bf-field--full">
+                      <div className="bf-label">{t("prog_valid_id_label", "Valid ID or Barangay Clearance")} {reqPill}</div>
+                      <label className={`bf-photo${form.idFile ? " is-filled" : ""}${errors.idFile ? " is-error" : ""}`}>
+                        <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={handleIdFile} style={{ display: "none" }} />
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {form.idFile
+                            ? <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>
+                            : <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>}
+                        </svg>
+                        <span className="bf-photo__text">
+                          {form.idFile ? (
+                            <>
+                              <strong>{t("doc_id_added", "ID added")}</strong>
+                              <small>{form.idFile} · {t("doc_tap_change", "Tap to change")}</small>
+                            </>
+                          ) : (
+                            <>
+                              <strong>{t("doc_tap_add_id", "Tap here to add your ID")}</strong>
+                              <small>{t("doc_id_guideline", "A photo or scan. JPG, PNG or PDF, up to 5MB")}</small>
+                            </>
+                          )}
+                        </span>
+                      </label>
+                      {form.idFile && (
+                        <button type="button" className="bf-secondary dz-remove" onClick={() => set("idFile", "")}>
+                          {t("doc_remove_file", "Remove this file")}
+                        </button>
+                      )}
+                      {errors.idFile && <div className="bf-error">{errors.idFile}</div>}
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
+          )}
 
-            <section className="dr-card">
-              <div className="dr-card__title">{t("prog_identification", "Identification")}</div>
-              <div className="dr-field">
-                <label className="sv-label">{t("prog_valid_id_label", "Valid ID or Barangay Clearance")} <span className="sv-required">*</span></label>
-                <label className={`dr-upload-box dr-upload-box--compact${form.idFile ? " dr-upload-box--filled" : ""}${errors.idFile ? " dr-upload-box--error" : ""}`}>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.pdf"
-                    style={{ display: "none" }}
-                    onChange={(e) => e.target.files[0] && set("idFile", e.target.files[0].name)}
-                  />
-                  {form.idFile
-                    ? <div className="dr-upload-done">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                      {form.idFile}
-                      <span className="dr-upload-hint" style={{ marginLeft: "0.4rem" }}>{t("doc_click_replace", "Click to replace")}</span>
-                    </div>
-                    : <div className="dr-upload-placeholder">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                      <span>{t("feedback_click_upload", "Click to upload")}</span>
-                      <span className="dr-upload-hint">JPG, PNG or PDF · Max 5MB</span>
-                    </div>
-                  }
-                </label>
-                {errors.idFile && <span className="sv-error-msg">{errors.idFile}</span>}
-              </div>
-            </section>
-          </>
-        )}
+          {/* ── Step 2: Choose program ── */}
+          {step === 2 && (
+            <section className="bz-card">
+              <h3 className="bz-heading">{t("prog_step_choose", "Choose Program")}</h3>
+              <p className="bz-text">{t("prog_step2_hint", "Select the community program you want to join.")}</p>
 
-        {/* ── Step 2: Choose Program ── */}
-        {step === 2 && (
-          <section className="dr-card">
-            <div className="dr-card__title">{t("prog_step_choose", "Choose Program")}</div>
-            <p className="dr-step-hint" style={{ marginBottom: "0.7rem" }}>{t("prog_step2_hint", "Select the community program you want to join.")}</p>
-            {loadingPrograms ? (
-              <div style={{ padding: "30px 0", textAlign: "center", color: "#9ca3af" }}>Loading programs…</div>
-            ) : (
-              <div className="lh-prog-select-list">
-                {programs.map((p) => {
-                  const full = isFull(p);
-                  const slotsNum = getSlotsNum(p);
-                  const selected = form.programId === p.id;
-                  const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
-                  const activeReg = userActiveRegForProgram(p.id);
-                  const disabled = full || !!activeReg;
+              {loadingPrograms ? (
+                <div className="bz-text">Loading programs…</div>
+              ) : (
+                <div className="lv-picks" role="radiogroup">
+                  {programs.map((p) => {
+                    const full = isFull(p);
+                    const slotsNum = getSlotsNum(p);
+                    const selected = form.programId === p.id;
+                    const timeLabel = [formatTime(p.startTime), formatTime(p.endTime)].filter(Boolean).join(" – ");
+                    const activeReg = userActiveRegForProgram(p.id);
+                    const disabled = full || !!activeReg;
+                    const hasSlots = p.slots !== undefined && p.slots !== "";
 
-                  return (
-                    <button
-                      key={p.id}
-                      className={`lh-prog-select-item${selected ? " lh-prog-select-item--active" : ""}${disabled ? " lh-prog-select-item--disabled" : ""}`}
-                      disabled={disabled}
-                      onClick={() => !disabled && set("programId", p.id)}
-                    >
-                      <div className="lh-prog-select-item__check">
-                        {selected && (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="lh-prog-select-item__body">
-                        <div className="lh-prog-select-item__name">
-                          {p.title}
-                          {full && <span className="lh-full-badge">{t("prog_badge_full", "Full")}</span>}
-                          {activeReg && !full && (
-                            <span className="lh-full-badge" style={{ background: "rgba(202,138,4,0.15)", color: "#a16207" }}>
-                              {t("prog_already_registered", "Registered")}
+                    return (
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        key={p.id}
+                        className={`lv-pick${selected ? " is-active" : ""}`}
+                        disabled={disabled}
+                        onClick={() => set("programId", p.id)}
+                      >
+                        <span className="lv-pick__check">
+                          {selected && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+                        </span>
+                        <span className="lv-pick__body">
+                          <span className="lv-pick__name">
+                            {p.title}
+                            {full && <span className="lv-pick__badge lv-pick__badge--full">{t("prog_badge_full", "Full")}</span>}
+                            {activeReg && !full && <span className="lv-pick__badge">{t("prog_already_registered", "Registered")}</span>}
+                          </span>
+                          {(p.date || timeLabel) && (
+                            <span className="lv-pick__meta">
+                              {formatDate(p.date)}{p.endDate && p.endDate !== p.date ? ` – ${formatDate(p.endDate)}` : ""}{timeLabel ? ` · ${timeLabel}` : ""}
                             </span>
                           )}
-                        </div>
-                        {(p.date || timeLabel) && (
-                          <div className="lh-prog-select-item__meta">
-                            {formatDate(p.date)}{p.endDate && p.endDate !== p.date ? ` – ${formatDate(p.endDate)}` : ""}
-                            {timeLabel ? ` · ${timeLabel}` : ""}
-                          </div>
+                          {p.location && <span className="lv-pick__meta">{p.location}</span>}
+                          {p.demographic && <span className="lv-pick__meta">{p.demographic}</span>}
+                        </span>
+                        {hasSlots && (
+                          <span className={`lv-pick__slots${full ? " is-full" : slotsNum <= 5 ? " is-low" : ""}`}>
+                            {full ? t("prog_badge_full", "Full") : `${slotsNum} left`}
+                          </span>
                         )}
-                        {p.location && <div className="lh-prog-select-item__meta">{p.location}</div>}
-                        {p.demographic && <div className="lh-prog-select-item__meta">{p.demographic}</div>}
-                      </div>
-                      {p.slots !== undefined && p.slots !== "" && (
-                        <div className="lh-prog-select-item__slots" style={{ color: full ? "#e03e3e" : slotsNum <= 5 ? "#ca8a04" : "#317D89" }}>
-                          {full ? t("prog_badge_full", "Full") : `${slotsNum} left`}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {errors.programId && (
-              <span className="sv-error-msg" style={{ marginTop: "0.5rem", display: "block" }}>
-                {errors.programId}
-              </span>
-            )}
-          </section>
-        )}
-
-        {/* ── Step 3: Review ── */}
-        {step === 3 && (
-          <>
-            <p className="dr-step-hint" style={{ margin: 0 }}>{t("prog_step3_hint", "Review your information before submitting.")}</p>
-            <div className="dr-review-grid">
-              {[
-                { label: t("doc_full_name", "Full Name"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" "), full: true },
-                { label: t("doc_address", "Address"), value: form.address, full: true },
-                { label: t("profile_contact", "Contact"), value: form.contact },
-                { label: t("profile_email", "Email"), value: form.email || "—" },
-                { label: t("doc_id_uploaded", "ID Uploaded"), value: form.idFile || "—", full: true },
-                { label: t("prog_type", "Program"), value: selectedProgram?.title || "—", full: true },
-                {
-                  label: t("fac_date", "Date"),
-                  value: selectedProgram
-                    ? formatDate(selectedProgram.date) +
-                    (selectedProgram.endDate && selectedProgram.endDate !== selectedProgram.date
-                      ? ` – ${formatDate(selectedProgram.endDate)}` : "")
-                    : "—",
-                },
-                {
-                  label: t("fac_time", "Time"),
-                  value: [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ") || "—",
-                },
-                { label: t("fac_location", "Location"), value: selectedProgram?.location || "—", full: true },
-                { label: t("prog_demographic", "Demographic"), value: selectedProgram?.demographic || "—" },
-              ].map((r, i) => (
-                <div key={i} className={`dr-review-row${r.full ? " dr-review-row--full" : ""}`}>
-                  <span className="dr-review-label">{r.label}</span>
-                  <span className="dr-review-value">{r.value}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-            {selectedProgram?.requirements?.length > 0 && (
-              <div style={{ padding: "12px 14px", background: "rgba(49,125,137,0.05)", borderRadius: "8px", border: "1px solid rgba(49,125,137,0.15)" }}>
-                <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#317D89", marginBottom: "6px" }}>{t("prog_requirements_label", "Requirements")}</div>
-                <ul style={{ margin: 0, paddingLeft: "16px", fontSize: "0.82rem", color: "#4b5563" }}>
-                  {selectedProgram.requirements.map((req, i) => <li key={i}>{req}</li>)}
-                </ul>
-              </div>
-            )}
-            {errors.submit && (
-              <div style={{ color: "#e03e3e", fontSize: "0.85rem", padding: "10px", background: "rgba(224,62,62,0.07)", borderRadius: "8px" }}>
-                {errors.submit}
-              </div>
-            )}
-          </>
-        )}
+              )}
+              {errors.programId && <div className="bf-error" style={{ marginTop: "0.8rem" }}>{errors.programId}</div>}
+            </section>
+          )}
 
-        {/* ── Step 4: Success ── */}
-        {step === 4 && (
-          <div className="lh-success-wrap">
-            <div className="po-submitted-icon">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-            <h3 className="po-submitted-title">{t("prog_success_title", "Registration Submitted!")}</h3>
-            <p className="po-submitted-sub">
-              You have successfully registered for <strong>{selectedProgram?.title}</strong>.
-              Please wait for admin approval.
-            </p>
-            <div className="po-ref-box" style={{ borderColor: "rgba(49,125,137,0.2)", background: "rgba(49,125,137,0.05)" }}>
-              <div className="po-ref-label">Registration Number</div>
-              <div className="po-ref-num" style={{ color: "#317D89" }}>{regNum}</div>
-              <div className="po-ref-hint">Save this to track your registration status</div>
-            </div>
-            <div className="po-submitted-btns">
-              <button className="sv-btn-primary" style={{ background: "#317D89" }} onClick={() => setView("myregs")}>
-                View My Registrations
+          {/* ── Step 3: Review ── */}
+          {step === 3 && (
+            <section className="bz-card">
+              <h3 className="bz-heading">{t("prog_check_registration", "Check your registration")}</h3>
+              <p className="bz-text">{t("prog_step3_hint", "Review your information before submitting.")}</p>
+
+              <dl className="lv-review">
+                {[
+                  { label: t("doc_full_name", "Full Name"), value: [form.firstName, form.middleName, form.lastName].filter(Boolean).join(" ") },
+                  { label: t("doc_address", "Address"), value: form.address },
+                  { label: t("profile_contact", "Contact Number"), value: form.contact },
+                  { label: t("profile_email", "Email"), value: form.email || "—" },
+                  { label: t("doc_id_uploaded", "ID Uploaded"), value: form.idFile || "—" },
+                  { label: t("prog_type", "Program"), value: selectedProgram?.title || "—" },
+                  {
+                    label: t("fac_date", "Date"),
+                    value: selectedProgram
+                      ? formatDate(selectedProgram.date) + (selectedProgram.endDate && selectedProgram.endDate !== selectedProgram.date ? ` – ${formatDate(selectedProgram.endDate)}` : "")
+                      : "—",
+                  },
+                  { label: t("fac_time", "Time"), value: [formatTime(selectedProgram?.startTime), formatTime(selectedProgram?.endTime)].filter(Boolean).join(" – ") || "—" },
+                  { label: t("fac_location", "Location"), value: selectedProgram?.location || "—" },
+                  { label: t("prog_demographic", "Demographic"), value: selectedProgram?.demographic || "—" },
+                ].map((r, i) => (
+                  <div key={i} className="lv-review__row">
+                    <dt>{r.label}</dt>
+                    <dd>{r.value}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              {selectedProgram?.requirements?.length > 0 && (
+                <div className="lv-chosen" style={{ marginTop: "1rem", marginBottom: 0 }}>
+                  <div className="lv-chosen__label">{t("prog_requirements_label", "Requirements")}</div>
+                  <ul className="dz-chosen-note" style={{ margin: "0.3rem 0 0", paddingLeft: "1.2rem" }}>
+                    {selectedProgram.requirements.map((req, i) => <li key={i}>{req}</li>)}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Step 4: Done ── */}
+          {step === 4 && (
+            <section className="bz-card">
+              <div className="bf-done">
+                <span className="bf-done__icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                </span>
+                <h3 className="bz-heading">{t("prog_success_title", "Registration Submitted!")}</h3>
+                <p className="bz-text">
+                  You have successfully registered for <strong>{selectedProgram?.title}</strong>. Please wait for admin approval.
+                </p>
+                <div className="bt-ref">
+                  <div className="bt-ref__label">Registration Number</div>
+                  <div className="bt-ref__num">{regNum}</div>
+                  <div className="bt-ref__hint">Save this to track your registration status</div>
+                </div>
+                <div className="bf-done__btns">
+                  <button type="button" className="bf-submit dz-again" onClick={() => setView("myregs")}>View My Registrations</button>
+                  <button type="button" className="bf-secondary dz-again" onClick={resetForm}>{t("close", "Done")}</button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {errors.submit && <div className="bf-alert">{errors.submit}</div>}
+
+          {step < 4 && (
+            <div className="dz-actions">
+              <button type="button" className="bf-submit" onClick={handleNext} disabled={submitting}>
+                {submitting
+                  ? t("prog_submitting_btn", "Submitting…")
+                  : step === 3 ? t("prog_submit_reg_btn", "Submit Registration") : t("doc_next", "Next")}
+                {!submitting && step < 3 && (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                )}
               </button>
-              <button className="sv-btn-ghost" onClick={resetForm}>{t("close", "Done")}</button>
+              <button type="button" className="bf-secondary" onClick={goBackOrExit} disabled={submitting}>
+                {step === 1 ? t("cancel", "Cancel") : t("back", "Previous")}
+              </button>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom action bar */}
-      {step < 4 && (
-        <div className="po-form-actions">
-          <button
-            className="sv-btn-ghost"
-            onClick={() => {
-              if (step > 1) { setStep((s) => s - 1); setErrors({}); }
-              else { setView("main"); setErrors({}); }
-            }}
-          >
-            {step === 1 ? t("cancel", "Cancel") : t("back", "Previous")}
-          </button>
-          <button
-            className="sv-btn-primary"
-            style={{ background: "#317D89" }}
-            onClick={handleNext}
-            disabled={submitting}
-          >
-            {submitting ? t("prog_submitting_btn", "Submitting…") : step === 3 ? t("prog_submit_reg_btn", "Submit Registration") : t("next_arrow", "Next →")}
-          </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -30,7 +30,9 @@ import { runStatusMaintenance } from "../../services/statusUpdater";
 import { createUserNotification } from "../../services/userNotifications";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildProgramEmail } from "../../utils/emailTemplates";
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 const getTodayStr = () => new Date().toISOString().split("T")[0];
@@ -64,23 +66,25 @@ function DescriptionPreview({ text }) {
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, t }) {
   const raw = status || "Pending";
   const s = raw.toLowerCase().trim();
 
   const map = {
-    approved:   { bg: "#dcfce7", color: "#166534", dot: "#16a34a" }, // emerald
-    pending:    { bg: "#fef3c7", color: "#92400e", dot: "#d97706" }, // amber
-    rejected:   { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" }, // red
-    registered: { bg: "#dbeafe", color: "#1e40af", dot: "#2563eb" }, // blue
+    approved: { bg: "#dcfce7", color: "#166534", dot: "#16a34a" },
+    pending: { bg: "#fef3c7", color: "#92400e", dot: "#d97706" },
+    rejected: { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+    registered: { bg: "#dbeafe", color: "#1e40af", dot: "#2563eb" },
   };
 
   const c = map[s] || map.pending;
 
-  const capitalizedStatus = raw
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
+  // Attempt to translate the status word, fallback to capitalized raw text
+  let translatedStatus = raw;
+  if (s === 'approved') translatedStatus = t('admin_prog_stat_approved');
+  if (s === 'pending') translatedStatus = t('admin_prog_stat_pending');
+  if (s === 'rejected') translatedStatus = t('admin_prog_stat_rejected');
+  if (s === 'registered') translatedStatus = t('admin_prog_stat_registered');
 
   return (
     <span
@@ -103,35 +107,35 @@ function StatusBadge({ status }) {
           display: "inline-block", flexShrink: 0,
         }}
       />
-      {capitalizedStatus}
+      {translatedStatus}
     </span>
   );
 }
 
-function StatBar({ stats }) {
+function StatBar({ stats, t }) {
   const statusColors = {
-    pending:    { bg: "#fef3c7", text: "#92400e", dot: "#d97706" }, // amber
-    approved:   { bg: "#dcfce7", text: "#166534", dot: "#16a34a" }, // emerald
-    rejected:   { bg: "#fee2e2", text: "#991b1b", dot: "#dc2626" }, // red
-    registered: { bg: "#dbeafe", text: "#1e40af", dot: "#2563eb" }, // blue
-    analyzed:   { bg: "#e0e7ff", text: "#3730a3", dot: "#4f46e5" }, // indigo
+    pending: { bg: "#fef3c7", text: "#92400e", dot: "#d97706" },
+    approved: { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
+    rejected: { bg: "#fee2e2", text: "#991b1b", dot: "#dc2626" },
+    registered: { bg: "#dbeafe", text: "#1e40af", dot: "#2563eb" },
   };
 
   return (
     <div style={{ marginTop: "12px", padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-        <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>Total registrations</span>
+        <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>{t('admin_prog_stat_total_reg')}</span>
         <span style={{ fontSize: "1rem", fontWeight: 700, color: "#111827" }}>{stats.total}</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px" }}>
         {Object.entries(stats.byStatus).map(([status, count]) => {
           const key = status.toLowerCase().trim();
           const c = statusColors[key] || { bg: "#f3f4f6", text: "#4b5563", dot: "#9ca3af" };
-          
-          const capitalizedStatus = status
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(" ");
+
+          let translatedStatus = status;
+          if (key === 'approved') translatedStatus = t('admin_prog_stat_approved');
+          if (key === 'pending') translatedStatus = t('admin_prog_stat_pending');
+          if (key === 'rejected') translatedStatus = t('admin_prog_stat_rejected');
+          if (key === 'registered') translatedStatus = t('admin_prog_stat_registered');
 
           return (
             <span
@@ -143,19 +147,20 @@ function StatBar({ stats }) {
               }}
             >
               <span style={{ width: "6px", height: "6px", minWidth: "6px", minHeight: "6px", borderRadius: "50%", backgroundColor: c.dot, display: "inline-block", flexShrink: 0 }} />
-              {capitalizedStatus}: {count}
+              {translatedStatus}: {count}
             </span>
           );
         })}
       </div>
-      <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>Latest: {stats.latest}</div>
+      <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>{t('admin_prog_stat_latest')} {stats.latest}</div>
     </div>
   );
 }
 
-// ─── PROGRAM WORKSPACE COMPONENT (Optimized with React Query) ───
-function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
+// ─── PROGRAM WORKSPACE COMPONENT ───
+function ProgramWorkspace({ program, onBack, adminName, adminRole, t }) {
   const queryClient = useQueryClient();
+  const { showAlert } = useAlert();
   const [filterStatus, setFilterStatus] = useState("All");
   const [sortOrder, setSortOrder] = useState("date_desc");
 
@@ -206,7 +211,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     if (totalSlots > 0) {
       const left = getSlotsLeft();
       if (left !== null && left <= 0) {
-        alert(`No slots left for "${program.title}". Cannot approve.`);
+        await showAlert("Slots Full", `No slots left for "${program.title}". Cannot approve.`);
         return;
       }
     }
@@ -229,14 +234,13 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
           updatedAt: serverTimestamp(),
         });
       }
-      
+
       const residentID = a.userID || a.residentID;
       const hhID = a.householdID;
       if (residentID && hhID) {
         await createUserNotification(hhID, residentID, "Program Registration Approved", `Your registration for "${program.title}" has been approved!`, "general", a.id);
       }
-      
-      // Refresh cache
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
     } catch (err) { console.error(err); }
@@ -262,16 +266,16 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
           status: "rejected", rejectReason: rejectReason.trim(), updatedAt: serverTimestamp(),
         });
       }
-      
+
       const residentID = a?.userID || a?.residentID;
       const hhID = a?.householdID;
       if (residentID && hhID) {
         await createUserNotification(hhID, residentID, "Program Registration Rejected", `Your registration for "${program.title}" was rejected. Reason: ${rejectReason.trim()}`, "general", a.id);
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
-      
+
       setShowRejectModal(false); setRejectTarget(null); setRejectReason("");
     } catch (err) { console.error(err); }
     setSaving(false);
@@ -292,7 +296,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
       for (const regDoc of regSnap.docs) {
         await updateDoc(doc(db, "programRegistrations", regDoc.id), { status: "pending", rejectReason: "", updatedAt: serverTimestamp() });
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programWorkspace', program.id] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_programStats'] });
 
@@ -329,7 +333,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
     <>
       <div style={{ animation: "fadeIn 0.3s ease", paddingBottom: "40px" }}>
         <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-          ← Back to Programs
+          {t('admin_prog_btn_back')}
         </button>
 
         <div className="as-header-section">
@@ -356,9 +360,9 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
               display: "flex", alignItems: "center", gap: "6px",
               alignSelf: "center", flexShrink: 0,
             }}
-            title="Send email to all approved registrants"
+            title={t('admin_prog_workspace_email_btn')}
           >
-            Email Registrants
+            {t('admin_prog_workspace_email_btn')}
           </button>
 
           {totalSlots > 0 && (
@@ -370,10 +374,10 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
               minWidth: "100px",
             }}>
               <div style={{ fontSize: "1.8rem", fontWeight: 700, color: isFull ? "#be123c" : "#15803d" }}>
-                {isFull ? "Full" : slotsLeft}
+                {isFull ? t('admin_prog_workspace_full') : slotsLeft}
               </div>
               <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                {isFull ? `0 / ${totalSlots} slots` : `of ${totalSlots} slots left`}
+                {isFull ? `0 / ${totalSlots} ${t('admin_prog_workspace_slots_full')}` : `of ${totalSlots} ${t('admin_prog_workspace_slots_left')}`}
               </div>
               <div style={{ marginTop: "8px", width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
                 <div style={{
@@ -388,11 +392,11 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
         {/* ── Stats & Controls ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px", marginBottom: "24px" }}>
           {[
-            { label: "Total", value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
-            { label: "Approved", value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-            { label: "Pending", value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-            { label: "Rejected", value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
-            { label: "Registered", value: stats.registered, bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af" },
+            { label: t('admin_prog_stat_total'), value: stats.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
+            { label: t('admin_prog_stat_approved'), value: stats.approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: t('admin_prog_stat_pending'), value: stats.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: t('admin_prog_stat_rejected'), value: stats.rejected, bg: "#fff1f2", border: "#fecdd3", color: "#be123c" },
+            { label: t('admin_prog_stat_registered'), value: stats.registered, bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af" },
           ].map((s) => (
             <div key={s.label} style={{ background: s.bg, padding: "18px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
               <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
@@ -408,11 +412,11 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
             onChange={(e) => setFilterStatus(e.target.value)}
             style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
           >
-            <option value="All">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="registered">Registered</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
+            <option value="All">{t('admin_prog_filter_all')}</option>
+            <option value="pending">{t('admin_prog_stat_pending')}</option>
+            <option value="registered">{t('admin_prog_stat_registered')}</option>
+            <option value="approved">{t('admin_prog_stat_approved')}</option>
+            <option value="rejected">{t('admin_prog_stat_rejected')}</option>
           </select>
 
           <select
@@ -420,25 +424,25 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
             onChange={(e) => setSortOrder(e.target.value)}
             style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
           >
-            <option value="date_desc">Date: Newest First</option>
-            <option value="date_asc">Date: Oldest First</option>
-            <option value="name_asc">Participant: A to Z</option>
-            <option value="name_desc">Participant: Z to A</option>
+            <option value="date_desc">{t('admin_prog_sort_date_new')}</option>
+            <option value="date_asc">{t('admin_prog_sort_date_old')}</option>
+            <option value="name_asc">{t('admin_prog_sort_name_asc')}</option>
+            <option value="name_desc">{t('admin_prog_sort_name_desc')}</option>
           </select>
         </div>
 
         {/* ── Table ── */}
         {loading ? (
-          <p style={{ color: "#9ca3af" }}>Loading registrations…</p>
+          <p style={{ color: "#9ca3af" }}>{t('admin_prog_loading')}</p>
         ) : (
           <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <tr>
-                  {["Ref Number", "Name", "Contact", "Date Registered", "Status", "Actions"].map((h) => (
+                  {[t('admin_prog_th_ref'), t('admin_prog_th_name'), t('admin_prog_th_contact'), t('admin_prog_th_date'), t('admin_prog_th_status'), t('admin_prog_th_actions')].map((h) => (
                     <th key={h} style={{
                       padding: "14px 16px", fontWeight: 600, color: "#4b5563",
-                      fontSize: "0.82rem", textAlign: h === "Actions" ? "right" : "left",
+                      fontSize: "0.82rem", textAlign: h === t('admin_prog_th_actions') ? "right" : "left",
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -446,8 +450,8 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
               <tbody>
                 {filteredAttendees.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: "40px", color: "#9ca3af", textAlign: "center" }}>
-                      No registrations match your criteria.
+                    <td colSpan={6} style={{ padding: "40px", color: "#9ca3af", textAlign: "center" }}>
+                      {t('admin_prog_table_empty')}
                     </td>
                   </tr>
                 ) : (
@@ -459,7 +463,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                     return (
                       <tr key={a.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                         <td style={{ padding: "14px 16px", fontSize: "0.8rem", color: "#6b7280" }}>
-                          {a.regNum || "No Ref Number"}
+                          {a.regNum || t('admin_prog_td_noref')}
                         </td>
                         <td style={{ padding: "14px 16px", fontWeight: 500 }}>
                           {a.userName || a.fullName || `${a.firstName || ""} ${a.lastName || ""}`.trim() || "—"}
@@ -471,7 +475,7 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                           {a.createdAt ? formatTs(a.createdAt) : "—"}
                         </td>
                         <td style={{ padding: "14px 16px" }}>
-                          <StatusBadge status={a.status || "pending"} />
+                          <StatusBadge status={a.status || "pending"} t={t} />
                         </td>
                         <td style={{ padding: "14px 16px", textAlign: "right" }}>
                           {status === "pending" || status === "registered" ? (
@@ -480,24 +484,24 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
                                 style={{ padding: "5px 12px", background: slotsFull ? "#e5e7eb" : "#2DB17B", color: slotsFull ? "#9ca3af" : "#fff", border: "none", borderRadius: "6px", cursor: slotsFull ? "not-allowed" : "pointer", fontSize: "0.8rem" }}
                                 onClick={() => !slotsFull && handleApprove(a)}
                                 disabled={slotsFull}
-                                title={slotsFull ? "No slots available" : "Approve"}
-                              >Approve</button>
+                                title={slotsFull ? "No slots available" : t('admin_prog_btn_approve')}
+                              >{t('admin_prog_btn_approve')}</button>
                               <button
                                 style={{ padding: "5px 12px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
                                 onClick={() => { setRejectTarget(a.id); setRejectReason(""); setShowRejectModal(true); }}
-                              >Reject</button>
+                              >{t('admin_prog_btn_reject')}</button>
                             </div>
                           ) : status === "approved" ? (
                             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
-                              <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Approved</span>
+                              <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>{t('admin_prog_stat_approved')}</span>
                               <button
                                 style={{ padding: "5px 12px", background: "#fff", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}
                                 onClick={() => { setRemoveTarget(a.id); setShowRemoveModal(true); }}
-                              >Remove</button>
+                              >{t('admin_prog_btn_remove')}</button>
                             </div>
                           ) : status === "rejected" ? (
                             <div style={{ textAlign: "right" }}>
-                              <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>Rejected</span>
+                              <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>{t('admin_prog_stat_rejected')}</span>
                               {a.rejectReason && (
                                 <div style={{ color: "#ef4444", fontSize: "0.75rem", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "2px" }} title={a.rejectReason}>
                                   "{a.rejectReason}"
@@ -517,20 +521,20 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
 
         {/* ── Reject Modal ── */}
         {showRejectModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
+          <div className="as-modal-overlay" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "400px" }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>Reject Registration</h2>
+                <h2 style={{ color: "#ffffff", margin: 0 }}>{t('admin_prog_reject_title')}</h2>
                 <button className="as-modal-close" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body">
                 <form onSubmit={handleConfirmReject}>
-                  <label className="as-form-label">Reason for Rejection <span style={{ color: "red" }}>*</span></label>
-                  <textarea className="as-form-textarea" rows="3" required placeholder="Provide a brief explanation…" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+                  <label className="as-form-label">{t('admin_prog_reject_reason')} <span style={{ color: "red" }}>*</span></label>
+                  <textarea className="as-form-textarea" rows="3" required placeholder={t('admin_prog_reject_ph')} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
                   <div className="as-modal-actions" style={{ marginTop: "15px" }}>
-                    <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>Cancel</button>
+                    <button type="button" className="as-btn-ghost" onClick={() => { setShowRejectModal(false); setRejectTarget(null); }}>{t('admin_prog_modal_btn_cancel')}</button>
                     <button type="submit" style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} disabled={saving}>
-                      {saving ? "Processing…" : "Confirm Rejection"}
+                      {saving ? t('admin_prog_reject_processing') : t('admin_prog_reject_confirm')}
                     </button>
                   </div>
                 </form>
@@ -541,20 +545,20 @@ function ProgramWorkspace({ program, onBack, adminName, adminRole }) {
 
         {/* ── Remove Modal ── */}
         {showRemoveModal && (
-          <div className="as-modal-overlay">
-            <div className="as-modal-content" style={{ maxWidth: "400px" }}>
+          <div className="as-modal-overlay" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>
+            <div className="as-modal-content" style={{ maxWidth: "400px" }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>Remove Approval</h2>
+                <h2 style={{ color: "#ffffff", margin: 0 }}>{t('admin_prog_remove_title')}</h2>
                 <button className="as-modal-close" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>×</button>
               </div>
               <div className="as-modal-body">
                 <p style={{ color: "#4b5563", marginBottom: "20px", lineHeight: 1.6 }}>
-                  This will move the registration back to <strong>Pending</strong>, freeing up the slot.
+                  {t('admin_prog_remove_desc')}<strong>{t('admin_prog_remove_desc_bold')}</strong>{t('admin_prog_remove_desc_end')}
                 </p>
                 <div className="as-modal-actions">
-                  <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>Cancel</button>
+                  <button className="as-btn-ghost" onClick={() => { setShowRemoveModal(false); setRemoveTarget(null); }}>{t('admin_prog_modal_btn_cancel')}</button>
                   <button style={{ padding: "8px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }} onClick={handleConfirmRemove} disabled={saving}>
-                    {saving ? "Processing…" : "Yes, Remove Approval"}
+                    {saving ? t('admin_prog_reject_processing') : t('admin_prog_remove_confirm')}
                   </button>
                 </div>
               </div>
@@ -589,12 +593,14 @@ const EMPTY_PROGRAM = {
 
 // ─── MAIN MANAGE PROGRAMS COMPONENT ───
 export default function ManagePrograms() {
-  const queryClient = useQueryClient(); // <-- For invalidating caches
-  
+  const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Hook implementation
+  const { showAlert, showConfirm } = useAlert();
+
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortCatalog, setSortCatalog] = useState("date_desc"); // date_desc, date_asc, title_asc, title_desc
+  const [sortCatalog, setSortCatalog] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [selectedQR, setSelectedQR] = useState(null);
@@ -604,7 +610,6 @@ export default function ManagePrograms() {
   const [newProgram, setNewProgram] = useState(EMPTY_PROGRAM);
   const [activeProgramWorkspace, setActiveProgramWorkspace] = useState(null);
 
-  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -619,10 +624,8 @@ export default function ManagePrograms() {
     return () => unsubscribe();
   }, []);
 
-  // Run status maintenance occasionally
   useEffect(() => { runStatusMaintenance(); }, []);
 
-  // ─── OPTIMIZED: React Query for Programs List ───
   const { data: programs = [], isLoading: loadingPrograms } = useQuery({
     queryKey: ['adminManage_programs'],
     queryFn: async () => {
@@ -640,25 +643,24 @@ export default function ManagePrograms() {
         })
         .filter((p) => p.programType !== "livelihood");
     },
-    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 
   const { data: programStats = {} } = useQuery({
     queryKey: ['adminManage_programStats', programs.map(p => p.id)],
     queryFn: async () => {
       const statsObj = {};
-      
+
       await Promise.all(programs.map(async (prog) => {
         const baseRef = collection(db, "Programs", prog.id, "attendees");
 
-        // Run all counts in parallel on the server (costs only 1 read per aggregate!)
         const [totalSnap, approvedSnap, pendingSnap, rejectedSnap, registeredSnap, latestSnap] = await Promise.all([
           getCountFromServer(baseRef),
           getCountFromServer(query(baseRef, where("status", "==", "approved"))),
           getCountFromServer(query(baseRef, where("status", "==", "pending"))),
           getCountFromServer(query(baseRef, where("status", "==", "rejected"))),
           getCountFromServer(query(baseRef, where("status", "==", "registered"))),
-          getDocs(query(baseRef, orderBy("createdAt", "desc"), limit(1))) // Only fetch exactly 1 document to find the latest date
+          getDocs(query(baseRef, orderBy("createdAt", "desc"), limit(1)))
         ]);
 
         let latestDate = "—";
@@ -681,11 +683,11 @@ export default function ManagePrograms() {
           latest: latestDate,
         };
       }));
-      
+
       return statsObj;
     },
     enabled: programs.length > 0,
-    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 
   const handleGenerateQR = (prog) => {
@@ -744,15 +746,20 @@ export default function ManagePrograms() {
   };
 
   const handleDelete = async (id, progTitle) => {
-    if (!window.confirm("Are you sure you want to delete this program?")) return;
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `Are you sure you want to delete this program?\n\n"${progTitle}"`
+    );
+    if (!isConfirmed) return;
+
     try {
       await deleteDoc(doc(db, "Programs", id));
       logTransaction(adminName, adminRole, "DELETED_PROGRAM", `Deleted program "${progTitle}" ID: ${id}`);
-      // Refresh cache
       queryClient.invalidateQueries({ queryKey: ['adminManage_programs'] });
+      await showAlert("Success", "Program deleted successfully.");
     } catch (error) {
       console.error("Error deleting program:", error);
-      alert("Failed to delete program. Please try again.");
+      await showAlert("Error", "Failed to delete program. Please try again.");
     }
   };
 
@@ -787,20 +794,15 @@ export default function ManagePrograms() {
         });
         logTransaction(adminName, adminRole, "CREATED_PROGRAM", `Created new program: "${newProgram.title}"`);
       }
-      
-      // Refresh cache
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_programs'] });
-      
+
       setNewProgram(EMPTY_PROGRAM);
       setEditingProgramId(null);
       setShowAddModal(false);
     } catch (error) {
       console.error("Error saving program:", error);
-      alert("Failed to save program. Please try again.");
-      logTransaction(adminName, adminRole,
-        editingProgramId ? "FAILED_UPDATE_PROGRAM" : "FAILED_CREATE_PROGRAM",
-        `Failed to ${editingProgramId ? "update" : "create"} program "${newProgram.title}" - ${error.message}`
-      );
+      await showAlert("Error", "Failed to save program. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -850,6 +852,7 @@ export default function ManagePrograms() {
           onBack={() => setActiveProgramWorkspace(null)}
           adminName={adminName}
           adminRole={adminRole}
+          t={t}
         />
       </div>
     );
@@ -859,10 +862,10 @@ export default function ManagePrograms() {
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Programs</h1>
-          <p className="as-subtitle">Manage barangay programs, slots, and requirements</p>
+          <h1>{t('admin_prog_title')}</h1>
+          <p className="as-subtitle">{t('admin_prog_subtitle')}</p>
         </div>
-        <button className="as-btn-aqua" onClick={openAddModal}><IconAdd /> Add New Program</button>
+        <button className="as-btn-aqua" onClick={openAddModal}><IconAdd /> {t('admin_prog_btn_add')}</button>
       </div>
 
       {/* SEARCH AND SORT TOOLBAR */}
@@ -873,7 +876,7 @@ export default function ManagePrograms() {
           </svg>
           <input
             type="text"
-            placeholder="Search programs..."
+            placeholder={t('admin_prog_search_placeholder')}
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
           />
@@ -884,18 +887,18 @@ export default function ManagePrograms() {
           onChange={(e) => setSortCatalog(e.target.value)}
           style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
         >
-          <option value="date_desc">Created: Newest First</option>
-          <option value="date_asc">Created: Oldest First</option>
-          <option value="title_asc">Title: A to Z</option>
-          <option value="title_desc">Title: Z to A</option>
+          <option value="date_desc">{t('admin_prog_sort_date_new')}</option>
+          <option value="date_asc">{t('admin_prog_sort_date_old')}</option>
+          <option value="title_asc">{t('admin_prog_sort_title_asc')}</option>
+          <option value="title_desc">{t('admin_prog_sort_title_desc')}</option>
         </select>
       </div>
 
       {loadingPrograms ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>Loading programs...</div>
+        <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>{t('admin_prog_loading')}</div>
       ) : filteredPrograms.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "0.95rem" }}>
-          {searchTerm ? "No programs match your search." : "No programs yet. Click 'Add New Program' to create one."}
+          {searchTerm ? t('admin_prog_empty_search') : t('admin_prog_empty')}
         </div>
       ) : (
         <>
@@ -910,22 +913,38 @@ export default function ManagePrograms() {
                   </div>
                   <DescriptionPreview text={prog.description} />
                   <ul className="as-card-details">
-                    <li><Manage_IconLocation /> {prog.location}</li>
                     <li>
-                      <Manage_IconCalendar />
-                      {prog.date}
-                      {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
-                      {" • "}{prog.time}
+                      <strong>{t('admin_card_lbl_location')}</strong>
+                      <span style={{ textAlign: 'right', maxWidth: '65%' }}>{prog.location || '—'}</span>
                     </li>
-                    <li><strong>Target:</strong> {prog.demographic}</li>
-                    <li><strong>Slots:</strong> {prog.slots || "Unlimited"}</li>
+                    <li>
+                      <strong>{t('admin_card_lbl_date')}</strong>
+                      <span>
+                        {prog.date}
+                        {prog.endDate && prog.endDate !== prog.date ? ` → ${prog.endDate}` : ""}
+                      </span>
+                    </li>
+                    {prog.time && (
+                      <li>
+                        <strong>{t('admin_card_lbl_time')}</strong>
+                        <span>{prog.time}</span>
+                      </li>
+                    )}
+                    <li>
+                      <strong>{t('admin_card_lbl_target')}</strong>
+                      <span>{prog.demographic}</span>
+                    </li>
+                    <li>
+                      <strong>{t('admin_prog_card_slots')}</strong>
+                      <span>{prog.slots || t('admin_prog_card_unlimited')}</span>
+                    </li>
                   </ul>
                   <div style={{ marginTop: "10px", fontSize: "0.85rem", color: "#6B7280" }}>
-                    <strong>Requirements:</strong>{" "}
-                    {prog.requirements?.length > 0 ? prog.requirements.join(", ") : "None"}
+                    <strong>{t('admin_prog_card_reqs')}</strong>{" "}
+                    {prog.requirements?.length > 0 ? prog.requirements.join(", ") : t('admin_prog_card_none')}
                   </div>
 
-                  <StatBar stats={stats} />
+                  <StatBar stats={stats} t={t} />
 
                   <div className="as-card-footer" style={{ gap: "10px", display: "flex", flexWrap: "wrap" }}>
                     <button
@@ -933,28 +952,28 @@ export default function ManagePrograms() {
                       style={{ padding: "8px 16px", flex: 1 }}
                       onClick={() => setActiveProgramWorkspace(prog)}
                     >
-                      Workspace →
+                      {t('admin_prog_btn_workspace')}
                     </button>
                     <button
                       className="as-btn-ghost"
                       style={{ padding: "8px 16px", flex: 1 }}
                       onClick={() => handleEdit(prog)}
                     >
-                      Edit
+                      {t('admin_prog_btn_edit')}
                     </button>
                     <button
                       className="as-btn-ghost"
                       style={{ padding: "8px 16px", flex: 1, color: "red", borderColor: "#fca5a5" }}
                       onClick={() => handleDelete(prog.id, prog.title)}
                     >
-                      Delete
+                      {t('admin_prog_btn_delete')}
                     </button>
                     <button
                       className="as-qr-btn"
                       style={{ width: "100%", marginTop: "5px" }}
                       onClick={() => handleGenerateQR(prog)}
                     >
-                      <Manage_IconQR /> Generate QR Code
+                      <Manage_IconQR /> {t('admin_prog_btn_qr')}
                     </button>
                   </div>
                 </div>
@@ -983,43 +1002,47 @@ export default function ManagePrograms() {
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "700px", width: "100%" }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "700px", width: "100%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="as-modal-header">
-              <h2>{editingProgramId ? "Edit Program" : "Add Program"}</h2>
+              <h2>{editingProgramId ? t('admin_prog_modal_edit_title') : t('admin_prog_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="as-modal-body" style={{ alignItems: "stretch" }}>
               <form className="as-form" onSubmit={handleAddProgram}>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Program Title</label>
+                  <label className="as-form-label">{t('admin_prog_modal_prog_title')}</label>
                   <input type="text" className="as-form-input" required value={newProgram.title}
                     onChange={(e) => setNewProgram({ ...newProgram, title: e.target.value })} />
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Description</label>
+                  <label className="as-form-label">{t('admin_prog_modal_desc')}</label>
                   <textarea className="as-form-textarea" required value={newProgram.description}
                     onChange={(e) => setNewProgram({ ...newProgram, description: e.target.value })} />
                 </div>
 
                 <div className="as-form-row">
                   <div className="as-form-group">
-                    <label className="as-form-label">Location</label>
+                    <label className="as-form-label">{t('admin_prog_modal_location')}</label>
                     <input type="text" className="as-form-input" required value={newProgram.location}
                       onChange={(e) => setNewProgram({ ...newProgram, location: e.target.value })} />
                   </div>
                   <div className="as-form-group">
-                    <label className="as-form-label">Target Demographic</label>
+                    <label className="as-form-label">{t('admin_prog_modal_target')}</label>
                     <select
                       className="as-form-input"
                       required
                       value={newProgram.demographic}
                       onChange={(e) => setNewProgram({ ...newProgram, demographic: e.target.value })}
                     >
-                      <option value="">Select Target Demographic</option>
-                      <option value="All Residents">All Residents</option>
+                      <option value="">{t('admin_prog_modal_target_select')}</option>
+                      <option value="All Residents">{t('admin_prog_modal_target_all')}</option>
                       <option value="Student">Student</option>
                       <option value="Senior Citizen">Senior Citizen</option>
                       <option value="PWD">PWD</option>
@@ -1031,9 +1054,10 @@ export default function ManagePrograms() {
                   </div>
                 </div>
 
+                {/* Row 1: Start Date & End Date */}
                 <div className="as-form-row">
                   <div className="as-form-group">
-                    <label className="as-form-label">Start Date</label>
+                    <label className="as-form-label">{t('admin_prog_modal_start_date')}</label>
                     <input
                       type="date"
                       className="as-form-input"
@@ -1052,8 +1076,10 @@ export default function ManagePrograms() {
                   </div>
                   <div className="as-form-group">
                     <label className="as-form-label">
-                      End Date
-                      <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>(same as start if 1 day)</span>
+                      {t('admin_prog_modal_end_date')}
+                      <span style={{ fontSize: "0.75rem", color: "#9ca3af", fontWeight: 400, marginLeft: 4 }}>
+                        {t('admin_prog_modal_end_date_hint')}
+                      </span>
                     </label>
                     <input
                       type="date"
@@ -1063,28 +1089,50 @@ export default function ManagePrograms() {
                       onChange={(e) => setNewProgram({ ...newProgram, endDate: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* Row 2: Start Time & End Time */}
+                <div className="as-form-row">
                   <div className="as-form-group">
-                    <label className="as-form-label">Start Time</label>
-                    <input type="time" className="as-form-input" required value={newProgram.startTime}
-                      onChange={(e) => setNewProgram({ ...newProgram, startTime: e.target.value })} />
+                    <label className="as-form-label">{t('admin_prog_modal_start_time')}</label>
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.startTime}
+                      onChange={(e) => setNewProgram({ ...newProgram, startTime: e.target.value })}
+                    />
                   </div>
                   <div className="as-form-group">
-                    <label className="as-form-label">End Time</label>
-                    <input type="time" className="as-form-input" required value={newProgram.endTime}
-                      onChange={(e) => setNewProgram({ ...newProgram, endTime: e.target.value })} />
-                  </div>
-                  <div className="as-form-group">
-                    <label className="as-form-label">Available Slots</label>
-                    <input type="number" className="as-form-input" placeholder="Leave blank if unlimited" value={newProgram.slots}
-                      onChange={(e) => setNewProgram({ ...newProgram, slots: e.target.value })} />
+                    <label className="as-form-label">{t('admin_prog_modal_end_time')}</label>
+                    <input
+                      type="time"
+                      className="as-form-input"
+                      required
+                      value={newProgram.endTime}
+                      onChange={(e) => setNewProgram({ ...newProgram, endTime: e.target.value })}
+                    />
                   </div>
                 </div>
 
+                {/* Row 3: Available Slots */}
                 <div className="as-form-group">
-                  <label className="as-form-label">Requirements (List)</label>
+                  <label className="as-form-label">{t('admin_prog_modal_slots')}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="as-form-input"
+                    placeholder={t('admin_prog_modal_slots_ph')}
+                    value={newProgram.slots}
+                    onChange={(e) => setNewProgram({ ...newProgram, slots: e.target.value })}
+                  />
+                </div>
+
+                <div className="as-form-group">
+                  <label className="as-form-label">{t('admin_prog_modal_req_list')}</label>
                   {newProgram.requirements.map((req, i) => (
                     <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
-                      <input type="text" className="as-form-input" placeholder="e.g. Valid ID" value={req}
+                      <input type="text" className="as-form-input" placeholder={t('admin_prog_modal_req_ph')} value={req}
                         onChange={(e) => handleReqChange(i, e.target.value)} />
                       {newProgram.requirements.length > 1 && (
                         <button type="button" className="as-btn-ghost" onClick={() => removeReqField(i)} style={{ padding: "0 10px", color: "red" }}>×</button>
@@ -1092,7 +1140,7 @@ export default function ManagePrograms() {
                     </div>
                   ))}
                   <button type="button" className="as-btn-ghost" onClick={addReqField} style={{ width: "fit-content", padding: "5px 10px", fontSize: "0.9rem" }}>
-                    + Add Requirement
+                    {t('admin_prog_modal_req_add')}
                   </button>
                 </div>
 
@@ -1101,10 +1149,10 @@ export default function ManagePrograms() {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
-                    Default Collected Fields
+                    {t('admin_prog_modal_default_fields')}
                   </h3>
                   <p style={{ fontSize: "0.85rem", color: "#6b7280", marginBottom: "12px", marginTop: "-10px" }}>
-                    The following information is automatically collected. Do not recreate them in the form builder.
+                    {t('admin_prog_modal_default_desc')}
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     {["Full Name", "Complete Address", "Contact Number", "Email (Optional)", "Upload Valid ID / Clearance"].map((f) => (
@@ -1124,9 +1172,9 @@ export default function ManagePrograms() {
                 />
 
                 <div className="as-modal-actions">
-                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>Cancel</button>
+                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)}>{t('admin_prog_modal_btn_cancel')}</button>
                   <button type="submit" className="as-btn-aqua" style={{ padding: "8px 16px", fontSize: "0.9rem" }} disabled={saving}>
-                    {saving ? "Saving..." : "Save Program"}
+                    {saving ? t('admin_prog_modal_btn_saving') : t('admin_prog_modal_btn_save')}
                   </button>
                 </div>
               </form>
@@ -1136,24 +1184,24 @@ export default function ManagePrograms() {
       )}
 
       {selectedQR && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "450px" }}>
+        <div className="as-modal-overlay" onClick={() => setSelectedQR(null)}>
+          <div className="as-modal-content" style={{ maxWidth: "450px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>QR Code Generated</h2>
+              <h2>{t('admin_prog_qr_title')}</h2>
               <button className="as-modal-close" onClick={() => setSelectedQR(null)}>×</button>
             </div>
             <div className="as-modal-body" style={{ textAlign: "center" }}>
               <div className="as-modal-confirm-icon"><IconConfirmCheck /></div>
               <h3>{selectedQR.name}</h3>
               <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "8px", padding: "10px 14px", marginBottom: "12px", fontSize: "0.82rem", color: "#92400e", textAlign: "left" }}>
-                ⚠️ <strong>This QR is valid for today only ({getTodayStr()}).</strong> Generate a new one each day the program is active.
+                ⚠️ <strong>{t('admin_prog_qr_warning')} ({getTodayStr()}).</strong> {t('admin_prog_qr_warning_end')}
               </div>
-              <p className="as-modal-desc">Residents can scan this code to access {selectedQR.name}.</p>
+              <p className="as-modal-desc">{t('admin_prog_qr_desc')} {selectedQR.name}.</p>
               <div className="as-qr-holder" style={{ margin: "20px auto", display: "flex", justifyContent: "center" }}>
                 <QRCodeSVG id="as-qr-svg" value={selectedQR.qrValue} size={150} level={"H"} includeMargin={true} />
               </div>
               <button className="as-btn-ghost" onClick={handleDownloadQR} style={{ width: "100%" }}>
-                <IconDownload /> Download QR Code (PNG)
+                <IconDownload /> {t('admin_prog_qr_download')}
               </button>
             </div>
           </div>

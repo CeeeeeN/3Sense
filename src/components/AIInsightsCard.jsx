@@ -56,9 +56,8 @@ export default function AIInsightsCard({ documentData = [], facilityData = [], e
         }
 
         // ==========================================
-        // TIER 3: Call Hugging Face AI API
+        // TIER 3: Call Gemini AI API (3.5 Flash Lite)
         // ==========================================
-        // <-- NEW: Added equipment totals and breakdown to the AI's context -->
         const rawData = {
           dateRange: dateRange,
           totalDocumentRequests: documentData.reduce((acc, curr) => acc + (curr.count || 0), 0),
@@ -69,37 +68,33 @@ export default function AIInsightsCard({ documentData = [], facilityData = [], e
           equipmentDailyBreakdown: equipmentData, 
         };
 
-        const response = await fetch(MODEL_URL, {
+        const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;
+        
+        const prompt = `You are an expert data analyst for Barangay Malanday. Provide a concise, professional 3-sentence summary highlighting the overall request volume across documents, facilities, and equipment, noting any peak dates, and providing a brief conclusion. Do not use bold text, asterisks, or markdown. Output plain text only.
+
+Here is the data: ${JSON.stringify(rawData)}`;
+
+        const response = await fetch(GEMINI_URL, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${HF_ACCESS_TOKEN}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "deepseek-ai/DeepSeek-V3-0324", 
-            messages: [
-              {
-                // <-- NEW: Updated prompt to explicitly mention equipment -->
-                role: "system",
-                content: "You are an expert data analyst for Barangay Malanday. Provide a concise, professional 3-sentence summary highlighting the overall request volume across documents, facilities, and equipment, noting any peak dates, and providing a brief conclusion. Do not use bold text, asterisks, or markdown. Output plain text only."
-              },
-              {
-                role: "user",
-                content: `Here is the data: ${JSON.stringify(rawData)}`
-              }
-            ],
-            max_tokens: 150,
-            temperature: 0.2
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+                maxOutputTokens: 150,
+                temperature: 0.2
+            }
           })
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.error?.message || "Failed to fetch from Hugging Face API");
+          throw new Error(result.error?.message || "Failed to fetch from Gemini API");
         }
 
-        const generatedText = result.choices[0].message.content.trim();
+        const generatedText = result.candidates[0].content.parts[0].text.trim();
 
         // ==========================================
         // SAVE CACHE FOR FUTURE USERS

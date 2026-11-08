@@ -10,11 +10,15 @@ import { logTransaction } from '../services/logger';
 import { formatDisplayEmail } from '../utils/maskEmail';
 import { getFamilyNumber } from '../utils/householdNumbers';
 import { useAlert } from '../context/AlertContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+// NEW: Import Language Hook
+import { useLanguage } from '../context/LanguageContext';
 
 export default function AdminRequests() {
-  const queryClient = useQueryClient(); 
+  const queryClient = useQueryClient();
   const { showAlert } = useAlert();
+  const { t } = useLanguage(); // NEW: Destructure hook
 
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -60,7 +64,7 @@ export default function AdminRequests() {
     const mName = middleName ? `${middleName} ` : '';
     return `${firstName || ''} ${mName}${lastName || ''}`.trim() || 'Unknown Resident';
   };
-  
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -106,7 +110,7 @@ export default function AdminRequests() {
         };
       });
     },
-    enabled: activeTab === 'Facility', 
+    enabled: activeTab === 'Facility',
     staleTime: 1000 * 60 * 30,
   });
 
@@ -136,7 +140,7 @@ export default function AdminRequests() {
         };
       });
     },
-    enabled: activeTab === 'Document', 
+    enabled: activeTab === 'Document',
     staleTime: 1000 * 60 * 30,
   });
 
@@ -195,13 +199,13 @@ export default function AdminRequests() {
       const safeId = String(req.id || "").toLowerCase();
       const safeStatus = String(req.status || "").toLowerCase();
 
-      const matchesSearch = 
+      const matchesSearch =
         safeResidentName.includes(safeSearchTerm) ||
         safeType.includes(safeSearchTerm) ||
         safeId.includes(safeSearchTerm);
-        
+
       const matchesStatus = filterStatus === 'All' || safeStatus === filterStatus.toLowerCase();
-      
+
       return matchesSearch && matchesStatus;
     }).sort((a, b) => {
       if (sortOrder === "date_desc") return (b.rawDate || 0) - (a.rawDate || 0);
@@ -227,7 +231,7 @@ export default function AdminRequests() {
   const renderPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
-    
+
     if (totalPages <= maxVisible) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
@@ -246,8 +250,8 @@ export default function AdminRequests() {
         className={`af-page-btn ${currentPage === page ? "active" : ""}`}
         onClick={() => typeof page === 'number' ? setCurrentPage(page) : null}
         disabled={typeof page !== 'number'}
-        style={{ 
-          cursor: typeof page === 'number' ? 'pointer' : 'default', 
+        style={{
+          cursor: typeof page === 'number' ? 'pointer' : 'default',
           border: typeof page !== 'number' ? 'none' : '',
           background: typeof page !== 'number' ? 'transparent' : ''
         }}
@@ -274,6 +278,21 @@ export default function AdminRequests() {
     setUnreturnedNotes('');
   };
 
+  const closeDetailsModal = () => {
+    setIsModalOpen(false);
+    setSelectedRequest(null);
+  };
+
+  const closeRejectModal = () => {
+    setIsRejectModalOpen(false);
+    setRejectReason('');
+  };
+
+  const closeUnreturnedModal = () => {
+    setIsUnreturnedModalOpen(false);
+    setUnreturnedNotes('');
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setIsRejectModalOpen(false);
@@ -284,10 +303,10 @@ export default function AdminRequests() {
 
   const updateLocalCache = (category, docId, newStatus) => {
     const queryKey = category === 'Facility' ? ['adminManage_facRequests'] :
-                     category === 'Document' ? ['adminManage_docRequests'] :
-                     ['adminManage_eqRequests'];
+      category === 'Document' ? ['adminManage_docRequests'] :
+        ['adminManage_eqRequests'];
 
-    queryClient.setQueryData(queryKey, (old = []) => 
+    queryClient.setQueryData(queryKey, (old = []) =>
       old.map(req => req.docId === docId ? { ...req, status: newStatus } : req)
     );
   };
@@ -298,15 +317,14 @@ export default function AdminRequests() {
 
     if (target.category === 'Facility') {
       const targetData = target.allData;
-      
-      // ─── OPTIMIZED: Targeted Server-Side Check ensures 100% accuracy ───
+
       const overlapQuery = query(
         collection(db, 'facility_reservations'),
         where('facilityId', '==', String(targetData.facilityId)),
         where('date', '==', targetData.date),
         where('status', 'in', ['Approved', 'approved', 'Completed', 'completed'])
       );
-      
+
       const checkSnap = await getDocs(overlapQuery);
       const hasOverlap = checkSnap.docs.some(doc => {
         if (doc.id === target.docId) return false;
@@ -315,14 +333,14 @@ export default function AdminRequests() {
       });
 
       if (hasOverlap) {
-        await showAlert("Conflict", "Cannot approve: The selected time slot conflicts with an existing approved reservation.");
+        await showAlert(t('admin_req_alert_conflict'), t('admin_req_alert_conflict_desc'));
         return;
       }
     }
 
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Approved',
         processedBy: adminName,
         processedRole: adminRole,
@@ -332,9 +350,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "APPROVED_REQUEST", `Approved ${target.category} request (Ref: ${target.docId}) for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         const label = target.type;
         let notifType = 'document_update';
@@ -349,12 +367,12 @@ export default function AdminRequests() {
         );
       }
 
-      updateLocalCache(target.category, target.docId, 'Approved'); // Sync UI instantly
-      await showAlert("Success", "Request Approved Successfully!");
+      updateLocalCache(target.category, target.docId, 'Approved');
+      await showAlert(t('admin_req_alert_success'), t('admin_req_toast_approved'));
       closeModal();
     } catch (error) {
       console.error("Error approving request: ", error);
-      await showAlert("Error", "Failed to approve request.");
+      await showAlert(t('admin_req_alert_error'), t('admin_req_alert_error'));
     }
   };
 
@@ -363,7 +381,7 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Ready for Pickup',
         processedBy: adminName,
         processedRole: adminRole,
@@ -373,9 +391,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "READY_FOR_PICKUP", `Marked ${target.category} request (Ref: ${target.docId}) as ready for pickup for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         const notifType = target.category === 'Equipment' ? 'equipment_update' : 'document_update';
         await createUserNotification(
@@ -387,11 +405,11 @@ export default function AdminRequests() {
       }
 
       updateLocalCache(target.category, target.docId, 'Ready for Pickup');
-      await showAlert("Success", "Request Marked as Ready for Pickup.");
+      await showAlert(t('admin_req_alert_success'), t('admin_req_toast_ready'));
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      await showAlert("Error", "Failed to update request.");
+      await showAlert(t('admin_req_alert_error'), t('admin_req_alert_error'));
     }
   };
 
@@ -400,7 +418,7 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Claimed',
         processedBy: adminName,
         processedRole: adminRole,
@@ -410,13 +428,12 @@ export default function AdminRequests() {
       if (target.category === 'Equipment') {
         const eqId = target.allData?.equipmentID;
         const requestedQty = Number(target.allData?.quantity || 0);
-        
+
         if (eqId && requestedQty > 0) {
           const eqRef = doc(db, 'equipment', eqId);
           await updateDoc(eqRef, {
             quantity: increment(-requestedQty)
           });
-          // ─── OPTIMIZED: Cross-Cache Invalidation ───
           queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
         }
       }
@@ -424,9 +441,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "CLAIMED_REQUEST", `Marked ${target.category} request (Ref: ${target.docId}) as claimed for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         const notifType = target.category === 'Equipment' ? 'equipment_update' : 'document_update';
         await createUserNotification(
@@ -438,11 +455,11 @@ export default function AdminRequests() {
       }
 
       updateLocalCache(target.category, target.docId, 'Claimed');
-      await showAlert("Success", "Request Marked as Claimed.");
+      await showAlert(t('admin_req_alert_success'), t('admin_req_toast_claimed'));
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      await showAlert("Error", "Failed to update request.");
+      await showAlert(t('admin_req_alert_error'), t('admin_req_alert_error'));
     }
   };
 
@@ -451,7 +468,7 @@ export default function AdminRequests() {
     if (!target) return;
     try {
       const requestRef = doc(db, target.collectionName, target.docId);
-      await updateDoc(requestRef, { 
+      await updateDoc(requestRef, {
         status: 'Returned',
         returnedProcessedBy: adminName,
         returnedProcessedRole: adminRole,
@@ -461,13 +478,12 @@ export default function AdminRequests() {
       if (target.category === 'Equipment') {
         const eqId = target.allData?.equipmentID;
         const requestedQty = Number(target.allData?.quantity || 0);
-        
+
         if (eqId && requestedQty > 0) {
           const eqRef = doc(db, 'equipment', eqId);
           await updateDoc(eqRef, {
             quantity: increment(requestedQty)
           });
-          // ─── OPTIMIZED: Cross-Cache Invalidation ───
           queryClient.invalidateQueries({ queryKey: ['adminManage_equipment'] });
         }
       }
@@ -475,9 +491,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "RETURNED_EQUIPMENT", `Marked ${target.category} request (Ref: ${target.docId}) as returned for ${target.residentName}`);
 
       const residentID = target.allData?.residentID || target.allData?.userID || "";
-      const hhID       = target.allData?.householdID || "";
-      const refNum     = target.id || "";
-      
+      const hhID = target.allData?.householdID || "";
+      const refNum = target.id || "";
+
       if (residentID && hhID) {
         await createUserNotification(
           hhID, residentID,
@@ -488,11 +504,11 @@ export default function AdminRequests() {
       }
 
       updateLocalCache(target.category, target.docId, 'Returned');
-      await showAlert("Success", "Equipment Marked as Returned.");
+      await showAlert(t('admin_req_alert_success'), t('admin_req_toast_returned'));
       closeModal();
     } catch (error) {
       console.error("Error updating request: ", error);
-      await showAlert("Error", "Failed to update request.");
+      await showAlert(t('admin_req_alert_error'), t('admin_req_alert_error'));
     }
   };
 
@@ -517,8 +533,8 @@ export default function AdminRequests() {
       );
 
       const residentID = target.allData?.residentID || target.allData?.userID || '';
-      const hhID       = target.allData?.householdID || '';
-      const refNum     = target.id || '';
+      const hhID = target.allData?.householdID || '';
+      const refNum = target.id || '';
 
       if (residentID && hhID) {
         await createUserNotification(
@@ -530,17 +546,17 @@ export default function AdminRequests() {
       }
 
       updateLocalCache(target.category, target.docId, 'Unreturned');
-      await showAlert("Reported", "Equipment reported as Unreturned.");
+      await showAlert("Reported", t('admin_req_toast_unreturned'));
       closeModal();
     } catch (error) {
       console.error('Error reporting unreturned:', error);
-      await showAlert("Error", "Failed to report equipment as unreturned.");
+      await showAlert(t('admin_req_alert_error'), t('admin_req_alert_error'));
     }
   };
 
   const handleConfirmReject = async () => {
     if (rejectReason.trim() === '') {
-      await showAlert("Required Field", "Please provide a reason for rejection.");
+      await showAlert(t('admin_req_alert_req_req'), t('admin_req_alert_req_desc'));
       return;
     }
 
@@ -557,9 +573,9 @@ export default function AdminRequests() {
       logTransaction(adminName, adminRole, "REJECT_REQUEST", `Rejected ${selectedRequest.category} request (Ref: ${selectedRequest.docId}) for ${selectedRequest.residentName}`);
 
       const residentID = selectedRequest.allData?.residentID || selectedRequest.allData?.userID || "";
-      const hhID       = selectedRequest.allData?.householdID || "";
-      const refNum     = selectedRequest.id || "";
-      
+      const hhID = selectedRequest.allData?.householdID || "";
+      const refNum = selectedRequest.id || "";
+
       if (residentID && hhID) {
         const label = selectedRequest.type || 'Request';
         let notifType = 'document_update';
@@ -575,11 +591,11 @@ export default function AdminRequests() {
       }
 
       updateLocalCache(selectedRequest.category, selectedRequest.docId, 'Rejected');
-      await showAlert("Success", "Request Rejected.");
+      await showAlert(t('admin_req_alert_success'), t('admin_req_toast_rejected'));
       closeModal();
     } catch (error) {
       console.error("Error rejecting request: ", error);
-      await showAlert("Error", "Failed to reject request.");
+      await showAlert(t('admin_req_alert_error'), t('admin_req_alert_error'));
     }
   };
 
@@ -588,8 +604,8 @@ export default function AdminRequests() {
       <div className="requests-container">
 
         <div className="requests-header">
-          <h1 className="requests-title">Requests Management</h1>
-          <p className="requests-subtitle">Efficiently manage and respond to resident applications, reservations, and rentals.</p>
+          <h1 className="requests-title">{t('admin_req_title')}</h1>
+          <p className="requests-subtitle">{t('admin_req_subtitle')}</p>
         </div>
 
         {/* TABS */}
@@ -598,19 +614,19 @@ export default function AdminRequests() {
             className={`req-tab ${activeTab === 'Facility' ? 'active' : ''}`}
             onClick={() => setActiveTab('Facility')}
           >
-            Facility Requests
+            {t('admin_req_tab_fac')}
           </button>
           <button
             className={`req-tab ${activeTab === 'Document' ? 'active' : ''}`}
             onClick={() => setActiveTab('Document')}
           >
-            Document Requests
+            {t('admin_req_tab_doc')}
           </button>
           <button
             className={`req-tab ${activeTab === 'Equipment' ? 'active' : ''}`}
             onClick={() => setActiveTab('Equipment')}
           >
-            Equipment Rentals
+            {t('admin_req_tab_eq')}
           </button>
         </div>
 
@@ -630,7 +646,7 @@ export default function AdminRequests() {
             />
             <input
               type="text"
-              placeholder={`Search by Name, ${activeTab} or Ref #...`}
+              placeholder={t('admin_req_search_ph')}
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -653,23 +669,23 @@ export default function AdminRequests() {
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
-              <option value="All">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
+              <option value="All">{t('admin_req_filter_status')}</option>
+              <option value="Pending">{t('admin_req_filter_pending')}</option>
+              <option value="Approved">{t('admin_req_filter_approved')}</option>
               {(activeTab === 'Document' || activeTab === 'Equipment') && (
                 <>
-                  <option value="Ready for Pickup">Ready for Pickup</option>
-                  <option value="Claimed">Claimed</option>
+                  <option value="Ready for Pickup">{t('admin_req_filter_ready')}</option>
+                  <option value="Claimed">{t('admin_req_filter_claimed')}</option>
                 </>
               )}
               {activeTab === 'Equipment' && (
                 <>
-                  <option value="Overdue">Overdue</option>
-                  <option value="Unreturned">Unreturned</option>
-                  <option value="Returned">Returned</option>
+                  <option value="Overdue">{t('admin_req_filter_overdue')}</option>
+                  <option value="Unreturned">{t('admin_req_filter_unreturned')}</option>
+                  <option value="Returned">{t('admin_req_filter_returned')}</option>
                 </>
               )}
-              <option value="Rejected">Rejected</option>
+              <option value="Rejected">{t('admin_req_filter_rejected')}</option>
             </select>
 
             <select
@@ -677,10 +693,10 @@ export default function AdminRequests() {
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
             >
-              <option value="date_desc">Date: Newest First</option>
-              <option value="date_asc">Date: Oldest First</option>
-              <option value="name_asc">Requester: A to Z</option>
-              <option value="name_desc">Requester: Z to A</option>
+              <option value="date_desc">{t('admin_req_sort_date_new')}</option>
+              <option value="date_asc">{t('admin_req_sort_date_old')}</option>
+              <option value="name_asc">{t('admin_req_sort_name_asc')}</option>
+              <option value="name_desc">{t('admin_req_sort_name_desc')}</option>
             </select>
           </div>
         </div>
@@ -690,25 +706,25 @@ export default function AdminRequests() {
           {loading ? (
             <div className="empty-state">
               <Clock className="animate-spin mb-2" size={32} />
-              <h3>Loading requests...</h3>
+              <h3>{t('admin_req_loading')}</h3>
             </div>
           ) : filteredRequests.length === 0 ? (
             <div className="empty-state">
               <Info className="empty-state-icon" size={48} />
-              <h3>No {activeTab.toLowerCase()} requests found</h3>
-              <p>Try adjusting your search or filters.</p>
+              <h3>{t('admin_req_empty_title')}</h3>
+              <p>{t('admin_req_empty_desc')}</p>
             </div>
           ) : (
             <table className="req-table" style={{ minWidth: '850px' }}>
               <thead>
                 <tr style={{ textAlign: 'center' }}>
-                  <th>Ref Number</th>
-                  <th>Requester</th>
-                  <th>Type</th>
-                  <th>{activeTab === 'Equipment' ? 'Pick-up / Date Needed' : 'Scheduled Date'}</th>
-                  <th>Date Submitted</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>{t('admin_req_th_ref')}</th>
+                  <th>{t('admin_req_th_req')}</th>
+                  <th>{t('admin_req_th_type')}</th>
+                  <th>{activeTab === 'Equipment' ? t('admin_req_th_pickup') : t('admin_req_th_sched')}</th>
+                  <th>{t('admin_req_th_date')}</th>
+                  <th>{t('admin_req_th_status')}</th>
+                  <th>{t('admin_req_th_action')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -735,7 +751,18 @@ export default function AdminRequests() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`status-badge ${String(req.status || "pending").toLowerCase()}`}>
-                        {String(req.status || "Pending").charAt(0).toUpperCase() + String(req.status || "Pending").slice(1).toLowerCase()}
+                        {(() => {
+                          const rawStatus = (req.status || "Pending").toLowerCase();
+                          if (rawStatus === 'pending') return t('admin_req_filter_pending');
+                          if (rawStatus === 'approved') return t('admin_req_filter_approved');
+                          if (rawStatus === 'ready for pickup') return t('admin_req_filter_ready');
+                          if (rawStatus === 'claimed') return t('admin_req_filter_claimed');
+                          if (rawStatus === 'overdue') return t('admin_req_filter_overdue');
+                          if (rawStatus === 'unreturned') return t('admin_req_filter_unreturned');
+                          if (rawStatus === 'returned') return t('admin_req_filter_returned');
+                          if (rawStatus === 'rejected') return t('admin_req_filter_rejected');
+                          return String(req.status || "Pending").charAt(0).toUpperCase() + String(req.status || "Pending").slice(1).toLowerCase();
+                        })()}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -747,7 +774,7 @@ export default function AdminRequests() {
                           openViewModal(req);
                         }}
                       >
-                        More Details
+                        {t('admin_req_btn_details')}
                       </button>
                     </td>
                   </tr>
@@ -759,51 +786,51 @@ export default function AdminRequests() {
 
         {!loading && filteredRequests.length > 0 && totalPages > 1 && (
           <div className="af-pagination" style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
-            <button 
-              className="af-page-btn" 
+            <button
+              className="af-page-btn"
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
             >
-              Previous
+              {t('admin_req_page_prev')}
             </button>
             {renderPageNumbers()}
-            <button 
-              className="af-page-btn" 
+            <button
+              className="af-page-btn"
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
               style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
             >
-              Next
+              {t('admin_req_page_next')}
             </button>
           </div>
         )}
 
         {/* VIEW DETAILS MODAL */}
         {isModalOpen && selectedRequest && (
-          <div className="as-modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" onClick={closeDetailsModal}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>{activeTab === 'Facility' ? 'Reservation' : activeTab === 'Equipment' ? 'Rental' : 'Request'} Details</h2>
+                <h2>{activeTab === 'Facility' ? t('admin_req_modal_title_fac') : activeTab === 'Equipment' ? t('admin_req_modal_title_eq') : t('admin_req_modal_title_doc')}</h2>
                 <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
               </div>
 
               <div className="modal-body">
                 <div className="modal-section">
                   <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>
-                    Section 1: {activeTab === 'Facility' ? 'Reservation' : activeTab === 'Equipment' ? 'Equipment' : 'Document'} Information
+                    {activeTab === 'Facility' ? t('admin_req_sec1_fac') : activeTab === 'Equipment' ? t('admin_req_sec1_eq') : t('admin_req_sec1_doc')}
                   </h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                     <div className="detail-item">
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Reference Number</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_ref')}</label>
                       <p className="detail-value" style={{ fontWeight: 600, letterSpacing: '1px' }}>{String(selectedRequest.id || "").toUpperCase()}</p>
                     </div>
                     <div className="detail-item">
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Household Number</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_hh')}</label>
                       <p className="detail-value" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{selectedRequest.allData?.householdID || 'N/A'}</p>
                     </div>
                     <div className="detail-item">
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Family Number</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_fam')}</label>
                       <p className="detail-value" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                         {selectedRequest.allData?.householdID
                           ? getFamilyNumber(selectedRequest.allData.householdID, selectedRequest.allData?.branchID || "BR-001")
@@ -812,19 +839,30 @@ export default function AdminRequests() {
                     </div>
                     <div className="detail-item">
                       <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>
-                        {activeTab === 'Facility' ? 'Facility' : activeTab === 'Equipment' ? 'Equipment Item' : 'Document Type'}
+                        {activeTab === 'Facility' ? t('admin_req_lbl_fac') : activeTab === 'Equipment' ? t('admin_req_lbl_eq') : t('admin_req_lbl_doc')}
                       </label>
                       <p className="detail-value" style={{ fontWeight: 500 }}>{selectedRequest.type}</p>
                     </div>
                     <div className="detail-item">
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Date Submitted</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_date_sub')}</label>
                       <p className="detail-value">{selectedRequest.dateRequested}</p>
                     </div>
                     <div className="detail-item">
-                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Status</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_status')}</label>
                       <div className="detail-value badge">
                         <span className={`status-badge ${String(selectedRequest.status || "").toLowerCase()}`}>
-                          {selectedRequest.status || "Pending"}
+                          {(() => {
+                            const rawStatus = (selectedRequest.status || "Pending").toLowerCase();
+                            if (rawStatus === 'pending') return t('admin_req_filter_pending');
+                            if (rawStatus === 'approved') return t('admin_req_filter_approved');
+                            if (rawStatus === 'ready for pickup') return t('admin_req_filter_ready');
+                            if (rawStatus === 'claimed') return t('admin_req_filter_claimed');
+                            if (rawStatus === 'overdue') return t('admin_req_filter_overdue');
+                            if (rawStatus === 'unreturned') return t('admin_req_filter_unreturned');
+                            if (rawStatus === 'returned') return t('admin_req_filter_returned');
+                            if (rawStatus === 'rejected') return t('admin_req_filter_rejected');
+                            return String(selectedRequest.status || "Pending").charAt(0).toUpperCase() + String(selectedRequest.status || "Pending").slice(1).toLowerCase();
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -833,46 +871,46 @@ export default function AdminRequests() {
 
                 <div className="modal-section" style={{ marginTop: '1.5rem' }}>
                   <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>
-                    Section 2: {activeTab === 'Document' ? 'Personal Information' : 'Request Details'}
+                    {activeTab === 'Document' ? t('admin_req_sec2_personal') : t('admin_req_sec2_req')}
                   </h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
 
                     {activeTab === 'Facility' && (
                       <>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Full Name</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_name')}</label>
                           <p className="detail-value">{selectedRequest.allData?.requesterName || selectedRequest.allData?.fullName || selectedRequest.residentName || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Contact Number</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_contact')}</label>
                           <p className="detail-value">{selectedRequest.allData?.contactNumber || selectedRequest.allData?.contact || selectedRequest.contact || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Email Address</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_email')}</label>
                           <p className="detail-value">{formatDisplayEmail(selectedRequest.allData?.email, adminRole)}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Reservation Date</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_res_date')}</label>
                           <p className="detail-value">{formatDate(selectedRequest.allData?.date) || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Estimated Pax</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_pax')}</label>
                           <p className="detail-value">{selectedRequest.allData?.attendees || selectedRequest.allData?.paxCount || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Start Time</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_start')}</label>
                           <p className="detail-value">{formatTime(selectedRequest.allData?.startTime)}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>End Time</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_end')}</label>
                           <p className="detail-value">{formatTime(selectedRequest.allData?.endTime)}</p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Purpose</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_purpose')}</label>
                           <p className="detail-value">{selectedRequest.purpose || 'N/A'}</p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Additional Notes</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_notes')}</label>
                           <p className="detail-value">{selectedRequest.allData?.notes || 'None'}</p>
                         </div>
                       </>
@@ -881,38 +919,38 @@ export default function AdminRequests() {
                     {activeTab === 'Equipment' && (
                       <>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Full Name</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_name')}</label>
                           <p className="detail-value">{selectedRequest.allData?.fullName || selectedRequest.residentName || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Contact Number</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_contact')}</label>
                           <p className="detail-value">{selectedRequest.allData?.contactNumber || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Email Address</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_email')}</label>
                           <p className="detail-value">{formatDisplayEmail(selectedRequest.allData?.email, adminRole)}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Pick-up Date</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_pickup')}</label>
                           <p className="detail-value">{formatDate(selectedRequest.allData?.pickUpDate) || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Return Date</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_return')}</label>
                           <p className="detail-value" style={{ color: selectedRequest.status === 'Overdue' ? '#dc2626' : 'inherit', fontWeight: selectedRequest.status === 'Overdue' ? 600 : 'inherit' }}>
                             {formatDate(selectedRequest.allData?.returnDate) || 'N/A'}
                             {selectedRequest.status === 'Overdue' && <span style={{ marginLeft: '8px', fontSize: '0.75rem', background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>OVERDUE</span>}
                           </p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Quantity Requested</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_qty')}</label>
                           <p className="detail-value" style={{ fontWeight: 600 }}>{selectedRequest.allData?.quantity || 'N/A'} units</p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Purpose</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_purpose')}</label>
                           <p className="detail-value">{selectedRequest.purpose || 'N/A'}</p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Additional Notes</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_notes')}</label>
                           <p className="detail-value">{selectedRequest.allData?.notes || 'None'}</p>
                         </div>
                         {selectedRequest.status === 'Overdue' && (
@@ -922,11 +960,11 @@ export default function AdminRequests() {
                             padding: '12px 14px', marginTop: '4px', fontSize: '0.85rem', color: '#9a3412',
                           }}>
                             <svg style={{ flexShrink: 0, marginTop: '2px' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                             </svg>
                             <div>
-                              <strong style={{ display: 'block', color: '#7c2d12', marginBottom: '2px' }}>Equipment Return Overdue</strong>
-                              This rental has passed its scheduled return date of <strong>{formatDate(selectedRequest.allData?.returnDate)}</strong>. The equipment has not been returned yet. Please coordinate with the resident and mark it as <strong>Returned</strong> once the equipment is back.
+                              <strong style={{ display: 'block', color: '#7c2d12', marginBottom: '2px' }}>{t('admin_req_lbl_overdue_title')}</strong>
+                              {t('admin_req_lbl_overdue_desc1')} <strong>{formatDate(selectedRequest.allData?.returnDate)}</strong>{t('admin_req_lbl_overdue_desc2')} <strong>{t('admin_req_filter_returned')}</strong> {t('admin_req_lbl_overdue_desc3')}
                             </div>
                           </div>
                         )}
@@ -936,58 +974,58 @@ export default function AdminRequests() {
                     {activeTab === 'Document' && (
                       <>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>First Name</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_fname')}</label>
                           <p className="detail-value">{selectedRequest.allData?.firstName || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Middle Name</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_mname')}</label>
                           <p className="detail-value">{selectedRequest.allData?.middleName || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Last Name</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_lname')}</label>
                           <p className="detail-value">{selectedRequest.allData?.lastName || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Date of Birth</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_dob')}</label>
                           <p className="detail-value">{selectedRequest.allData?.dob || selectedRequest.allData?.birthDate || selectedRequest.allData?.dateOfBirth || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Civil Status</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_civil')}</label>
                           <p className="detail-value">{selectedRequest.allData?.civilStatus || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Contact Number</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_contact')}</label>
                           <p className="detail-value">{selectedRequest.allData?.contactNumber || selectedRequest.allData?.contact || selectedRequest.contact || 'N/A'}</p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Complete Address</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_address')}</label>
                           <p className="detail-value">{selectedRequest.allData?.address || 'N/A'}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Email Address</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_email')}</label>
                           <p className="detail-value">{formatDisplayEmail(selectedRequest.allData?.email, adminRole)}</p>
                         </div>
                         <div className="detail-item">
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Residing Since (Year)</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_since')}</label>
                           <p className="detail-value">{selectedRequest.allData?.residingSince || 'N/A'}</p>
                         </div>
                         <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>Purpose</label>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>{t('admin_req_lbl_purpose')}</label>
                           <p className="detail-value">{selectedRequest.purpose || 'N/A'}</p>
                         </div>
                         {selectedRequest.allData?.validIdUrl && (
                           <div style={{ marginTop: '16px', gridColumn: 'span 2' }}>
-                            <label style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>Attached Valid ID Verification</label>
+                            <label style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>{t('admin_req_lbl_id')}</label>
                             <div style={{ marginTop: '8px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc', display: 'flex', justifyContent: 'center' }}>
                               <a href={selectedRequest.allData.validIdUrl} target="_blank" rel="noopener noreferrer">
-                                <img 
-                                  src={selectedRequest.allData.validIdUrl} 
-                                  alt="Resident Valid ID" 
-                                  style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px' }} 
+                                <img
+                                  src={selectedRequest.allData.validIdUrl}
+                                  alt="Resident Valid ID"
+                                  style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px' }}
                                 />
                               </a>
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>Click to view full size</div>
+                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>{t('admin_req_lbl_id_hint')}</div>
                           </div>
                         )}
                       </>
@@ -996,7 +1034,7 @@ export default function AdminRequests() {
                 </div>
 
                 <div className="modal-section" style={{ marginTop: '1.5rem' }}>
-                  <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>Section 3: Additional Specific Requirements</h3>
+                  <h3 className="section-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#334155' }}>{t('admin_req_sec3_title')}</h3>
                   <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                     {selectedRequest.allData?.customFields && Object.entries(selectedRequest.allData.customFields)
                       .filter(([key, value]) => typeof value !== 'object' && value !== '')
@@ -1009,19 +1047,19 @@ export default function AdminRequests() {
 
                     {(!selectedRequest.allData?.customFields || Object.entries(selectedRequest.allData.customFields)
                       .filter(([key, value]) => typeof value !== 'object' && value !== '').length === 0) && (
-                        <p style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>No additional requirements answered for this request.</p>
+                        <p style={{ gridColumn: 'span 2', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>{t('admin_req_sec3_empty')}</p>
                       )}
 
                     {String(selectedRequest.status || "").toLowerCase() === 'rejected' && selectedRequest.allData?.rejectionReason && (
                       <div className="detail-item" style={{ gridColumn: 'span 2', marginTop: '1rem', background: '#fff1f2', padding: '1rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
-                        <label style={{ display: 'block', color: '#e11d48', fontWeight: 700, marginBottom: '0.3rem' }}>Admin Remarks / Rejection Reason</label>
+                        <label style={{ display: 'block', color: '#e11d48', fontWeight: 700, marginBottom: '0.3rem' }}>{t('admin_req_sec3_reject')}</label>
                         <p className="detail-value" style={{ color: '#be123c', fontWeight: 400 }}>{selectedRequest.allData.rejectionReason}</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-              
+
               <div className="modal-footer">
                 {(
                   String(selectedRequest.status || "").toLowerCase() === 'pending' ||
@@ -1030,52 +1068,52 @@ export default function AdminRequests() {
                   ((['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment') ||
                   (String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment')
                 ) && (
-                  <div className="modal-footer">
-                    {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
-                      <>
-                        <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
-                          <XCircle size={16} /> Reject
+                    <div className="modal-footer">
+                      {String(selectedRequest.status || "").toLowerCase() === 'pending' && (
+                        <>
+                          <button className="btn-reject" onClick={() => openRejectModal(selectedRequest)}>
+                            <XCircle size={16} /> {t('admin_req_btn_reject')}
+                          </button>
+                          <button className="btn-approve" onClick={() => handleApprove()}>
+                            <CheckCircle size={16} /> {t('admin_req_btn_approve')}
+                          </button>
+                        </>
+                      )}
+                      {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+                        <button className="btn-approve" onClick={() => handleReadyForPickup()}>
+                          <CheckCircle size={16} /> {t('admin_req_btn_ready')}
                         </button>
-                        <button className="btn-approve" onClick={() => handleApprove()}>
-                          <CheckCircle size={16} /> Approve
+                      )}
+                      {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
+                        <button className="btn-approve" onClick={() => handleClaimed()}>
+                          <CheckCircle size={16} /> {t('admin_req_btn_claimed')}
                         </button>
-                      </>
-                    )}
-                    {String(selectedRequest.status || "").toLowerCase() === 'approved' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-                      <button className="btn-approve" onClick={() => handleReadyForPickup()}>
-                        <CheckCircle size={16} /> Mark Ready for Pickup
-                      </button>
-                    )}
-                    {String(selectedRequest.status || "").toLowerCase() === 'ready for pickup' && (selectedRequest.category === 'Document' || selectedRequest.category === 'Equipment') && (
-                      <button className="btn-approve" onClick={() => handleClaimed()}>
-                        <CheckCircle size={16} /> Mark Claimed
-                      </button>
-                    )}
-                    {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
-                      <button className="btn-approve" onClick={() => handleReturned()}>
-                        <CheckCircle size={16} /> Mark Returned
-                      </button>
-                    )}
-                    {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
-                      <button
-                        onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
-                        style={{
-                          height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
-                          fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          gap: '6px', padding: '0 16px', borderRadius: '8px',
-                          background: '#fff7ed', color: '#c2410c',
-                          border: '1.5px solid #fed7aa',
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                        Report Unreturned
-                      </button>
-                    )}
-                  </div>
-                )}
+                      )}
+                      {(['claimed', 'overdue', 'unreturned'].includes(String(selectedRequest.status || '').toLowerCase())) && selectedRequest.category === 'Equipment' && (
+                        <button className="btn-approve" onClick={() => handleReturned()}>
+                          <CheckCircle size={16} /> {t('admin_req_btn_returned')}
+                        </button>
+                      )}
+                      {String(selectedRequest.status || "").toLowerCase() === 'overdue' && selectedRequest.category === 'Equipment' && (
+                        <button
+                          onClick={() => { closeModal(); setTimeout(() => openUnreturnedModal(selectedRequest), 50); }}
+                          style={{
+                            height: '38px', fontFamily: "'Poppins',sans-serif", fontWeight: 600,
+                            fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            gap: '6px', padding: '0 16px', borderRadius: '8px',
+                            background: '#fff7ed', color: '#c2410c',
+                            border: '1.5px solid #fed7aa',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {t('admin_req_btn_unreturned')}
+                        </button>
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -1083,22 +1121,21 @@ export default function AdminRequests() {
 
         {/* REJECT REMARKS MODAL */}
         {isRejectModalOpen && selectedRequest && (
-          <div className="as-modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" style={{ zIndex: 10001 }} onClick={closeRejectModal}>
             <div className="modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header">
-                <h2>Confirm Rejection</h2>
-                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
+                <h2>{t('admin_req_rej_title')}</h2>
+                <button className="as-modal-close" onClick={closeRejectModal}><X size={22} /></button>
               </div>
               <div className="modal-body">
                 <p style={{ marginBottom: '1.25rem', fontSize: '0.9rem', color: '#64748b', lineHeight: '1.6' }}>
-                  Please provide a clear reason for rejecting the request from <strong>{selectedRequest.residentName}</strong>.
-                  This info will be visible to the resident.
+                  {t('admin_req_rej_desc')} <strong>{selectedRequest.residentName}</strong>{t('admin_req_rej_desc_end')}
                 </p>
                 <div className="detail-item">
-                  <label>Remarks / Reason for Rejection</label>
+                  <label>{t('admin_req_rej_lbl')}</label>
                   <textarea
                     rows="4"
-                    placeholder="E.g., Incomplete documentation, Missing field information, Under maintenance..."
+                    placeholder={t('admin_req_rej_ph')}
                     style={{
                       width: '100%', padding: '1rem', borderRadius: '8px',
                       border: '1.5px solid #e2e8f0', fontFamily: 'inherit',
@@ -1111,13 +1148,13 @@ export default function AdminRequests() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn-view" onClick={closeModal}>Cancel</button>
+                <button className="btn-view" onClick={closeRejectModal}>{t('admin_req_rej_cancel')}</button>
                 <button
                   className="btn-reject"
                   onClick={handleConfirmReject}
                   style={{ background: '#ef4444', color: 'white', border: 'none' }}
                 >
-                  Confirm Rejection
+                  {t('admin_req_rej_confirm')}
                 </button>
               </div>
             </div>
@@ -1126,41 +1163,41 @@ export default function AdminRequests() {
 
         {/* REPORT UNRETURNED CONFIRMATION MODAL */}
         {isUnreturnedModalOpen && selectedRequest && (
-          <div className="as-modal-overlay" onClick={closeModal}>
+          <div className="as-modal-overlay" style={{ zIndex: 10001 }} onClick={closeUnreturnedModal}>
             <div className="modal-content" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
               <div className="as-modal-header" style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ffedd5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
                   </div>
-                  <h2 style={{ color: '#7c2d12', margin: 0 }}>Report Equipment as Unreturned</h2>
+                  <h2 style={{ color: '#7c2d12', margin: 0 }}>{t('admin_req_unret_title')}</h2>
                 </div>
-                <button className="as-modal-close" onClick={closeModal}><X size={22} /></button>
+                <button className="as-modal-close" onClick={closeUnreturnedModal}><X size={22} /></button>
               </div>
 
               <div className="modal-body">
                 {/* Rental Summary */}
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px 16px', marginBottom: '1.25rem' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rental Summary</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('admin_req_unret_summary')}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '0.875rem' }}>
-                    <div><span style={{ color: '#94a3b8' }}>Resident: </span><strong style={{ color: '#1e293b' }}>{selectedRequest.residentName}</strong></div>
-                    <div><span style={{ color: '#94a3b8' }}>Equipment: </span><strong style={{ color: '#1e293b' }}>{selectedRequest.type}</strong></div>
-                    <div><span style={{ color: '#94a3b8' }}>Ref #: </span><strong style={{ color: '#1e293b', fontFamily: 'monospace' }}>{String(selectedRequest.id || '').toUpperCase()}</strong></div>
-                    <div><span style={{ color: '#94a3b8' }}>Return Date: </span><strong style={{ color: '#dc2626' }}>{formatDate(selectedRequest.allData?.returnDate)}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>{t('admin_req_unret_res')} </span><strong style={{ color: '#1e293b' }}>{selectedRequest.residentName}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>{t('admin_req_unret_eq')} </span><strong style={{ color: '#1e293b' }}>{selectedRequest.type}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>{t('admin_req_unret_ref')} </span><strong style={{ color: '#1e293b', fontFamily: 'monospace' }}>{String(selectedRequest.id || '').toUpperCase()}</strong></div>
+                    <div><span style={{ color: '#94a3b8' }}>{t('admin_req_unret_date')} </span><strong style={{ color: '#dc2626' }}>{formatDate(selectedRequest.allData?.returnDate)}</strong></div>
                   </div>
                 </div>
 
                 <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#64748b', lineHeight: '1.65' }}>
-                  This action will mark the equipment as <strong style={{ color: '#c2410c' }}>Unreturned</strong> and notify the resident. The date of this report will be recorded. Use this only when you have confirmed the equipment has not been returned.
+                  {t('admin_req_unret_desc1')} <strong style={{ color: '#c2410c' }}>{t('admin_req_filter_unreturned')}</strong> {t('admin_req_unret_desc2')}
                 </p>
 
                 <div className="detail-item">
-                  <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#475569', display: 'block', marginBottom: '6px' }}>Admin Notes <span style={{ fontWeight: 400, color: '#94a3b8' }}>(Optional)</span></label>
+                  <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#475569', display: 'block', marginBottom: '6px' }}>{t('admin_req_unret_notes')} <span style={{ fontWeight: 400, color: '#94a3b8' }}>{t('admin_req_unret_notes_opt')}</span></label>
                   <textarea
                     rows="3"
-                    placeholder="E.g., Multiple follow-ups made, resident not reachable, equipment confirmed not returned as of today..."
+                    placeholder={t('admin_req_unret_notes_ph')}
                     style={{
                       width: '100%', padding: '0.875rem', borderRadius: '8px',
                       border: '1.5px solid #e2e8f0', fontFamily: 'inherit',
@@ -1177,14 +1214,14 @@ export default function AdminRequests() {
 
                 <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '7px', padding: '10px 12px' }}>
                   <svg style={{ flexShrink: 0, marginTop: '1px' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
-                  A notification will be sent to the resident and the report date will be logged for record-keeping.
+                  {t('admin_req_unret_notif')}
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button className="btn-view" onClick={closeModal}>Cancel</button>
+                <button className="btn-view" onClick={closeUnreturnedModal}>{t('admin_req_rej_cancel')}</button>
                 <button
                   onClick={handleConfirmUnreturned}
                   style={{
@@ -1197,9 +1234,9 @@ export default function AdminRequests() {
                   onMouseOut={(e) => e.currentTarget.style.background = '#c2410c'}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
-                  Confirm — Report as Unreturned
+                  {t('admin_req_unret_confirm')}
                 </button>
               </div>
             </div>

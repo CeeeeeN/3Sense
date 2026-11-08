@@ -9,23 +9,30 @@ import ManageFacilities from "./ManageTabs/ManageFacilities";
 import ManageEquipment from "./ManageTabs/ManageEquipment";
 import ManageAnnouncements from "./ManageTabs/ManageAnnouncements";
 
+// NEW: Import the custom language hook
+import { useLanguage } from '../context/LanguageContext';
+
 export default function AdminManage() {
   const [activeTab, setActiveTab] = useState(() => {
     return sessionStorage.getItem("adminManageActiveTab") || "programs";
   });
+
+  // NEW: Destructure the translation hook
+  const { t } = useLanguage();
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     sessionStorage.setItem("adminManageActiveTab", tabId);
   };
 
+  // Dynamic TABS array inside the component so it re-translates instantly on toggle
   const TABS = [
-    { id: "programs", label: "Programs" },
-    { id: "services", label: "Services" },
-    { id: "documents", label: "Documents" },
-    { id: "facilities", label: "Facilities" },
-    { id: "equipment", label: "Equipment" },
-    { id: "announcements", label: "Announcements" },
+    { id: "programs", label: t('admin_manage_programs') },
+    { id: "services", label: t('admin_manage_services') },
+    { id: "documents", label: t('admin_manage_documents') },
+    { id: "facilities", label: t('admin_manage_facilities') },
+    { id: "equipment", label: t('admin_manage_equipment') },
+    { id: "announcements", label: t('admin_manage_announcements') },
   ];
 
   return (

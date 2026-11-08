@@ -1148,6 +1148,7 @@ export default function AddMembers({ onBack, onDone, householdID: propHouseholdI
     const color = AVATAR_COLORS[members.length % AVATAR_COLORS.length];
     
     try {
+      // Includes both branchID and familyBranch to ensure full backward compatibility with Login.jsx profile selection
       await addHouseholdMember(householdID, {
         ...form,
         branchID: familyBranch,

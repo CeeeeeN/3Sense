@@ -10,13 +10,16 @@ import { logTransaction } from '../../services/logger';
 import { onAuthStateChanged } from "firebase/auth";
 import { useQuery, useQueryClient } from '@tanstack/react-query'; 
 
+// NEW: Import Language Hook
+import { useLanguage } from '../../context/LanguageContext'; 
+
 const formatTs = (ts) => {
   if (!ts) return "—";
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, t }) => {
   const raw = (status || "Pending").trim();
   const s = raw.toLowerCase();
   
@@ -29,17 +32,25 @@ const StatusBadge = ({ status }) => {
     statusClass = "received";
   }
 
-  const label = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  // Attempt to translate the status, fallback to capitalized raw string
+  let displayStatus = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  if (s === "pending") displayStatus = t('admin_srv_bswd_stat_pending');
+  if (s.includes("resolved")) displayStatus = t('admin_srv_bswd_stat_resolved');
+  if (s.includes("handled")) displayStatus = t('admin_srv_bswd_stat_handled');
+  if (s === "responded") displayStatus = t('admin_srv_bswd_stat_responded');
+  if (s === "received") displayStatus = t('admin_srv_bswd_filter_received');
 
   return (
     <span className={`status-badge ${statusClass}`}>
-      {label}
+      {displayStatus}
     </span>
   );
 };
 
 export default function ServiceBswd({ onBack }) {
   const queryClient = useQueryClient(); 
+  const { t } = useLanguage(); // NEW: Destructure hook
+
   const [activeTab, setActiveTab] = useState("reports");
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -71,7 +82,6 @@ export default function ServiceBswd({ onBack }) {
     return () => unsubscribe();
   }, []);
 
-  // ─── 1. OPTIMIZED: React Query for Table Data (Limited to 200) ───
   const { data: reports = [], isLoading: loadingReports } = useQuery({
     queryKey: ['adminManage_bswdReports'],
     queryFn: async () => {
@@ -90,7 +100,6 @@ export default function ServiceBswd({ onBack }) {
     staleTime: 1000 * 60 * 30, 
   });
 
-  // ─── 2. FULLY OPTIMIZED: Accurate Server-Side Stats ───
   const { data: stats = { reports: {}, tips: {} } } = useQuery({
     queryKey: ['adminManage_bswdStats'],
     queryFn: async () => {
@@ -100,12 +109,10 @@ export default function ServiceBswd({ onBack }) {
         totalRep, pendingRep, respondedRep, resolvedRep,
         totalTip, pendingTip, handledTip
       ] = await Promise.all([
-        // Displacement Reports
         getCountFromServer(query(rRef, where("type", "==", "homeless_report"))),
         getCountFromServer(query(rRef, where("type", "==", "homeless_report"), where("status", "in", ["pending", "received"]))),
         getCountFromServer(query(rRef, where("type", "==", "homeless_report"), where("status", "==", "responded"))),
         getCountFromServer(query(rRef, where("type", "==", "homeless_report"), where("status", "==", "resolved"))),
-        // Community Tips
         getCountFromServer(query(rRef, where("type", "==", "tip"))),
         getCountFromServer(query(rRef, where("type", "==", "tip"), where("status", "==", "pending"))),
         getCountFromServer(query(rRef, where("type", "==", "tip"), where("status", "in", ["resolved", "handled"])))
@@ -131,7 +138,6 @@ export default function ServiceBswd({ onBack }) {
   const reportsStats = stats.reports;
   const tipsStats = stats.tips;
 
-  // ── Update status ────────────────────────────────────────────────
   const updateStatus = async (id, newStatus) => {
     setSaving(true);
     try {
@@ -168,7 +174,6 @@ export default function ServiceBswd({ onBack }) {
         setSelectedItem(prev => ({ ...prev, status: newStatus }));
       }
 
-      // Refresh all caches
       queryClient.invalidateQueries({ queryKey: ['adminManage_bswdReports'] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_bswdStats'] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_servicesStats'] });
@@ -182,7 +187,6 @@ export default function ServiceBswd({ onBack }) {
   const displacementReports = useMemo(() => reports.filter(r => (r.type || "") === "homeless_report"), [reports]);
   const communityTips       = useMemo(() => reports.filter(r => (r.type || "") !== "homeless_report"), [reports]);
 
-  // ── Filtered & Sorted Tab Data ────────────────────────────────────
   const currentData = useMemo(() => {
     const rawList = activeTab === "reports" ? displacementReports : communityTips;
     return rawList
@@ -254,13 +258,13 @@ export default function ServiceBswd({ onBack }) {
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
       <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-        &larr; Back to Services Hub
+        {t('admin_srv_bswd_back')}
       </button>
 
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Social Welfare &amp; Development</h1>
-          <p className="as-subtitle">Manage displaced person reports and community welfare tips</p>
+          <h1>{t('admin_srv_bswd_title')}</h1>
+          <p className="as-subtitle">{t('admin_srv_bswd_subtitle')}</p>
         </div>
       </div>
 
@@ -269,23 +273,23 @@ export default function ServiceBswd({ onBack }) {
           className={`req-tab ${activeTab === "reports" ? "active" : ""}`}
           onClick={() => { setActiveTab("reports"); setFilterStatus("All"); }}
         >
-          Displacement Reports ({reportsStats?.total || 0})
+          {t('admin_srv_bswd_tab_reports')} ({reportsStats?.total || 0})
         </button>
         <button
           className={`req-tab ${activeTab === "tips" ? "active" : ""}`}
           onClick={() => { setActiveTab("tips"); setFilterStatus("All"); }}
         >
-          Community Tips ({tipsStats?.total || 0})
+          {t('admin_srv_bswd_tab_tips')} ({tipsStats?.total || 0})
         </button>
       </div>
 
       {activeTab === "reports" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
-            { label: "Total",     value: reportsStats?.total || 0,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
-            { label: "Pending",   value: reportsStats?.pending || 0,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-            { label: "Responded", value: reportsStats?.responded || 0, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
-            { label: "Resolved",  value: reportsStats?.resolved || 0,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: t('admin_srv_bswd_stat_total'),     value: reportsStats?.total || 0,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+            { label: t('admin_srv_bswd_stat_pending'),   value: reportsStats?.pending || 0,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: t('admin_srv_bswd_stat_responded'), value: reportsStats?.responded || 0, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+            { label: t('admin_srv_bswd_stat_resolved'),  value: reportsStats?.resolved || 0,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, padding: "14px 18px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
               <div style={{ color: "#6b7280", fontSize: "0.82rem", marginBottom: "4px" }}>{s.label}</div>
@@ -297,9 +301,9 @@ export default function ServiceBswd({ onBack }) {
       {activeTab === "tips" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
-            { label: "Total Tips", value: tipsStats?.total || 0,   bg: "#fff",    border: "#e5e7eb", color: "#111827" },
-            { label: "Pending",    value: tipsStats?.pending || 0, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-            { label: "Handled",    value: tipsStats?.handled || 0, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+            { label: t('admin_srv_bswd_stat_total_tips'), value: tipsStats?.total || 0,   bg: "#fff",    border: "#e5e7eb", color: "#111827" },
+            { label: t('admin_srv_bswd_stat_pending'),    value: tipsStats?.pending || 0, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+            { label: t('admin_srv_bswd_stat_handled'),    value: tipsStats?.handled || 0, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, padding: "14px 18px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
               <div style={{ color: "#6b7280", fontSize: "0.82rem", marginBottom: "4px" }}>{s.label}</div>
@@ -317,11 +321,11 @@ export default function ServiceBswd({ onBack }) {
           onChange={(e) => setFilterStatus(e.target.value)}
           style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
         >
-          <option value="All">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="received">Received</option>
-          <option value="responded">Responded</option>
-          <option value="resolved">Resolved / Handled</option>
+          <option value="All">{t('admin_srv_bswd_filter_status')}</option>
+          <option value="pending">{t('admin_srv_bswd_stat_pending')}</option>
+          <option value="received">{t('admin_srv_bswd_filter_received')}</option>
+          <option value="responded">{t('admin_srv_bswd_stat_responded')}</option>
+          <option value="resolved">{t('admin_srv_bswd_filter_resolved_handled')}</option>
         </select>
 
         <select
@@ -330,11 +334,11 @@ export default function ServiceBswd({ onBack }) {
           onChange={(e) => setSortOrder(e.target.value)}
           style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff" }}
         >
-          <option value="date_desc">Date: Newest First</option>
-          <option value="date_asc">Date: Oldest First</option>
-          <option value="name_asc">Reporter: A to Z</option>
-          <option value="name_desc">Reporter: Z to A</option>
-          <option value="loc_asc">{activeTab === "reports" ? "Location: A to Z" : "Subject: A to Z"}</option>
+          <option value="date_desc">{t('admin_srv_bswd_sort_date_new')}</option>
+          <option value="date_asc">{t('admin_srv_bswd_sort_date_old')}</option>
+          <option value="name_asc">{t('admin_srv_bswd_sort_rep_asc')}</option>
+          <option value="name_desc">{t('admin_srv_bswd_sort_rep_desc')}</option>
+          <option value="loc_asc">{activeTab === "reports" ? t('admin_srv_bswd_sort_loc_asc') : t('admin_srv_bswd_sort_sub_asc')}</option>
         </select>
       </div>
 
@@ -347,14 +351,14 @@ export default function ServiceBswd({ onBack }) {
           <table className="req-table" style={{ width: "100%", minWidth: "750px" }}>
             <thead>
               <tr style={{ textAlign: 'center' }}>
-                {["Date", "Reporter Name", "Location", "Description", "Status", "Action"].map(h => (
+                {[t('admin_srv_bswd_th_date'), t('admin_srv_bswd_th_reporter'), t('admin_srv_bswd_th_location'), t('admin_srv_bswd_th_desc'), t('admin_srv_bswd_th_status'), t('admin_srv_bswd_th_action')].map(h => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {currentData.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No displacement reports match your criteria.</td></tr>
+                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>{t('admin_srv_bswd_empty_reports')}</td></tr>
               ) : (
                 paginatedData.map(r => {
                   const hasPhoto = r.photoFileName && r.photoFileName !== "None" && r.photoFileName !== "";
@@ -365,17 +369,17 @@ export default function ServiceBswd({ onBack }) {
                       style={{ cursor: "pointer", textAlign: "center" }}
                     >
                       <td style={{ color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(r.submittedAt)}</td>
-                      <td style={{ fontWeight: 500 }}>{r.reporterName || "Anonymous"}</td>
+                      <td style={{ fontWeight: 500 }}>{r.reporterName || t('admin_srv_bswd_anon')}</td>
                       <td style={{ color: "#111827", maxWidth: "150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.location || "—"}</td>
                       <td style={{ color: "#4b5563", maxWidth: "220px" }}>
                         <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.description || "—"}</div>
                         {hasPhoto && (
                           <span style={{ fontSize: "0.75rem", color: "#317D89", background: "#e0f2fe", padding: "2px 8px", borderRadius: "12px", marginTop: "4px", display: "inline-block", fontWeight: 500 }}>
-                            📸 Photo Attached
+                            {t('admin_srv_bswd_photo_badge')}
                           </span>
                         )}
                       </td>
-                      <td><StatusBadge status={r.status} /></td>
+                      <td><StatusBadge status={r.status} t={t} /></td>
                       <td style={{ textAlign: "center" }}>
                         <button 
                           className="btn-view"
@@ -385,7 +389,7 @@ export default function ServiceBswd({ onBack }) {
                             setSelectedItem(r);
                           }}
                         >
-                          More Details
+                          {t('admin_srv_bswd_btn_details')}
                         </button>
                       </td>
                     </tr>
@@ -442,38 +446,38 @@ export default function ServiceBswd({ onBack }) {
           <table className="req-table" style={{ width: "100%", minWidth: "750px" }}>
             <thead>
               <tr style={{ textAlign: 'center' }}>
-                {["Date", "Reporter Name", "Subject", "Tip Info", "Status", "Action"].map(h => (
+                {[t('admin_srv_bswd_th_date'), t('admin_srv_bswd_th_reporter'), t('admin_srv_bswd_th_subject'), t('admin_srv_bswd_th_tip_info'), t('admin_srv_bswd_th_status'), t('admin_srv_bswd_th_action')].map(h => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {currentData.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No community tips match your criteria.</td></tr>
+                <tr><td colSpan={6} style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>{t('admin_srv_bswd_empty_tips')}</td></tr>
               ) : (
-                paginatedData.map(t => (
+                paginatedData.map(tData => (
                   <tr 
-                    key={t.id} 
-                    onClick={() => setSelectedItem(t)} 
+                    key={tData.id} 
+                    onClick={() => setSelectedItem(tData)} 
                     style={{ cursor: "pointer", textAlign: "center" }}
                   >
-                    <td style={{ color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(t.submittedAt)}</td>
-                    <td style={{ fontWeight: 500 }}>{t.contact || "Anonymous"}</td>
-                    <td style={{ color: "#111827" }}>{t.about || "—"}</td>
+                    <td style={{ color: "#6b7280", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatTs(tData.submittedAt)}</td>
+                    <td style={{ fontWeight: 500 }}>{tData.contact || t('admin_srv_bswd_anon')}</td>
+                    <td style={{ color: "#111827" }}>{tData.about || "—"}</td>
                     <td style={{ color: "#4b5563", maxWidth: "260px" }}>
-                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.tip || "—"}</div>
+                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tData.tip || "—"}</div>
                     </td>
-                    <td><StatusBadge status={t.status} /></td>
+                    <td><StatusBadge status={tData.status} t={t} /></td>
                     <td style={{ textAlign: "center" }}>
                       <button 
                         className="btn-view"
                         style={{ padding: "6px 14px", fontSize: "0.82rem" }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedItem(t);
+                          setSelectedItem(tData);
                         }}
                       >
-                        More Details
+                        {t('admin_srv_bswd_btn_details')}
                       </button>
                     </td>
                   </tr>
@@ -525,8 +529,8 @@ export default function ServiceBswd({ onBack }) {
 
       {/* ── DETAIL MODAL POPUP ── */}
       {selectedItem && (() => {
-        const reporterName = selectedItem.reporterName || selectedItem.contact || "Anonymous";
-        const isAnonymous = reporterName.trim().toLowerCase() === "anonymous";
+        const reporterName = selectedItem.reporterName || selectedItem.contact || t('admin_srv_bswd_anon');
+        const isAnonymous = reporterName.trim().toLowerCase() === "anonymous" || reporterName.trim().toLowerCase() === t('admin_srv_bswd_anon').toLowerCase();
 
         return (
           <div 
@@ -538,21 +542,20 @@ export default function ServiceBswd({ onBack }) {
               style={{ maxWidth: "600px" }}
               onClick={e => e.stopPropagation()}
             >
-              {/* Header is neutral/gray (#f9fafb), NOT blue */}
-              <div style={{ padding: "18px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
-                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700, color: "#111827" }}>
-                  {selectedItem.type === "tip" ? "Community Tip Details" : "Displacement Report Details"}
+              <div className="as-modal-header">
+                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
+                  {selectedItem.type === "tip" ? t('admin_srv_bswd_modal_tip_title') : t('admin_srv_bswd_modal_rep_title')}
                 </h2>
                 <button 
+                  className="as-modal-close"
                   onClick={() => setSelectedItem(null)}
-                  style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
                 >&times;</button>
               </div>
 
               <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
                   <div>
-                    <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Reported By</div>
+                    <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>{t('admin_srv_bswd_modal_reported_by')}</div>
                     
                     <div style={{ fontSize: "1.1rem", fontWeight: 500, color: "#111827", marginTop: "4px" }}>
                       {reporterName}
@@ -560,37 +563,37 @@ export default function ServiceBswd({ onBack }) {
                     
                     {!isAnonymous && selectedItem.UID && (
                       <div style={{ fontSize: "0.85rem", color: "#317D89", marginTop: "2px", fontWeight: 600 }}>
-                        UID: {selectedItem.UID}
+                        {t('admin_srv_bswd_modal_uid')} {selectedItem.UID}
                       </div>
                     )}
                     
-                    <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>Date: {formatTs(selectedItem.submittedAt)}</div>
+                    <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "2px" }}>{t('admin_srv_bswd_modal_date')} {formatTs(selectedItem.submittedAt)}</div>
                   </div>
-                  <StatusBadge status={selectedItem.status} />
+                  <StatusBadge status={selectedItem.status} t={t} />
                 </div>
 
                 <div style={{ marginBottom: "20px", background: "#f3f4f6", padding: "16px", borderRadius: "8px" }}>
                   <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "8px" }}>
-                    {selectedItem.type === "tip" ? "Subject / About" : "Location"}
+                    {selectedItem.type === "tip" ? t('admin_srv_bswd_modal_subject') : t('admin_srv_bswd_modal_loc_label')}
                   </div>
                   <div style={{ color: "#111827", fontWeight: 500, fontSize: "1.05rem" }}>
-                    {selectedItem.location || selectedItem.about || "Not specified"}
+                    {selectedItem.location || selectedItem.about || t('admin_srv_bswd_modal_not_spec')}
                   </div>
                 </div>
 
                 <div style={{ marginBottom: "24px" }}>
                   <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "8px" }}>
-                    Description / Information
+                    {t('admin_srv_bswd_modal_desc_label')}
                   </div>
                   <p style={{ margin: 0, color: "#374151", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                    {selectedItem.description || selectedItem.tip || "No description provided."}
+                    {selectedItem.description || selectedItem.tip || t('admin_srv_bswd_modal_no_desc')}
                   </p>
                 </div>
 
                 {selectedItem.photoFileName && selectedItem.photoFileName.startsWith('http') && (
                   <div>
                     <div style={{ fontSize: "0.8rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginBottom: "12px" }}>
-                      Attached Evidence
+                      {t('admin_srv_bswd_modal_evidence')}
                     </div>
                     <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#f9fafb", padding: "4px" }}>
                       <img 
@@ -605,17 +608,17 @@ export default function ServiceBswd({ onBack }) {
 
               <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>Update Status:</span>
+                  <span style={{ fontSize: "0.85rem", color: "#6b7280", fontWeight: 500 }}>{t('admin_srv_bswd_modal_update')}</span>
                   <select
                     value={selectedItem.status || "pending"}
                     onChange={(e) => updateStatus(selectedItem.id, e.target.value)}
                     disabled={saving}
                     style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", cursor: "pointer", background: "#fff", fontWeight: 500 }}
                   >
-                    <option value="pending">Pending</option>
-                    <option value="received">Received</option>
-                    <option value="responded">Responded</option>
-                    <option value="resolved">Resolved</option>
+                    <option value="pending">{t('admin_srv_bswd_stat_pending')}</option>
+                    <option value="received">{t('admin_srv_bswd_filter_received')}</option>
+                    <option value="responded">{t('admin_srv_bswd_stat_responded')}</option>
+                    <option value="resolved">{t('admin_srv_bswd_stat_resolved')}</option>
                   </select>
                 </div>
               </div>

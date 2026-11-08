@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { collection, query, where, onSnapshot, collectionGroup, orderBy, limit } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import FeedbackModal from "./FeedbackModal";
-import { AlertCircleIcon } from "../Icons";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function FeedbackAlerts({ householdID, residentID, onNavigate }) {
@@ -10,20 +9,6 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
   const [pendingItems, setPendingItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // ADDED FOR 480px RESPONSIVE
-  const [isMobile480, setIsMobile480] = useState(window.innerWidth <= 480);
-
-  // ADDED FOR 480px RESPONSIVE
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile480(window.innerWidth <= 480);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   useEffect(() => {
     if (!householdID || !residentID) return;
@@ -70,7 +55,7 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       where("householdID", "==", householdID),
       where("residentID", "==", residentID),
       where("status", "==", "Completed"),
-      limit(10) 
+      limit(10)
     );
 
     const qInc = query(
@@ -91,11 +76,9 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
       limit(10)
     );
 
-    // Added eqData to the arrays
     let docsData = [], resData = [], eqData = [], progData = [], genProgData = [], incData = [], bswdData = [];
 
     const updatePending = () => {
-      // Include eqData in the combined array
       const combined = [...docsData, ...resData, ...eqData, ...progData, ...genProgData, ...incData, ...bswdData];
 
       const requiresFeedback = combined.filter(item => item.feedbackSubmitted !== true);
@@ -153,7 +136,7 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
     return () => {
       unsubDocs();
       unsubRes();
-      unsubEq(); // 👇 Clean up the equipment listener
+      unsubEq();
       unsubProg();
       unsubGenProg();
       unsubInc();
@@ -169,11 +152,10 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
 
   const handleAnswer = () => {
     setIsModalOpen(false);
-    console.log("Redirecting to survey for:", selectedItem);
 
     const safeTitle = selectedItem?.title || "Barangay Service";
 
-    // encodeURIComponent safely handles the slashes in the document path we passed!
+    // encodeURIComponent safely handles the slashes in the document path
     const queryParams = `?refId=${encodeURIComponent(selectedItem.id)}&type=${selectedItem._type}&title=${encodeURIComponent(safeTitle)}`;
     window.history.pushState({}, '', queryParams);
 
@@ -198,62 +180,40 @@ export default function FeedbackAlerts({ householdID, residentID, onNavigate }) 
 
   return (
     <>
-      <div style={{ marginBottom: "20px" }}>
-        <div
-          onClick={handleOpenModal}
-          style={{
-            display: isMobile480 ? "block" : "flex",
-            alignItems: isMobile480 ? "unset" : "center",
-            justifyContent: isMobile480 ? "unset" : "space-between",
-            gap: isMobile480 ? "0" : "12px",
-            backgroundColor: "#fffbeb",
-            borderLeft: "4px solid #f59e0b",
-            padding: "12px 16px",
-            borderRadius: "8px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            cursor: "pointer",
-            transition: "transform 0.1s ease-in-out",
-
-            // RESPONSIVE FOR 480px
-            textAlign: isMobile480 ? "center" : "left"
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.01)"}
-          onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-        >
-          <div style={{ flex: isMobile480 ? "unset" : 1, marginBottom: isMobile480 ? "10px" : "0" }}>
-            <h4 style={{ margin: 0, fontSize: "0.9rem", color: "#92400e", fontFamily: "'Poppins', sans-serif" }}>
-              {count > 1 ? t('feedback_action_pending', count) : t('feedback_action_needed', 'Action Required: Feedback Needed')}
-            </h4>
-
-            <p style={{ margin: 0, fontSize: "0.8rem", color: "#b45309", fontFamily: "'Poppins', sans-serif" }}>
-              {count > 1
-                ? <>{t('feedback_review_queue_prefix', 'Please review your recently completed ')}<strong>{formatItemTitle(firstItem)}</strong>{t('feedback_review_queue_suffix', ' to continue clearing your queue.')}</>
-                : <>{t('feedback_provide_prefix', 'Please provide feedback for your recently completed ')}<strong>{formatItemTitle(firstItem)}</strong>{t('feedback_provide_suffix', '.')}</>
-              }
-            </p>
-          </div>
-
-          <button
-            style={{
-              backgroundColor: "#f59e0b",
-              color: "#fff",
-              border: "none",
-              padding: "6px 14px",
-              borderRadius: "6px",
-              fontSize: "0.75rem",
-              fontWeight: "bold",
-              cursor: "pointer",
-              fontFamily: "'Poppins', sans-serif",
-              whiteSpace: "nowrap",
-
-              // RESPONSIVE FOR 480px
-              display: "block",
-              margin: isMobile480 ? "10px auto 0 auto" : "0"
-            }}
-          >
-            {t('feedback_review_now_btn', 'Review Now')}
-          </button>
+      {/* Layout and phone styles live in the Dashboard CSS (.db-banner) */}
+      <div
+        className="db-banner db-banner--amber db-banner--clickable"
+        role="button"
+        tabIndex={0}
+        onClick={handleOpenModal}
+        onKeyDown={(e) => e.key === "Enter" && handleOpenModal()}
+      >
+        <div className="db-banner__icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
         </div>
+
+        <div className="db-banner__body">
+          <h4 className="db-banner__title">
+            {count > 1 ? t('feedback_action_pending', count) : t('feedback_action_needed', 'Action Required: Feedback Needed')}
+          </h4>
+
+          <p className="db-banner__text">
+            {count > 1
+              ? <>{t('feedback_review_queue_prefix', 'Please review your recently completed ')}<strong>{formatItemTitle(firstItem)}</strong>{t('feedback_review_queue_suffix', ' to continue clearing your queue.')}</>
+              : <>{t('feedback_provide_prefix', 'Please provide feedback for your recently completed ')}<strong>{formatItemTitle(firstItem)}</strong>{t('feedback_provide_suffix', '.')}</>
+            }
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="db-banner__btn"
+          onClick={(e) => { e.stopPropagation(); handleOpenModal(); }}
+        >
+          {t('feedback_review_now_btn', 'Review Now')}
+        </button>
       </div>
 
       <FeedbackModal

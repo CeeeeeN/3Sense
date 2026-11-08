@@ -11,11 +11,13 @@ import {
 } from "../../services/announcements";
 import EmailBlastModal from "../../components/EmailBlastModal";
 import { buildAnnouncementEmail } from "../../utils/emailTemplates";
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- Added React Query
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const PREVIEW_LIMIT = 120;
 
-function DescriptionPreview({ text }) {
+function DescriptionPreview({ text, t }) {
   const [expanded, setExpanded] = React.useState(false);
   if (!text) return null;
   const isLong = text.length > PREVIEW_LIMIT;
@@ -39,11 +41,13 @@ function DescriptionPreview({ text }) {
 }
 
 export default function ManageAnnouncements() {
-  const queryClient = useQueryClient(); // <-- For invalidating cache after edits
+  const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm, showAlert } = useAlert();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
-  const [sortOrder, setSortOrder] = useState("date_desc"); // date_desc, date_asc, title_asc, title_desc
+  const [sortOrder, setSortOrder] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -67,7 +71,6 @@ export default function ManageAnnouncements() {
     time: ""
   });
 
-  // ─── OPTIMIZED: Fetch Admin Profile from Cache ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -82,7 +85,6 @@ export default function ManageAnnouncements() {
     return () => unsubscribe();
   }, []);
 
-  // ─── OPTIMIZED: React Query instead of onSnapshot listener ───
   const { data: announcements = [], isLoading } = useQuery({
     queryKey: ['adminManage_announcements'],
     queryFn: async () => {
@@ -102,7 +104,7 @@ export default function ManageAnnouncements() {
         };
       });
     },
-    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 
   useEffect(() => {
@@ -137,28 +139,32 @@ export default function ManageAnnouncements() {
     setShowEmailBlast(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this announcement?")) {
-      try {
-        await deleteAnnouncement(id);
-        logTransaction(
-          adminName,
-          adminRole,
-          "DELETED_ANNOUNCEMENT",
-          `Deleted announcement with ID: ${id}`,
-        );
-        // Refresh cache
-        queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
-      } catch (error) {
-        console.error("Error deleting announcement:", error);
-        alert("Failed to delete announcement.");
-        logTransaction(
-          adminName,
-          adminRole,
-          "ERROR_DELETING_ANNOUNCEMENT",
-          `Error deleting announcement with ID: ${id}\n${error.message}`,
-        );
-      }
+  const handleDelete = async (id, annTitle) => {
+    const isConfirmed = await showConfirm(
+      "Confirm Deletion",
+      `${t('admin_ann_confirm_delete')}\n\n"${annTitle}"`
+    );
+    if (!isConfirmed) return;
+
+    try {
+      await deleteAnnouncement(id);
+      logTransaction(
+        adminName,
+        adminRole,
+        "DELETED_ANNOUNCEMENT",
+        `Deleted announcement with ID: ${id}`
+      );
+      queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
+      await showAlert("Success", "Announcement deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting announcement:", error);
+      await showAlert("Error", t('admin_ann_delete_failed'));
+      logTransaction(
+        adminName,
+        adminRole,
+        "ERROR_DELETING_ANNOUNCEMENT",
+        `Error deleting announcement with ID: ${id}\n${error.message}`
+      );
     }
   };
 
@@ -169,7 +175,7 @@ export default function ManageAnnouncements() {
     if (newAnnouncement.time) {
       const selected = new Date(newAnnouncement.time);
       if (selected < new Date()) {
-        setDateError("Date cannot be in the past.");
+        setDateError(t('admin_ann_modal_err_past'));
         return;
       }
     }
@@ -197,8 +203,7 @@ export default function ManageAnnouncements() {
           `Added new announcement: ${newAnnouncement.title}`,
         );
       }
-      
-      // Refresh cache so the new/edited item appears immediately
+
       queryClient.invalidateQueries({ queryKey: ['adminManage_announcements'] });
 
       setNewAnnouncement({
@@ -208,7 +213,7 @@ export default function ManageAnnouncements() {
       setShowAddModal(false);
     } catch (error) {
       console.error("Error saving announcement:", error);
-      alert("Failed to save announcement.");
+      alert(t('admin_ann_save_failed'));
       logTransaction(
         adminName,
         adminRole,
@@ -288,18 +293,18 @@ export default function ManageAnnouncements() {
   };
 
   if (isLoading) {
-    return <div style={{ padding: "40px", textAlign: "center" }}>Loading Announcements...</div>;
+    return <div style={{ padding: "40px", textAlign: "center" }}>{t('admin_ann_loading')}</div>;
   }
 
   return (
     <div className="as-container" style={{ padding: 0 }}>
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Announcements</h1>
-          <p className="as-subtitle">Create and manage barangay announcements and notifications</p>
+          <h1>{t('admin_ann_title')}</h1>
+          <p className="as-subtitle">{t('admin_ann_subtitle')}</p>
         </div>
         <button className="as-btn-aqua" onClick={openAddModal}>
-          <IconAdd /> Create Announcement
+          <IconAdd /> {t('admin_ann_btn_add')}
         </button>
       </div>
 
@@ -307,7 +312,7 @@ export default function ManageAnnouncements() {
       <div className="as-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <div className="as-search-box" style={{ flex: 1, minWidth: "260px" }}>
           <svg width="20" height="20" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          <input type="text" placeholder="Search announcements..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
+          <input type="text" placeholder={t('admin_ann_search_placeholder')} value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
         </div>
 
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -316,7 +321,7 @@ export default function ManageAnnouncements() {
             onChange={(e) => setFilterCategory(e.target.value)}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
           >
-            <option value="All">All Audiences</option>
+            <option value="All">{t('admin_ann_filter_audience_all')}</option>
             <option value="All Residents">All Residents</option>
             <option value="Student">Student</option>
             <option value="Senior Citizen">Senior Citizen</option>
@@ -332,81 +337,142 @@ export default function ManageAnnouncements() {
             onChange={(e) => setSortOrder(e.target.value)}
             style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "0.85rem", background: "#fff", cursor: "pointer" }}
           >
-            <option value="date_desc">Posted: Newest First</option>
-            <option value="date_asc">Posted: Oldest First</option>
-            <option value="title_asc">Title: A to Z</option>
-            <option value="title_desc">Title: Z to A</option>
+            <option value="date_desc">{t('admin_ann_sort_date_new')}</option>
+            <option value="date_asc">{t('admin_ann_sort_date_old')}</option>
+            <option value="title_asc">{t('admin_ann_sort_title_asc')}</option>
+            <option value="title_desc">{t('admin_ann_sort_title_desc')}</option>
           </select>
         </div>
       </div>
 
       <div className="as-card-grid">
         {filteredAnnouncements.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280', gridColumn: '1 / -1' }}>No announcements found.</div>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280', gridColumn: '1 / -1' }}>
+            {t('admin_ann_empty')}
+          </div>
         ) : paginatedAnnouncements.map((ann) => (
           <div className="as-card" key={ann.id}>
             <div className="as-card-header">
               <h2 className="as-card-title">{ann.title}</h2>
-              <span className="as-badge open" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>{ann.announcementCategory}</span>
+              <span
+                className="as-badge"
+                style={{
+                  backgroundColor: "#ede9fe",
+                  color: "#6d28d9",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  padding: "3px 10px",
+                  borderRadius: "12px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {ann.announcementCategory || "General"}
+              </span>
             </div>
-            <DescriptionPreview text={ann.description} />
-            <ul className="as-card-details">
-              <li><Manage_IconLocation /> {ann.location || "TBA"}</li>
-              {ann.time && <li><strong>Time:</strong> {new Date(ann.time).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</li>}
-              <li><strong>Target Audience:</strong> {ann.category}</li>
-              <li><strong>Date Posted:</strong> {ann.date}</li>
-              <li><strong>Posted By:</strong> {ann.postedBy}</li>
+
+            <DescriptionPreview text={ann.description} t={t} />
+
+            <ul className="as-card-details" style={{ marginTop: "12px" }}>
+              <li>
+                <strong>{t('admin_card_lbl_location')}</strong>
+                <span style={{ textAlign: "right", maxWidth: "65%", wordBreak: "break-word" }}>
+                  {ann.location || t('admin_ann_card_tba')}
+                </span>
+              </li>
+              {ann.time && (
+                <li>
+                  <strong>{t('admin_card_lbl_time')}</strong>
+                  <span style={{ textAlign: "right", maxWidth: "65%" }}>
+                    {new Date(ann.time).toLocaleString(t('app_name') ? (t('admin_ann_title') === 'Mga Anunsyo' ? 'fil-PH' : 'en-US') : 'en-US', {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </span>
+                </li>
+              )}
+              <li>
+                <strong>{t('admin_ann_card_audience')}</strong>
+                <span style={{ textAlign: "right" }}>{ann.category}</span>
+              </li>
+              <li>
+                <strong>{t('admin_ann_card_date_posted')}</strong>
+                <span>{ann.date || "—"}</span>
+              </li>
+              <li>
+                <strong>{t('admin_ann_card_posted_by')}</strong>
+                <span style={{ textAlign: "right", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={ann.postedBy || "Admin"}>
+                  {ann.postedBy || "Admin"}
+                </span>
+              </li>
             </ul>
-            <div className="as-card-footer" style={{ gap: '8px', display: 'flex' }}>
-              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1 }} onClick={() => handleEdit(ann)}>Edit</button>
+
+            <div className="as-card-footer" style={{ gap: "8px", display: "flex" }}>
+              <button className="as-btn-ghost" style={{ padding: "8px 12px", flex: 1 }} onClick={() => handleEdit(ann)}>
+                {t('admin_ann_btn_edit')}
+              </button>
               <button
                 className="as-btn-ghost"
-                style={{ padding: '8px 12px', flex: 1, color: '#0369a1', borderColor: '#bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                style={{ padding: "8px 12px", flex: 1, color: "#0369a1", borderColor: "#bae6fd" }}
                 onClick={() => handleEmailBlast(ann)}
-                title="Send email notification to eligible residents"
+                title={t('admin_ann_btn_email_title')}
               >
-                Email
+                {t('admin_ann_btn_email')}
               </button>
-              <button className="as-btn-ghost" style={{ padding: '8px 12px', flex: 1, color: 'red', borderColor: '#fca5a5' }} onClick={() => handleDelete(ann.id)}>Delete</button>
+              <button
+                className="as-btn-ghost"
+                style={{ padding: "8px 12px", flex: 1, color: "#dc2626", borderColor: "#fca5a5" }}
+                onClick={() => handleDelete(ann.id, ann.title)}
+              >
+                {t('admin_ann_btn_delete')}
+              </button>
             </div>
           </div>
         ))}
       </div>
-
+      
       {totalPages > 1 && (
         <div className="af-pagination" style={{ display: "flex", justifyContent: "center", gap: "8px", padding: "16px" }}>
           <button
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: "not-allowed" }}
+            style={{
+              opacity: currentPage === 1 ? 0.5 : 1,
+              cursor: currentPage === 1 ? "not-allowed" : "pointer"
+            }}
           >
-            Previous
+            {t('admin_ann_page_prev')}
           </button>
           {renderPageNumbers()}
           <button
             className="af-page-btn"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: "not-allowed" }}
+            style={{
+              opacity: currentPage === totalPages ? 0.5 : 1,
+              cursor: currentPage === totalPages ? "not-allowed" : "pointer"
+            }}
           >
-            Next
+            {t('admin_ann_page_next')}
           </button>
         </div>
       )}
 
       {showAddModal && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: '600px' }}>
+        <div className="as-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="as-modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>{editingAnnId ? "Edit Announcement" : "Create Announcement"}</h2>
+              <h2>{editingAnnId ? t('admin_ann_modal_edit_title') : t('admin_ann_modal_add_title')}</h2>
               <button className="as-modal-close" onClick={() => setShowAddModal(false)}>&times;</button>
             </div>
 
             <div className="as-modal-body" style={{ alignItems: 'stretch' }}>
               <form className="as-form" onSubmit={handleAddAnnouncement}>
                 <div className="as-form-group">
-                  <label className="as-form-label">Title</label>
+                  <label className="as-form-label">{t('admin_ann_modal_title_label')}</label>
                   <input type="text" className="as-form-input" required
                     value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
                   />
@@ -414,7 +480,7 @@ export default function ManageAnnouncements() {
 
                 <div className="as-form-row">
                   <div className="as-form-group">
-                    <label className="as-form-label">Category (Target Audience)</label>
+                    <label className="as-form-label">{t('admin_ann_modal_category_label')}</label>
                     <select className="as-form-select" required
                       value={newAnnouncement.category} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, category: e.target.value })}
                     >
@@ -429,7 +495,7 @@ export default function ManageAnnouncements() {
                     </select>
                   </div>
                   <div className="as-form-group">
-                    <label className="as-form-label">Announcement Category</label>
+                    <label className="as-form-label">{t('admin_ann_modal_ann_category')}</label>
                     <select className="as-form-select" required
                       value={newAnnouncement.announcementCategory} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, announcementCategory: e.target.value })}
                     >
@@ -445,7 +511,7 @@ export default function ManageAnnouncements() {
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Description</label>
+                  <label className="as-form-label">{t('admin_ann_modal_desc')}</label>
                   <textarea className="as-form-textarea" required
                     value={newAnnouncement.description} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, description: e.target.value })}
                     style={{ minHeight: '100px' }}
@@ -453,10 +519,10 @@ export default function ManageAnnouncements() {
                 </div>
 
                 <div className="as-form-group">
-                  <label className="as-form-label">Requirements (List)</label>
+                  <label className="as-form-label">{t('admin_ann_modal_req_list')}</label>
                   {Array.isArray(newAnnouncement.requirements) && newAnnouncement.requirements.map((req, i) => (
                     <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
-                      <input type="text" className="as-form-input" placeholder="e.g. Valid ID"
+                      <input type="text" className="as-form-input" placeholder={t('admin_ann_modal_req_ph')}
                         value={req} onChange={(e) => handleReqChange(i, e.target.value)}
                       />
                       {newAnnouncement.requirements.length > 1 && (
@@ -467,19 +533,19 @@ export default function ManageAnnouncements() {
                   ))}
                   <button type="button" className="as-btn-ghost" onClick={addReqField}
                     style={{ width: "fit-content", padding: "5px 10px", fontSize: "0.9rem" }}>
-                    + Add Requirement
+                    {t('admin_ann_modal_req_add')}
                   </button>
                 </div>
 
                 <div className="as-form-row">
                   <div className="as-form-group">
-                    <label className="as-form-label">Location (Optional)</label>
-                    <input type="text" className="as-form-input" placeholder="e.g., Barangay Hall"
+                    <label className="as-form-label">{t('admin_ann_modal_location')}</label>
+                    <input type="text" className="as-form-input" placeholder={t('admin_ann_modal_location_ph')}
                       value={newAnnouncement.location} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, location: e.target.value })}
                     />
                   </div>
                   <div className="as-form-group">
-                    <label className="as-form-label">Date &amp; Time (Optional)</label>
+                    <label className="as-form-label">{t('admin_ann_modal_datetime')}</label>
                     <input
                       type="datetime-local"
                       className="as-form-input"
@@ -499,9 +565,9 @@ export default function ManageAnnouncements() {
                 </div>
 
                 <div className="as-modal-actions">
-                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Cancel</button>
+                  <button type="button" className="as-btn-ghost" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>{t('admin_ann_modal_btn_cancel')}</button>
                   <button type="submit" className="as-btn-aqua" disabled={isSubmitting}>
-                    {isSubmitting ? "Saving..." : (editingAnnId ? "Update Announcement" : "Post Announcement")}
+                    {isSubmitting ? t('admin_ann_modal_btn_saving') : (editingAnnId ? t('admin_ann_modal_btn_update') : t('admin_ann_modal_btn_save'))}
                   </button>
                 </div>
               </form>

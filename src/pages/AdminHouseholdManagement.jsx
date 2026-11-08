@@ -16,25 +16,29 @@ import {
   getDocs,
   orderBy,
   limit,
-  where // <-- Ensure where is imported
+  where
 } from "firebase/firestore";
 import { approveRegistration, generateResidentUID } from "../services/admin";
 import { createUserNotification } from "../services/userNotifications";
 import { Search } from "lucide-react";
 import { formatDisplayEmail } from "../utils/maskEmail";
 import { getFamilyNumber } from "../utils/householdNumbers";
-import { useAlert } from "../context/AlertContext"; 
-import { useQuery, useQueryClient } from "@tanstack/react-query"; 
+import { useAlert } from "../context/AlertContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import TransferRequestsTab from "../components/TransferRequestsTab"; 
-import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab"; 
+import TransferRequestsTab from "../components/TransferRequestsTab";
+import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab";
 
 import { Plus } from "lucide-react";
 import AdminAddHouseholdPanel from "../components/AdminAddHouseholdPanel";
 
+// NEW: Import Language Hook
+import { useLanguage } from '../context/LanguageContext';
+
 export default function HouseholdManagement() {
-  const queryClient = useQueryClient(); 
-  const { showAlert, showConfirm } = useAlert(); 
+  const queryClient = useQueryClient();
+  const { showAlert, showConfirm } = useAlert();
+  const { t } = useLanguage(); // NEW: Destructure hook
 
   const [showAddPanel, setShowAddPanel] = useState(false);
 
@@ -63,11 +67,14 @@ export default function HouseholdManagement() {
   const [showHhViewModal, setShowHhViewModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
+  const [showHhRejectModal, setShowHhRejectModal] = useState(false);
+  const [hhRejectTarget, setHhRejectTarget] = useState(null);
+  const [isRejecting, setIsRejecting] = useState(false);
+
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
   const [adminProfile, setAdminProfile] = useState({ fullName: "Admin", position: "" });
 
-  // ─── 1. OPTIMIZED: Zero-Read Admin Verification ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -86,7 +93,6 @@ export default function HouseholdManagement() {
     return () => unsubscribe();
   }, []);
 
-  // ─── 2. LAZY LOADED: Pending Registrations ───
   const { data: hhRequests = [], isLoading: loadingRequests } = useQuery({
     queryKey: ['adminManage_hhRequests'],
     queryFn: async () => {
@@ -112,15 +118,13 @@ export default function HouseholdManagement() {
         };
       });
     },
-    enabled: activeTab === "requests", 
+    enabled: activeTab === "requests",
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
 
-  // ─── 3. LAZY LOADED & SERVER-FILTERED: Active Residents & Unactivated Households ───
   const { data: residents = [], isLoading: loadingResidents } = useQuery({
     queryKey: ['adminManage_residents'],
     queryFn: async () => {
-      // OPTIMIZATION: Use where("activated", "==", false) so we only fetch exactly what we need
       const [resSnap, unactivatedHhSnap] = await Promise.all([
         getDocs(query(collectionGroup(db, "residents"), limit(300))),
         getDocs(query(collection(db, "households"), where("activated", "==", false), limit(100)))
@@ -178,7 +182,6 @@ export default function HouseholdManagement() {
         }
       });
 
-      // Deduplicate
       const seen = new Set();
       const dedupedRes = resDocs.filter(r => {
         const key = `${r.householdId}__${r.id}`;
@@ -190,10 +193,9 @@ export default function HouseholdManagement() {
       return [...dedupedRes, ...unactDocs];
     },
     enabled: activeTab === "residents",
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 
-  // ─── 4. LAZY LOADED: Household Transfers & New Households ───
   const { data: allTransfers = [] } = useQuery({
     queryKey: ['adminManage_transfers'],
     queryFn: async () => {
@@ -219,7 +221,6 @@ export default function HouseholdManagement() {
   const transfers = useMemo(() => allTransfers.filter(t => t.transferType === "existing"), [allTransfers]);
   const newHouseholds = useMemo(() => allTransfers.filter(t => t.transferType === "new"), [allTransfers]);
 
-  // ─── Filter Logic ───
   const filteredHhRequests = useMemo(() => {
     return hhRequests
       .filter((req) => {
@@ -250,7 +251,6 @@ export default function HouseholdManagement() {
   }, [searchHhRequest, filterHhStatus, sortHhRequest, hhRowsPerPage]);
 
   const filteredResidents = useMemo(() => {
-    // Re-dedupe just in case
     const seenKeys = new Set();
     const unique = residents.filter(r => {
       const key = `${r.householdId}__${r.id}`;
@@ -321,11 +321,10 @@ export default function HouseholdManagement() {
     ));
   };
 
-  // ─── 5. OPTIMIZED: Zero-Read Local Mutations ───
   const handleHhApprove = async (req) => {
     const isConfirmed = await showConfirm(
-      "Approve Resident Registration",
-      "Approving will create a Household ID and email the resident. They will appear in the Account Management tab."
+      t('admin_hm_confirm_app_title'),
+      t('admin_hm_confirm_app_desc')
     );
 
     if (!isConfirmed) return;
@@ -334,12 +333,10 @@ export default function HouseholdManagement() {
     setIsApproving(true);
     try {
       await approveRegistration(req.id);
-      
-      // Zero-Read Mutation
-      queryClient.setQueryData(['adminManage_hhRequests'], (old = []) => 
+
+      queryClient.setQueryData(['adminManage_hhRequests'], (old = []) =>
         old.map(r => r.id === req.id ? { ...r, status: 'approved' } : r)
       );
-      // Invalidate residents cache so it pulls the new household next time the tab is clicked
       queryClient.invalidateQueries({ queryKey: ['adminManage_residents'] });
 
       logTransaction(
@@ -348,48 +345,60 @@ export default function HouseholdManagement() {
         "Approved Registration",
         `Approved household registration for ${req.fullName} (Household ID: ${req.householdId})`
       );
-      await showAlert("Success", "Registration approved successfully. An email has been sent to the head.");
+
+      setShowHhViewModal(false);
+      setSelectedHhRequest(null);
+
+      await showAlert("Success", t('admin_hm_toast_app_success'));
     } catch (error) {
       console.error("Error approving registration:", error);
-      await showAlert("Error", "Error approving registration: " + error.message);
+      await showAlert("Error", t('admin_hm_toast_app_err') + " " + error.message);
     } finally {
       setIsApproving(false);
     }
   };
 
-  const handleHhReject = async (req) => {
-    const isConfirmed = await showConfirm(
-      "Confirm Rejection",
-      "Are you sure you want to reject this resident registration? This will delete the request permanently."
-    );
+  const handleHhReject = (req) => {
+    setHhRejectTarget(req);
+    setShowHhRejectModal(true);
+  };
 
-    if (!isConfirmed) return;
+  const handleConfirmHhReject = async () => {
+    if (!hhRejectTarget || isRejecting) return;
+    setIsRejecting(true);
 
     try {
-      await deleteDoc(doc(db, "pending_registrations", req.id));
+      await deleteDoc(doc(db, "pending_registrations", hhRejectTarget.id));
 
-      // Zero-Read Mutation
-      queryClient.setQueryData(['adminManage_hhRequests'], (old = []) => 
-        old.filter(r => r.id !== req.id)
+      queryClient.setQueryData(['adminManage_hhRequests'], (old = []) =>
+        old.filter(r => r.id !== hhRejectTarget.id)
       );
 
       logTransaction(
         adminName,
         adminRole,
         "Rejected Registration",
-        `Rejected household registration for ${req.fullName} (Household ID: ${req.householdId})`
+        `Rejected household registration for ${hhRejectTarget.fullName} (Household ID: ${hhRejectTarget.householdId})`
       );
-      await showAlert("Success", "Registration rejected successfully.");
+
+      setShowHhRejectModal(false);
+      setHhRejectTarget(null);
+      setShowHhViewModal(false);
+      setSelectedHhRequest(null);
+
+      await showAlert("Success", t('admin_hm_toast_rej_success'));
     } catch (error) {
       console.error("Error rejecting registration:", error);
-      await showAlert("Error", "Error rejecting registration: " + error.message);
+      await showAlert("Error", t('admin_hm_toast_rej_err') + " " + error.message);
+    } finally {
+      setIsRejecting(false);
     }
   };
 
   const handleDeleteResident = async (res) => {
     const isConfirmed = await showConfirm(
-      "Confirm Deletion",
-      `Are you sure you want to delete the resident ${res.fullName}? This action cannot be undone.`
+      t('admin_hm_confirm_del_title'),
+      `${t('admin_hm_confirm_del_desc')} ${res.fullName}${t('admin_hm_confirm_del_desc2')}`
     );
 
     if (!isConfirmed) return;
@@ -420,15 +429,14 @@ export default function HouseholdManagement() {
         }
       }
 
-      // Zero-Read Mutation
-      queryClient.setQueryData(['adminManage_residents'], (old = []) => 
+      queryClient.setQueryData(['adminManage_residents'], (old = []) =>
         old.filter(r => r.id !== res.id)
       );
 
-      await showAlert("Success", "Resident deleted successfully.");
+      await showAlert("Success", t('admin_hm_toast_del_success'));
     } catch (error) {
       console.error("Error deleting resident:", error);
-      await showAlert("Error", "Error deleting resident: " + error.message);
+      await showAlert("Error", t('admin_hm_toast_del_err') + " " + error.message);
     }
   };
 
@@ -436,7 +444,7 @@ export default function HouseholdManagement() {
     if (!statusData) return;
 
     if (statusData.isPendingActivation) {
-      await showAlert("Action Denied", "Cannot update status of accounts that are pending activation. Wait for the user to activate their profile.");
+      await showAlert("Action Denied", t('admin_hm_toast_stat_denied'));
       return;
     }
 
@@ -467,10 +475,9 @@ export default function HouseholdManagement() {
         : `Your barangay status has been updated to: ${statusData.status}.`;
       await createUserNotification(statusData.householdId, statusData.id, "Status Update", notifMsg, "general");
 
-      // Zero-Read Mutation
-      queryClient.setQueryData(['adminManage_residents'], (old = []) => 
-        old.map(r => r.id === statusData.id ? { 
-          ...r, 
+      queryClient.setQueryData(['adminManage_residents'], (old = []) =>
+        old.map(r => r.id === statusData.id ? {
+          ...r,
           status: statusData.status,
           remarks: statusData.remarks,
           incident: statusData.incident,
@@ -490,7 +497,7 @@ export default function HouseholdManagement() {
       setStatusData(null);
     } catch (error) {
       console.error("Error updating resident status:", error);
-      await showAlert("Error", "Failed to update status.");
+      await showAlert("Error", t('admin_hm_toast_stat_err'));
     }
   };
 
@@ -502,14 +509,13 @@ export default function HouseholdManagement() {
       try {
         const newUID = generateResidentUID();
         const residentRef = doc(db, "households", res.householdId, "residents", res.id);
-        
-        await updateDoc(residentRef, { 
+
+        await updateDoc(residentRef, {
           UID: newUID,
-          updatedAt: serverTimestamp() 
+          updatedAt: serverTimestamp()
         });
-        
-        // Zero-Read Mutation
-        queryClient.setQueryData(['adminManage_residents'], (old = []) => 
+
+        queryClient.setQueryData(['adminManage_residents'], (old = []) =>
           old.map(r => r.id === res.id ? { ...r, UID: newUID } : r)
         );
 
@@ -525,18 +531,18 @@ export default function HouseholdManagement() {
       <div className="requests-container">
         <div className="requests-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h1 className="requests-title">Household Management</h1>
-            <p className="requests-subtitle">Manage household registrations, residents, and transfer requests.</p>
+            <h1 className="requests-title">{t('admin_hm_title')}</h1>
+            <p className="requests-subtitle">{t('admin_hm_subtitle')}</p>
           </div>
           <button
             onClick={() => setShowAddPanel(true)}
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', background: '#0f766e', color: 'white', 
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', background: '#0f766e', color: 'white',
               border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600',
               boxShadow: '0 2px 4px rgba(15, 118, 110, 0.2)'
             }}
           >
-            <Plus size={18} /> Add Household
+            <Plus size={18} /> {t('admin_hm_btn_add')}
           </button>
         </div>
 
@@ -545,25 +551,25 @@ export default function HouseholdManagement() {
             className={`req-tab ${activeTab === "requests" ? "active" : ""}`}
             onClick={() => setActiveTab("requests")}
           >
-            Registration Requests
+            {t('admin_hm_tab_requests')}
           </button>
           <button
             className={`req-tab ${activeTab === "residents" ? "active" : ""}`}
             onClick={() => setActiveTab("residents")}
           >
-            Resident Accounts
+            {t('admin_hm_tab_residents')}
           </button>
           <button
             className={`req-tab ${activeTab === "transfers" ? "active" : ""}`}
             onClick={() => setActiveTab("transfers")}
           >
-            Household Transfers
+            {t('admin_hm_tab_transfers')}
           </button>
           <button
             className={`req-tab ${activeTab === "new_households" ? "active" : ""}`}
             onClick={() => setActiveTab("new_households")}
           >
-            New Household Requests
+            {t('admin_hm_tab_new')}
           </button>
         </div>
 
@@ -585,7 +591,7 @@ export default function HouseholdManagement() {
                 />
                 <input
                   type="text"
-                  placeholder="Search resident..."
+                  placeholder={t('admin_hm_search_res_ph')}
                   className="search-input"
                   value={searchHhRequest}
                   onChange={(e) => setSearchHhRequest(e.target.value)}
@@ -608,10 +614,10 @@ export default function HouseholdManagement() {
                   value={filterHhStatus}
                   onChange={(e) => setFilterHhStatus(e.target.value)}
                 >
-                  <option value="All">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
+                  <option value="All">{t('admin_hm_filter_status')}</option>
+                  <option value="pending">{t('admin_hm_filter_pending')}</option>
+                  <option value="approved">{t('admin_hm_filter_approved')}</option>
+                  <option value="rejected">{t('admin_hm_filter_rejected')}</option>
                 </select>
 
                 <select
@@ -619,10 +625,10 @@ export default function HouseholdManagement() {
                   value={sortHhRequest}
                   onChange={(e) => setSortHhRequest(e.target.value)}
                 >
-                  <option value="date_desc">Date: Newest First</option>
-                  <option value="date_asc">Date: Oldest First</option>
-                  <option value="name_asc">Name: A to Z</option>
-                  <option value="name_desc">Name: Z to A</option>
+                  <option value="date_desc">{t('admin_hm_sort_date_new')}</option>
+                  <option value="date_asc">{t('admin_hm_sort_date_old')}</option>
+                  <option value="name_asc">{t('admin_hm_sort_name_asc')}</option>
+                  <option value="name_desc">{t('admin_hm_sort_name_desc')}</option>
                 </select>
               </div>
             </div>
@@ -631,16 +637,16 @@ export default function HouseholdManagement() {
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr style={{ textAlign: "center" }}>
-                    <th>Full Name</th>
-                    <th>Household Number</th>
-                    <th>Family Number</th>
-                    <th>Date Submitted</th>
-                    <th>Action</th>
+                    <th>{t('admin_hm_th_name')}</th>
+                    <th>{t('admin_hm_th_hh_num')}</th>
+                    <th>{t('admin_hm_th_fam_num')}</th>
+                    <th>{t('admin_hm_th_date')}</th>
+                    <th>{t('admin_mgt_th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingRequests ? (
-                     <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>Loading requests...</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>{t('admin_hm_loading_req')}</td></tr>
                   ) : paginatedHhRequests.length > 0 ? (
                     paginatedHhRequests.map((req) => (
                       <tr
@@ -665,13 +671,13 @@ export default function HouseholdManagement() {
                               setShowHhViewModal(true);
                             }}
                           >
-                            More Details
+                            {t('admin_hm_btn_details')}
                           </button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No pending requests found.</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>{t('admin_hm_empty_req')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -689,7 +695,7 @@ export default function HouseholdManagement() {
                 gap: "16px"
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>Rows per page:</span>
+                  <span>{t('admin_mgt_page_rows')}</span>
                   <select
                     value={hhRowsPerPage}
                     onChange={(e) => setHhRowsPerPage(Number(e.target.value))}
@@ -715,7 +721,7 @@ export default function HouseholdManagement() {
                       onClick={() => setHhRequestPage(prev => Math.max(prev - 1, 1))}
                       disabled={hhRequestPage === 1}
                     >
-                      Previous
+                      {t('admin_mgt_page_prev')}
                     </button>
                     {renderPageNumbers(hhRequestPage, totalHhRequestPages, setHhRequestPage)}
                     <button
@@ -723,7 +729,7 @@ export default function HouseholdManagement() {
                       onClick={() => setHhRequestPage(prev => Math.min(prev + 1, totalHhRequestPages))}
                       disabled={hhRequestPage === totalHhRequestPages}
                     >
-                      Next
+                      {t('admin_mgt_page_next')}
                     </button>
                   </div>
                 )}
@@ -756,7 +762,7 @@ export default function HouseholdManagement() {
                 />
                 <input
                   type="text"
-                  placeholder="Search resident..."
+                  placeholder={t('admin_hm_search_res_ph')}
                   className="search-input"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -778,11 +784,11 @@ export default function HouseholdManagement() {
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
-                  <option value="All">All Status</option>
-                  <option value="Clear Case">Clear Case</option>
-                  <option value="Pending Case">Pending Case</option>
-                  <option value="Violation">Violation</option>
-                  <option value="Pending Activation">Pending Activation</option>
+                  <option value="All">{t('admin_hm_filter_status')}</option>
+                  <option value="Clear Case">{t('admin_hm_filter_clear')}</option>
+                  <option value="Pending Case">{t('admin_hm_filter_pending_case')}</option>
+                  <option value="Violation">{t('admin_hm_filter_violation')}</option>
+                  <option value="Pending Activation">{t('admin_hm_filter_activation')}</option>
                 </select>
 
                 <select
@@ -790,10 +796,10 @@ export default function HouseholdManagement() {
                   value={sortResident}
                   onChange={(e) => setSortResident(e.target.value)}
                 >
-                  <option value="name_asc">Name: A to Z</option>
-                  <option value="name_desc">Name: Z to A</option>
-                  <option value="id_asc">Household ID: Ascending</option>
-                  <option value="id_desc">Household ID: Descending</option>
+                  <option value="name_asc">{t('admin_hm_sort_name_asc')}</option>
+                  <option value="name_desc">{t('admin_hm_sort_name_desc')}</option>
+                  <option value="id_asc">{t('admin_hm_sort_id_asc')}</option>
+                  <option value="id_desc">{t('admin_hm_sort_id_desc')}</option>
                 </select>
               </div>
             </div>
@@ -802,16 +808,16 @@ export default function HouseholdManagement() {
               <table className="req-table" style={{ minWidth: "850px" }}>
                 <thead>
                   <tr style={{ textAlign: "center" }}>
-                    <th>Full Name</th>
-                    <th>Household Number</th>
-                    <th>Family Number</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>{t('admin_hm_th_name')}</th>
+                    <th>{t('admin_hm_th_hh_num')}</th>
+                    <th>{t('admin_hm_th_fam_num')}</th>
+                    <th>{t('admin_hm_th_status')}</th>
+                    <th>{t('admin_mgt_th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingResidents ? (
-                     <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>Loading residents...</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>{t('admin_hm_loading_res')}</td></tr>
                   ) : paginatedResidents.length > 0 ? (
                     paginatedResidents.map((res) => (
                       <tr
@@ -830,7 +836,14 @@ export default function HouseholdManagement() {
                             textTransform: 'uppercase',
                             letterSpacing: '0.03em'
                           }}>
-                            {res.status}
+                            {(() => {
+                              const s = res.status.toLowerCase();
+                              if (s === 'clear case') return t('admin_hm_filter_clear');
+                              if (s === 'pending case') return t('admin_hm_filter_pending_case');
+                              if (s === 'violation') return t('admin_hm_filter_violation');
+                              if (s === 'pending activation') return t('admin_hm_filter_activation');
+                              return res.status;
+                            })()}
                           </span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
@@ -842,13 +855,13 @@ export default function HouseholdManagement() {
                               handleViewResident(res);
                             }}
                           >
-                            More Details
+                            {t('admin_hm_btn_details')}
                           </button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>No results found.</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: '#6b7280', padding: "32px" }}>{t('admin_hm_empty_res')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -866,7 +879,7 @@ export default function HouseholdManagement() {
                 gap: "16px"
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>Rows per page:</span>
+                  <span>{t('admin_mgt_page_rows')}</span>
                   <select
                     value={rowsPerPage}
                     onChange={(e) => setRowsPerPage(Number(e.target.value))}
@@ -892,7 +905,7 @@ export default function HouseholdManagement() {
                       onClick={() => setPage(prev => Math.max(prev - 1, 1))}
                       disabled={page === 1}
                     >
-                      Previous
+                      {t('admin_mgt_page_prev')}
                     </button>
                     {renderPageNumbers(page, totalPages, setPage)}
                     <button
@@ -900,7 +913,7 @@ export default function HouseholdManagement() {
                       onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={page === totalPages}
                     >
-                      Next
+                      {t('admin_mgt_page_next')}
                     </button>
                   </div>
                 )}
@@ -923,53 +936,60 @@ export default function HouseholdManagement() {
       </div>
 
       {/* DATA VIEW MODALS */}
-  {showResidentModal && selectedResident && (
-    <div
-      className="as-modal-overlay"
-      onClick={() => {
-        setShowResidentModal(false);
-        setSelectedResident(null);
-      }}
-    >
-    <div
-      className="as-modal-content"
-      style={{ maxWidth: "600px" }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="as-modal-header">
-        <h2>Resident Details</h2>
-        <button
-          className="as-modal-close"
+      {showResidentModal && selectedResident && (
+        <div
+          className="as-modal-overlay"
           onClick={() => {
             setShowResidentModal(false);
             setSelectedResident(null);
           }}
         >
-          &times;
-        </button>
-      </div>
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "600px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="as-modal-header">
+              <h2>{t('admin_hm_modal_res_title')}</h2>
+              <button
+                className="as-modal-close"
+                onClick={() => {
+                  setShowResidentModal(false);
+                  setSelectedResident(null);
+                }}
+              >
+                &times;
+              </button>
+            </div>
 
-      <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
+            <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
               <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
-                  <strong>Barangay UID:</strong> <span style={{ color: "#0d7a55", fontWeight: "bold", letterSpacing: "0.5px" }}>{selectedResident.UID || "Generating..."}</span><br />
-                  <strong>Household Number:</strong> <span>{selectedResident.householdId}</span><br />
-                  <strong>Family Number:</strong> <span>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
+                  <strong>{t('admin_hm_modal_lbl_uid')}</strong> <span style={{ color: "#0d7a55", fontWeight: "bold", letterSpacing: "0.5px" }}>{selectedResident.UID || t('admin_hm_modal_uid_gen')}</span><br />
+                  <strong>{t('admin_hm_modal_lbl_hh')}</strong> <span>{selectedResident.householdId}</span><br />
+                  <strong>{t('admin_hm_modal_lbl_fam')}</strong> <span>{selectedResident.familyNumber || getFamilyNumber(selectedResident.householdId, selectedResident.branchID)}</span><br />
                   <div style={{ marginTop: '8px' }}>
-                    <strong>Status:</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{selectedResident.status}</span>
+                    <strong>{t('admin_hm_modal_lbl_status')}</strong> <span className={`status-badge status-${selectedResident.status.toLowerCase().replace(/\s+/g, "")}`}>{(() => {
+                      const s = selectedResident.status.toLowerCase();
+                      if (s === 'clear case') return t('admin_hm_filter_clear');
+                      if (s === 'pending case') return t('admin_hm_filter_pending_case');
+                      if (s === 'violation') return t('admin_hm_filter_violation');
+                      if (s === 'pending activation') return t('admin_hm_filter_activation');
+                      return selectedResident.status;
+                    })()}</span>
                   </div>
                 </div>
-                <div><strong>Full Name:</strong><br />{selectedResident.fullName}</div>
-                <div><strong>Contact No:</strong><br />{selectedResident.contactNumber || "N/A"}</div>
-                <div><strong>Email:</strong><br />{formatDisplayEmail(selectedResident.email, adminRole)}</div>
-                <div><strong>Birth Date:</strong><br />{selectedResident.birthDate} {selectedResident.age ? `(${selectedResident.age} yrs)` : ""}</div>
-                <div><strong>Birth Place:</strong><br />{selectedResident.birthPlace || "N/A"}</div>
-                <div><strong>Sex:</strong><br />{selectedResident.sex}</div>
-                <div><strong>Civil Status:</strong><br />{selectedResident.civilStatus}</div>
-                <div><strong>Religion:</strong><br />{selectedResident.religion || "N/A"}</div>
-                <div><strong>Citizenship:</strong><br />{selectedResident.citizenship || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_name')}</strong><br />{selectedResident.fullName}</div>
+                <div><strong>{t('admin_hm_modal_lbl_contact')}</strong><br />{selectedResident.contactNumber || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_email')}</strong><br />{formatDisplayEmail(selectedResident.email, adminRole)}</div>
+                <div><strong>{t('admin_hm_modal_lbl_dob')}</strong><br />{selectedResident.birthDate} {selectedResident.age ? `(${selectedResident.age} yrs)` : ""}</div>
+                <div><strong>{t('admin_hm_modal_lbl_bplace')}</strong><br />{selectedResident.birthPlace || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_sex')}</strong><br />{selectedResident.sex}</div>
+                <div><strong>{t('admin_hm_modal_lbl_civil')}</strong><br />{selectedResident.civilStatus}</div>
+                <div><strong>{t('admin_hm_modal_lbl_religion')}</strong><br />{selectedResident.religion || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_citizen')}</strong><br />{selectedResident.citizenship || "N/A"}</div>
                 <div>
-                  <strong>Category:</strong><br />
+                  <strong>{t('admin_hm_modal_lbl_category')}</strong><br />
                   {selectedResident.category && selectedResident.category.length > 0 ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
                       {selectedResident.category.map((c, i) => (
@@ -982,32 +1002,32 @@ export default function HouseholdManagement() {
                     "None"
                   )}
                 </div>
-                <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>Address:</strong><br />{selectedResident.address}</div>
-                {selectedResident.pwdStatus && <div><strong>PWD Status:</strong><br />{selectedResident.pwdStatus}</div>}
-                {selectedResident.disabilityType && <div><strong>Disability Type:</strong><br />{selectedResident.disabilityType}</div>}
+                <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>{t('admin_hm_modal_lbl_address')}</strong><br />{selectedResident.address}</div>
+                {selectedResident.pwdStatus && <div><strong>{t('admin_hm_modal_lbl_pwd')}</strong><br />{selectedResident.pwdStatus}</div>}
+                {selectedResident.disabilityType && <div><strong>{t('admin_hm_modal_lbl_disability')}</strong><br />{selectedResident.disabilityType}</div>}
                 <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', marginTop: '-4px' }}></div>
-                <div><strong>Education:</strong><br />{selectedResident.educationAttainment || selectedResident.education || "N/A"}</div>
-                <div><strong>Ed. Status:</strong><br />{selectedResident.educationStatus || "N/A"}</div>
-                <div><strong>Employment:</strong><br />{selectedResident.employmentStatus || selectedResident.employment || "N/A"}</div>
-                <div><strong>Occupation:</strong><br />{selectedResident.occupation || "N/A"}</div>
-                <div><strong>Total Members:</strong><br />{selectedResident.totalMembers || selectedResident.members || "N/A"}</div>
-                <div><strong>Household Class.:</strong><br />{selectedResident.householdClassification || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_educ')}</strong><br />{selectedResident.educationAttainment || selectedResident.education || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_ed_status')}</strong><br />{selectedResident.educationStatus || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_emp')}</strong><br />{selectedResident.employmentStatus || selectedResident.employment || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_occ')}</strong><br />{selectedResident.occupation || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_members')}</strong><br />{selectedResident.totalMembers || selectedResident.members || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_class')}</strong><br />{selectedResident.householdClassification || "N/A"}</div>
 
                 {(selectedResident.remarks || selectedResident.incident) && (
                   <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', color: '#b91c1c' }}>
-                    {selectedResident.remarks && <div style={{ marginBottom: '8px' }}><strong>Remarks:</strong><br />{selectedResident.remarks}</div>}
-                    {selectedResident.incident && <div><strong>Incident Details:</strong><br />{selectedResident.incident}</div>}
+                    {selectedResident.remarks && <div style={{ marginBottom: '8px' }}><strong>{t('admin_hm_modal_lbl_remarks')}</strong><br />{selectedResident.remarks}</div>}
+                    {selectedResident.incident && <div><strong>{t('admin_hm_modal_lbl_incident')}</strong><br />{selectedResident.incident}</div>}
                   </div>
                 )}
                 {selectedResident.adminLastUpdatedBy && (
                   <div style={{ gridColumn: '1 / -1', color: "#888", marginTop: "8px" }}>
-                    Last updated by <strong>{selectedResident.adminLastUpdatedBy}</strong>
+                    {t('admin_hm_modal_lbl_updated_by')} <strong>{selectedResident.adminLastUpdatedBy}</strong>
                     {selectedResident.adminLastUpdatedByPosition ? ` (${selectedResident.adminLastUpdatedByPosition})` : ""}
                   </div>
                 )}
               </div>
             </div>
-           <div className="modal-footer">
+            <div className="modal-footer">
               <button
                 className="btn-reject"
                 onClick={() => {
@@ -1016,18 +1036,17 @@ export default function HouseholdManagement() {
                   setSelectedResident(null);
                 }}
               >
-                Delete
+                {t('admin_hm_modal_btn_delete')}
               </button>
               {!selectedResident.isPendingActivation && (
                 <button
                   className="btn-approve"
                   onClick={() => {
                     setStatusData({ ...selectedResident });
-                    setShowResidentModal(false);
                     setShowStatusModal(true);
                   }}
                 >
-                  Update Status
+                  {t('admin_hm_modal_btn_update')}
                 </button>
               )}
             </div>
@@ -1036,16 +1055,13 @@ export default function HouseholdManagement() {
       )}
 
       {showStatusModal && statusData && (
-        <div className="as-modal-overlay">
-          <div className="as-modal-content" style={{ maxWidth: "420px" }}>
+        <div className="as-modal-overlay" style={{ zIndex: 10001 }} onClick={() => { setShowStatusModal(false); setStatusData(null); }}>
+          <div className="as-modal-content" style={{ maxWidth: "420px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>Update Record Status</h2>
+              <h2 style={{ color: "#ffffff", margin: 0 }}>{t('admin_hm_status_title')}</h2>
               <button
                 className="as-modal-close"
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setStatusData(null);
-                }}
+                onClick={() => { setShowStatusModal(false); setStatusData(null); }}
               >
                 &times;
               </button>
@@ -1053,17 +1069,17 @@ export default function HouseholdManagement() {
 
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left" }}>
               <div className="admin-details">
-                <p><strong>Full Name:</strong> {statusData.fullName}</p>
-                <p><strong>Household Number:</strong> <span>{statusData.householdId}</span></p>
-                <p><strong>Family Number:</strong> <span>{statusData.familyNumber || getFamilyNumber(statusData.householdId, statusData.branchID)}</span></p>
+                <p><strong>{t('admin_hm_modal_lbl_name')}</strong> {statusData.fullName}</p>
+                <p><strong>{t('admin_hm_modal_lbl_hh')}</strong> <span>{statusData.householdId}</span></p>
+                <p><strong>{t('admin_hm_modal_lbl_fam')}</strong> <span>{statusData.familyNumber || getFamilyNumber(statusData.householdId, statusData.branchID)}</span></p>
                 <p style={{ color: "#888" }}>
-                  Setting as: <strong>{adminProfile.fullName}</strong>
+                  {t('admin_hm_status_lbl_setting_as')} <strong>{adminProfile.fullName}</strong>
                   {adminProfile.position ? ` · ${adminProfile.position}` : ""}
                 </p>
               </div>
 
               <div style={{ marginTop: "15px" }}>
-                <label className="hm-label">Status</label>
+                <label className="hm-label">{t('admin_hm_modal_lbl_status')}</label>
                 <select
                   className="hm-input"
                   value={statusData.status}
@@ -1071,15 +1087,15 @@ export default function HouseholdManagement() {
                     setStatusData({ ...statusData, status: e.target.value })
                   }
                 >
-                  <option>Clear Case</option>
-                  <option>Pending Case</option>
-                  <option>Violation</option>
+                  <option value="Clear Case">{t('admin_hm_status_opt_clear')}</option>
+                  <option value="Pending Case">{t('admin_hm_status_opt_pending')}</option>
+                  <option value="Violation">{t('admin_hm_status_opt_violation')}</option>
                 </select>
 
-                <label className="hm-label">Remarks</label>
+                <label className="hm-label">{t('admin_hm_modal_lbl_remarks')}</label>
                 <textarea
                   className="hm-textarea"
-                  placeholder="Enter remarks..."
+                  placeholder={t('admin_hm_status_ph_remarks')}
                   value={statusData.remarks}
                   onChange={(e) => {
                     setStatusData({ ...statusData, remarks: e.target.value });
@@ -1088,10 +1104,10 @@ export default function HouseholdManagement() {
                   }}
                 />
 
-                <label className="hm-label">Incident Description</label>
+                <label className="hm-label">{t('admin_hm_status_lbl_desc')}</label>
                 <textarea
                   className="hm-textarea hm-textarea-large"
-                  placeholder="Enter incident details..."
+                  placeholder={t('admin_hm_status_ph_desc')}
                   value={statusData.incident}
                   onChange={(e) => {
                     setStatusData({ ...statusData, incident: e.target.value });
@@ -1104,10 +1120,10 @@ export default function HouseholdManagement() {
 
             <div className="modal-actions hm-status-actions">
               <button className="approve-btn" onClick={handleSaveStatus}>
-                Save Changes
+                {t('admin_hm_status_btn_save')}
               </button>
               <button className="reject-btn" onClick={() => { setShowStatusModal(false); setStatusData(null); }}>
-                Cancel
+                {t('admin_hm_status_btn_cancel')}
               </button>
             </div>
           </div>
@@ -1118,7 +1134,7 @@ export default function HouseholdManagement() {
         <div className="as-modal-overlay" onClick={() => { setShowHhViewModal(false); setSelectedHhRequest(null); }}>
           <div className="as-modal-content" style={{ maxWidth: "600px" }} onClick={(e) => e.stopPropagation()}>
             <div className="as-modal-header">
-              <h2>Household Request Details</h2>
+              <h2>{t('admin_hm_req_title')}</h2>
               <button
                 className="as-modal-close"
                 onClick={() => {
@@ -1133,24 +1149,51 @@ export default function HouseholdManagement() {
             <div className="as-modal-body" style={{ alignItems: "stretch", textAlign: "left", maxHeight: "70vh", overflowY: "auto" }}>
               <div className="admin-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                 <div style={{ gridColumn: '1 / -1', paddingBottom: '10px', borderBottom: '1px solid #eee', marginBottom: '4px' }}>
-                  <strong>Date Submitted:</strong> {selectedHhRequest.dateSubmitted}<br />
+                  <strong>{t('admin_hm_req_lbl_date')}</strong> {selectedHhRequest.dateSubmitted}<br />
                   <div style={{ marginTop: '8px' }}>
-                    <strong>Status:</strong> <span className={`status-badge status-${selectedHhRequest.status}`}>
-                      {selectedHhRequest.status.charAt(0).toUpperCase() + selectedHhRequest.status.slice(1)}
+                    <strong>{t('admin_hm_modal_lbl_status')}</strong>{' '}
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      background: (selectedHhRequest.status || '').toLowerCase() === 'approved' ? '#dcfce7' : (selectedHhRequest.status || '').toLowerCase() === 'rejected' ? '#fee2e2' : '#fef3c7',
+                      color: (selectedHhRequest.status || '').toLowerCase() === 'approved' ? '#166534' : (selectedHhRequest.status || '').toLowerCase() === 'rejected' ? '#991b1b' : '#92400e'
+                    }}>
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        minWidth: '6px',
+                        minHeight: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: (selectedHhRequest.status || '').toLowerCase() === 'approved' ? '#16a34a' : (selectedHhRequest.status || '').toLowerCase() === 'rejected' ? '#dc2626' : '#d97706',
+                        display: 'inline-block',
+                        flexShrink: 0
+                      }} />
+                      {(() => {
+                        const s = (selectedHhRequest.status || 'pending').toLowerCase();
+                        if (s === 'pending') return t('admin_hm_filter_pending');
+                        if (s === 'approved') return t('admin_hm_filter_approved');
+                        if (s === 'rejected') return t('admin_hm_filter_rejected');
+                        return selectedHhRequest.status.charAt(0).toUpperCase() + selectedHhRequest.status.slice(1);
+                      })()}
                     </span>
                   </div>
                 </div>
-                <div><strong>Full Name:</strong><br />{selectedHhRequest.fullName}</div>
-                <div><strong>Contact No:</strong><br />{selectedHhRequest.contactNumber || "N/A"}</div>
-                <div><strong>Email:</strong><br />{formatDisplayEmail(selectedHhRequest.email, adminRole)}</div>
-                <div><strong>Birth Date:</strong><br />{selectedHhRequest.birthDate} {selectedHhRequest.age ? `(${selectedHhRequest.age} yrs)` : ""}</div>
-                <div><strong>Birth Place:</strong><br />{selectedHhRequest.birthPlace || "N/A"}</div>
-                <div><strong>Sex:</strong><br />{selectedHhRequest.sex}</div>
-                <div><strong>Civil Status:</strong><br />{selectedHhRequest.civilStatus}</div>
-                <div><strong>Religion:</strong><br />{selectedHhRequest.religion || "N/A"}</div>
-                <div><strong>Citizenship:</strong><br />{selectedHhRequest.citizenship || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_name')}</strong><br />{selectedHhRequest.fullName}</div>
+                <div><strong>{t('admin_hm_modal_lbl_contact')}</strong><br />{selectedHhRequest.contactNumber || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_email')}</strong><br />{formatDisplayEmail(selectedHhRequest.email, adminRole)}</div>
+                <div><strong>{t('admin_hm_modal_lbl_dob')}</strong><br />{selectedHhRequest.birthDate} {selectedHhRequest.age ? `(${selectedHhRequest.age} yrs)` : ""}</div>
+                <div><strong>{t('admin_hm_modal_lbl_bplace')}</strong><br />{selectedHhRequest.birthPlace || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_sex')}</strong><br />{selectedHhRequest.sex}</div>
+                <div><strong>{t('admin_hm_modal_lbl_civil')}</strong><br />{selectedHhRequest.civilStatus}</div>
+                <div><strong>{t('admin_hm_modal_lbl_religion')}</strong><br />{selectedHhRequest.religion || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_citizen')}</strong><br />{selectedHhRequest.citizenship || "N/A"}</div>
                 <div>
-                  <strong>Category:</strong><br />
+                  <strong>{t('admin_hm_modal_lbl_category')}</strong><br />
                   {selectedHhRequest.category && selectedHhRequest.category.length > 0 ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
                       {selectedHhRequest.category.map((c, i) => (
@@ -1163,16 +1206,16 @@ export default function HouseholdManagement() {
                     "None"
                   )}
                 </div>
-                <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>Address:</strong><br />{selectedHhRequest.address}</div>
-                {selectedHhRequest.pwdStatus && <div><strong>PWD Status:</strong><br />{selectedHhRequest.pwdStatus}</div>}
-                {selectedHhRequest.disabilityType && <div><strong>Disability Type:</strong><br />{selectedHhRequest.disabilityType}</div>}
+                <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee' }}><strong>{t('admin_hm_modal_lbl_address')}</strong><br />{selectedHhRequest.address}</div>
+                {selectedHhRequest.pwdStatus && <div><strong>{t('admin_hm_modal_lbl_pwd')}</strong><br />{selectedHhRequest.pwdStatus}</div>}
+                {selectedHhRequest.disabilityType && <div><strong>{t('admin_hm_modal_lbl_disability')}</strong><br />{selectedHhRequest.disabilityType}</div>}
                 <div style={{ gridColumn: '1 / -1', paddingTop: '10px', borderTop: '1px solid #eee', marginTop: '-4px' }}></div>
-                <div><strong>Education:</strong><br />{selectedHhRequest.educationAttainment || "N/A"}</div>
-                <div><strong>Ed. Status:</strong><br />{selectedHhRequest.educationStatus || "N/A"}</div>
-                <div><strong>Employment:</strong><br />{selectedHhRequest.employmentStatus || "N/A"}</div>
-                <div><strong>Occupation:</strong><br />{selectedHhRequest.occupation || "N/A"}</div>
-                <div><strong>Total Members:</strong><br />{selectedHhRequest.totalMembers || "N/A"}</div>
-                <div><strong>Household Class.:</strong><br />{selectedHhRequest.householdClassification || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_educ')}</strong><br />{selectedHhRequest.educationAttainment || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_ed_status')}</strong><br />{selectedHhRequest.educationStatus || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_emp')}</strong><br />{selectedHhRequest.employmentStatus || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_occ')}</strong><br />{selectedHhRequest.occupation || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_members')}</strong><br />{selectedHhRequest.totalMembers || "N/A"}</div>
+                <div><strong>{t('admin_hm_modal_lbl_class')}</strong><br />{selectedHhRequest.householdClassification || "N/A"}</div>
               </div>
             </div>
 
@@ -1182,21 +1225,17 @@ export default function HouseholdManagement() {
                   className="btn-reject"
                   onClick={() => {
                     handleHhReject(selectedHhRequest);
-                    setShowHhViewModal(false);
-                    setSelectedHhRequest(null);
                   }}
                 >
-                  Reject
+                  {t('admin_hm_req_btn_reject')}
                 </button>
                 <button
                   className="btn-approve"
                   onClick={() => {
                     handleHhApprove(selectedHhRequest);
-                    setShowHhViewModal(false);
-                    setSelectedHhRequest(null);
                   }}
                 >
-                  Approve
+                  {t('admin_hm_req_btn_approve')}
                 </button>
               </div>
             )}
@@ -1204,15 +1243,71 @@ export default function HouseholdManagement() {
         </div>
       )}
 
+      {showHhRejectModal && hhRejectTarget && (
+        <div
+          className="as-modal-overlay"
+          style={{ zIndex: 10001 }}
+          onClick={() => { setShowHhRejectModal(false); setHhRejectTarget(null); }}
+        >
+          <div
+            className="as-modal-content"
+            style={{ maxWidth: "420px", padding: 0, overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="as-modal-header" style={{ padding: "16px 20px" }}>
+              <h2 style={{ color: "#ffffff", margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>
+                {t('admin_hm_confirm_rej_title')}
+              </h2>
+              <button
+                className="as-modal-close"
+                onClick={() => { setShowHhRejectModal(false); setHhRejectTarget(null); }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="as-modal-body" style={{ padding: "28px 20px", textAlign: "center" }}>
+              <p style={{ fontSize: "0.95rem", color: "#374151", margin: 0, lineHeight: 1.6 }}>
+                {t('admin_hm_confirm_rej_desc')}
+              </p>
+              <p style={{ fontSize: "1rem", color: "#111827", margin: "16px 0 0 0" }}>
+                "{hhRejectTarget.fullName}"?
+              </p>
+            </div>
+
+            <div style={{ padding: "16px 20px", background: "#f9fafb", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                type="button"
+                className="as-btn-ghost"
+                onClick={() => { setShowHhRejectModal(false); setHhRejectTarget(null); }}
+                disabled={isRejecting}
+                style={{ padding: "8px 16px" }}
+              >
+                {t('admin_hm_status_btn_cancel') || "Cancel"}
+              </button>
+              <button
+                type="button"
+                className="approve-btn"
+                onClick={handleConfirmHhReject}
+                disabled={isRejecting}
+                style={{ padding: "8px 20px", fontWeight: 600 }}
+              >
+                {isRejecting ? "Rejecting..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddPanel && (
-        <AdminAddHouseholdPanel 
-          isOpen={showAddPanel} 
-          onClose={() => setShowAddPanel(false)} 
-          adminName={adminName} 
-          adminRole={adminRole} 
+        <AdminAddHouseholdPanel
+          isOpen={showAddPanel}
+          onClose={() => setShowAddPanel(false)}
+          adminName={adminName}
+          adminRole={adminRole}
         />
       )}
-      
+
     </AdminLayout>
   );
 }

@@ -8,20 +8,22 @@ import { createUserNotification } from "../../services/userNotifications";
 import { logTransaction } from '../../services/logger';
 import { onAuthStateChanged } from "firebase/auth";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const URGENCY_MAP = {
-  "Domestic Dispute":             "emergency",
+  "Domestic Dispute": "emergency",
   "Fight / Physical Altercation": "emergency",
-  "Noise Complaint":              "urgent",
+  "Noise Complaint": "urgent",
   "Suspicious Person / Activity": "urgent",
-  "Vandalism":                    "urgent",
+  "Vandalism": "urgent",
 };
 
 const getUrgency = (type) => URGENCY_MAP[type] || "docs";
 
 const getUrgencyColor = (u) => {
   if (u === "emergency") return { bg: "#fee2e2", text: "#b91c1c" };
-  if (u === "urgent")    return { bg: "#fef08a", text: "#a16207" };
+  if (u === "urgent") return { bg: "#fef08a", text: "#a16207" };
   return { bg: "#e0e7ff", text: "#4338ca" };
 };
 
@@ -39,34 +41,35 @@ const formatTime = (ts) => {
 
 export default function ServicePeaceOrder({ onBack }) {
   const queryClient = useQueryClient();
+  const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm } = useAlert();
 
   const [selectedReport, setSelectedReport] = useState(null);
-  const [assignedTanod, setAssignedTanod]   = useState("Unassigned");
-  const [saving, setSaving]                 = useState(false);
+  const [assignedTanod, setAssignedTanod] = useState("Unassigned");
+  const [saving, setSaving] = useState(false);
 
   // ── Tanod Groups State ────────────────────────────────────────────
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [newGroupName, setNewGroupName]     = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
   const [newMemberInputs, setNewMemberInputs] = useState({});
 
   // ── Pagination & Filter State ─────────────────────────────────────
-  const [currentPage, setCurrentPage]       = useState(1);
-  const itemsPerPage                        = 7; 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
 
-  const [filterStatus, setFilterStatus]     = useState("All");
-  const [filterUrgency, setFilterUrgency]   = useState("All");
-  const [filterType, setFilterType]         = useState("All");
-  const [sortOrder, setSortOrder]           = useState("date_desc");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterUrgency, setFilterUrgency] = useState("All");
+  const [filterType, setFilterType] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc");
 
   // For logging purposes
-  const [adminName, setAdminName]           = useState("");
-  const [adminRole, setAdminRole]           = useState("");
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
 
   useEffect(() => {
     setCurrentPage(1);
   }, [filterStatus, filterUrgency, filterType, sortOrder]);
 
-  // ─── 1. OPTIMIZED: Fetch Admin Profile from Session Cache (0 Reads) ───
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -81,7 +84,6 @@ export default function ServicePeaceOrder({ onBack }) {
     return () => unsubscribe();
   }, []);
 
-  // ─── 2. OPTIMIZED: React Query for Reports List ───
   const { data: reports = [], isLoading: loading } = useQuery({
     queryKey: ['adminManage_incidentReports'],
     queryFn: async () => {
@@ -104,17 +106,15 @@ export default function ServicePeaceOrder({ onBack }) {
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
 
-  // Keep selected report in sync with local cache updates
   useEffect(() => {
     setSelectedReport(prev => prev ? (reports.find(r => r.id === prev.id) || prev) : null);
   }, [reports]);
 
-  // ─── 3. OPTIMIZED: React Query for Tanod Groups ───
   const { data: tanodGroups = [] } = useQuery({
     queryKey: ['adminManage_tanodGroups'],
     queryFn: async () => {
       const q = query(
-        collection(db, "tanodGroups"), 
+        collection(db, "tanodGroups"),
         orderBy("createdAt", "asc"),
         limit(50)
       );
@@ -124,7 +124,6 @@ export default function ServicePeaceOrder({ onBack }) {
     staleTime: 1000 * 60 * 30,
   });
 
-  // ─── 4. OPTIMIZED: Case-Safe Server-Side Counts for Stats Cards ───
   const { data: counts = { total: 0, pending: 0, responded: 0, resolved: 0 } } = useQuery({
     queryKey: ['adminManage_peaceStats'],
     queryFn: async () => {
@@ -146,10 +145,9 @@ export default function ServicePeaceOrder({ onBack }) {
   });
 
   useEffect(() => {
-    if (selectedReport) setAssignedTanod(selectedReport.tanod || "Unassigned");
-  }, [selectedReport?.id]);
+    if (selectedReport) setAssignedTanod(selectedReport.tanod || t('admin_srv_po_det_unassigned'));
+  }, [selectedReport?.id, t]);
 
-  // ─── 5. ZERO-READ LOCAL CACHE UPDATES FOR TANOD GROUPS ───
   const handleCreateGroup = async (e) => {
     e.preventDefault();
     const trimmed = newGroupName.trim();
@@ -200,7 +198,7 @@ export default function ServicePeaceOrder({ onBack }) {
   };
 
   const handleDeleteGroup = async (groupId, groupName) => {
-    if (window.confirm(`Are you sure you want to delete ${groupName}?`)) {
+    if (window.confirm(`${t('admin_srv_po_confirm_delete_grp')} ${groupName}?`)) {
       try {
         await deleteDoc(doc(db, "tanodGroups", groupId));
         queryClient.setQueryData(['adminManage_tanodGroups'], (old = []) =>
@@ -212,7 +210,6 @@ export default function ServicePeaceOrder({ onBack }) {
     }
   };
 
-  // ─── 6. ZERO-READ LOCAL CACHE UPDATES FOR REPORTS ───
   const updateStatus = async (newStatus) => {
     if (!selectedReport) return;
     setSaving(true);
@@ -234,7 +231,7 @@ export default function ServicePeaceOrder({ onBack }) {
       );
 
       const residentID = selectedReport.residentID || selectedReport.userID;
-      const hhID       = selectedReport.householdID;
+      const hhID = selectedReport.householdID;
       if ((newStatus === "responded" || newStatus === "resolved") && residentID && hhID) {
         await createUserNotification(
           hhID,
@@ -246,7 +243,6 @@ export default function ServicePeaceOrder({ onBack }) {
         );
       }
 
-      // Surgically update the 1 modified report in memory (Saves 200 reads!)
       queryClient.setQueryData(['adminManage_incidentReports'], (old = []) =>
         old.map(r => r.id === selectedReport.id ? {
           ...r,
@@ -256,7 +252,6 @@ export default function ServicePeaceOrder({ onBack }) {
         } : r)
       );
 
-      // Refresh lightweight server-side counts (only 4 aggregate reads)
       queryClient.invalidateQueries({ queryKey: ['adminManage_peaceStats'] });
       queryClient.invalidateQueries({ queryKey: ['adminManage_servicesStats'] });
 
@@ -287,7 +282,6 @@ export default function ServicePeaceOrder({ onBack }) {
         `Updated report ${selectedReport.refNum || selectedReport.id} tanod assignment to ${tanodName}`,
       );
 
-      // Surgically update the Tanod assignment in memory (Saves 200 reads!)
       queryClient.setQueryData(['adminManage_incidentReports'], (old = []) =>
         old.map(r => r.id === selectedReport.id ? { ...r, tanod: tanodName } : r)
       );
@@ -325,6 +319,20 @@ export default function ServicePeaceOrder({ onBack }) {
         return 0;
       });
   }, [reports, filterStatus, filterUrgency, filterType, sortOrder]);
+
+const handleResolve = async () => {
+    if (!selectedReport) return;
+    
+    const isConfirmed = showConfirm
+      ? await showConfirm(
+          t('admin_srv_po_confirm_resolve_title') || "Confirm Resolution",
+          t('admin_srv_po_confirm_resolve_desc') || "Are you sure you want to mark this incident report as Resolved? This will notify the resident."
+        )
+      : window.confirm(t('admin_srv_po_confirm_resolve_desc') || "Are you sure you want to mark this incident report as Resolved?");
+
+    if (!isConfirmed) return;
+    updateStatus("resolved");
+  };
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -366,22 +374,22 @@ export default function ServicePeaceOrder({ onBack }) {
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
       <button className="as-btn-ghost" onClick={onBack} style={{ marginBottom: "20px" }}>
-        &larr; Back to Services Hub
+        {t('admin_srv_po_back')}
       </button>
 
       <div className="as-header-section">
         <div className="as-title-wrap">
-          <h1>Peace &amp; Order Workspace</h1>
-          <p className="as-subtitle">Manage incident reports, dispatch tanod groups, and update blotters</p>
+          <h1>{t('admin_srv_po_title')}</h1>
+          <p className="as-subtitle">{t('admin_srv_po_subtitle')}</p>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
+      <div className="po-stats-grid">
         {[
-          { label: "Total Reports", value: counts.total,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
-          { label: "Pending",       value: counts.pending,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-          { label: "Responded",     value: counts.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
-          { label: "Resolved",      value: counts.resolved,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+          { label: t('admin_srv_po_stat_total'), value: counts.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
+          { label: t('admin_srv_po_stat_pending'), value: counts.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+          { label: t('admin_srv_po_stat_responded'), value: counts.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+          { label: t('admin_srv_po_stat_resolved'), value: counts.resolved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
         ].map(s => (
           <div key={s.label} style={{ background: s.bg, padding: "16px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
             <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
@@ -391,61 +399,76 @@ export default function ServicePeaceOrder({ onBack }) {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>Loading reports…</div>
+        <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>{t('admin_srv_po_loading')}</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(380px, 1.1fr) 1.9fr", gap: "20px", minHeight: "60vh" }}>
+        <div className="po-workspace-grid">
 
           {/* ── Inbox list ── */}
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div className={`po-inbox-panel ${selectedReport ? 'mobile-hidden' : ''}`}>
             <div style={{ padding: "16px", borderBottom: "1px solid #e5e7eb", fontWeight: "bold", background: "#f9fafb" }}>
-              Incoming Reports ({filteredReports.length})
+              {t('admin_srv_po_incoming')} ({filteredReports.length})
             </div>
 
-            {/* FILTER & SORT PANEL */}
-            <div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="All">All Statuses</option>
-                  <option value="received">Received</option>
-                  <option value="pending">Pending</option>
-                  <option value="responded">Responded</option>
-                  <option value="resolved">Resolved</option>
-                </select>
+{/* FILTER & SORT PANEL */}
+<div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "8px" }}>
+  <div style={{ display: "flex", gap: "8px" }}>
+    <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="All">{t('admin_srv_po_filter_status')}</option>
+      <option value="received">{t('admin_srv_po_filter_received')}</option>
+      <option value="pending">{t('admin_srv_po_stat_pending')}</option>
+      <option value="responded">{t('admin_srv_po_stat_responded')}</option>
+      <option value="resolved">{t('admin_srv_po_stat_resolved')}</option>
+    </select>
 
-                <select className="filter-select" value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="All">All Urgencies</option>
-                  <option value="emergency">Emergency</option>
-                  <option value="urgent">Urgent</option>
-                  <option value="docs">Docs / Normal</option>
-                </select>
-              </div>
+    <select className="filter-select" value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="All">{t('admin_srv_po_filter_urgency')}</option>
+      <option value="emergency">{t('admin_srv_po_filter_emergency')}</option>
+      <option value="urgent">{t('admin_srv_po_filter_urgent')}</option>
+      <option value="docs">{t('admin_srv_po_filter_docs')}</option>
+    </select>
+  </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
-                <select className="filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="All">All Types</option>
-                  {uniqueIncidentTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+  <div style={{ display: "flex", gap: "8px" }}>
+    <select className="filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="All">{t('admin_srv_po_filter_type')}</option>
+      {uniqueIncidentTypes.map(type => (
+        <option key={type} value={type}>{type}</option>
+      ))}
+    </select>
 
-                <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="date_desc">Date: Newest</option>
-                  <option value="date_asc">Date: Oldest</option>
-                  <option value="type_asc">Type: A to Z</option>
-                  <option value="type_desc">Type: Z to A</option>
-                  <option value="status_asc">Status Order</option>
-                </select>
-              </div>
-            </div>
+    <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="date_desc">{t('admin_srv_po_sort_date_new')}</option>
+      <option value="date_asc">{t('admin_srv_po_sort_date_old')}</option>
+      <option value="type_asc">{t('admin_srv_po_sort_type_asc')}</option>
+      <option value="type_desc">{t('admin_srv_po_sort_type_desc')}</option>
+      <option value="status_asc">{t('admin_srv_po_sort_status')}</option>
+    </select>
+  </div>
+</div>
 
             <div style={{ overflowY: "auto", flex: 1 }}>
               {filteredReports.length === 0 && (
-                <div style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>No reports match your filters.</div>
+                <div style={{ padding: "32px", color: "#9ca3af", textAlign: "center" }}>{t('admin_srv_po_empty')}</div>
               )}
               {paginatedReports.map(r => {
                 const urgency = getUrgency(r.incidentType);
-                const uColor  = getUrgencyColor(urgency);
+                const uColor = getUrgencyColor(urgency);
                 const isActive = selectedReport?.id === r.id;
+
+                // Translate urgency label
+                let translatedUrgency = urgency.toUpperCase();
+                if (urgency === 'emergency') translatedUrgency = t('admin_srv_po_filter_emergency').toUpperCase();
+                if (urgency === 'urgent') translatedUrgency = t('admin_srv_po_filter_urgent').toUpperCase();
+                if (urgency === 'docs') translatedUrgency = 'DOCS';
+
+                // Translate status label for the badge
+                let statusRaw = (r.status || "received");
+                let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
+                if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_po_stat_pending');
+                if (statusRaw.toLowerCase() === 'received') displayStatus = t('admin_srv_po_filter_received');
+                if (statusRaw.toLowerCase() === 'responded') displayStatus = t('admin_srv_po_stat_responded');
+                if (statusRaw.toLowerCase() === 'resolved') displayStatus = t('admin_srv_po_stat_resolved');
+
                 return (
                   <div key={r.id} onClick={() => setSelectedReport(r)}
                     style={{
@@ -457,7 +480,7 @@ export default function ServicePeaceOrder({ onBack }) {
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
                       <span style={{ fontSize: "0.78rem", color: "#6b7280", fontWeight: "bold" }}>{r.refNum || r.id.slice(0, 12)}</span>
                       <span style={{ fontSize: "0.72rem", padding: "2px 7px", borderRadius: "12px", background: uColor.bg, color: uColor.text, fontWeight: "bold" }}>
-                        {urgency.toUpperCase()}
+                        {translatedUrgency}
                       </span>
                     </div>
                     <div style={{ fontWeight: 600, color: "#111827", marginBottom: "4px" }}>{r.incidentType || "Incident"}</div>
@@ -466,7 +489,7 @@ export default function ServicePeaceOrder({ onBack }) {
                     </div>
                     <div style={{ marginTop: "6px" }}>
                       <span className={`status-badge ${(r.status || "pending").toLowerCase()}`}>
-                        {(r.status || "received").charAt(0).toUpperCase() + (r.status || "received").slice(1).toLowerCase()}
+                        {displayStatus}
                       </span>
                     </div>
                   </div>
@@ -497,7 +520,7 @@ export default function ServicePeaceOrder({ onBack }) {
                       disabled={currentPage === 1}
                       style={{ padding: "4px 8px", fontSize: "0.75rem" }}
                     >
-                      Prev
+                      {t('admin_srv_po_page_prev')}
                     </button>
                     {renderPageNumbers()}
                     <button
@@ -506,7 +529,7 @@ export default function ServicePeaceOrder({ onBack }) {
                       disabled={currentPage === totalPages}
                       style={{ padding: "4px 8px", fontSize: "0.75rem" }}
                     >
-                      Next
+                      {t('admin_srv_po_page_next')}
                     </button>
                   </div>
                 )}
@@ -515,54 +538,71 @@ export default function ServicePeaceOrder({ onBack }) {
           </div>
 
           {/* ── Detail panel ── */}
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px", display: "flex", flexDirection: "column" }}>
+          <div className={`po-detail-panel ${!selectedReport ? 'mobile-hidden' : ''}`}>
             {selectedReport ? (
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px", marginBottom: "20px" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                {/* Mobile-only back button */}
+                <button
+                  type="button"
+                  className="as-btn-ghost po-mobile-back-btn"
+                  onClick={() => setSelectedReport(null)}
+                >
+                  {t('admin_srv_po_btn_back_incoming') || '← Back to Incoming Reports'}
+                </button>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px", marginBottom: "20px" }}>
                   <div>
-                    <h2 style={{ margin: "0 0 6px 0" }}>Incident Details</h2>
-                    <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>Ref: {selectedReport.refNum || selectedReport.id}</span>
+                    <h2 style={{ margin: "0 0 6px 0" }}>{t('admin_srv_po_det_title')}</h2>
+                    <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>{t('admin_srv_po_det_ref')} {selectedReport.refNum || selectedReport.id}</span>
                   </div>
-                    <span className={`status-badge ${(selectedReport.status || "received").toLowerCase()}`}>
-                      {(selectedReport.status || "received").charAt(0).toUpperCase() + (selectedReport.status || "received").slice(1).toLowerCase()}
-                    </span>
+                  <span className={`status-badge ${(selectedReport.status || "received").toLowerCase()}`}>
+                    {(() => {
+                      let statusRaw = (selectedReport.status || "received");
+                      let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
+                      if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_po_stat_pending');
+                      if (statusRaw.toLowerCase() === 'received') displayStatus = t('admin_srv_po_filter_received');
+                      if (statusRaw.toLowerCase() === 'responded') displayStatus = t('admin_srv_po_stat_responded');
+                      if (statusRaw.toLowerCase() === 'resolved') displayStatus = t('admin_srv_po_stat_resolved');
+                      return displayStatus;
+                    })()}
+                  </span>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+                <div className="po-details-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
                   <div>
-                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Incident Type</p>
+                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_type')}</p>
                     <p style={{ fontWeight: 600, margin: 0 }}>{selectedReport.incidentType || "—"}</p>
                   </div>
                   <div>
-                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Date &amp; Time</p>
+                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_datetime')}</p>
                     <p style={{ fontWeight: 600, margin: 0 }}>
                       {selectedReport.date || formatTs(selectedReport.submittedAt)} at {selectedReport.time || formatTime(selectedReport.submittedAt)}
                     </p>
                   </div>
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Exact Location</p>
+                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_loc')}</p>
                     <p style={{ fontWeight: 600, margin: 0 }}>{selectedReport.location || "—"}</p>
                   </div>
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Description</p>
+                    <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_desc')}</p>
                     <div style={{ background: "#f9fafb", padding: "12px", borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "0.95rem" }}>
-                      {selectedReport.description || "No description provided."}
+                      {selectedReport.description || t('admin_srv_po_det_no_desc')}
                     </div>
                   </div>
 
                   {(selectedReport.photoURL || selectedReport.photoFileName || selectedReport.photo) && (
                     <div style={{ gridColumn: "1 / -1", marginTop: "8px" }}>
-                      <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 8px 0" }}>Attached Photo Evidence</p>
+                      <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 8px 0" }}>{t('admin_srv_po_det_photo')}</p>
                       {selectedReport.photoURL ? (
                         <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px", background: "#f9fafb", display: "inline-block", maxWidth: "100%" }}>
                           <a href={selectedReport.photoURL} target="_blank" rel="noopener noreferrer" title="Click to view full size">
-                            <img 
-                              src={selectedReport.photoURL} 
-                              alt="Incident Evidence" 
-                              style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }} 
+                            <img
+                              src={selectedReport.photoURL}
+                              alt="Incident Evidence"
+                              style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }}
                             />
                           </a>
-                          <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>Click image to view full size</div>
+                          <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>{t('admin_srv_po_det_photo_hint')}</div>
                         </div>
                       ) : (
                         <span style={{ fontSize: "0.8rem", color: "#317D89", background: "#e0f2fe", padding: "6px 12px", borderRadius: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
@@ -574,29 +614,29 @@ export default function ServicePeaceOrder({ onBack }) {
                 </div>
 
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginBottom: "24px" }}>
-                  <h3 style={{ margin: "0 0 14px 0", fontSize: "1rem" }}>Reporter Information</h3>
+                  <h3 style={{ margin: "0 0 14px 0", fontSize: "1rem" }}>{t('admin_srv_po_det_rep_info')}</h3>
                   {selectedReport.isAnonymous || !selectedReport.reporterName ? (
                     <div style={{ padding: "12px", background: "#fef2f2", color: "#991b1b", borderRadius: "8px", fontSize: "0.9rem" }}>
-                      <strong>Anonymous Report</strong> — The user opted not to provide personal details.
+                      <strong>{t('admin_srv_po_det_anon')}</strong> — {t('admin_srv_po_det_anon_desc')}
                     </div>
                   ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                       <div>
-                        <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Name</p>
+                        <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_name')}</p>
                         <p style={{ margin: 0, fontWeight: 500 }}>{selectedReport.reporterName}</p>
                         {selectedReport.UID && (
                           <div style={{ fontSize: "0.85rem", color: "#317D89", marginTop: "4px", fontWeight: 600 }}>
-                            UID: {selectedReport.UID}
+                            {t('admin_srv_po_det_uid')} {selectedReport.UID}
                           </div>
                         )}
                       </div>
                       <div>
-                        <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Contact</p>
+                        <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_contact')}</p>
                         <p style={{ margin: 0 }}>{selectedReport.contact || "—"}</p>
                       </div>
                       {selectedReport.reporterAddress && (
                         <div style={{ gridColumn: "1 / -1" }}>
-                          <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>Address</p>
+                          <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_address')}</p>
                           <p style={{ margin: 0 }}>{selectedReport.reporterAddress}</p>
                         </div>
                       )}
@@ -605,35 +645,57 @@ export default function ServicePeaceOrder({ onBack }) {
                 </div>
 
                 {selectedReport.updates?.length > 0 && (
-                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "16px", marginBottom: "24px" }}>
-                    <h3 style={{ margin: "0 0 10px 0", fontSize: "1rem" }}>Updates Log</h3>
-                    <ul style={{ margin: 0, padding: "0 0 0 18px", color: "#4b5563", fontSize: "0.85rem" }}>
-                      {selectedReport.updates.map((u, i) => <li key={i}>{u}</li>)}
-                    </ul>
+                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "16px", marginBottom: "20px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <h3 style={{ margin: 0, fontSize: "0.95rem", color: "#334155" }}>{t('admin_srv_po_det_updates')}</h3>
+                      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                        {selectedReport.updates.length} {selectedReport.updates.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </div>
+                    <div style={{
+                      maxHeight: "140px",
+                      overflowY: "auto",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "10px",
+                      padding: "10px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px"
+                    }}>
+                      {selectedReport.updates.map((u, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem", color: "#475569" }}>
+                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#317D89", flexShrink: 0 }} />
+                          <span>{u}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginTop: "auto" }}>
-                  <h3 style={{ margin: "0 0 16px 0", fontSize: "1rem" }}>Admin Action Panel</h3>
-                  <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "18px" }}>
+                  <h3 style={{ margin: "0 0 14px 0", fontSize: "0.95rem", color: "#334155" }}>{t('admin_srv_po_det_action_panel')}</h3>
+                  <div className="po-action-inputs">
+                    {/* Assign Tanod */}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
-                        <label style={{ color: "#6b7280", fontSize: "0.85rem", fontWeight: 500 }}>Assign Tanod Group</label>
-                        <button 
-                          onClick={() => setShowGroupModal(true)} 
-                          style={{ background: "none", border: "none", color: "#317D89", fontSize: "0.8rem", cursor: "pointer", padding: 0 }}
+                        <label style={{ color: "#64748b", fontSize: "0.82rem", fontWeight: 600 }}>{t('admin_srv_po_det_assign_tanod')}</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowGroupModal(true)}
+                          style={{ background: "none", border: "none", color: "#317D89", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", padding: 0 }}
                         >
-                          + Manage Groups
+                          {t('admin_srv_po_det_manage_groups')}
                         </button>
                       </div>
                       <select
                         className="filter-select"
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.875rem", background: "#fff" }}
                         value={assignedTanod}
                         onChange={(e) => saveTanod(e.target.value)}
                         disabled={saving}
                       >
-                        <option value="Unassigned">Unassigned</option>
+                        <option value="Unassigned">{t('admin_srv_po_det_unassigned')}</option>
                         {tanodGroups.map(g => (
                           <option key={g.id} value={g.groupName}>
                             {g.groupName} ({g.members?.length || 0} members)
@@ -641,35 +703,36 @@ export default function ServicePeaceOrder({ onBack }) {
                         ))}
                       </select>
                     </div>
+
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px", fontWeight: 500 }}>Update Status</label>
+                      <label style={{ display: "block", color: "#64748b", fontSize: "0.82rem", marginBottom: "6px", fontWeight: 600 }}>{t('admin_srv_po_det_update_status')}</label>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button
-                          className="as-btn-ghost"
-                          style={{ flex: 1, padding: "10px", borderColor: (selectedReport.status || "").toLowerCase() === "responded" ? "#BDBD64" : "#e5e7eb" }}
+                          type="button"
                           onClick={() => updateStatus("responded")}
                           disabled={saving || (selectedReport.status || "").toLowerCase() === "resolved"}
+                          className={`po-btn-status po-btn-responded ${(selectedReport.status || "").toLowerCase() === "responded" ? "active" : ""}`}
                         >
-                          Responded
+                          <span className="dot" /> {t('admin_srv_po_stat_responded')}
                         </button>
-                        <button
-                          className="as-btn-ghost"
-                          style={{ flex: 1, padding: "10px", borderColor: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "#e5e7eb", color: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "inherit" }}
-                          onClick={() => updateStatus("resolved")}
-                          disabled={saving}
-                        >
-                          Resolved
-                        </button>
+<button
+  type="button"
+  onClick={handleResolve}
+  disabled={saving || (selectedReport.status || "").toLowerCase() === "resolved"}
+  className={`po-btn-status po-btn-resolved ${(selectedReport.status || "").toLowerCase() === "resolved" ? "active" : ""}`}
+>
+  <span className="dot" /> {t('admin_srv_po_stat_resolved')}
+</button>
                       </div>
                     </div>
                   </div>
-                  {saving && <p style={{ color: "#9ca3af", fontSize: "0.8rem", marginTop: "8px" }}>Saving…</p>}
+                  {saving && <p style={{ color: "#9ca3af", fontSize: "0.8rem", marginTop: "8px" }}>{t('admin_srv_po_det_saving')}</p>}
                 </div>
               </div>
             ) : (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", flexDirection: "column" }}>
                 <ServiceAlertTriangleIcon />
-                <p style={{ marginTop: "16px" }}>Select an incident report from the inbox to view details.</p>
+                <p style={{ marginTop: "16px" }}>{t('admin_srv_po_det_select_prompt')}</p>
               </div>
             )}
           </div>
@@ -682,7 +745,7 @@ export default function ServicePeaceOrder({ onBack }) {
           <div style={{ background: "#fff", borderRadius: "12px", width: "100%", maxWidth: "600px", maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
 
             <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>Manage Tanod Groups</h2>
+              <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#111827" }}>{t('admin_srv_po_grp_title')}</h2>
               <button onClick={() => setShowGroupModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}>&times;</button>
             </div>
 
@@ -690,29 +753,29 @@ export default function ServicePeaceOrder({ onBack }) {
 
               <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#fff", padding: "16px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: "block", fontSize: "0.8rem", color: "#6b7280", marginBottom: "6px", fontWeight: 600 }}>Create New Group</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Group A, Night Shift Team..." 
-                    value={newGroupName} 
-                    onChange={e => setNewGroupName(e.target.value)} 
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#6b7280", marginBottom: "6px", fontWeight: 600 }}>{t('admin_srv_grp_create')}</label>
+                  <input
+                    type="text"
+                    placeholder={t('admin_srv_grp_create_ph')}
+                    value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
                   />
                 </div>
                 <button type="submit" disabled={!newGroupName.trim()} style={{ alignSelf: "flex-end", padding: "9px 16px", background: newGroupName.trim() ? "#317D89" : "#d1d5db", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 500, cursor: newGroupName.trim() ? "pointer" : "not-allowed" }}>
-                  Add Group
+                  {t('admin_srv_grp_btn_add')}
                 </button>
               </form>
 
               {tanodGroups.length === 0 ? (
-                <p style={{ textAlign: "center", color: "#9ca3af", margin: "20px 0" }}>No Tanod groups created yet.</p>
+                <p style={{ textAlign: "center", color: "#9ca3af", margin: "20px 0" }}>{t('admin_srv_grp_empty')}</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   {tanodGroups.map(group => (
                     <div key={group.id} style={{ background: "#fff", borderRadius: "8px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
                       <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f3f4f6" }}>
                         <span style={{ fontWeight: 600, color: "#374151" }}>{group.groupName}</span>
-                        <button onClick={() => handleDeleteGroup(group.id, group.groupName)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: "0.8rem", cursor: "pointer" }}>Delete Group</button>
+                        <button onClick={() => handleDeleteGroup(group.id, group.groupName)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: "0.8rem", cursor: "pointer" }}>{t('admin_srv_grp_btn_delete')}</button>
                       </div>
 
                       <div style={{ padding: "16px" }}>
@@ -725,26 +788,26 @@ export default function ServicePeaceOrder({ onBack }) {
                               </div>
                             ))
                           ) : (
-                            <span style={{ fontSize: "0.85rem", color: "#9ca3af" }}>No members in this group yet.</span>
+                            <span style={{ fontSize: "0.85rem", color: "#9ca3af" }}>{t('admin_srv_grp_members_empty')}</span>
                           )}
                         </div>
 
                         <div style={{ display: "flex", gap: "8px" }}>
-                          <input 
-                            type="text" 
-                            placeholder="Add Tanod name..." 
+                          <input
+                            type="text"
+                            placeholder={t('admin_srv_grp_add_member_ph')}
                             value={newMemberInputs[group.id] || ""}
                             onChange={e => setNewMemberInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
-                            onKeyDown={e => { if(e.key === "Enter") { e.preventDefault(); handleAddMember(group.id); }}}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddMember(group.id); } }}
                             style={{ flex: 1, padding: "6px 10px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}
                           />
-                          <button 
+                          <button
                             type="button"
                             onClick={() => handleAddMember(group.id)}
                             disabled={!newMemberInputs[group.id]?.trim()}
                             style={{ padding: "6px 12px", background: newMemberInputs[group.id]?.trim() ? "#111827" : "#e5e7eb", color: newMemberInputs[group.id]?.trim() ? "#fff" : "#9ca3af", border: "none", borderRadius: "6px", fontSize: "0.85rem", cursor: newMemberInputs[group.id]?.trim() ? "pointer" : "not-allowed" }}
                           >
-                            Add
+                            {t('admin_srv_grp_btn_add_member')}
                           </button>
                         </div>
                       </div>
@@ -759,5 +822,5 @@ export default function ServicePeaceOrder({ onBack }) {
       )}
 
     </div>
-  ); 
+  );
 }

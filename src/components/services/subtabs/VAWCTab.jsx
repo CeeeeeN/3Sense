@@ -1,6 +1,41 @@
 import { useState, useEffect, useRef } from "react";
 import { ServiceShieldIcon, PhoneCallIcon, ServiceAlertTriangleIcon, HeartIcon } from "../../Icons";
-import { useLanguage } from "../../../context/LanguageContext";
+
+// Phone numbers appear in ONE place each:
+//   • 911 / 117 → the red emergency bar (always visible)
+//   • everything else → the "Talk to someone" screen
+const SUPPORT_LINES = [
+  { name: "Barangay 3S+ VAWC Desk",         number: "(044) 000-0000", desc: "Our barangay's VAWC officer" },
+  { name: "Valenzuela City Social Welfare", number: "(02) 8292-9200", desc: "City social welfare office" },
+  { name: "DSWD Hotline",                   number: "8-888",          desc: "Social welfare and protection" },
+  { name: "DOH Mental Health Hotline",      number: "1553",           desc: "Free counseling, 24 hours a day" },
+  { name: "Philippine Commission on Women", number: "(02) 8735-1654", desc: "Help with women's rights" },
+];
+
+const BPO_STEPS = [
+  { title: "Go to the Barangay Hall",         desc: "Go to Barangay 3S+ Malanday Hall. Ask for the VAWC Desk or the Barangay Secretary." },
+  { title: "Ask for the BPO form",            desc: "Ask for a \u201CBarangay Protection Order\u201D form. The Social Worker can help you fill it out." },
+  { title: "Give the form and your ID",       desc: "You do not need to bring the other person with you." },
+  { title: "Get your BPO within 24 hours",    desc: "By law, the Barangay must give it to you within 24 hours. It is free." },
+  { title: "Keep your copy with you",         desc: "If the other person breaks the order, they can be jailed." },
+];
+
+const CASE_PAPERS = [
+  { id: "id",        label: "Valid ID (UMID, PhilSys, Passport, or Driver's License)" },
+  { id: "brgy",      label: "Barangay Clearance" },
+  { id: "incident",  label: "Your written story of what happened" },
+  { id: "medcert",   label: "Medical certificate from the hospital or health center" },
+  { id: "photos",    label: "Photos of injuries or damage (if you have any)" },
+  { id: "witness",   label: "Name and number of a witness (if there is one)" },
+  { id: "affidavit", label: "Sworn complaint (the Barangay or police will help you write it)" },
+];
+
+const WHERE_TO_GO = [
+  { color: "#317D89", place: "Barangay Hall",                        why: "for the Barangay Blotter and the Protection Order" },
+  { color: "#703381", place: "Police Women & Children Desk",         why: "for the Police Blotter" },
+  { color: "#e03e3e", place: "Hospital or Health Center",            why: "for the Medical Certificate" },
+  { color: "#9a7b00", place: "City Prosecutor's Office",             why: "to file the case" },
+];
 
 const telHref = (n) => `tel:${n.replace(/[^0-9+]/g, "")}`;
 
@@ -18,54 +53,22 @@ const ChatIcon = () => (
 );
 
 export default function VAWCTab() {
-  const { t } = useLanguage();
   const [view, setView] = useState(null); // null | "bpo" | "case" | "talk"
   const [checked, setChecked] = useState({});
   const topRef = useRef(null);
 
   // Bring the person back to the top of the content whenever the screen changes
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [view]);
 
   const count = Object.values(checked).filter(Boolean).length;
 
-  const bpoSteps = [
-    { title: t("vawc_bpo_step1_title"), desc: t("vawc_bpo_step1_desc") },
-    { title: t("vawc_bpo_step2_title"), desc: t("vawc_bpo_step2_desc") },
-    { title: t("vawc_bpo_step3_title"), desc: t("vawc_bpo_step3_desc") },
-    { title: t("vawc_bpo_step4_title"), desc: t("vawc_bpo_step4_desc") },
-    { title: t("vawc_bpo_step5_title"), desc: t("vawc_bpo_step5_desc") },
-  ];
-
-  const casePapers = [
-    { id: "id", label: t("vawc_case_paper_id") },
-    { id: "brgy", label: t("vawc_case_paper_brgy") },
-    { id: "incident", label: t("vawc_case_paper_incident") },
-    { id: "medcert", label: t("vawc_case_paper_medcert") },
-    { id: "photos", label: t("vawc_case_paper_photos") },
-    { id: "witness", label: t("vawc_case_paper_witness") },
-    { id: "affidavit", label: t("vawc_case_paper_affidavit") },
-  ];
-
-  const whereToGo = [
-    { color: "#317D89", place: t("vawc_where_brgy_hall"), why: t("vawc_where_brgy_hall_why") },
-    { color: "#703381", place: t("vawc_where_police"), why: t("vawc_where_police_why") },
-    { color: "#e03e3e", place: t("vawc_where_hospital"), why: t("vawc_where_hospital_why") },
-    { color: "#9a7b00", place: t("vawc_where_prosecutor"), why: t("vawc_where_prosecutor_why") },
-  ];
-
-  const supportLines = [
-    { name: t("vawc_line_vawc_desk"), number: "(044) 000-0000", desc: t("vawc_line_vawc_desc") },
-    { name: t("vawc_line_valenzuela_sw"), number: "(02) 8292-9200", desc: t("vawc_line_valenzuela_desc") },
-    { name: t("vawc_line_dswd"), number: "8-888", desc: t("vawc_line_dswd_desc") },
-    { name: t("vawc_line_doh"), number: "1553", desc: t("vawc_line_doh_desc") },
-    { name: t("vawc_line_pcw"), number: "(02) 8735-1654", desc: t("vawc_line_pcw_desc") },
-  ];
-
   const BackButton = () => (
     <button type="button" className="vz-back" onClick={() => setView(null)}>
-      <ArrowLeft /> {t("vawc_back_choices")}
+      <ArrowLeft /> Back to choices
     </button>
   );
 
@@ -75,9 +78,9 @@ export default function VAWCTab() {
       <div className="svc-hero svc-hero--red vz-hero">
         <div className="svc-hero__inner">
           <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><ServiceShieldIcon /></span>{t("vawc_eyebrow")}</div>
-            <h2 className="svc-hero__title">{t("vawc_hero_title")}</h2>
-            <p className="svc-hero__sub">{t("vawc_sub")}</p>
+            <div className="svc-hero__eyebrow"><span className="svc-hero__eyebrow-icon"><ServiceShieldIcon /></span>VAWC</div>
+            <h2 className="svc-hero__title">Violence Against Women and Children</h2>
+            <p className="svc-hero__sub">Report cases of abuse and get help, guidance, and protection for women and children who are experiencing violence. Help is free and private.</p>
           </div>
         </div>
       </div>
@@ -88,16 +91,16 @@ export default function VAWCTab() {
           <div className="vz-emergency__text">
             <span className="vz-emergency__icon"><ServiceAlertTriangleIcon /></span>
             <div>
-              <div className="vz-emergency__title">{t("vawc_emg_title")}</div>
-              <div className="vz-emergency__sub">{t("vawc_emg_sub")}</div>
+              <div className="vz-emergency__title">In danger right now?</div>
+              <div className="vz-emergency__sub">Do not wait. Call for help.</div>
             </div>
           </div>
           <div className="vz-emergency__btns">
             <a href="tel:911" className="vz-emergency__btn">
-              <PhoneCallIcon /> <span>{t("vawc_call_911")}<small>{t("vawc_call_911_sub")}</small></span>
+              <PhoneCallIcon /> <span>Call <strong>911</strong><small>Police Emergency</small></span>
             </a>
             <a href="tel:117" className="vz-emergency__btn">
-              <PhoneCallIcon /> <span>{t("vawc_call_117")}<small>{t("vawc_call_117_sub")}</small></span>
+              <PhoneCallIcon /> <span>Call <strong>117</strong><small>Women &amp; Children</small></span>
             </a>
           </div>
         </section>
@@ -105,15 +108,15 @@ export default function VAWCTab() {
         {/* ── Choices ── */}
         {view === null && (
           <section className="vz-section">
-            <h3 className="vz-heading">{t("vawc_help_title")}</h3>
-            <p className="vz-text">{t("vawc_help_sub")}</p>
+            <h3 className="vz-heading">What do you need help with?</h3>
+            <p className="vz-text">Tap one of the big buttons below.</p>
 
             <div className="vz-choices">
               <button type="button" className="vz-choice" onClick={() => setView("bpo")}>
                 <span className="vz-choice__icon vz-choice__icon--teal"><ServiceShieldIcon /></span>
                 <span className="vz-choice__body">
-                  <span className="vz-choice__title">{t("vawc_choice_bpo_title")}</span>
-                  <span className="vz-choice__desc">{t("vawc_choice_bpo_desc")}</span>
+                  <span className="vz-choice__title">Someone is hurting me. I need protection.</span>
+                  <span className="vz-choice__desc">Get a Protection Order from the Barangay. It is free.</span>
                 </span>
                 <span className="vz-choice__arrow"><ArrowRight /></span>
               </button>
@@ -121,8 +124,8 @@ export default function VAWCTab() {
               <button type="button" className="vz-choice" onClick={() => setView("case")}>
                 <span className="vz-choice__icon vz-choice__icon--purple"><PaperIcon /></span>
                 <span className="vz-choice__body">
-                  <span className="vz-choice__title">{t("vawc_choice_case_title")}</span>
-                  <span className="vz-choice__desc">{t("vawc_choice_case_desc")}</span>
+                  <span className="vz-choice__title">I want to report it or file a case.</span>
+                  <span className="vz-choice__desc">See what papers to bring and where to go.</span>
                 </span>
                 <span className="vz-choice__arrow"><ArrowRight /></span>
               </button>
@@ -130,8 +133,8 @@ export default function VAWCTab() {
               <button type="button" className="vz-choice" onClick={() => setView("talk")}>
                 <span className="vz-choice__icon vz-choice__icon--green"><ChatIcon /></span>
                 <span className="vz-choice__body">
-                  <span className="vz-choice__title">{t("vawc_choice_talk_title")}</span>
-                  <span className="vz-choice__desc">{t("vawc_choice_talk_desc")}</span>
+                  <span className="vz-choice__title">I want to talk to someone.</span>
+                  <span className="vz-choice__desc">Phone numbers of counselors and social workers.</span>
                 </span>
                 <span className="vz-choice__arrow"><ArrowRight /></span>
               </button>
@@ -143,11 +146,11 @@ export default function VAWCTab() {
         {view === "bpo" && (
           <section className="vz-section">
             <BackButton />
-            <h3 className="vz-heading">{t("vawc_bpo_heading")}</h3>
-            <p className="vz-text">{t("vawc_bpo_desc")}</p>
+            <h3 className="vz-heading">How to get a Protection Order</h3>
+            <p className="vz-text">A Protection Order (BPO) is a paper from the Barangay. It orders the other person to stay away from you and not to hurt you or contact or threaten you. You do not have to go to court first. Follow these 5 steps.</p>
 
             <ol className="vz-steps">
-              {bpoSteps.map((s, i) => (
+              {BPO_STEPS.map((s, i) => (
                 <li className="vz-step" key={s.title}>
                   <span className="vz-step__num">{i + 1}</span>
                   <div>
@@ -159,7 +162,7 @@ export default function VAWCTab() {
             </ol>
 
             <div className="vz-note vz-note--good">
-              <strong>{t("vawc_bpo_free_title")}</strong> {t("vawc_bpo_free_desc")}
+              <strong>It is free.</strong> Under RA 9262 (the Anti-VAWC Act of 2004), breaking a BPO is punishable by 30 days in jail.
             </div>
             <BackButton />
           </section>
@@ -169,11 +172,11 @@ export default function VAWCTab() {
         {view === "case" && (
           <section className="vz-section">
             <BackButton />
-            <h3 className="vz-heading">{t("vawc_case_heading")}</h3>
-            <p className="vz-text">{t("vawc_case_desc")}</p>
+            <h3 className="vz-heading">Papers to bring</h3>
+            <p className="vz-text">Tap each paper when you have it. Do not worry if you do not have everything yet. The Barangay Hall can guide you.</p>
 
             <div className="vz-checklist">
-              {casePapers.map((r) => (
+              {CASE_PAPERS.map((r) => (
                 <label key={r.id} className={`vz-check${checked[r.id] ? " is-done" : ""}`}>
                   <input
                     type="checkbox"
@@ -185,13 +188,11 @@ export default function VAWCTab() {
                 </label>
               ))}
             </div>
-            <div className="vz-count">
-              {typeof t("vawc_case_count") === "function" ? t("vawc_case_count")(count, casePapers.length) : `${count} of ${casePapers.length} ready`}
-            </div>
+            <div className="vz-count">{count} of {CASE_PAPERS.length} ready</div>
 
-            <h3 className="vz-heading vz-heading--spaced">{t("vawc_where_heading")}</h3>
+            <h3 className="vz-heading vz-heading--spaced">Where to go</h3>
             <ul className="vz-where">
-              {whereToGo.map((w) => (
+              {WHERE_TO_GO.map((w) => (
                 <li key={w.place} className="vz-where__item">
                   <span className="vz-where__dot" style={{ background: w.color }} />
                   <span><strong>{w.place}</strong> {w.why}</span>
@@ -206,11 +207,11 @@ export default function VAWCTab() {
         {view === "talk" && (
           <section className="vz-section">
             <BackButton />
-            <h3 className="vz-heading">{t("vawc_talk_heading")}</h3>
-            <p className="vz-text">{t("vawc_talk_desc")}</p>
+            <h3 className="vz-heading">You are not alone</h3>
+            <p className="vz-text">These people are ready to listen. What you tell them is private. Tap a number to call.</p>
 
             <div className="vz-calls">
-              {supportLines.map((h) => (
+              {SUPPORT_LINES.map((h) => (
                 <a key={h.name} href={telHref(h.number)} className="vz-call">
                   <span className="vz-call__icon"><HeartIcon /></span>
                   <span className="vz-call__body">
@@ -219,7 +220,7 @@ export default function VAWCTab() {
                   </span>
                   <span className="vz-call__num">
                     {h.number}
-                    <small>{t("vawc_talk_tap")}</small>
+                    <small>Tap to call</small>
                   </span>
                 </a>
               ))}
@@ -228,7 +229,7 @@ export default function VAWCTab() {
           </section>
         )}
 
-        <div className="bz-legal bd-legal">{t("vawc_legal")}</div>
+        <div className="bz-legal bd-legal">Legal reference: RA 9262, the Anti-Violence Against Women and Their Children Act of 2004</div>
       </div>
     </div>
   );
