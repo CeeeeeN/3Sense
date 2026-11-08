@@ -1,7 +1,7 @@
 import { db } from "../firebase/firebase";
 import {
   collection, doc, getDocs, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, serverTimestamp, limit, getDoc, writeBatch, or
+  query, where, orderBy, serverTimestamp, limit, getDoc, writeBatch, or, and
 } from "firebase/firestore";
 import { generateHouseholdID, sendApprovalEmail } from "./admin";
 import { verifyMemberPin } from "./login";
@@ -517,26 +517,33 @@ export async function fetchUserTransactions(householdID, residentID, userID, rol
   // Reduces network requests from 24 -> 8 by doing all multi-variable matching in 1 pass per collection
   const fetchCollection = async (collectionName, mapper, limitCount = 50) => {
     try {
-      const conditions = [];
-      if (householdID && residentID) conditions.push(where("residentID", "==", residentID));
-      else if (householdID) conditions.push(where("householdID", "==", householdID));
-      else if (residentID) conditions.push(where("residentID", "==", residentID));
+      // 1. STRICT ISOLATION: Always prioritize the globally unique UID and pair it with the household
+      if (userUID && userUID !== "") {
+        const q = query(
+          collection(db, collectionName), 
+          and(where("householdID", "==", householdID), where("UID", "==", userUID)), 
+          limit(limitCount)
+        );
+        const snap = await getDocs(q);
+        const results = snap.docs.map(d => mapper({ id: d.id, data: () => d.data() }));
+        return results;
+      }
+      
+      // 2. SAFE FALLBACK: If no UID, use residentID, but ONLY if it's not the shared "head" ID
+      if (householdID && residentID && residentID !== "head") {
+        const q = query(
+          collection(db, collectionName), 
+          and(where("householdID", "==", householdID), where("residentID", "==", residentID)), 
+          limit(limitCount)
+        );
+        const snap = await getDocs(q);
+        const results = snap.docs.map(d => mapper({ id: d.id, data: () => d.data() }));
+        return results;
+      }
 
-      if (userUID) conditions.push(where("UID", "==", userUID));
-
-      // Build native query
-      const q = conditions.length > 1 
-        ? query(collection(db, collectionName), or(...conditions), limit(limitCount))
-        : query(collection(db, collectionName), conditions[0], limit(limitCount));
-
-      const snap = await getDocs(q);
-      const results = snap.docs.map(d => mapper({ id: d.id, data: () => d.data() }));
-
-      return results.sort((a, b) => {
-        const ta = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-        const tb = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-        return tb - ta;
-      });
+      // 3. If it's a "head" but their UID hasn't loaded yet, return empty to prevent pulling old head's data
+      return [];
+      
     } catch (err) {
       console.warn(`[${collectionName}] query error:`, err);
       return [];
