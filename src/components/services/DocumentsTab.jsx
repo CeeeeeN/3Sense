@@ -270,6 +270,11 @@ function Step2({ docType, form, setForm, errors, setErrors }) {
     set("validIdFile", file);
     clearError("validId");
 
+    setErrors(prev => {
+      const { validId, ...rest } = prev;
+      return rest;
+    });
+
     if (file.type.startsWith("image/")) {
       setPreviewUrl(URL.createObjectURL(file));
     } else {
