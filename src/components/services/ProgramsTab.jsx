@@ -102,48 +102,11 @@ const DocsIcon = () => (
     <polyline points="14 2 14 8 20 8" />
   </svg>
 );
-const MegaphoneIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 11l19-9-9 19-2-8-8-2z" />
-  </svg>
-);
 const CheckIcon = ({ size = 14, stroke = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
-
-// ── Description that clamps to 3 lines and expands with "more..." ─────────────
-function ExpandableDesc({ text }) {
-  const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const check = () => {
-      if (!open) setOverflowing(el.scrollHeight > el.clientHeight + 1);
-    };
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, [text, open]);
-
-  return (
-    <div className="lh-prog-card__desc-wrap">
-      <div ref={ref} className={`lh-prog-card__desc${open ? " lh-prog-card__desc--open" : ""}`}>
-        {text}
-      </div>
-      {(overflowing || open) && (
-        <button type="button" className="lh-more-btn" onClick={() => setOpen((o) => !o)}>
-          {open ? t("less", "less") : t("more_dots", "more...")}
-        </button>
-      )}
-    </div>
-  );
-}
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ProgramsTab({ userData, householdID, userName }) {
@@ -474,37 +437,14 @@ export default function ProgramsTab({ userData, householdID, userName }) {
   // ════════════════════════════════════════════════════════════════
   if (view === "main") return (
     <div className="lh-page">
-      {/* Hero Section (contains My Registrations button) */}
-      <div className="svc-hero" style={{ background: "linear-gradient(135deg, #1a3a4a 0%, #317D89 100%)" }}>
-        <div className="svc-hero__inner">
-          <div className="svc-hero__left">
-            <div className="svc-hero__eyebrow">
-              <span className="svc-hero__eyebrow-icon"><MegaphoneIcon /></span>
-              Barangay Programs
-            </div>
-            <h2 className="svc-hero__title">Community Programs</h2>
-            <p className="svc-hero__sub">
-              Join barangay-organized programs designed to uplift and strengthen the community.
-              Register now to secure your slot before they fill up.
-            </p>
-            <div className="svc-hero__law">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              Organized by Barangay Malanday · Open to all qualified residents
-            </div>
-          </div>
-          <div className="svc-hero__right">
-            <button className="sv-btn-primary" style={{ fontSize: "0.8rem" }} onClick={() => setView("myregs")}>
-              <DocsIcon /> My Registrations
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Programs grid */}
       <div className="lh-programs-section">
-        <div className="lh-section-label">Available Programs</div>
+        <div className="lh-section-head">
+          <div className="lh-section-label">{t("prog_available", "Available Programs")}</div>
+          <button type="button" className="sv-btn-primary lh-myregs-btn" onClick={() => setView("myregs")}>
+            <DocsIcon /> {t("prog_my_registrations", "My Registrations")}
+          </button>
+        </div>
 
         {loadingPrograms ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "#9ca3af" }}>Loading programs…</div>
@@ -537,14 +477,19 @@ export default function ProgramsTab({ userData, householdID, userName }) {
                     </span>
                     {p.slots !== undefined && p.slots !== "" && (
                       <span className={`lh-prog-card__slots${full ? " lh-prog-card__slots--full" : low ? " lh-prog-card__slots--low" : ""}`}>
-                        {full ? t("prog_badge_full", "Full") : t("prog_slots_remaining", `${slotsNum} slots remaining`)}
+                        {full ? t("prog_badge_full", "Full") : `${slotsNum} ${t("prog_slots_left_word", "slots left")}`}
                       </span>
                     )}
                   </div>
 
                   <div className="lh-prog-card__name">{p.title}</div>
 
-                  <ExpandableDesc text={p.description || "—"} />
+                  {/* Full description, no more/less toggle */}
+                  <div className="lh-prog-card__desc-wrap">
+                    <div className="lh-prog-card__desc lh-prog-card__desc--open">
+                      {p.description || "—"}
+                    </div>
+                  </div>
 
                   <div className="lh-prog-card__meta">
                     {p.date && (
