@@ -9,20 +9,21 @@ import { logTransaction } from '../../services/logger';
 import { onAuthStateChanged } from "firebase/auth";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../../context/LanguageContext'; // NEW: Language Hook
+import { useAlert } from "../../context/AlertContext";
 
 const URGENCY_MAP = {
-  "Domestic Dispute":             "emergency",
+  "Domestic Dispute": "emergency",
   "Fight / Physical Altercation": "emergency",
-  "Noise Complaint":              "urgent",
+  "Noise Complaint": "urgent",
   "Suspicious Person / Activity": "urgent",
-  "Vandalism":                    "urgent",
+  "Vandalism": "urgent",
 };
 
 const getUrgency = (type) => URGENCY_MAP[type] || "docs";
 
 const getUrgencyColor = (u) => {
   if (u === "emergency") return { bg: "#fee2e2", text: "#b91c1c" };
-  if (u === "urgent")    return { bg: "#fef08a", text: "#a16207" };
+  if (u === "urgent") return { bg: "#fef08a", text: "#a16207" };
   return { bg: "#e0e7ff", text: "#4338ca" };
 };
 
@@ -41,28 +42,29 @@ const formatTime = (ts) => {
 export default function ServicePeaceOrder({ onBack }) {
   const queryClient = useQueryClient();
   const { t } = useLanguage(); // NEW: Destructure hook
+  const { showConfirm } = useAlert();
 
   const [selectedReport, setSelectedReport] = useState(null);
-  const [assignedTanod, setAssignedTanod]   = useState("Unassigned");
-  const [saving, setSaving]                 = useState(false);
+  const [assignedTanod, setAssignedTanod] = useState("Unassigned");
+  const [saving, setSaving] = useState(false);
 
   // ── Tanod Groups State ────────────────────────────────────────────
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [newGroupName, setNewGroupName]     = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
   const [newMemberInputs, setNewMemberInputs] = useState({});
 
   // ── Pagination & Filter State ─────────────────────────────────────
-  const [currentPage, setCurrentPage]       = useState(1);
-  const itemsPerPage                        = 7; 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
 
-  const [filterStatus, setFilterStatus]     = useState("All");
-  const [filterUrgency, setFilterUrgency]   = useState("All");
-  const [filterType, setFilterType]         = useState("All");
-  const [sortOrder, setSortOrder]           = useState("date_desc");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterUrgency, setFilterUrgency] = useState("All");
+  const [filterType, setFilterType] = useState("All");
+  const [sortOrder, setSortOrder] = useState("date_desc");
 
   // For logging purposes
-  const [adminName, setAdminName]           = useState("");
-  const [adminRole, setAdminRole]           = useState("");
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
 
   useEffect(() => {
     setCurrentPage(1);
@@ -112,7 +114,7 @@ export default function ServicePeaceOrder({ onBack }) {
     queryKey: ['adminManage_tanodGroups'],
     queryFn: async () => {
       const q = query(
-        collection(db, "tanodGroups"), 
+        collection(db, "tanodGroups"),
         orderBy("createdAt", "asc"),
         limit(50)
       );
@@ -229,7 +231,7 @@ export default function ServicePeaceOrder({ onBack }) {
       );
 
       const residentID = selectedReport.residentID || selectedReport.userID;
-      const hhID       = selectedReport.householdID;
+      const hhID = selectedReport.householdID;
       if ((newStatus === "responded" || newStatus === "resolved") && residentID && hhID) {
         await createUserNotification(
           hhID,
@@ -318,6 +320,20 @@ export default function ServicePeaceOrder({ onBack }) {
       });
   }, [reports, filterStatus, filterUrgency, filterType, sortOrder]);
 
+const handleResolve = async () => {
+    if (!selectedReport) return;
+    
+    const isConfirmed = showConfirm
+      ? await showConfirm(
+          t('admin_srv_po_confirm_resolve_title') || "Confirm Resolution",
+          t('admin_srv_po_confirm_resolve_desc') || "Are you sure you want to mark this incident report as Resolved? This will notify the resident."
+        )
+      : window.confirm(t('admin_srv_po_confirm_resolve_desc') || "Are you sure you want to mark this incident report as Resolved?");
+
+    if (!isConfirmed) return;
+    updateStatus("resolved");
+  };
+
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReports = filteredReports.slice(startIndex, startIndex + itemsPerPage);
@@ -368,12 +384,12 @@ export default function ServicePeaceOrder({ onBack }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
+      <div className="po-stats-grid">
         {[
-          { label: t('admin_srv_po_stat_total'), value: counts.total,     bg: "#fff",    border: "#e5e7eb", color: "#111827" },
-          { label: t('admin_srv_po_stat_pending'),      value: counts.pending,   bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
-          { label: t('admin_srv_po_stat_responded'),    value: counts.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
-          { label: t('admin_srv_po_stat_resolved'),     value: counts.resolved,  bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+          { label: t('admin_srv_po_stat_total'), value: counts.total, bg: "#fff", border: "#e5e7eb", color: "#111827" },
+          { label: t('admin_srv_po_stat_pending'), value: counts.pending, bg: "#fffbeb", border: "#fde68a", color: "#a16207" },
+          { label: t('admin_srv_po_stat_responded'), value: counts.responded, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+          { label: t('admin_srv_po_stat_resolved'), value: counts.resolved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
         ].map(s => (
           <div key={s.label} style={{ background: s.bg, padding: "16px 20px", borderRadius: "12px", border: `1px solid ${s.border}` }}>
             <div style={{ color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px" }}>{s.label}</div>
@@ -385,50 +401,50 @@ export default function ServicePeaceOrder({ onBack }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>{t('admin_srv_po_loading')}</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(380px, 1.1fr) 1.9fr", gap: "20px", minHeight: "60vh" }}>
+        <div className="po-workspace-grid">
 
           {/* ── Inbox list ── */}
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div className={`po-inbox-panel ${selectedReport ? 'mobile-hidden' : ''}`}>
             <div style={{ padding: "16px", borderBottom: "1px solid #e5e7eb", fontWeight: "bold", background: "#f9fafb" }}>
               {t('admin_srv_po_incoming')} ({filteredReports.length})
             </div>
 
-            {/* FILTER & SORT PANEL */}
-            <div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="All">{t('admin_srv_po_filter_status')}</option>
-                  <option value="received">{t('admin_srv_po_filter_received')}</option>
-                  <option value="pending">{t('admin_srv_po_stat_pending')}</option>
-                  <option value="responded">{t('admin_srv_po_stat_responded')}</option>
-                  <option value="resolved">{t('admin_srv_po_stat_resolved')}</option>
-                </select>
+{/* FILTER & SORT PANEL */}
+<div style={{ padding: "12px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "8px" }}>
+  <div style={{ display: "flex", gap: "8px" }}>
+    <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="All">{t('admin_srv_po_filter_status')}</option>
+      <option value="received">{t('admin_srv_po_filter_received')}</option>
+      <option value="pending">{t('admin_srv_po_stat_pending')}</option>
+      <option value="responded">{t('admin_srv_po_stat_responded')}</option>
+      <option value="resolved">{t('admin_srv_po_stat_resolved')}</option>
+    </select>
 
-                <select className="filter-select" value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="All">{t('admin_srv_po_filter_urgency')}</option>
-                  <option value="emergency">{t('admin_srv_po_filter_emergency')}</option>
-                  <option value="urgent">{t('admin_srv_po_filter_urgent')}</option>
-                  <option value="docs">{t('admin_srv_po_filter_docs')}</option>
-                </select>
-              </div>
+    <select className="filter-select" value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="All">{t('admin_srv_po_filter_urgency')}</option>
+      <option value="emergency">{t('admin_srv_po_filter_emergency')}</option>
+      <option value="urgent">{t('admin_srv_po_filter_urgent')}</option>
+      <option value="docs">{t('admin_srv_po_filter_docs')}</option>
+    </select>
+  </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
-                <select className="filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="All">{t('admin_srv_po_filter_type')}</option>
-                  {uniqueIncidentTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+  <div style={{ display: "flex", gap: "8px" }}>
+    <select className="filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="All">{t('admin_srv_po_filter_type')}</option>
+      {uniqueIncidentTypes.map(type => (
+        <option key={type} value={type}>{type}</option>
+      ))}
+    </select>
 
-                <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
-                  <option value="date_desc">{t('admin_srv_po_sort_date_new')}</option>
-                  <option value="date_asc">{t('admin_srv_po_sort_date_old')}</option>
-                  <option value="type_asc">{t('admin_srv_po_sort_type_asc')}</option>
-                  <option value="type_desc">{t('admin_srv_po_sort_type_desc')}</option>
-                  <option value="status_asc">{t('admin_srv_po_sort_status')}</option>
-                </select>
-              </div>
-            </div>
+    <select className="filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, minWidth: 0, padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.8rem", color: "#374151" }}>
+      <option value="date_desc">{t('admin_srv_po_sort_date_new')}</option>
+      <option value="date_asc">{t('admin_srv_po_sort_date_old')}</option>
+      <option value="type_asc">{t('admin_srv_po_sort_type_asc')}</option>
+      <option value="type_desc">{t('admin_srv_po_sort_type_desc')}</option>
+      <option value="status_asc">{t('admin_srv_po_sort_status')}</option>
+    </select>
+  </div>
+</div>
 
             <div style={{ overflowY: "auto", flex: 1 }}>
               {filteredReports.length === 0 && (
@@ -436,15 +452,15 @@ export default function ServicePeaceOrder({ onBack }) {
               )}
               {paginatedReports.map(r => {
                 const urgency = getUrgency(r.incidentType);
-                const uColor  = getUrgencyColor(urgency);
+                const uColor = getUrgencyColor(urgency);
                 const isActive = selectedReport?.id === r.id;
-                
+
                 // Translate urgency label
                 let translatedUrgency = urgency.toUpperCase();
                 if (urgency === 'emergency') translatedUrgency = t('admin_srv_po_filter_emergency').toUpperCase();
                 if (urgency === 'urgent') translatedUrgency = t('admin_srv_po_filter_urgent').toUpperCase();
                 if (urgency === 'docs') translatedUrgency = 'DOCS';
-                
+
                 // Translate status label for the badge
                 let statusRaw = (r.status || "received");
                 let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
@@ -522,28 +538,37 @@ export default function ServicePeaceOrder({ onBack }) {
           </div>
 
           {/* ── Detail panel ── */}
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px", display: "flex", flexDirection: "column" }}>
+          <div className={`po-detail-panel ${!selectedReport ? 'mobile-hidden' : ''}`}>
             {selectedReport ? (
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px", marginBottom: "20px" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                {/* Mobile-only back button */}
+                <button
+                  type="button"
+                  className="as-btn-ghost po-mobile-back-btn"
+                  onClick={() => setSelectedReport(null)}
+                >
+                  {t('admin_srv_po_btn_back_incoming') || '← Back to Incoming Reports'}
+                </button>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px", marginBottom: "20px" }}>
                   <div>
                     <h2 style={{ margin: "0 0 6px 0" }}>{t('admin_srv_po_det_title')}</h2>
                     <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>{t('admin_srv_po_det_ref')} {selectedReport.refNum || selectedReport.id}</span>
                   </div>
-                    <span className={`status-badge ${(selectedReport.status || "received").toLowerCase()}`}>
-                      {(() => {
-                        let statusRaw = (selectedReport.status || "received");
-                        let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
-                        if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_po_stat_pending');
-                        if (statusRaw.toLowerCase() === 'received') displayStatus = t('admin_srv_po_filter_received');
-                        if (statusRaw.toLowerCase() === 'responded') displayStatus = t('admin_srv_po_stat_responded');
-                        if (statusRaw.toLowerCase() === 'resolved') displayStatus = t('admin_srv_po_stat_resolved');
-                        return displayStatus;
-                      })()}
-                    </span>
+                  <span className={`status-badge ${(selectedReport.status || "received").toLowerCase()}`}>
+                    {(() => {
+                      let statusRaw = (selectedReport.status || "received");
+                      let displayStatus = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
+                      if (statusRaw.toLowerCase() === 'pending') displayStatus = t('admin_srv_po_stat_pending');
+                      if (statusRaw.toLowerCase() === 'received') displayStatus = t('admin_srv_po_filter_received');
+                      if (statusRaw.toLowerCase() === 'responded') displayStatus = t('admin_srv_po_stat_responded');
+                      if (statusRaw.toLowerCase() === 'resolved') displayStatus = t('admin_srv_po_stat_resolved');
+                      return displayStatus;
+                    })()}
+                  </span>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+                <div className="po-details-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
                   <div>
                     <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: "0 0 4px 0" }}>{t('admin_srv_po_det_type')}</p>
                     <p style={{ fontWeight: 600, margin: 0 }}>{selectedReport.incidentType || "—"}</p>
@@ -571,10 +596,10 @@ export default function ServicePeaceOrder({ onBack }) {
                       {selectedReport.photoURL ? (
                         <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px", background: "#f9fafb", display: "inline-block", maxWidth: "100%" }}>
                           <a href={selectedReport.photoURL} target="_blank" rel="noopener noreferrer" title="Click to view full size">
-                            <img 
-                              src={selectedReport.photoURL} 
-                              alt="Incident Evidence" 
-                              style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }} 
+                            <img
+                              src={selectedReport.photoURL}
+                              alt="Incident Evidence"
+                              style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px", cursor: "pointer", display: "block" }}
                             />
                           </a>
                           <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "8px", textAlign: "center" }}>{t('admin_srv_po_det_photo_hint')}</div>
@@ -620,30 +645,52 @@ export default function ServicePeaceOrder({ onBack }) {
                 </div>
 
                 {selectedReport.updates?.length > 0 && (
-                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "16px", marginBottom: "24px" }}>
-                    <h3 style={{ margin: "0 0 10px 0", fontSize: "1rem" }}>{t('admin_srv_po_det_updates')}</h3>
-                    <ul style={{ margin: 0, padding: "0 0 0 18px", color: "#4b5563", fontSize: "0.85rem" }}>
-                      {selectedReport.updates.map((u, i) => <li key={i}>{u}</li>)}
-                    </ul>
+                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "16px", marginBottom: "20px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <h3 style={{ margin: 0, fontSize: "0.95rem", color: "#334155" }}>{t('admin_srv_po_det_updates')}</h3>
+                      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                        {selectedReport.updates.length} {selectedReport.updates.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </div>
+                    <div style={{
+                      maxHeight: "140px",
+                      overflowY: "auto",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "10px",
+                      padding: "10px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px"
+                    }}>
+                      {selectedReport.updates.map((u, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem", color: "#475569" }}>
+                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#317D89", flexShrink: 0 }} />
+                          <span>{u}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginTop: "auto" }}>
-                  <h3 style={{ margin: "0 0 16px 0", fontSize: "1rem" }}>{t('admin_srv_po_det_action_panel')}</h3>
-                  <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "18px" }}>
+                  <h3 style={{ margin: "0 0 14px 0", fontSize: "0.95rem", color: "#334155" }}>{t('admin_srv_po_det_action_panel')}</h3>
+                  <div className="po-action-inputs">
+                    {/* Assign Tanod */}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
-                        <label style={{ color: "#6b7280", fontSize: "0.85rem", fontWeight: 500 }}>{t('admin_srv_po_det_assign_tanod')}</label>
-                        <button 
-                          onClick={() => setShowGroupModal(true)} 
-                          style={{ background: "none", border: "none", color: "#317D89", fontSize: "0.8rem", cursor: "pointer", padding: 0 }}
+                        <label style={{ color: "#64748b", fontSize: "0.82rem", fontWeight: 600 }}>{t('admin_srv_po_det_assign_tanod')}</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowGroupModal(true)}
+                          style={{ background: "none", border: "none", color: "#317D89", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", padding: 0 }}
                         >
                           {t('admin_srv_po_det_manage_groups')}
                         </button>
                       </div>
                       <select
                         className="filter-select"
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.875rem", background: "#fff" }}
                         value={assignedTanod}
                         onChange={(e) => saveTanod(e.target.value)}
                         disabled={saving}
@@ -656,25 +703,26 @@ export default function ServicePeaceOrder({ onBack }) {
                         ))}
                       </select>
                     </div>
+
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", color: "#6b7280", fontSize: "0.85rem", marginBottom: "6px", fontWeight: 500 }}>{t('admin_srv_po_det_update_status')}</label>
+                      <label style={{ display: "block", color: "#64748b", fontSize: "0.82rem", marginBottom: "6px", fontWeight: 600 }}>{t('admin_srv_po_det_update_status')}</label>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button
-                          className="as-btn-ghost"
-                          style={{ flex: 1, padding: "10px", borderColor: (selectedReport.status || "").toLowerCase() === "responded" ? "#BDBD64" : "#e5e7eb" }}
+                          type="button"
                           onClick={() => updateStatus("responded")}
                           disabled={saving || (selectedReport.status || "").toLowerCase() === "resolved"}
+                          className={`po-btn-status po-btn-responded ${(selectedReport.status || "").toLowerCase() === "responded" ? "active" : ""}`}
                         >
-                          {t('admin_srv_po_stat_responded')}
+                          <span className="dot" /> {t('admin_srv_po_stat_responded')}
                         </button>
-                        <button
-                          className="as-btn-ghost"
-                          style={{ flex: 1, padding: "10px", borderColor: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "#e5e7eb", color: (selectedReport.status || "").toLowerCase() === "resolved" ? "#2DB17B" : "inherit" }}
-                          onClick={() => updateStatus("resolved")}
-                          disabled={saving}
-                        >
-                          {t('admin_srv_po_stat_resolved')}
-                        </button>
+<button
+  type="button"
+  onClick={handleResolve}
+  disabled={saving || (selectedReport.status || "").toLowerCase() === "resolved"}
+  className={`po-btn-status po-btn-resolved ${(selectedReport.status || "").toLowerCase() === "resolved" ? "active" : ""}`}
+>
+  <span className="dot" /> {t('admin_srv_po_stat_resolved')}
+</button>
                       </div>
                     </div>
                   </div>
@@ -706,11 +754,11 @@ export default function ServicePeaceOrder({ onBack }) {
               <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#fff", padding: "16px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: "block", fontSize: "0.8rem", color: "#6b7280", marginBottom: "6px", fontWeight: 600 }}>{t('admin_srv_grp_create')}</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder={t('admin_srv_grp_create_ph')}
-                    value={newGroupName} 
-                    onChange={e => setNewGroupName(e.target.value)} 
+                    value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.9rem" }}
                   />
                 </div>
@@ -745,15 +793,15 @@ export default function ServicePeaceOrder({ onBack }) {
                         </div>
 
                         <div style={{ display: "flex", gap: "8px" }}>
-                          <input 
-                            type="text" 
+                          <input
+                            type="text"
                             placeholder={t('admin_srv_grp_add_member_ph')}
                             value={newMemberInputs[group.id] || ""}
                             onChange={e => setNewMemberInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
-                            onKeyDown={e => { if(e.key === "Enter") { e.preventDefault(); handleAddMember(group.id); }}}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddMember(group.id); } }}
                             style={{ flex: 1, padding: "6px 10px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}
                           />
-                          <button 
+                          <button
                             type="button"
                             onClick={() => handleAddMember(group.id)}
                             disabled={!newMemberInputs[group.id]?.trim()}
@@ -774,5 +822,5 @@ export default function ServicePeaceOrder({ onBack }) {
       )}
 
     </div>
-  ); 
+  );
 }
