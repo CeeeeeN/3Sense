@@ -60,19 +60,81 @@ async function fetchHouseholdAddress(householdID) {
   return null;
 }
 
+// ─── STRICT PHILSYS NATIONAL ID VALIDATION ────────────────────────────────────
 async function validateIsGovernmentId(imageBase64) {
   try {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve({
+    const formData = new FormData();
+    formData.append("base64Image", imageBase64);
+    formData.append("apikey", "helloworld");
+    formData.append("language", "eng");
+    formData.append("isOverlayRequired", false);
+    formData.append("detectOrientation", true);
+    formData.append("scale", true);
+    formData.append("OCREngine", 2);
+
+    const response = await fetch("https://api.ocr.space/parse/image", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+    if (result.IsErroredOnProcessing || !result.ParsedResults || !result.ParsedResults[0]) {
+      return {
+        isValid: false,
+        reason: "Image text could not be read clearly. Please align your PhilSys ID and retry.",
+        detectedType: null,
+      };
+    }
+
+    const text = (result.ParsedResults[0].ParsedText || "").toUpperCase();
+
+    // 1. Strict PhilSys Header Check
+    const philsysHeaders = [
+      "PHILIPPINE IDENTIFICATION",
+      "PAMBANSANG PAGKAKAKILANLAN",
+      "REPUBLIKA NG PILIPINAS",
+      "PHILSYS"
+    ];
+    const hasHeader = philsysHeaders.some(h => text.includes(h));
+
+    // 2. Strict 16-digit PCN Check (XXXX-XXXX-XXXX-XXXX or 16 continuous digits)
+    const pcnRegex = /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/;
+    const idMatch = text.match(pcnRegex);
+
+    // 3. Strict Field Label Check (Requires at least 2 matching labels)
+    const fieldLabels = [
+      "LAST NAME", "APELYIDO",
+      "GIVEN NAMES", "MGA PANGALAN", "PANGALAN",
+      "DATE OF BIRTH", "KAPANGANAKAN",
+      "ADDRESS", "TIRAHAN"
+    ];
+    const labelMatches = fieldLabels.filter(label => text.includes(label));
+    const hasSufficientLabels = labelMatches.length >= 2;
+
+    // Strict multi-factor validation
+    const isValidPhilSys = (hasHeader && idMatch) || (hasHeader && hasSufficientLabels) || (idMatch && hasSufficientLabels);
+
+    if (isValidPhilSys) {
+      return {
         isValid: true,
         reason: null,
-        detectedType: "National ID / Government ID",
-        idNumber: null,
-      }), 1000)
-    );
+        detectedType: "PhilSys National ID",
+        idNumber: idMatch ? idMatch[0].replace(/[\s]/g, '-') : null,
+      };
+    }
+
+    return {
+      isValid: false,
+      reason: "No valid PhilSys National ID detected. Please ensure your physical card is clearly visible inside the frame.",
+      detectedType: null,
+    };
   } catch (err) {
     console.error("[validateIsGovernmentId] Error:", err);
-    return { isValid: null, reason: "Verification service unavailable. Please try again.", detectedType: null };
+    return {
+      isValid: null,
+      reason: "Verification service temporarily unavailable. Please try again.",
+      detectedType: null,
+    };
   }
 }
 
@@ -104,7 +166,7 @@ async function performLiveOCR(imageBase64) {
       birthDate: "", houseNumber: "", street: "", province: "NCR"
     };
 
-    const idMatch = text.match(/\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}/) || text.match(/\d{4}\s*\d{4}\s*\d{4}\s*\d{4}/);
+    const idMatch = text.match(/\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}\s*[-–]\s*\d{4}/) || text.match(/\b\d{16}\b/);
     if (idMatch) {
       data.idNumber = idMatch[0].replace(/[\s–]/g, '-'); 
     }
