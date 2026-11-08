@@ -26,9 +26,6 @@ import { getFamilyNumber } from "../utils/householdNumbers";
 import { useAlert } from "../context/AlertContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import TransferRequestsTab from "../components/TransferRequestsTab";
-import NewHouseholdRequestsTab from "../components/NewHouseholdRequestsTab";
-
 import { Plus } from "lucide-react";
 import AdminAddHouseholdPanel from "../components/AdminAddHouseholdPanel";
 
@@ -195,31 +192,6 @@ export default function HouseholdManagement() {
     enabled: activeTab === "residents",
     staleTime: 1000 * 60 * 30,
   });
-
-  const { data: allTransfers = [] } = useQuery({
-    queryKey: ['adminManage_transfers'],
-    queryFn: async () => {
-      const q = query(
-        collection(db, "household_transfers"),
-        orderBy("submittedAt", "desc"),
-        limit(200)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          dateSubmitted: data.submittedAt ? data.submittedAt.toDate().toLocaleDateString() : "N/A",
-          ...data
-        };
-      });
-    },
-    enabled: activeTab === "transfers" || activeTab === "new_households",
-    staleTime: 1000 * 60 * 30,
-  });
-
-  const transfers = useMemo(() => allTransfers.filter(t => t.transferType === "existing"), [allTransfers]);
-  const newHouseholds = useMemo(() => allTransfers.filter(t => t.transferType === "new"), [allTransfers]);
 
   const filteredHhRequests = useMemo(() => {
     return hhRequests
@@ -558,18 +530,6 @@ export default function HouseholdManagement() {
             onClick={() => setActiveTab("residents")}
           >
             {t('admin_hm_tab_residents')}
-          </button>
-          <button
-            className={`req-tab ${activeTab === "transfers" ? "active" : ""}`}
-            onClick={() => setActiveTab("transfers")}
-          >
-            {t('admin_hm_tab_transfers')}
-          </button>
-          <button
-            className={`req-tab ${activeTab === "new_households" ? "active" : ""}`}
-            onClick={() => setActiveTab("new_households")}
-          >
-            {t('admin_hm_tab_new')}
           </button>
         </div>
 
@@ -927,12 +887,6 @@ export default function HouseholdManagement() {
             )}
           </>
         )}
-
-        {/* ── TAB: HOUSEHOLD TRANSFERS ── */}
-        {activeTab === "transfers" && <TransferRequestsTab transfers={transfers} />}
-
-        {/* ── TAB: NEW HOUSEHOLD REQUESTS ── */}
-        {activeTab === "new_households" && <NewHouseholdRequestsTab newHouseholds={newHouseholds} />}
       </div>
 
       {/* DATA VIEW MODALS */}

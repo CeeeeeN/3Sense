@@ -393,13 +393,13 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
   // Fetch transaction history
   useEffect(() => {
     let isMounted = true;
-    if (!householdID) {
+    if (!householdID || !memberID) {
       setTxLoading(false);
       return;
     }
 
     // Include data.UID to securely fetch their individual history
-    fetchUserTransactions(householdID, memberID, userID, userRole, data.UID)
+    fetchUserTransactions(householdID, memberID, userID, "Member", data.UID || null)
       .then(txData => {
         if (!isMounted) return;
         setTransactions(txData || []);
@@ -412,7 +412,7 @@ export default function Profile({ onBack, onNavigate, householdID, memberID, use
       });
 
     return () => { isMounted = false; };
-  }, [householdID, memberID, userID, userRole, data.UID]);
+  }, [householdID, memberID, userID, data.UID]);
 
   useEffect(() => {
     let uid = data.UID;
