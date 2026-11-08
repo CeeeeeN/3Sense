@@ -2186,7 +2186,7 @@ body:has(.af-modal-overlay) {
 
   /* ── Manage Page ── */
   .as-container {
-    @apply p-3;
+    @apply p-3 max-w-full overflow-x-hidden box-border;
   }
   .as-card-grid {
     @apply grid-cols-[1fr] p-3 gap-4;
@@ -2216,17 +2216,27 @@ body:has(.af-modal-overlay) {
     @apply w-full justify-center;
   }
   .as-btn-aqua,
-  .as-btn-ghost {
-    @apply w-full justify-center text-sm px-3 py-2;
+  .as-btn-ghost,
+  .as-qr-btn {
+    @apply w-full justify-center text-sm px-3 py-2 text-center whitespace-normal;
   }
   .as-header-section {
-    @apply flex-col items-start gap-3;
+    @apply flex-col items-stretch gap-3 w-full;
+  }
+  .as-header-section > div:last-child {
+    @apply !flex !flex-col w-full gap-2;
   }
   .as-controls {
-    @apply flex-col items-stretch gap-3 p-3;
+    @apply flex-col items-stretch gap-2.5 p-3 w-full box-border;
   }
   .as-search-box {
-    @apply max-w-full w-full;
+    @apply max-w-full w-full !min-w-0;
+  }
+  .as-controls > div:not(.as-search-box) {
+    @apply !flex !flex-col w-full gap-2 items-stretch;
+  }
+  .as-controls select {
+    @apply w-full min-w-0 box-border text-sm py-2.5 px-3;
   }
  
   /* ── Feedback Page ── */
